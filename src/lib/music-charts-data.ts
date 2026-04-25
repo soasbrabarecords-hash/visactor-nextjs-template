@@ -60,36 +60,36 @@ const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
 
 const MUSIC_GENRE_OPTIONS: MusicGenreOption[] = [
   { value: "all", label: "Todos os generos", queries: [] },
-  { value: "trap", label: "Trap", queries: ['genre:"trap"'] },
-  { value: "rap", label: "Rap", queries: ['genre:"rap"'] },
+  { value: "trap", label: "Trap", queries: ['genre:"trap"', "trap"] },
+  { value: "rap", label: "Rap", queries: ['genre:"rap"', "rap"] },
   {
     value: "hip-hop",
     label: "Hip Hop",
-    queries: ['genre:"hip hop"'],
+    queries: ['genre:"hip hop"', '"hip hop"'],
   },
-  { value: "funk", label: "Funk", queries: ['genre:"funk"'] },
-  { value: "phonk", label: "Phonk", queries: ['genre:"phonk"'] },
-  { value: "pop", label: "Pop", queries: ['genre:"pop"'] },
-  { value: "latin", label: "Latin", queries: ['genre:"latin"'] },
+  { value: "funk", label: "Funk", queries: ['genre:"funk"', "funk"] },
+  { value: "phonk", label: "Phonk", queries: ['genre:"phonk"', "phonk"] },
+  { value: "pop", label: "Pop", queries: ['genre:"pop"', "pop"] },
+  { value: "latin", label: "Latin", queries: ['genre:"latin"', "latin"] },
   {
     value: "reggaeton",
     label: "Reggaeton",
-    queries: ['genre:"reggaeton"'],
+    queries: ['genre:"reggaeton"', "reggaeton"],
   },
   {
     value: "electronic",
     label: "Electronic",
-    queries: ['genre:"electronic"'],
+    queries: ['genre:"electronic"', "electronic"],
   },
-  { value: "house", label: "House", queries: ['genre:"house"'] },
-  { value: "indie", label: "Indie", queries: ['genre:"indie"'] },
-  { value: "r-n-b", label: "R&B", queries: ['genre:"r-n-b"'] },
-  { value: "samba", label: "Samba", queries: ['genre:"samba"'] },
-  { value: "pagode", label: "Pagode", queries: ['genre:"pagode"'] },
+  { value: "house", label: "House", queries: ['genre:"house"', "house"] },
+  { value: "indie", label: "Indie", queries: ['genre:"indie"', "indie"] },
+  { value: "r-n-b", label: "R&B", queries: ['genre:"r-n-b"', '"r&b"'] },
+  { value: "samba", label: "Samba", queries: ['genre:"samba"', "samba"] },
+  { value: "pagode", label: "Pagode", queries: ['genre:"pagode"', "pagode"] },
   {
     value: "sertanejo",
     label: "Sertanejo",
-    queries: ['genre:"sertanejo"'],
+    queries: ['genre:"sertanejo"', "sertanejo"],
   },
 ];
 
@@ -286,11 +286,8 @@ function buildPopularityHealth(tracks: AggregatedTrack[]): ScoreBreakdown {
   };
 }
 
-function buildTrackInsights(
-  tracks: AggregatedTrack[],
-  limit = 20,
-): TrackInsight[] {
-  return tracks.slice(0, limit).map((track) => ({
+function buildTrackInsights(tracks: AggregatedTrack[]): TrackInsight[] {
+  return tracks.slice(0, 20).map((track) => ({
     id: track.id,
     name: track.name,
     artists: track.artists,
@@ -627,11 +624,10 @@ async function loadGenreTracks(
   }
 
   try {
-    const perQueryLimit = Math.max(10, Math.ceil(200 / queries.length));
     const groups = await Promise.all(
       queries.map(async (query) => {
         try {
-          return await fetchSpotifyTracksByGenre(query, country, perQueryLimit);
+          return await fetchSpotifyTracksByGenre(query, country, 20);
         } catch {
           return [];
         }
@@ -694,7 +690,7 @@ export async function getMusicChartsData({
     topTracks: buildTopTracks(focusTracks),
     artistDistribution: buildArtistDistribution(focusTracks),
     popularityHealth: buildPopularityHealth(focusTracks),
-    tracks: buildTrackInsights(focusTracks, 200),
+    tracks: buildTrackInsights(focusTracks),
     topMovers,
     newEntries,
     recurringTracks,

@@ -50,7 +50,7 @@ export default async function ChartsMusicPage({
       <PageIntro
         eyebrow="Radar Externo"
         title="Charts Music"
-        description="Radar de tracks que estao bombando agora por pais e genero, usando sinais editoriais do Spotify para encontrar tendencias, oportunidades e uma lista profissional com as 200 tracks mais fortes do recorte."
+        description="Radar de tracks que estao bombando agora por pais e genero, usando sinais editoriais do Spotify para encontrar tendencias, oportunidades e base para novas playlists."
         action={
           <>
             <MusicFilters
@@ -75,11 +75,7 @@ export default async function ChartsMusicPage({
         <Container className="py-4 laptop:col-span-2">
           <Conversions
             data={chartsData.topTracks}
-            title={
-              chartsData.genreValue === "all"
-                ? `Radar do Mercado · ${chartsData.countryLabel}`
-                : `Radar ${chartsData.genreLabel}`
-            }
+            title={`Radar ${chartsData.genreLabel}`}
             indicatorLabel="Popularidade somada"
           />
         </Container>
@@ -165,8 +161,8 @@ export default async function ChartsMusicPage({
       <div className="border-b border-border">
         <TracksTable
           tracks={chartsData.tracks}
-          title="Top 200 Tracks do Radar"
-          description={`Leitura completa das 200 faixas mais fortes em ${chartsData.countryLabel}${chartsData.genreValue !== "all" ? ` dentro do recorte ${chartsData.genreLabel}` : ""}, para pesquisa e validacao editorial.`}
+          title="Radar Completo de Tracks"
+          description={`Leitura completa das faixas mais fortes em ${chartsData.countryLabel}${chartsData.genreValue !== "all" ? ` dentro do recorte ${chartsData.genreLabel}` : ""}, para pesquisa e validacao editorial.`}
           emptyMessage="Sem sinal suficiente para esse filtro neste momento."
           countLabel="Sinal"
         />

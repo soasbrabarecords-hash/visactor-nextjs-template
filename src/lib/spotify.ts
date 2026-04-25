@@ -332,9 +332,9 @@ export async function fetchFeaturedPlaylists(
 export async function searchSpotifyTracks(
   query: string,
   market = "BR",
-  limit = 200,
+  limit = 30,
 ): Promise<SpotifyTrackRecord[]> {
-  const cappedLimit = Math.max(1, Math.min(limit, 200));
+  const cappedLimit = Math.max(1, Math.min(limit, 30));
   const tracks: SpotifyTrackRecord[] = [];
   const seenTrackIds = new Set<string>();
 
@@ -369,7 +369,7 @@ export async function searchSpotifyTracks(
 export async function fetchSpotifyTracksByGenre(
   genreQuery: string,
   market = "BR",
-  limit = 200,
+  limit = 30,
 ): Promise<SpotifyTrackRecord[]> {
   return searchSpotifyTracks(genreQuery, market, limit);
 }
