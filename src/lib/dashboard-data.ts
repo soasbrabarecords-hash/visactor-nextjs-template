@@ -283,8 +283,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       playlistCount: scoreHealth.playlistCount,
       playlists,
     };
-  } catch (error) {
-    console.error("Failed to load dashboard data", error);
+  } catch {
     return emptyDashboardData();
   }
 }
