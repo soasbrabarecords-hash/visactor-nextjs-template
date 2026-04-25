@@ -23,7 +23,7 @@ import {
 } from "./spotify";
 
 type MusicGenreOption = MusicFilterOption & {
-  query: string | null;
+  queries: string[];
 };
 
 type MusicMarketOption = MusicFilterOption & {
@@ -57,23 +57,98 @@ const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
 ];
 
 const MUSIC_GENRE_OPTIONS: MusicGenreOption[] = [
-  { value: "all", label: "Todos os generos", query: null },
-  { value: "trap", label: "Trap", query: 'genre:"trap"' },
-  { value: "rap", label: "Rap", query: 'genre:"rap"' },
-  { value: "hip-hop", label: "Hip Hop", query: 'genre:"hip hop"' },
-  { value: "funk", label: "Funk", query: 'genre:"funk"' },
-  { value: "phonk", label: "Phonk", query: 'genre:"phonk"' },
-  { value: "pop", label: "Pop", query: 'genre:"pop"' },
-  { value: "latin", label: "Latin", query: 'genre:"latin"' },
-  { value: "reggaeton", label: "Reggaeton", query: 'genre:"reggaeton"' },
-  { value: "electronic", label: "Electronic", query: 'genre:"electronic"' },
-  { value: "house", label: "House", query: 'genre:"house"' },
-  { value: "indie", label: "Indie", query: 'genre:"indie"' },
-  { value: "r-n-b", label: "R&B", query: 'genre:"r-n-b"' },
-  { value: "samba", label: "Samba", query: 'genre:"samba"' },
-  { value: "pagode", label: "Pagode", query: 'genre:"pagode"' },
-  { value: "sertanejo", label: "Sertanejo", query: 'genre:"sertanejo"' },
+  { value: "all", label: "Todos os generos", queries: [] },
+  { value: "trap", label: "Trap", queries: ['genre:"trap"', "trap"] },
+  { value: "rap", label: "Rap", queries: ['genre:"rap"', "rap"] },
+  {
+    value: "hip-hop",
+    label: "Hip Hop",
+    queries: ['genre:"hip hop"', '"hip hop"'],
+  },
+  { value: "funk", label: "Funk", queries: ['genre:"funk"', "funk"] },
+  { value: "phonk", label: "Phonk", queries: ['genre:"phonk"', "phonk"] },
+  { value: "pop", label: "Pop", queries: ['genre:"pop"', "pop"] },
+  { value: "latin", label: "Latin", queries: ['genre:"latin"', "latin"] },
+  {
+    value: "reggaeton",
+    label: "Reggaeton",
+    queries: ['genre:"reggaeton"', "reggaeton"],
+  },
+  {
+    value: "electronic",
+    label: "Electronic",
+    queries: ['genre:"electronic"', "electronic"],
+  },
+  { value: "house", label: "House", queries: ['genre:"house"', "house"] },
+  { value: "indie", label: "Indie", queries: ['genre:"indie"', "indie"] },
+  { value: "r-n-b", label: "R&B", queries: ['genre:"r-n-b"', '"r&b"'] },
+  { value: "samba", label: "Samba", queries: ['genre:"samba"', "samba"] },
+  { value: "pagode", label: "Pagode", queries: ['genre:"pagode"', "pagode"] },
+  {
+    value: "sertanejo",
+    label: "Sertanejo",
+    queries: ['genre:"sertanejo"', "sertanejo"],
+  },
 ];
+
+const MARKET_PROBE_QUERIES: Record<string, string[]> = {
+  BR: [
+    'genre:"trap"',
+    'genre:"rap"',
+    'genre:"funk"',
+    'genre:"pop"',
+    'genre:"sertanejo"',
+  ],
+  US: [
+    'genre:"hip hop"',
+    'genre:"pop"',
+    'genre:"rap"',
+    'genre:"r-n-b"',
+    'genre:"electronic"',
+  ],
+  MX: [
+    'genre:"reggaeton"',
+    'genre:"latin"',
+    'genre:"pop"',
+    'genre:"rap"',
+  ],
+  AR: [
+    'genre:"reggaeton"',
+    'genre:"latin"',
+    'genre:"trap"',
+    'genre:"pop"',
+  ],
+  CO: [
+    'genre:"reggaeton"',
+    'genre:"latin"',
+    'genre:"trap"',
+    'genre:"pop"',
+  ],
+  ES: [
+    'genre:"reggaeton"',
+    'genre:"latin"',
+    'genre:"pop"',
+    'genre:"indie"',
+  ],
+  PT: [
+    'genre:"trap"',
+    'genre:"hip hop"',
+    'genre:"pop"',
+    'genre:"house"',
+  ],
+  FR: [
+    'genre:"rap"',
+    'genre:"pop"',
+    'genre:"electronic"',
+    'genre:"house"',
+  ],
+  GB: [
+    'genre:"hip hop"',
+    'genre:"pop"',
+    'genre:"house"',
+    'genre:"electronic"',
+  ],
+};
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
@@ -360,16 +435,25 @@ async function loadFeaturedPlaylistTracks(
 }
 
 async function loadGenreTracks(
-  genreQuery: string | null,
+  queries: string[],
   country: string,
 ): Promise<AggregatedTrack[]> {
-  if (!genreQuery) {
+  if (queries.length === 0) {
     return [];
   }
 
   try {
-    const tracks = await fetchSpotifyTracksByGenre(genreQuery, country, 30);
-    return aggregateTracks([tracks]);
+    const groups = await Promise.all(
+      queries.map(async (query) => {
+        try {
+          return await fetchSpotifyTracksByGenre(query, country, 20);
+        } catch {
+          return [];
+        }
+      }),
+    );
+
+    return aggregateTracks(groups.filter((group) => group.length > 0));
   } catch {
     return [];
   }
@@ -402,11 +486,15 @@ export async function getMusicChartsData({
     marketOption.value,
     marketOption.locale,
   );
-  const genreTracks = await loadGenreTracks(genreOption.query, marketOption.value);
-  const focusTracks =
+  const fallbackQueries =
     genreOption.value === "all"
-      ? marketData.aggregatedTracks
-      : mergeGenreAndMarketTracks(marketData.aggregatedTracks, genreTracks);
+      ? MARKET_PROBE_QUERIES[marketOption.value] ?? MARKET_PROBE_QUERIES.BR
+      : genreOption.queries;
+  const searchedTracks = await loadGenreTracks(fallbackQueries, marketOption.value);
+  const focusTracks =
+    marketData.aggregatedTracks.length > 0
+      ? mergeGenreAndMarketTracks(marketData.aggregatedTracks, searchedTracks)
+      : searchedTracks;
   const marketTrackIds = new Set(marketData.aggregatedTracks.map((track) => track.id));
   const featuredIntersectionCount = focusTracks.filter((track) =>
     marketTrackIds.has(track.id),

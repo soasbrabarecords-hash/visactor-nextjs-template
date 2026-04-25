@@ -65,7 +65,7 @@ export default function AverageTicketsCreated({
     }
 
     const lastDate = parseISO(availableDates[availableDates.length - 1]);
-    const defaultFromIndex = Math.max(availableDates.length - 7, 0);
+    const defaultFromIndex = Math.max(availableDates.length - 30, 0);
     const from = parseISO(availableDates[defaultFromIndex]);
 
     setDateRange({
@@ -96,7 +96,7 @@ export default function AverageTicketsCreated({
   return (
     <section className="flex h-full flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <ChartTitle title="Playlist Activity" icon={FilePlus2} />
+        <ChartTitle title="Playlist Activity · Ultimos 30 dias" icon={FilePlus2} />
         <DatePickerWithRange
           className=""
           dateRange={dateRange}
@@ -112,7 +112,7 @@ export default function AverageTicketsCreated({
             color="#60C2FB"
           />
           <MetricCard
-            title="Avg. Scored"
+            title="Avg. Radar-ready"
             value={avgResolved}
             color="#3161F8"
           />

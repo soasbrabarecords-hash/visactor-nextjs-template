@@ -1,6 +1,13 @@
 import "server-only";
 
-import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
+import {
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  startOfMonth,
+  subDays,
+  subMonths,
+} from "date-fns";
 import type {
   ChannelDatum,
   ConversionDatum,
@@ -247,7 +254,25 @@ function buildMetrics(playlists: PlaylistRecord[]): DashboardMetric[] {
 }
 
 function buildPlaylistActivity(playlists: PlaylistRecord[]): PlaylistActivityDatum[] {
-  const byDay = new Map<string, PlaylistActivityDatum>();
+  const referenceDate = new Date();
+  const interval = eachDayOfInterval({
+    start: subDays(referenceDate, 29),
+    end: referenceDate,
+  });
+  const byDay = new Map<string, PlaylistActivityDatum>(
+    interval.map((date) => {
+      const dateKey = format(date, "yyyy-MM-dd");
+
+      return [
+        dateKey,
+        {
+          date: dateKey,
+          created: 0,
+          scored: 0,
+        },
+      ] as const;
+    }),
+  );
 
   for (const row of playlists) {
     const createdDate = toDate(row.createdAt);
@@ -257,9 +282,14 @@ function buildPlaylistActivity(playlists: PlaylistRecord[]): PlaylistActivityDat
     }
 
     const dateKey = format(createdDate, "yyyy-MM-dd");
-    const entry = byDay.get(dateKey) ?? { date: dateKey, created: 0, scored: 0 };
+    const entry = byDay.get(dateKey);
+
+    if (!entry) {
+      continue;
+    }
+
     entry.created += 1;
-    entry.scored += row.score > 0 ? 1 : 0;
+    entry.scored += row.score >= 70 ? 1 : 0;
     byDay.set(dateKey, entry);
   }
 
