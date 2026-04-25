@@ -22,6 +22,7 @@ type PlaylistRow = {
   created_at: string | null;
   url: string | null;
   name: string | null;
+  image_url: string | null;
   followers: number | string | null;
   tracks: number | string | null;
   score: number | string | null;
@@ -80,7 +81,7 @@ function normalizePlaylists(rows: PlaylistRow[]): PlaylistRecord[] {
     createdAt: row.created_at,
     url: row.url?.trim() || "#",
     name: row.name?.trim() || "Playlist sem nome",
-    coverUrl: null,
+    coverUrl: row.image_url?.trim() || null,
     followers: toNumber(row.followers),
     tracks: toNumber(row.tracks),
     score: toNumber(row.score),
@@ -137,6 +138,7 @@ async function enrichPlaylists(
           await updatePlaylistInSupabase(playlist.id, {
             url: enrichedPlaylist.url,
             name: enrichedPlaylist.name,
+            image_url: enrichedPlaylist.coverUrl,
             followers: enrichedPlaylist.followers,
             tracks: enrichedPlaylist.tracks,
             score: enrichedPlaylist.score,

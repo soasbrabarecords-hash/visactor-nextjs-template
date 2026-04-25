@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     const payload = {
       url: spotifyPlaylist.url,
       name: spotifyPlaylist.name,
+      image_url: spotifyPlaylist.coverUrl,
       followers: spotifyPlaylist.followers,
       tracks: spotifyPlaylist.tracks,
       score: calculatePlaylistScore({

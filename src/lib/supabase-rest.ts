@@ -1,12 +1,13 @@
 import "server-only";
 
-const PLAYLIST_COLUMNS = "id,created_at,url,name,followers,tracks,score";
+const PLAYLIST_COLUMNS = "id,created_at,url,name,image_url,followers,tracks,score";
 
 export type SupabasePlaylistRow = {
   id: string | number | null;
   created_at: string | null;
   url: string | null;
   name: string | null;
+  image_url: string | null;
   followers: number | string | null;
   tracks: number | string | null;
   score: number | string | null;
@@ -19,6 +20,7 @@ type SupabaseSelectResponse = {
 type SupabaseInsertPlaylistInput = {
   url: string;
   name?: string | null;
+  image_url?: string | null;
   followers?: number | null;
   tracks?: number | null;
   score?: number | null;
@@ -27,6 +29,7 @@ type SupabaseInsertPlaylistInput = {
 type SupabaseUpdatePlaylistInput = {
   url?: string;
   name?: string | null;
+  image_url?: string | null;
   followers?: number | null;
   tracks?: number | null;
   score?: number | null;
@@ -88,6 +91,7 @@ export async function insertPlaylistIntoSupabase(
   const payload = {
     url: input.url,
     name: input.name ?? null,
+    image_url: input.image_url ?? null,
     followers: input.followers ?? null,
     tracks: input.tracks ?? null,
     score: input.score ?? null,
