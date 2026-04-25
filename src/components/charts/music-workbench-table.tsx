@@ -99,6 +99,7 @@ export default function MusicWorkbenchTable({
               key={filter.value}
               type="button"
               onClick={() => setActiveFilter(filter.value)}
+              aria-pressed={activeFilter === filter.value}
               className={cn(
                 "rounded-full border px-3 py-1.5 text-sm transition-colors",
                 activeFilter === filter.value
