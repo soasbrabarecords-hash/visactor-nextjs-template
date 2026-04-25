@@ -1,8 +1,18 @@
+type Playlist = {
+  id: number;
+  created_at: string;
+  url: string | null;
+  name: string | null;
+  followers: number | null;
+  tracks: number | null;
+  score: number | null;
+};
+
 export default async function Home() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  let playlists: any[] = [];
+  let playlists: Playlist[] = [];
   let errorMessage = "";
 
   if (!supabaseUrl || !supabaseKey) {
@@ -22,7 +32,7 @@ export default async function Home() {
     if (!response.ok) {
       errorMessage = await response.text();
     } else {
-      playlists = await response.json();
+      playlists = (await response.json()) as Playlist[];
     }
   }
 
@@ -34,7 +44,7 @@ export default async function Home() {
         </p>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight">
-          🎧 Playlists IA — Só as Braba
+          Playlists IA — Só as Braba
         </h1>
 
         <p className="mt-2 text-muted-foreground">
@@ -70,14 +80,18 @@ export default async function Home() {
                     <td className="px-4 py-3">{p.tracks ?? "-"}</td>
                     <td className="px-4 py-3">{p.score ?? "-"}</td>
                     <td className="px-4 py-3">
-                      <a
-                        href={p.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline"
-                      >
-                        Abrir
-                      </a>
+                      {p.url ? (
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline"
+                        >
+                          Abrir
+                        </a>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                   </tr>
                 ))
