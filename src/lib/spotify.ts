@@ -189,7 +189,8 @@ export async function fetchSpotifyPlaylistTracks(
     | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(name),album(name))),next`;
 
   while (nextUrl) {
-    const payload = await spotifyFetch<SpotifyPlaylistTracksResponse>(nextUrl);
+    const payload: SpotifyPlaylistTracksResponse =
+      await spotifyFetch<SpotifyPlaylistTracksResponse>(nextUrl);
 
     for (const item of payload.items ?? []) {
       const track = item.track;
