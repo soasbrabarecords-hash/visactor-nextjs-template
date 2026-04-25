@@ -87,7 +87,9 @@ function normalizePlaylists(rows: PlaylistRow[]): PlaylistRecord[] {
   }));
 }
 
-async function enrichPlaylists(playlists: PlaylistRecord[]) {
+async function enrichPlaylists(
+  playlists: PlaylistRecord[],
+): Promise<PlaylistRecord[]> {
   return Promise.all(
     playlists.map(async (playlist) => {
       const playlistId = extractSpotifyPlaylistId(playlist.url);
@@ -169,7 +171,7 @@ function buildMetrics(playlists: PlaylistRecord[]): DashboardMetric[] {
     .filter(
       (
         row,
-      ): row is PlaylistRow & {
+      ): row is PlaylistRecord & {
         createdDate: Date;
       } => Boolean(row.createdDate),
     );
