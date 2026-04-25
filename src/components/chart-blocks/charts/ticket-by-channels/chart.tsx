@@ -5,24 +5,10 @@ import {
   VChart,
 } from "@visactor/react-vchart";
 import type { Datum } from "@visactor/vchart/esm/typings";
-import { ticketByChannels } from "@/data/ticket-by-channels";
+import type { ChannelDatum } from "@/types/dashboard";
 import { addThousandsSeparator } from "@/lib/utils";
 
-const data = ticketByChannels.reduce(
-  (acc, curr) => {
-    acc.push({
-      type: curr.type,
-      value: curr.value + (acc[acc.length - 1]?.value || 0),
-      realValue: curr.value,
-    });
-    return acc;
-  },
-  [] as { type: string; value: number; realValue: number }[],
-);
-
-const totalTickets = data.reduce((acc, curr) => acc + curr.value, 0);
-
-const spec: IPieChartSpec = {
+const getSpec = (data: ChannelDatum[]): IPieChartSpec => ({
   type: "pie",
   legends: [
     {
@@ -34,7 +20,7 @@ const spec: IPieChartSpec = {
   data: [
     {
       id: "id0",
-      values: ticketByChannels,
+      values: data,
     },
   ],
   valueField: "value",
@@ -60,7 +46,7 @@ const spec: IPieChartSpec = {
       content: [
         {
           key: (datum: Datum | undefined) => datum?.type,
-          value: (datum: Datum | undefined) => datum?.realValue,
+          value: (datum: Datum | undefined) => datum?.value,
         },
       ],
     },
@@ -71,7 +57,7 @@ const spec: IPieChartSpec = {
       offsetY: "40%",
       title: {
         style: {
-          text: "Total Active Tickets",
+          text: "Total Playlists",
           fontSize: 16,
           opacity: 0.6,
         },
@@ -82,14 +68,16 @@ const spec: IPieChartSpec = {
       offsetY: "64%",
       title: {
         style: {
-          text: addThousandsSeparator(totalTickets),
+          text: addThousandsSeparator(
+            data.reduce((acc, curr) => acc + curr.value, 0),
+          ),
           fontSize: 28,
         },
       },
     },
   ],
-};
+});
 
-export default function Chart() {
-  return <VChart spec={spec} />;
+export default function Chart({ data }: { data: ChannelDatum[] }) {
+  return <VChart spec={getSpec(data)} />;
 }

@@ -1,12 +1,10 @@
 "use client";
 
-import { useAtomValue } from "jotai";
 import { VChart } from "@visactor/react-vchart";
 import type { IBarChartSpec } from "@visactor/vchart";
-import { ticketChartDataAtom } from "@/lib/atoms";
-import type { TicketMetric } from "@/types/types";
+import type { PlaylistTimelineMetric } from "@/types/dashboard";
 
-const generateSpec = (data: TicketMetric[]): IBarChartSpec => ({
+const generateSpec = (data: PlaylistTimelineMetric[]): IBarChartSpec => ({
   type: "bar",
   data: [
     {
@@ -37,14 +35,13 @@ const generateSpec = (data: TicketMetric[]): IBarChartSpec => ({
     style: {
       cornerRadius: [12, 12, 12, 12],
       zIndex: (datum) => {
-        return datum.type === "resolved" ? 2 : 1;
+        return datum.type === "scored" ? 2 : 1;
       },
     },
   },
 });
 
-export default function Chart() {
-  const ticketChartData = useAtomValue(ticketChartDataAtom);
-  const spec = generateSpec(ticketChartData);
+export default function Chart({ data }: { data: PlaylistTimelineMetric[] }) {
+  const spec = generateSpec(data);
   return <VChart spec={spec} />;
 }

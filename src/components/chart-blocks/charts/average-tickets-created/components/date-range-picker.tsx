@@ -1,7 +1,6 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { useAtom } from "jotai";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -10,30 +9,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { averageTicketsCreated } from "@/data/average-tickets-created";
-import { dateRangeAtom } from "@/lib/atoms";
+import type { DateRangePickerProps } from "@/types/dashboard";
 import { cn } from "@/lib/utils";
 
 export function DatePickerWithRange({
   className,
-}: React.HTMLAttributes<HTMLDivElement>) {
-  const [dateRange, setDateRange] = useAtom(dateRangeAtom);
+  dateRange,
+  setDateRange,
+  availableDates,
+}: DateRangePickerProps) {
+  const firstDate = availableDates[0];
+  const lastDate = availableDates[availableDates.length - 1];
 
-  const firstAvailableDate = averageTicketsCreated.reduce(
-    (minDate, current) => {
-      const currentDate = parseISO(current.date);
-      return currentDate < minDate ? currentDate : minDate;
-    },
-    parseISO(averageTicketsCreated[0].date),
-  );
-
-  const lastAvailableDate = averageTicketsCreated.reduce(
-    (maxDate, current) => {
-      const currentDate = parseISO(current.date);
-      return currentDate > maxDate ? currentDate : maxDate;
-    },
-    parseISO(averageTicketsCreated[averageTicketsCreated.length - 1].date),
-  );
+  const firstAvailableDate = firstDate ? parseISO(firstDate) : undefined;
+  const lastAvailableDate = lastDate ? parseISO(lastDate) : undefined;
 
   return (
     <div className={cn("grid gap-2", className)}>

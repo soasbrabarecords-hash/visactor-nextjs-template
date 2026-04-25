@@ -2,14 +2,14 @@
 
 import { VChart } from "@visactor/react-vchart";
 import type { ICirclePackingChartSpec } from "@visactor/vchart";
-import { convertions } from "@/data/convertions";
+import type { ConversionDatum } from "@/types/dashboard";
 import { addThousandsSeparator } from "@/lib/utils";
 
-const spec: ICirclePackingChartSpec = {
+const getSpec = (data: ConversionDatum[]): ICirclePackingChartSpec => ({
   data: [
     {
       id: "data",
-      values: convertions,
+      values: data,
     },
   ],
   type: "circlePacking",
@@ -53,8 +53,8 @@ const spec: ICirclePackingChartSpec = {
   animationUpdate: {
     easing: "cubicInOut",
   },
-};
+});
 
-export default function Chart() {
-  return <VChart spec={spec} />;
+export default function Chart({ data }: { data: ConversionDatum[] }) {
+  return <VChart spec={getSpec(data)} />;
 }
