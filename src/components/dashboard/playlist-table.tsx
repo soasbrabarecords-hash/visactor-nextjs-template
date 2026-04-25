@@ -44,7 +44,23 @@ export default function PlaylistTable({
               ) : (
                 playlists.map((playlist) => (
                   <tr key={playlist.id}>
-                    <td className="px-4 py-4 font-medium">{playlist.name}</td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        {playlist.coverUrl ? (
+                          <div
+                            className="h-12 w-12 rounded-xl object-cover"
+                            style={{
+                              backgroundImage: `url(${playlist.coverUrl})`,
+                              backgroundPosition: "center",
+                              backgroundSize: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-xl bg-muted" />
+                        )}
+                        <div className="font-medium">{playlist.name}</div>
+                      </div>
+                    </td>
                     <td className="px-4 py-4 text-sm">
                       {addThousandsSeparator(playlist.followers)}
                     </td>

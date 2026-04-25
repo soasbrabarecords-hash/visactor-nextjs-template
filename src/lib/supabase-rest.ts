@@ -24,6 +24,14 @@ type SupabaseInsertPlaylistInput = {
   score?: number | null;
 };
 
+type SupabaseUpdatePlaylistInput = {
+  url?: string;
+  name?: string | null;
+  followers?: number | null;
+  tracks?: number | null;
+  score?: number | null;
+};
+
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -115,4 +123,39 @@ export async function insertPlaylistIntoSupabase(
   }
 
   return insertedRow;
+}
+
+export async function updatePlaylistInSupabase(
+  id: string,
+  input: SupabaseUpdatePlaylistInput,
+): Promise<void> {
+  const env = getSupabaseEnv();
+
+  if (!env) {
+    throw new Error("Supabase environment variables are not configured.");
+  }
+
+  const response = await fetch(
+    `${env.url}/rest/v1/playlists?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: env.anonKey,
+        Authorization: `Bearer ${env.anonKey}`,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | SupabaseSelectResponse
+      | null;
+
+    throw new Error(
+      errorPayload?.message ?? "Failed to update playlist in Supabase.",
+    );
+  }
 }

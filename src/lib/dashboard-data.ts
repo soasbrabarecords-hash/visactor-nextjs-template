@@ -10,7 +10,12 @@ import type {
   PlaylistRecord,
   ScoreBreakdown,
 } from "@/types/dashboard";
-import { fetchPlaylistsFromSupabase } from "./supabase-rest";
+import { fetchPlaylistsFromSupabase, updatePlaylistInSupabase } from "./supabase-rest";
+import {
+  calculatePlaylistScore,
+  extractSpotifyPlaylistId,
+  fetchSpotifyPlaylistMetadata,
+} from "./spotify";
 
 type PlaylistRow = {
   id: string | number | null;
@@ -75,17 +80,91 @@ function normalizePlaylists(rows: PlaylistRow[]): PlaylistRecord[] {
     createdAt: row.created_at,
     url: row.url?.trim() || "#",
     name: row.name?.trim() || "Playlist sem nome",
+    coverUrl: null,
     followers: toNumber(row.followers),
     tracks: toNumber(row.tracks),
     score: toNumber(row.score),
   }));
 }
 
-function buildMetrics(rows: PlaylistRow[]): DashboardMetric[] {
-  const datedRows = rows
+async function enrichPlaylists(playlists: PlaylistRecord[]) {
+  return Promise.all(
+    playlists.map(async (playlist) => {
+      const playlistId = extractSpotifyPlaylistId(playlist.url);
+
+      if (!playlistId) {
+        const score =
+          playlist.score > 0
+            ? playlist.score
+            : calculatePlaylistScore({
+                followers: playlist.followers,
+                tracks: playlist.tracks,
+              });
+
+        return {
+          ...playlist,
+          score,
+        };
+      }
+
+      try {
+        const spotifyPlaylist = await fetchSpotifyPlaylistMetadata(playlistId);
+        const score = calculatePlaylistScore({
+          followers: spotifyPlaylist.followers,
+          tracks: spotifyPlaylist.tracks,
+        });
+
+        const enrichedPlaylist: PlaylistRecord = {
+          ...playlist,
+          url: spotifyPlaylist.url,
+          name: spotifyPlaylist.name,
+          coverUrl: spotifyPlaylist.coverUrl,
+          followers: spotifyPlaylist.followers,
+          tracks: spotifyPlaylist.tracks,
+          score,
+        };
+
+        const shouldPersist =
+          enrichedPlaylist.url !== playlist.url ||
+          enrichedPlaylist.name !== playlist.name ||
+          enrichedPlaylist.followers !== playlist.followers ||
+          enrichedPlaylist.tracks !== playlist.tracks ||
+          enrichedPlaylist.score !== playlist.score;
+
+        if (shouldPersist) {
+          await updatePlaylistInSupabase(playlist.id, {
+            url: enrichedPlaylist.url,
+            name: enrichedPlaylist.name,
+            followers: enrichedPlaylist.followers,
+            tracks: enrichedPlaylist.tracks,
+            score: enrichedPlaylist.score,
+          }).catch(() => undefined);
+        }
+
+        return enrichedPlaylist;
+      } catch {
+        const score =
+          playlist.score > 0
+            ? playlist.score
+            : calculatePlaylistScore({
+                followers: playlist.followers,
+                tracks: playlist.tracks,
+              });
+
+        return {
+          ...playlist,
+          score,
+        };
+      }
+    }),
+  );
+}
+
+function buildMetrics(playlists: PlaylistRecord[]): DashboardMetric[] {
+  const datedRows = playlists
     .map((row) => ({
       ...row,
-      createdDate: toDate(row.created_at),
+      createdDate: toDate(row.createdAt),
     }))
     .filter(
       (
@@ -114,29 +193,28 @@ function buildMetrics(rows: PlaylistRow[]): DashboardMetric[] {
   );
 
   const totalFollowersCurrent = currentRows.reduce(
-    (sum, row) => sum + toNumber(row.followers),
+    (sum, row) => sum + row.followers,
     0,
   );
   const totalFollowersPrevious = previousRows.reduce(
-    (sum, row) => sum + toNumber(row.followers),
+    (sum, row) => sum + row.followers,
     0,
   );
   const averageTracksCurrent =
     currentRows.length > 0
-      ? currentRows.reduce((sum, row) => sum + toNumber(row.tracks), 0) /
-        currentRows.length
+      ? currentRows.reduce((sum, row) => sum + row.tracks, 0) / currentRows.length
       : 0;
   const averageTracksPrevious =
     previousRows.length > 0
-      ? previousRows.reduce((sum, row) => sum + toNumber(row.tracks), 0) /
+      ? previousRows.reduce((sum, row) => sum + row.tracks, 0) /
         previousRows.length
       : 0;
   const bestScoreCurrent = currentRows.reduce(
-    (maxValue, row) => Math.max(maxValue, toNumber(row.score)),
+    (maxValue, row) => Math.max(maxValue, row.score),
     0,
   );
   const bestScorePrevious = previousRows.reduce(
-    (maxValue, row) => Math.max(maxValue, toNumber(row.score)),
+    (maxValue, row) => Math.max(maxValue, row.score),
     0,
   );
 
@@ -164,11 +242,11 @@ function buildMetrics(rows: PlaylistRow[]): DashboardMetric[] {
   ];
 }
 
-function buildPlaylistActivity(rows: PlaylistRow[]): PlaylistActivityDatum[] {
+function buildPlaylistActivity(playlists: PlaylistRecord[]): PlaylistActivityDatum[] {
   const byDay = new Map<string, PlaylistActivityDatum>();
 
-  for (const row of rows) {
-    const createdDate = toDate(row.created_at);
+  for (const row of playlists) {
+    const createdDate = toDate(row.createdAt);
 
     if (!createdDate) {
       continue;
@@ -177,7 +255,7 @@ function buildPlaylistActivity(rows: PlaylistRow[]): PlaylistActivityDatum[] {
     const dateKey = format(createdDate, "yyyy-MM-dd");
     const entry = byDay.get(dateKey) ?? { date: dateKey, created: 0, scored: 0 };
     entry.created += 1;
-    entry.scored += toNumber(row.score) > 0 ? 1 : 0;
+    entry.scored += row.score > 0 ? 1 : 0;
     byDay.set(dateKey, entry);
   }
 
@@ -272,16 +350,17 @@ export async function getDashboardData(): Promise<DashboardData> {
   try {
     const rows = (await fetchPlaylistsFromSupabase()) as PlaylistRow[];
     const playlists = normalizePlaylists(rows);
-    const scoreHealth = buildScoreHealth(playlists);
+    const enrichedPlaylists = await enrichPlaylists(playlists);
+    const scoreHealth = buildScoreHealth(enrichedPlaylists);
 
     return {
-      metrics: buildMetrics(rows),
-      playlistActivity: buildPlaylistActivity(rows),
-      topFollowers: buildTopFollowers(playlists),
-      scoreDistribution: buildScoreDistribution(playlists),
+      metrics: buildMetrics(enrichedPlaylists),
+      playlistActivity: buildPlaylistActivity(enrichedPlaylists),
+      topFollowers: buildTopFollowers(enrichedPlaylists),
+      scoreDistribution: buildScoreDistribution(enrichedPlaylists),
       scoreHealth: scoreHealth.scoreHealth,
       playlistCount: scoreHealth.playlistCount,
-      playlists,
+      playlists: enrichedPlaylists,
     };
   } catch {
     return emptyDashboardData();

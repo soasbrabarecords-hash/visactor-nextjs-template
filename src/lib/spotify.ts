@@ -9,6 +9,9 @@ type SpotifyTokenResponse = {
 
 type SpotifyPlaylistResponse = {
   name?: string;
+  images?: Array<{
+    url?: string;
+  }>;
   followers?: {
     total?: number;
   };
@@ -45,6 +48,7 @@ type SpotifyPlaylistTracksResponse = {
 export type SpotifyPlaylistMetadata = {
   playlistId: string;
   name: string;
+  coverUrl: string | null;
   followers: number;
   tracks: number;
   url: string;
@@ -84,6 +88,19 @@ function getSpotifyEnv() {
 
 function parseNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+export function calculatePlaylistScore({
+  followers,
+  tracks,
+}: {
+  followers: number;
+  tracks: number;
+}) {
+  const followersScore = Math.min(Math.log10(followers + 1) / 6, 1) * 70;
+  const trackBalance = Math.max(0, 1 - Math.abs(tracks - 80) / 120) * 30;
+
+  return Math.round(followersScore + trackBalance);
 }
 
 export function extractSpotifyPlaylistId(input: string): string | null {
@@ -166,12 +183,13 @@ export async function fetchSpotifyPlaylistMetadata(
   playlistId: string,
 ): Promise<SpotifyPlaylistMetadata> {
   const playlist = await spotifyFetch<SpotifyPlaylistResponse>(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,followers(total),tracks(total),external_urls(spotify)`,
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images(url),followers(total),tracks(total),external_urls(spotify)`,
   );
 
   return {
     playlistId,
     name: playlist.name?.trim() || "Spotify Playlist",
+    coverUrl: playlist.images?.[0]?.url?.trim() || null,
     followers: parseNumber(playlist.followers?.total),
     tracks: parseNumber(playlist.tracks?.total),
     url:

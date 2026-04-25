@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { insertPlaylistIntoSupabase } from "@/lib/supabase-rest";
 import {
+  calculatePlaylistScore,
   extractSpotifyPlaylistId,
   fetchSpotifyPlaylistMetadata,
 } from "@/lib/spotify";
@@ -34,29 +35,17 @@ export async function POST(request: Request) {
       );
     }
 
-    let payload = {
-      url: rawUrl,
-      name: "Nova playlist" as string,
-      followers: 0,
-      tracks: 0,
-      score: 0,
-    };
-
-    try {
-      const spotifyPlaylist = await fetchSpotifyPlaylistMetadata(playlistId);
-      payload = {
-        ...payload,
-        url: spotifyPlaylist.url,
-        name: spotifyPlaylist.name,
+    const spotifyPlaylist = await fetchSpotifyPlaylistMetadata(playlistId);
+    const payload = {
+      url: spotifyPlaylist.url,
+      name: spotifyPlaylist.name,
+      followers: spotifyPlaylist.followers,
+      tracks: spotifyPlaylist.tracks,
+      score: calculatePlaylistScore({
         followers: spotifyPlaylist.followers,
         tracks: spotifyPlaylist.tracks,
-      };
-    } catch {
-      payload = {
-        ...payload,
-        url: rawUrl,
-      };
-    }
+      }),
+    };
 
     const insertedPlaylist = await insertPlaylistIntoSupabase(payload);
 

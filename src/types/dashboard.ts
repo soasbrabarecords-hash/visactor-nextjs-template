@@ -39,6 +39,7 @@ export type PlaylistRecord = {
   createdAt: string | null;
   url: string;
   name: string;
+  coverUrl: string | null;
   followers: number;
   tracks: number;
   score: number;
