@@ -8,7 +8,10 @@ import type { Datum } from "@visactor/vchart/esm/typings";
 import type { ChannelDatum } from "@/types/dashboard";
 import { addThousandsSeparator } from "@/lib/utils";
 
-const getSpec = (data: ChannelDatum[]): IPieChartSpec => ({
+const getSpec = (
+  data: ChannelDatum[],
+  centerLabel: string,
+): IPieChartSpec => ({
   type: "pie",
   legends: [
     {
@@ -57,7 +60,7 @@ const getSpec = (data: ChannelDatum[]): IPieChartSpec => ({
       offsetY: "40%",
       title: {
         style: {
-          text: "Total Playlists",
+          text: centerLabel,
           fontSize: 16,
           opacity: 0.6,
         },
@@ -78,6 +81,12 @@ const getSpec = (data: ChannelDatum[]): IPieChartSpec => ({
   ],
 });
 
-export default function Chart({ data }: { data: ChannelDatum[] }) {
-  return <VChart spec={getSpec(data)} />;
+export default function Chart({
+  data,
+  centerLabel,
+}: {
+  data: ChannelDatum[];
+  centerLabel: string;
+}) {
+  return <VChart spec={getSpec(data, centerLabel)} />;
 }

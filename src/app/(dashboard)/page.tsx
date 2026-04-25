@@ -6,6 +6,7 @@ import {
   TicketByChannels,
 } from "@/components/chart-blocks";
 import Container from "@/components/container";
+import AddPlaylistForm from "@/components/dashboard/add-playlist-form";
 import PlaylistTable from "@/components/dashboard/playlist-table";
 import { getDashboardData } from "@/lib/dashboard-data";
 
@@ -15,6 +16,7 @@ export default async function Home() {
   return (
     <div>
       <Metrics metrics={dashboardData.metrics} />
+      <AddPlaylistForm />
 
       <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-3 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
         <Container className="py-4 laptop:col-span-2">
