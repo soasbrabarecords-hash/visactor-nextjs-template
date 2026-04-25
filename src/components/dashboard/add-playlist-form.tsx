@@ -30,7 +30,8 @@ export default function AddPlaylistForm() {
 
     startTransition(() => {
       const submitPlaylist = async () => {
-        setFeedback(null);
+        setFeedbackType("success");
+        setFeedback("Buscando dados da playlist no Spotify...");
 
         const response = await fetch("/api/playlists", {
           method: "POST",

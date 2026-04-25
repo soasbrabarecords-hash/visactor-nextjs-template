@@ -6,6 +6,9 @@ import {
   fetchSpotifyPlaylistMetadata,
 } from "@/lib/spotify";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type CreatePlaylistBody = {
   url?: unknown;
 };
@@ -24,30 +27,35 @@ export async function POST(request: Request) {
 
     const playlistId = extractSpotifyPlaylistId(rawUrl);
 
+    if (!playlistId) {
+      return NextResponse.json(
+        { message: "Cole uma URL valida de playlist do Spotify." },
+        { status: 400 },
+      );
+    }
+
     let payload = {
       url: rawUrl,
-      name: null as string | null,
-      followers: null as number | null,
-      tracks: null as number | null,
-      score: null as number | null,
+      name: "Nova playlist" as string,
+      followers: 0,
+      tracks: 0,
+      score: 0,
     };
 
-    if (playlistId) {
-      try {
-        const spotifyPlaylist = await fetchSpotifyPlaylistMetadata(playlistId);
-        payload = {
-          ...payload,
-          url: spotifyPlaylist.url,
-          name: spotifyPlaylist.name,
-          followers: spotifyPlaylist.followers,
-          tracks: spotifyPlaylist.tracks,
-        };
-      } catch {
-        payload = {
-          ...payload,
-          url: rawUrl,
-        };
-      }
+    try {
+      const spotifyPlaylist = await fetchSpotifyPlaylistMetadata(playlistId);
+      payload = {
+        ...payload,
+        url: spotifyPlaylist.url,
+        name: spotifyPlaylist.name,
+        followers: spotifyPlaylist.followers,
+        tracks: spotifyPlaylist.tracks,
+      };
+    } catch {
+      payload = {
+        ...payload,
+        url: rawUrl,
+      };
     }
 
     const insertedPlaylist = await insertPlaylistIntoSupabase(payload);

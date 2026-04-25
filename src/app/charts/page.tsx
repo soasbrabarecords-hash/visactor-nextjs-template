@@ -9,6 +9,8 @@ import InsightPanel from "@/components/charts/insight-panel";
 import TracksTable from "@/components/charts/tracks-table";
 import { getChartsData } from "@/lib/charts-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function ChartsPage() {
   const chartsData = await getChartsData();
 

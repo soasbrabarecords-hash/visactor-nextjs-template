@@ -223,9 +223,12 @@ function buildTrackInsights(tracks: AggregatedTrack[]): TrackInsight[] {
 export async function getChartsData(): Promise<ChartsData> {
   try {
     const playlists = await fetchPlaylistsFromSupabase();
+    const spotifyPlaylists = playlists.filter((playlist) =>
+      Boolean(extractSpotifyPlaylistId(playlist.url ?? "")),
+    );
 
     const playlistTrackGroups = await Promise.all(
-      playlists.map(async (playlist) => {
+      spotifyPlaylists.map(async (playlist) => {
         const playlistId = extractSpotifyPlaylistId(playlist.url ?? "");
 
         if (!playlistId) {
