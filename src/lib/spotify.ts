@@ -74,6 +74,12 @@ type SpotifyFeaturedPlaylistsResponse = {
   };
 };
 
+type SpotifySearchTracksResponse = {
+  tracks?: {
+    items?: SpotifyTrackObject[];
+  };
+};
+
 export type SpotifyPlaylistMetadata = {
   playlistId: string;
   name: string;
@@ -264,11 +270,12 @@ export async function fetchSpotifyPlaylistMetadata(
 
 export async function fetchSpotifyPlaylistTracks(
   playlistId: string,
+  market = "BR",
 ): Promise<SpotifyTrackRecord[]> {
   const tracks: SpotifyTrackRecord[] = [];
   let nextUrl:
     | string
-    | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&market=BR&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(id,name),album(name,images(url)))),next`;
+    | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&market=${market}&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(id,name),album(name,images(url)))),next`;
 
   while (nextUrl) {
     const payload: SpotifyPlaylistTracksResponse =
@@ -304,9 +311,10 @@ export async function fetchArtistTopTracks(
 export async function fetchFeaturedPlaylists(
   country = "BR",
   limit = 6,
+  locale = "pt_BR",
 ): Promise<SpotifyFeaturedPlaylist[]> {
   const payload = await spotifyFetch<SpotifyFeaturedPlaylistsResponse>(
-    `https://api.spotify.com/v1/browse/featured-playlists?country=${country}&locale=pt_BR&limit=${limit}`,
+    `https://api.spotify.com/v1/browse/featured-playlists?country=${country}&locale=${locale}&limit=${limit}`,
   );
 
   return (payload.playlists?.items ?? [])
@@ -319,4 +327,49 @@ export async function fetchFeaturedPlaylists(
       tracksTotal: parseNumber(playlist.tracks?.total),
     }))
     .filter((playlist) => Boolean(playlist.id && playlist.spotifyUrl));
+}
+
+export async function searchSpotifyTracks(
+  query: string,
+  market = "BR",
+  limit = 30,
+): Promise<SpotifyTrackRecord[]> {
+  const cappedLimit = Math.max(1, Math.min(limit, 30));
+  const tracks: SpotifyTrackRecord[] = [];
+  const seenTrackIds = new Set<string>();
+
+  for (let offset = 0; offset < cappedLimit; offset += 10) {
+    const pageLimit = Math.min(10, cappedLimit - offset);
+    const searchParams = new URLSearchParams({
+      q: query,
+      type: "track",
+      market,
+      limit: String(pageLimit),
+      offset: String(offset),
+    });
+    const payload = await spotifyFetch<SpotifySearchTracksResponse>(
+      `https://api.spotify.com/v1/search?${searchParams.toString()}`,
+    );
+
+    for (const track of payload.tracks?.items ?? []) {
+      const mappedTrack = mapSpotifyTrack(track);
+
+      if (!mappedTrack || seenTrackIds.has(mappedTrack.id)) {
+        continue;
+      }
+
+      seenTrackIds.add(mappedTrack.id);
+      tracks.push(mappedTrack);
+    }
+  }
+
+  return tracks;
+}
+
+export async function fetchSpotifyTracksByGenre(
+  genreQuery: string,
+  market = "BR",
+  limit = 30,
+): Promise<SpotifyTrackRecord[]> {
+  return searchSpotifyTracks(genreQuery, market, limit);
 }

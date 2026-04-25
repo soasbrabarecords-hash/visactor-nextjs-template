@@ -7,6 +7,23 @@ import { cn } from "@/lib/utils";
 
 export default function Navigation() {
   const pathname = usePathname();
+
+  function isActive(href: string) {
+    if (href === "/charts/music") {
+      return pathname === "/charts/music";
+    }
+
+    if (href === "/charts") {
+      return pathname === "/charts";
+    }
+
+    if (href === "/playlists-monitoradas") {
+      return pathname === "/playlists-monitoradas" || pathname.startsWith("/playlists/");
+    }
+
+    return pathname === href;
+  }
+
   return (
     <nav className="flex flex-grow flex-col gap-y-1 p-2">
       {navigations.map((navigation) => {
@@ -17,7 +34,7 @@ export default function Navigation() {
             href={navigation.href}
             className={cn(
               "flex items-center rounded-md px-2 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-800",
-              pathname === navigation.href
+              isActive(navigation.href)
                 ? "bg-slate-200 dark:bg-slate-800"
                 : "bg-transparent",
             )}

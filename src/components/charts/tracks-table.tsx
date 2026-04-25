@@ -8,11 +8,13 @@ export default function TracksTable({
   title = "Top Faixas do Radar",
   description = "Ranking das musicas mais fortes dentro das playlists monitoradas, com base em repeticao, popularidade e presenca editorial.",
   emptyMessage = "Adicione playlists com URL do Spotify para liberar a analise de charts.",
+  countLabel = "Playlists",
 }: {
   tracks: TrackInsight[];
   title?: string;
   description?: string;
   emptyMessage?: string;
+  countLabel?: string;
 }) {
   return (
     <Container className="py-4">
@@ -27,12 +29,12 @@ export default function TracksTable({
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="min-w-full divide-y divide-border text-left">
             <thead className="bg-muted/30">
-                <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Faixa</th>
-                  <th className="px-4 py-3 font-medium">Artistas</th>
+              <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Faixa</th>
+                <th className="px-4 py-3 font-medium">Artistas</th>
                 <th className="px-4 py-3 font-medium">Album</th>
                 <th className="px-4 py-3 font-medium">Popularidade</th>
-                <th className="px-4 py-3 font-medium">Playlists</th>
+                <th className="px-4 py-3 font-medium">{countLabel}</th>
                 <th className="px-4 py-3 font-medium">Duracao</th>
                 <th className="px-4 py-3 font-medium">Spotify</th>
               </tr>

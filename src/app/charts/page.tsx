@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import {
   Conversions,
   CustomerSatisfication,
@@ -8,6 +10,9 @@ import Container from "@/components/container";
 import FeaturedPlaylistsStrip from "@/components/charts/featured-playlists-strip";
 import InsightPanel from "@/components/charts/insight-panel";
 import TracksTable from "@/components/charts/tracks-table";
+import { TopNav } from "@/components/nav";
+import PageIntro from "@/components/page-intro";
+import { Button } from "@/components/ui/button";
 import { getChartsData } from "@/lib/charts-data";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +22,25 @@ export default async function ChartsPage() {
 
   return (
     <div>
+      <TopNav title="Charts Playlists" />
+      <PageIntro
+        eyebrow="Radar Interno"
+        title="Charts Playlists"
+        description="Cruza as playlists monitoradas com sinais editoriais do Spotify para mostrar repeticao, lideranca por artista e momentum entre as suas curadorias."
+        action={
+          <>
+            <Button asChild>
+              <Link href="/charts/music">Abrir Charts Music</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/playlists-monitoradas">
+                Ver Playlists Monitoradas
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </Button>
+          </>
+        }
+      />
       <Metrics metrics={chartsData.metrics} />
 
       <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-3 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
@@ -66,7 +90,11 @@ export default async function ChartsPage() {
 
       <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-3 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
         <Container className="py-4 laptop:col-span-1">
-          <FeaturedPlaylistsStrip playlists={chartsData.featuredPlaylists} />
+          <FeaturedPlaylistsStrip
+            playlists={chartsData.featuredPlaylists}
+            title="Mercado Externo"
+            description="Playlists destaque do Spotify que ajudam a validar se o seu radar interno esta alinhado com o momento."
+          />
         </Container>
 
         <Container className="py-4 laptop:col-span-2">
@@ -80,7 +108,11 @@ export default async function ChartsPage() {
       </div>
 
       <div className="border-b border-border">
-        <TracksTable tracks={chartsData.tracks} />
+        <TracksTable
+          tracks={chartsData.tracks}
+          title="Radar das Playlists Monitoradas"
+          description="Faixas que mais aparecem dentro da sua base monitorada, ranqueadas por repeticao e popularidade."
+        />
       </div>
     </div>
   );

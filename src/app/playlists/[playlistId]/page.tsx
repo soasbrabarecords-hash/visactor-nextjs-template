@@ -58,7 +58,7 @@ export default async function PlaylistAnalysisPage({
 
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="outline">
-              <Link href="/">Voltar</Link>
+              <Link href="/playlists-monitoradas">Voltar</Link>
             </Button>
             <Button asChild>
               <a

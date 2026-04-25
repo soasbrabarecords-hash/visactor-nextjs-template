@@ -4,21 +4,26 @@ import type { FeaturedPlaylistInsight } from "@/types/charts";
 
 export default function FeaturedPlaylistsStrip({
   playlists,
+  title = "Mercado em Movimento",
+  description = "Leitura do que esta ganhando destaque agora nas playlists featured do Spotify Brasil, independente do seu radar interno.",
+  emptyMessage = "Mercado em movimento indisponivel no momento.",
 }: {
   playlists: FeaturedPlaylistInsight[];
+  title?: string;
+  description?: string;
+  emptyMessage?: string;
 }) {
   return (
     <section className="flex h-full flex-col gap-4">
-      <ChartTitle title="Mercado em Movimento" icon={Radio} />
+      <ChartTitle title={title} icon={Radio} />
       <p className="text-sm text-muted-foreground">
-        Leitura do que esta ganhando destaque agora nas playlists featured do
-        Spotify Brasil, independente do seu radar interno.
+        {description}
       </p>
 
       <div className="grid gap-3">
         {playlists.length === 0 ? (
           <div className="rounded-2xl border border-border bg-muted/10 p-4 text-sm text-muted-foreground">
-            Mercado em movimento indisponivel no momento.
+            {emptyMessage}
           </div>
         ) : (
           playlists.map((playlist) => (

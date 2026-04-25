@@ -7,17 +7,22 @@ import type { PlaylistRecord } from "@/types/dashboard";
 
 export default function PlaylistTable({
   playlists,
+  title = "Playlists Monitoradas",
+  description = "Dados reais do Spotify e do Supabase dentro da estrutura visual do dashboard.",
+  emptyMessage = "No playlists found in Supabase yet.",
 }: {
   playlists: PlaylistRecord[];
+  title?: string;
+  description?: string;
+  emptyMessage?: string;
 }) {
   return (
     <Container className="py-4">
       <section className="flex flex-col gap-4">
         <div>
-          <ChartTitle title="Playlists Monitoradas" icon={ListMusic} />
+          <ChartTitle title={title} icon={ListMusic} />
           <p className="mt-1 text-sm text-muted-foreground">
-            Dados reais do Spotify e do Supabase dentro da estrutura visual do
-            dashboard.
+            {description}
           </p>
         </div>
 
@@ -39,7 +44,7 @@ export default function PlaylistTable({
                     colSpan={5}
                     className="px-4 py-8 text-center text-sm text-muted-foreground"
                   >
-                    No playlists found in Supabase yet.
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (

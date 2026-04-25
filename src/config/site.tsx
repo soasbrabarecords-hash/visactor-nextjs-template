@@ -1,4 +1,10 @@
-import { BarChart3, Gauge, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Gauge,
+  ListMusic,
+  Radio,
+  type LucideIcon,
+} from "lucide-react";
 
 export type SiteConfig = typeof siteConfig;
 export type Navigation = {
@@ -20,7 +26,17 @@ export const navigations: Navigation[] = [
   },
   {
     icon: BarChart3,
-    name: "Charts",
+    name: "Charts Playlists",
     href: "/charts",
+  },
+  {
+    icon: Radio,
+    name: "Charts Music",
+    href: "/charts/music",
+  },
+  {
+    icon: ListMusic,
+    name: "Playlists Monitoradas",
+    href: "/playlists-monitoradas",
   },
 ];
