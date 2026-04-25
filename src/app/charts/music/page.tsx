@@ -10,6 +10,8 @@ import Container from "@/components/container";
 import FeaturedPlaylistsStrip from "@/components/charts/featured-playlists-strip";
 import MusicFilters from "@/components/charts/music-filters";
 import MusicInsightPanel from "@/components/charts/music-insight-panel";
+import MusicOpportunitiesPanel from "@/components/charts/music-opportunities-panel";
+import MusicTrackGrid from "@/components/charts/music-track-grid";
 import TracksTable from "@/components/charts/tracks-table";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
@@ -73,7 +75,11 @@ export default async function ChartsMusicPage({
         <Container className="py-4 laptop:col-span-2">
           <Conversions
             data={chartsData.topTracks}
-            title={`Radar ${chartsData.genreLabel}`}
+            title={
+              chartsData.genreValue === "all"
+                ? `Radar do Mercado · ${chartsData.countryLabel}`
+                : `Radar ${chartsData.genreLabel}`
+            }
             indicatorLabel="Popularidade somada"
           />
         </Container>
@@ -115,6 +121,22 @@ export default async function ChartsMusicPage({
         </Container>
       </div>
 
+      <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-2 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
+        <MusicTrackGrid
+          title="Top Movers"
+          description="Faixas com maior momentum no radar, combinando popularidade e recorrencia nas playlists fonte."
+          tracks={chartsData.topMovers}
+          emptyMessage="Ainda sem movers fortes para esse mercado."
+        />
+
+        <MusicTrackGrid
+          title="Novas Entradas"
+          description="Sinais frescos com baixa saturacao e potencial de crescimento rapido para descoberta."
+          tracks={chartsData.newEntries}
+          emptyMessage="Ainda sem novas entradas fortes neste recorte."
+        />
+      </div>
+
       <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-3 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
         <Container className="py-4 laptop:col-span-1">
           <FeaturedPlaylistsStrip
@@ -127,13 +149,27 @@ export default async function ChartsMusicPage({
 
         <Container className="py-4 laptop:col-span-2">
           <TracksTable
-            tracks={chartsData.tracks}
-            title="Radar de Faixas em Alta"
-            description={`Faixas que estao mais fortes em ${chartsData.countryLabel}${chartsData.genreValue !== "all" ? ` dentro do recorte ${chartsData.genreLabel}` : ""}.`}
-            emptyMessage="Sem sinal suficiente para esse filtro neste momento."
-            countLabel="Sinal"
+            tracks={chartsData.recurringTracks}
+            title="Faixas Recorrentes por Mercado"
+            description={`Faixas que se repetem nas playlists fonte de ${chartsData.countryLabel} e ajudam a validar o repertorio que realmente esta dominando o momento.`}
+            emptyMessage="Ainda nao encontramos recorrencia suficiente neste mercado."
+            countLabel="Mercado"
           />
         </Container>
+      </div>
+
+      <div className="border-b border-border">
+        <MusicOpportunitiesPanel opportunities={chartsData.opportunities} />
+      </div>
+
+      <div className="border-b border-border">
+        <TracksTable
+          tracks={chartsData.tracks}
+          title="Radar Completo de Tracks"
+          description={`Leitura completa das faixas mais fortes em ${chartsData.countryLabel}${chartsData.genreValue !== "all" ? ` dentro do recorte ${chartsData.genreLabel}` : ""}, para pesquisa e validacao editorial.`}
+          emptyMessage="Sem sinal suficiente para esse filtro neste momento."
+          countLabel="Sinal"
+        />
       </div>
     </div>
   );

@@ -9,6 +9,8 @@ import type {
 import type {
   MusicChartsData,
   MusicFilterOption,
+  MusicOpportunity,
+  MusicTrackHighlight,
 } from "@/types/music-charts";
 import type {
   FeaturedPlaylistInsight,
@@ -300,6 +302,16 @@ function buildTrackInsights(tracks: AggregatedTrack[]): TrackInsight[] {
   }));
 }
 
+function buildSeedTracks(tracks: AggregatedTrack[], limit = 3) {
+  return tracks.slice(0, limit).map((track) => ({
+    id: track.id,
+    name: track.name,
+    artists: track.artists,
+    coverUrl: track.coverUrl,
+    spotifyUrl: track.spotifyUrl,
+  }));
+}
+
 function buildFeaturedPlaylistInsights(
   playlists: SpotifyFeaturedPlaylist[],
 ): FeaturedPlaylistInsight[] {
@@ -376,6 +388,175 @@ function buildMetrics(
       title: "Avg. Popularity",
       value: formatDecimal(averagePopularity),
       change: 0,
+    },
+  ];
+}
+
+function getMomentumScore(track: AggregatedTrack, maxPlaylistsCount: number) {
+  const normalizedRecurrence =
+    maxPlaylistsCount > 0 ? track.playlistsCount / maxPlaylistsCount : 0;
+
+  return Math.round(track.popularity * 0.7 + normalizedRecurrence * 30);
+}
+
+function buildTopMovers(tracks: AggregatedTrack[]): MusicTrackHighlight[] {
+  const maxPlaylistsCount = tracks.reduce(
+    (maxValue, track) => Math.max(maxValue, track.playlistsCount),
+    0,
+  );
+
+  return [...tracks]
+    .sort((left, right) => {
+      const rightScore = getMomentumScore(right, maxPlaylistsCount);
+      const leftScore = getMomentumScore(left, maxPlaylistsCount);
+
+      return rightScore - leftScore;
+    })
+    .slice(0, 6)
+    .map((track) => ({
+      id: track.id,
+      name: track.name,
+      artists: track.artists,
+      coverUrl: track.coverUrl,
+      spotifyUrl: track.spotifyUrl,
+      primaryMetric: `${getMomentumScore(track, maxPlaylistsCount)} pts`,
+      secondaryMetric: `${track.playlistsCount} playlists · ${track.popularity} pop`,
+      summary:
+        track.playlistsCount > 1
+          ? `Movendo o mercado com recorrencia em ${track.playlistsCount} playlists fonte.`
+          : "Sinal forte de tracao com performance acima da media do radar.",
+    }));
+}
+
+function buildNewEntries(tracks: AggregatedTrack[]): MusicTrackHighlight[] {
+  const candidates = tracks.filter(
+    (track) => track.playlistsCount <= 1 && track.popularity >= 55,
+  );
+  const fallbackCandidates = tracks.filter((track) => track.playlistsCount <= 2);
+  const source = candidates.length >= 6 ? candidates : fallbackCandidates;
+
+  return [...source]
+    .sort((left, right) => right.popularity - left.popularity)
+    .slice(0, 6)
+    .map((track) => ({
+      id: track.id,
+      name: track.name,
+      artists: track.artists,
+      coverUrl: track.coverUrl,
+      spotifyUrl: track.spotifyUrl,
+      primaryMetric: `${track.popularity} pop`,
+      secondaryMetric:
+        track.playlistsCount <= 1
+          ? "Baixa saturacao"
+          : `${track.playlistsCount} aparicoes no radar`,
+      summary:
+        track.playlistsCount <= 1
+          ? "Faixa ainda pouco saturada e pronta para descoberta rapida."
+          : "Entrada recente no radar com chance de crescer nas proximas viradas.",
+    }));
+}
+
+function buildRecurringTracks(tracks: AggregatedTrack[]): TrackInsight[] {
+  const recurring = tracks.filter((track) => track.playlistsCount >= 2);
+  const source = recurring.length > 0 ? recurring : tracks;
+
+  return buildTrackInsights(
+    [...source]
+      .sort((left, right) => {
+        if (right.playlistsCount !== left.playlistsCount) {
+          return right.playlistsCount - left.playlistsCount;
+        }
+
+        return right.popularity - left.popularity;
+      })
+      .slice(0, 12),
+  );
+}
+
+function buildOpportunities(
+  tracks: AggregatedTrack[],
+  newEntries: MusicTrackHighlight[],
+  countryLabel: string,
+  genreLabel: string,
+): MusicOpportunity[] {
+  const recurringTracks = tracks
+    .filter((track) => track.playlistsCount >= 2)
+    .sort((left, right) => {
+      if (right.playlistsCount !== left.playlistsCount) {
+        return right.playlistsCount - left.playlistsCount;
+      }
+
+      return right.popularity - left.popularity;
+    });
+
+  const artistFrequency = new Map<
+    string,
+    {
+      name: string;
+      count: number;
+    }
+  >();
+
+  for (const track of tracks) {
+    for (const artist of track.artists.split(", ").filter(Boolean)) {
+      const current = artistFrequency.get(artist);
+
+      if (current) {
+        current.count += 1;
+      } else {
+        artistFrequency.set(artist, {
+          name: artist,
+          count: 1,
+        });
+      }
+    }
+  }
+
+  const topArtists = Array.from(artistFrequency.values())
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 3);
+  const artistDominanceTracks = tracks.filter((track) =>
+    topArtists.some((artist) => track.artists.includes(artist.name)),
+  );
+
+  return [
+    {
+      title: "Playlist ancora de alta tracao",
+      description: `Monte uma playlist ${genreLabel === "Todos os generos" ? "mainstream de mercado" : `de ${genreLabel}`} para ${countryLabel} com as faixas que ja dominaram o radar externo.`,
+      rationale:
+        recurringTracks.length > 0
+          ? `Essas faixas ja se repetem nas playlists fonte e ajudam a entrar com aderencia imediata.`
+          : "Mesmo sem grande recorrencia, esse bloco concentra as faixas mais fortes para abrir uma nova playlist.",
+      badge: "High traction",
+      seeds: buildSeedTracks(recurringTracks.length > 0 ? recurringTracks : tracks),
+    },
+    {
+      title: "Janela de descoberta",
+      description:
+        "Use sinais ainda pouco saturados para criar uma playlist de descoberta e capturar tendencia antes da concorrencia.",
+      rationale:
+        newEntries.length > 0
+          ? "As seeds abaixo aparecem como entradas frescas com alto potencial de crescimento."
+          : "O radar ainda nao mostrou entradas frescas suficientes, entao use os movers para discovery.",
+      badge: "Early signal",
+      seeds: buildSeedTracks(
+        tracks.filter((track) =>
+          newEntries.some((entry) => entry.id === track.id),
+        ),
+      ),
+    },
+    {
+      title: "Dominio de artista",
+      description:
+        "Crie uma frente editorial baseada nos artistas que mais estao puxando o mercado agora.",
+      rationale:
+        topArtists.length > 0
+          ? `Os nomes mais presentes agora sao ${topArtists.map((artist) => artist.name).join(", ")}.`
+          : "Ainda nao ha artistas dominantes suficientes para fechar esse cluster.",
+      badge: "Artist wave",
+      seeds: buildSeedTracks(
+        artistDominanceTracks.length > 0 ? artistDominanceTracks : tracks,
+      ),
     },
   ];
 }
@@ -495,6 +676,9 @@ export async function getMusicChartsData({
     marketData.aggregatedTracks.length > 0
       ? mergeGenreAndMarketTracks(marketData.aggregatedTracks, searchedTracks)
       : searchedTracks;
+  const topMovers = buildTopMovers(focusTracks);
+  const newEntries = buildNewEntries(focusTracks);
+  const recurringTracks = buildRecurringTracks(focusTracks);
   const marketTrackIds = new Set(marketData.aggregatedTracks.map((track) => track.id));
   const featuredIntersectionCount = focusTracks.filter((track) =>
     marketTrackIds.has(track.id),
@@ -507,12 +691,21 @@ export async function getMusicChartsData({
     artistDistribution: buildArtistDistribution(focusTracks),
     popularityHealth: buildPopularityHealth(focusTracks),
     tracks: buildTrackInsights(focusTracks),
+    topMovers,
+    newEntries,
+    recurringTracks,
+    opportunities: buildOpportunities(
+      focusTracks,
+      newEntries,
+      marketOption.label,
+      genreOption.label,
+    ),
     featuredPlaylists: marketData.featuredPlaylists,
     countryValue: marketOption.value,
     countryLabel: marketOption.label,
     genreValue: genreOption.value,
     genreLabel: genreOption.label,
-    topTrackName: focusTracks[0]?.name ?? "Sem faixa lider ainda",
+    topTrackName: topMovers[0]?.name ?? focusTracks[0]?.name ?? "Sem faixa lider ainda",
     explicitShare:
       focusTracks.length > 0
         ? `${Math.round((explicitTracks.length / focusTracks.length) * 100)}%`
