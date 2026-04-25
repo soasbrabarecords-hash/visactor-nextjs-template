@@ -79,6 +79,39 @@ export async function fetchPlaylistsFromSupabase(): Promise<SupabasePlaylistRow[
   return (await response.json()) as SupabasePlaylistRow[];
 }
 
+export async function fetchPlaylistByIdFromSupabase(
+  id: string,
+): Promise<SupabasePlaylistRow | null> {
+  const env = getSupabaseEnv();
+
+  if (!env) {
+    return null;
+  }
+
+  const response = await fetch(
+    `${env.url}/rest/v1/playlists?select=${encodeURIComponent(PLAYLIST_COLUMNS)}&id=eq.${encodeURIComponent(id)}&limit=1`,
+    {
+      headers: {
+        apikey: env.anonKey,
+        Authorization: `Bearer ${env.anonKey}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const errorPayload = (await response.json().catch(() => null)) as
+      | SupabaseSelectResponse
+      | null;
+    throw new Error(
+      errorPayload?.message ?? "Failed to fetch playlist from Supabase.",
+    );
+  }
+
+  const rows = (await response.json()) as SupabasePlaylistRow[];
+  return rows[0] ?? null;
+}
+
 export async function insertPlaylistIntoSupabase(
   input: SupabaseInsertPlaylistInput,
 ): Promise<SupabasePlaylistRow> {

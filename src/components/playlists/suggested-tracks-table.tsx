@@ -1,39 +1,33 @@
-import { ExternalLink, ListMusic } from "lucide-react";
+import { ExternalLink, WandSparkles } from "lucide-react";
 import ChartTitle from "@/components/chart-blocks/components/chart-title";
 import Container from "@/components/container";
-import type { TrackInsight } from "@/types/charts";
+import type { SuggestedTrackInsight } from "@/types/playlist-analysis";
 
-export default function TracksTable({
+export default function SuggestedTracksTable({
   tracks,
-  title = "Top Faixas do Radar",
-  description = "Ranking das musicas mais fortes dentro das playlists monitoradas, com base em repeticao, popularidade e presenca editorial.",
-  emptyMessage = "Adicione playlists com URL do Spotify para liberar a analise de charts.",
 }: {
-  tracks: TrackInsight[];
-  title?: string;
-  description?: string;
-  emptyMessage?: string;
+  tracks: SuggestedTrackInsight[];
 }) {
   return (
     <Container className="py-4">
       <section className="flex flex-col gap-4">
         <div>
-          <ChartTitle title={title} icon={ListMusic} />
+          <ChartTitle title="Sugestoes Relacionadas" icon={WandSparkles} />
           <p className="mt-1 text-sm text-muted-foreground">
-            {description}
+            Faixas com match forte com o DNA atual da playlist e potencial de
+            curadoria para o momento.
           </p>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="min-w-full divide-y divide-border text-left">
             <thead className="bg-muted/30">
-                <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Faixa</th>
-                  <th className="px-4 py-3 font-medium">Artistas</th>
+              <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Faixa</th>
+                <th className="px-4 py-3 font-medium">Artistas</th>
                 <th className="px-4 py-3 font-medium">Album</th>
                 <th className="px-4 py-3 font-medium">Popularidade</th>
-                <th className="px-4 py-3 font-medium">Playlists</th>
-                <th className="px-4 py-3 font-medium">Duracao</th>
+                <th className="px-4 py-3 font-medium">Motivo</th>
                 <th className="px-4 py-3 font-medium">Spotify</th>
               </tr>
             </thead>
@@ -41,10 +35,10 @@ export default function TracksTable({
               {tracks.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-4 py-8 text-center text-sm text-muted-foreground"
                   >
-                    {emptyMessage}
+                    Ainda nao temos sugestoes relacionadas para esta playlist.
                   </td>
                 </tr>
               ) : (
@@ -69,23 +63,10 @@ export default function TracksTable({
                     </td>
                     <td className="px-4 py-4 text-sm">{track.artists}</td>
                     <td className="px-4 py-4 text-sm">{track.albumName}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{
-                              width: `${Math.max(0, Math.min(track.popularity, 100))}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">
-                          {track.popularity}
-                        </span>
-                      </div>
+                    <td className="px-4 py-4 text-sm">{track.popularity}</td>
+                    <td className="px-4 py-4 text-sm text-muted-foreground">
+                      {track.reason}
                     </td>
-                    <td className="px-4 py-4 text-sm">{track.playlistsCount}</td>
-                    <td className="px-4 py-4 text-sm">{track.durationLabel}</td>
                     <td className="px-4 py-4">
                       <a
                         href={track.spotifyUrl}

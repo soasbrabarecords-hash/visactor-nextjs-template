@@ -25,24 +25,53 @@ type SpotifyPlaylistResponse = {
 
 type SpotifyPlaylistTracksResponse = {
   items?: Array<{
-    track?: {
+    track?: SpotifyTrackObject;
+  }>;
+  next?: string | null;
+};
+
+type SpotifyTrackObject = {
+  id?: string;
+  name?: string;
+  popularity?: number;
+  explicit?: boolean;
+  duration_ms?: number;
+  external_urls?: {
+    spotify?: string;
+  };
+  artists?: Array<{
+    id?: string;
+    name?: string;
+  }>;
+  album?: {
+    name?: string;
+    images?: Array<{
+      url?: string;
+    }>;
+  };
+};
+
+type SpotifyArtistTopTracksResponse = {
+  tracks?: SpotifyTrackObject[];
+};
+
+type SpotifyFeaturedPlaylistsResponse = {
+  playlists?: {
+    items?: Array<{
       id?: string;
       name?: string;
-      popularity?: number;
-      explicit?: boolean;
-      duration_ms?: number;
+      description?: string;
       external_urls?: {
         spotify?: string;
       };
-      artists?: Array<{
-        name?: string;
+      images?: Array<{
+        url?: string;
       }>;
-      album?: {
-        name?: string;
+      tracks?: {
+        total?: number;
       };
-    };
-  }>;
-  next?: string | null;
+    }>;
+  };
 };
 
 export type SpotifyPlaylistMetadata = {
@@ -58,11 +87,22 @@ export type SpotifyTrackRecord = {
   id: string;
   name: string;
   artists: string[];
+  artistIds: string[];
   popularity: number;
   explicit: boolean;
   durationMs: number;
   albumName: string;
+  coverUrl: string | null;
   spotifyUrl: string;
+};
+
+export type SpotifyFeaturedPlaylist = {
+  id: string;
+  name: string;
+  description: string;
+  coverUrl: string | null;
+  spotifyUrl: string;
+  tracksTotal: number;
 };
 
 let spotifyToken:
@@ -179,6 +219,30 @@ async function spotifyFetch<T>(url: string) {
   return (await response.json()) as T;
 }
 
+function mapSpotifyTrack(track: SpotifyTrackObject): SpotifyTrackRecord | null {
+  if (!track.id || !track.name) {
+    return null;
+  }
+
+  return {
+    id: track.id,
+    name: track.name,
+    artists: (track.artists ?? [])
+      .map((artist) => artist.name?.trim() || "")
+      .filter(Boolean),
+    artistIds: (track.artists ?? [])
+      .map((artist) => artist.id?.trim() || "")
+      .filter(Boolean),
+    popularity: parseNumber(track.popularity),
+    explicit: Boolean(track.explicit),
+    durationMs: parseNumber(track.duration_ms),
+    albumName: track.album?.name?.trim() || "Unknown album",
+    coverUrl: track.album?.images?.[0]?.url?.trim() || null,
+    spotifyUrl:
+      track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`,
+  };
+}
+
 export async function fetchSpotifyPlaylistMetadata(
   playlistId: string,
 ): Promise<SpotifyPlaylistMetadata> {
@@ -204,37 +268,55 @@ export async function fetchSpotifyPlaylistTracks(
   const tracks: SpotifyTrackRecord[] = [];
   let nextUrl:
     | string
-    | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(name),album(name))),next`;
+    | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&market=BR&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(id,name),album(name,images(url)))),next`;
 
   while (nextUrl) {
     const payload: SpotifyPlaylistTracksResponse =
       await spotifyFetch<SpotifyPlaylistTracksResponse>(nextUrl);
 
     for (const item of payload.items ?? []) {
-      const track = item.track;
+      const mappedTrack = item.track ? mapSpotifyTrack(item.track) : null;
 
-      if (!track?.id || !track.name) {
-        continue;
+      if (mappedTrack) {
+        tracks.push(mappedTrack);
       }
-
-      tracks.push({
-        id: track.id,
-        name: track.name,
-        artists: (track.artists ?? [])
-          .map((artist) => artist.name?.trim() || "")
-          .filter(Boolean),
-        popularity: parseNumber(track.popularity),
-        explicit: Boolean(track.explicit),
-        durationMs: parseNumber(track.duration_ms),
-        albumName: track.album?.name?.trim() || "Unknown album",
-        spotifyUrl:
-          track.external_urls?.spotify ||
-          `https://open.spotify.com/track/${track.id}`,
-      });
     }
 
     nextUrl = payload.next ?? null;
   }
 
   return tracks;
+}
+
+export async function fetchArtistTopTracks(
+  artistId: string,
+  market = "BR",
+): Promise<SpotifyTrackRecord[]> {
+  const payload = await spotifyFetch<SpotifyArtistTopTracksResponse>(
+    `https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=${market}`,
+  );
+
+  return (payload.tracks ?? [])
+    .map((track) => mapSpotifyTrack(track))
+    .filter((track): track is SpotifyTrackRecord => Boolean(track));
+}
+
+export async function fetchFeaturedPlaylists(
+  country = "BR",
+  limit = 6,
+): Promise<SpotifyFeaturedPlaylist[]> {
+  const payload = await spotifyFetch<SpotifyFeaturedPlaylistsResponse>(
+    `https://api.spotify.com/v1/browse/featured-playlists?country=${country}&locale=pt_BR&limit=${limit}`,
+  );
+
+  return (payload.playlists?.items ?? [])
+    .map((playlist) => ({
+      id: playlist.id?.trim() || "",
+      name: playlist.name?.trim() || "Playlist em destaque",
+      description: playlist.description?.trim() || "",
+      coverUrl: playlist.images?.[0]?.url?.trim() || null,
+      spotifyUrl: playlist.external_urls?.spotify?.trim() || "",
+      tracksTotal: parseNumber(playlist.tracks?.total),
+    }))
+    .filter((playlist) => Boolean(playlist.id && playlist.spotifyUrl));
 }

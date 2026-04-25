@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ExternalLink, ListMusic } from "lucide-react";
 import ChartTitle from "@/components/chart-blocks/components/chart-title";
 import Container from "@/components/container";
@@ -43,9 +44,12 @@ export default function PlaylistTable({
                 </tr>
               ) : (
                 playlists.map((playlist) => (
-                  <tr key={playlist.id}>
+                  <tr key={playlist.id} className="transition-colors hover:bg-muted/10">
                     <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
+                      <Link
+                        href={`/playlists/${playlist.id}`}
+                        className="flex items-center gap-3"
+                      >
                         {playlist.coverUrl ? (
                           <div
                             className="h-12 w-12 rounded-xl object-cover"
@@ -58,8 +62,13 @@ export default function PlaylistTable({
                         ) : (
                           <div className="h-12 w-12 rounded-xl bg-muted" />
                         )}
-                        <div className="font-medium">{playlist.name}</div>
-                      </div>
+                        <div>
+                          <div className="font-medium">{playlist.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Abrir analise da playlist
+                          </div>
+                        </div>
+                      </Link>
                     </td>
                     <td className="px-4 py-4 text-sm">
                       {addThousandsSeparator(playlist.followers)}

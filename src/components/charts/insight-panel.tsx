@@ -5,10 +5,14 @@ export default function InsightPanel({
   analyzedPlaylists,
   topRepeatedTrack,
   explicitShare,
+  marketHighlight,
+  sharedMomentumCount,
 }: {
   analyzedPlaylists: number;
   topRepeatedTrack: string;
   explicitShare: string;
+  marketHighlight: string;
+  sharedMomentumCount: number;
 }) {
   return (
     <section className="flex h-full flex-col gap-4">
@@ -36,6 +40,18 @@ export default function InsightPanel({
             Share de explicit
           </div>
           <div className="mt-2 text-2xl font-medium">{explicitShare}</div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-muted/10 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Shared momentum
+          </div>
+          <div className="mt-2 text-2xl font-medium">
+            {sharedMomentumCount} faixas
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {marketHighlight}
+          </p>
         </div>
       </div>
     </section>
