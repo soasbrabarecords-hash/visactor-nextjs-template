@@ -50,6 +50,9 @@ export default function MusicTrackGrid({
                 )}
 
                 <div className="min-w-0">
+                  <div className="mb-2 inline-flex rounded-full border border-border px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    {track.badgeLabel}
+                  </div>
                   <div className="truncate font-medium">{track.name}</div>
                   <p className="truncate text-sm text-muted-foreground">
                     {track.artists}

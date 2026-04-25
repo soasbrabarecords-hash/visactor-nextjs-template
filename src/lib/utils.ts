@@ -10,5 +10,7 @@ export function addThousandsSeparator(num: number) {
 }
 
 export function numberToPercentage(num: number) {
-  return `${num * 100}%`;
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 1,
+  }).format(num * 100)}%`;
 }

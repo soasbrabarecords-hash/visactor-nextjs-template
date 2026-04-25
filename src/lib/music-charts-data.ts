@@ -1,21 +1,17 @@
 import "server-only";
 
-import type {
-  ChannelDatum,
-  ConversionDatum,
-  DashboardMetric,
-  ScoreBreakdown,
-} from "@/types/dashboard";
+import type { ChannelDatum, ConversionDatum, ScoreBreakdown } from "@/types/dashboard";
+import type { FeaturedPlaylistInsight, TrackInsight } from "@/types/charts";
 import type {
   MusicChartsData,
+  MusicDataTrustContext,
   MusicFilterOption,
   MusicOpportunity,
+  MusicSignalSource,
   MusicTrackHighlight,
+  MusicWorkbenchMetric,
+  MusicWorkbenchTrack,
 } from "@/types/music-charts";
-import type {
-  FeaturedPlaylistInsight,
-  TrackInsight,
-} from "@/types/charts";
 import {
   fetchFeaturedPlaylists,
   fetchSpotifyPlaylistTracks,
@@ -44,6 +40,8 @@ type AggregatedTrack = {
   explicit: boolean;
   spotifyUrl: string;
   coverUrl: string | null;
+  marketSignals: number;
+  searchSignals: number;
 };
 
 const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
@@ -156,19 +154,16 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
-function formatDecimal(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
 function formatDuration(durationMs: number) {
   const totalSeconds = Math.floor(durationMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function clamp(value: number, minValue: number, maxValue: number) {
+  return Math.min(Math.max(value, minValue), maxValue);
 }
 
 function getMarketOption(country?: string) {
@@ -185,7 +180,166 @@ function getGenreOption(genre?: string) {
   );
 }
 
-function aggregateTracks(trackGroups: SpotifyTrackRecord[][]): AggregatedTrack[] {
+function getSignalCount(track: Pick<AggregatedTrack, "marketSignals" | "searchSignals">) {
+  return track.marketSignals + track.searchSignals;
+}
+
+function getTrackSignalSource(track: Pick<AggregatedTrack, "marketSignals" | "searchSignals">): MusicSignalSource {
+  if (track.marketSignals > 0 && track.searchSignals > 0) {
+    return "hybrid";
+  }
+
+  if (track.marketSignals > 0) {
+    return "featured";
+  }
+
+  if (track.searchSignals > 0) {
+    return "search";
+  }
+
+  return "empty";
+}
+
+function getSignalSourceLabel(source: MusicSignalSource) {
+  switch (source) {
+    case "featured":
+      return "Featured";
+    case "search":
+      return "Search fallback";
+    case "hybrid":
+      return "Featured + Search";
+    default:
+      return "Sem fonte";
+  }
+}
+
+function getSourceMode(
+  featuredPlaylistCount: number,
+  activeQueryCount: number,
+): MusicSignalSource {
+  if (featuredPlaylistCount > 0 && activeQueryCount > 0) {
+    return "hybrid";
+  }
+
+  if (featuredPlaylistCount > 0) {
+    return "featured";
+  }
+
+  if (activeQueryCount > 0) {
+    return "search";
+  }
+
+  return "empty";
+}
+
+function getSourceModeLabel(sourceMode: MusicSignalSource) {
+  switch (sourceMode) {
+    case "hybrid":
+      return "Radar hibrido";
+    case "featured":
+      return "Radar editorial";
+    case "search":
+      return "Search fallback";
+    default:
+      return "Sem leitura ativa";
+  }
+}
+
+function getSourceModeDescription(sourceMode: MusicSignalSource) {
+  switch (sourceMode) {
+    case "hybrid":
+      return "Cruza playlists destaque com buscas editoriais para ampliar cobertura sem perder contexto.";
+    case "featured":
+      return "Baseado diretamente nas playlists em destaque do Spotify para este mercado.";
+    case "search":
+      return "Spotify nao trouxe playlists destaque suficientes e a leitura foi sustentada por buscas editoriais.";
+    default:
+      return "Ainda sem base suficiente para produzir um radar confiavel.";
+  }
+}
+
+function getTractionLabel(track: AggregatedTrack) {
+  const signalCount = getSignalCount(track);
+
+  if (track.popularity >= 75 || (track.marketSignals > 0 && track.popularity >= 68)) {
+    return "Alta tracao";
+  }
+
+  if (track.popularity >= 55 || signalCount >= 3) {
+    return "Media tracao";
+  }
+
+  return "Sinal inicial";
+}
+
+function getSaturationLabel(track: AggregatedTrack) {
+  const signalCount = getSignalCount(track);
+
+  if (signalCount <= 1) {
+    return "Baixa saturacao";
+  }
+
+  if (signalCount >= 4) {
+    return "Alta saturacao";
+  }
+
+  return "Saturacao moderada";
+}
+
+function getMomentumScore(track: AggregatedTrack, maxSignalCount: number) {
+  const normalizedSignals =
+    maxSignalCount > 0 ? getSignalCount(track) / maxSignalCount : 0;
+  const editorialBonus = track.marketSignals > 0 ? 8 : 0;
+  const hybridBonus = track.marketSignals > 0 && track.searchSignals > 0 ? 6 : 0;
+
+  return clamp(
+    Math.round(track.popularity * 0.6 + normalizedSignals * 26 + editorialBonus + hybridBonus),
+    0,
+    100,
+  );
+}
+
+function getOpportunityScore(track: AggregatedTrack, maxSignalCount: number) {
+  const normalizedSignals =
+    maxSignalCount > 0 ? getSignalCount(track) / maxSignalCount : 0;
+  const lowSaturationBonus = getSignalCount(track) <= 2 ? 16 : 0;
+  const discoveryBonus =
+    track.popularity >= 60 && getSignalCount(track) <= 2 ? 12 : 0;
+  const editorialBonus = track.marketSignals > 0 ? 10 : 0;
+  const hybridBonus = track.marketSignals > 0 && track.searchSignals > 0 ? 6 : 0;
+  const saturationPenalty = getSignalCount(track) >= 5 ? 8 : 0;
+
+  return clamp(
+    Math.round(
+      track.popularity * 0.48 +
+        normalizedSignals * 18 +
+        lowSaturationBonus +
+        discoveryBonus +
+        editorialBonus +
+        hybridBonus -
+        saturationPenalty,
+    ),
+    0,
+    100,
+  );
+}
+
+function sortTracks(tracks: AggregatedTrack[]) {
+  return [...tracks].sort((left, right) => {
+    const signalDifference = getSignalCount(right) - getSignalCount(left);
+
+    if (signalDifference !== 0) {
+      return signalDifference;
+    }
+
+    return right.popularity - left.popularity;
+  });
+}
+
+function aggregateTracks(
+  trackGroups: SpotifyTrackRecord[][],
+  source: "market" | "search",
+): AggregatedTrack[] {
   const trackMap = new Map<string, AggregatedTrack>();
 
   for (const group of trackGroups) {
@@ -198,6 +352,8 @@ function aggregateTracks(trackGroups: SpotifyTrackRecord[][]): AggregatedTrack[]
       if (existing) {
         existing.popularity = Math.max(existing.popularity, track.popularity);
         existing.explicit = existing.explicit || track.explicit;
+        existing.coverUrl = existing.coverUrl ?? track.coverUrl ?? null;
+        existing.albumName = existing.albumName || track.albumName || "Unknown album";
       } else {
         trackMap.set(track.id, {
           id: track.id,
@@ -211,6 +367,8 @@ function aggregateTracks(trackGroups: SpotifyTrackRecord[][]): AggregatedTrack[]
           explicit: track.explicit,
           spotifyUrl: track.spotifyUrl,
           coverUrl: track.coverUrl,
+          marketSignals: 0,
+          searchSignals: 0,
         });
       }
 
@@ -220,18 +378,18 @@ function aggregateTracks(trackGroups: SpotifyTrackRecord[][]): AggregatedTrack[]
 
         if (aggregated) {
           aggregated.playlistsCount += 1;
+
+          if (source === "market") {
+            aggregated.marketSignals += 1;
+          } else {
+            aggregated.searchSignals += 1;
+          }
         }
       }
     }
   }
 
-  return Array.from(trackMap.values()).sort((left, right) => {
-    if (right.playlistsCount !== left.playlistsCount) {
-      return right.playlistsCount - left.playlistsCount;
-    }
-
-    return right.popularity - left.popularity;
-  });
+  return sortTracks(Array.from(trackMap.values()));
 }
 
 function buildTopTracks(tracks: AggregatedTrack[]): ConversionDatum[] {
@@ -286,15 +444,15 @@ function buildPopularityHealth(tracks: AggregatedTrack[]): ScoreBreakdown {
   };
 }
 
-function buildTrackInsights(tracks: AggregatedTrack[]): TrackInsight[] {
-  return tracks.slice(0, 20).map((track) => ({
+function buildTrackInsights(tracks: AggregatedTrack[], limit = tracks.length): TrackInsight[] {
+  return tracks.slice(0, limit).map((track) => ({
     id: track.id,
     name: track.name,
     artists: track.artists,
     artistIds: track.artistIds,
     albumName: track.albumName,
     popularity: track.popularity,
-    playlistsCount: track.playlistsCount,
+    playlistsCount: getSignalCount(track),
     durationLabel: formatDuration(track.durationMs),
     explicit: track.explicit,
     spotifyUrl: track.spotifyUrl,
@@ -325,237 +483,390 @@ function buildFeaturedPlaylistInsights(
   }));
 }
 
+function mergeTracks(left: AggregatedTrack, right: AggregatedTrack): AggregatedTrack {
+  return {
+    ...left,
+    popularity: Math.max(left.popularity, right.popularity),
+    playlistsCount: left.playlistsCount + right.playlistsCount,
+    coverUrl: left.coverUrl ?? right.coverUrl ?? null,
+    albumName: left.albumName || right.albumName || "Unknown album",
+    marketSignals: left.marketSignals + right.marketSignals,
+    searchSignals: left.searchSignals + right.searchSignals,
+  };
+}
+
 function mergeGenreAndMarketTracks(
   marketTracks: AggregatedTrack[],
   genreTracks: AggregatedTrack[],
+  includeMarketUnion: boolean,
 ): AggregatedTrack[] {
   if (genreTracks.length === 0) {
-    return marketTracks;
+    return sortTracks(marketTracks);
+  }
+
+  if (marketTracks.length === 0) {
+    return sortTracks(genreTracks);
   }
 
   const marketTrackMap = new Map(
     marketTracks.map((track) => [track.id, track] as const),
   );
 
-  return genreTracks
-    .map((track) => {
-      const marketTrack = marketTrackMap.get(track.id);
+  if (!includeMarketUnion) {
+    return sortTracks(
+      genreTracks.map((track) => {
+        const marketTrack = marketTrackMap.get(track.id);
 
-      return {
-        ...track,
-        popularity: Math.max(track.popularity, marketTrack?.popularity ?? 0),
-        playlistsCount: marketTrack?.playlistsCount ?? track.playlistsCount,
-        coverUrl: track.coverUrl ?? marketTrack?.coverUrl ?? null,
-        albumName: track.albumName || marketTrack?.albumName || "Unknown album",
-      };
-    })
-    .sort((left, right) => {
-      if (right.playlistsCount !== left.playlistsCount) {
-        return right.playlistsCount - left.playlistsCount;
-      }
+        return marketTrack ? mergeTracks(track, marketTrack) : track;
+      }),
+    );
+  }
 
-      return right.popularity - left.popularity;
-    });
+  const mergedMap = new Map(
+    marketTracks.map((track) => [track.id, track] as const),
+  );
+
+  for (const track of genreTracks) {
+    const existing = mergedMap.get(track.id);
+
+    if (existing) {
+      mergedMap.set(track.id, mergeTracks(existing, track));
+    } else {
+      mergedMap.set(track.id, track);
+    }
+  }
+
+  return sortTracks(Array.from(mergedMap.values()));
 }
 
-function buildMetrics(
+function buildSummaryCards(
   tracks: AggregatedTrack[],
-  featuredPlaylists: FeaturedPlaylistInsight[],
-): DashboardMetric[] {
-  const averagePopularity =
-    tracks.length > 0
-      ? tracks.reduce((sum, track) => sum + track.popularity, 0) / tracks.length
-      : 0;
-  const highMomentumTracks = tracks.filter((track) => track.popularity >= 70);
+  workbenchTracks: MusicWorkbenchTrack[],
+  featuredPlaylistCount: number,
+  activeQueryCount: number,
+): MusicWorkbenchMetric[] {
+  const highTractionCount = workbenchTracks.filter((track) => track.highTraction).length;
+  const opportunityCount = workbenchTracks.filter(
+    (track) => track.lowSaturation && track.opportunityScore >= 70,
+  ).length;
+  const activeSourceCount = featuredPlaylistCount + activeQueryCount;
 
   return [
     {
-      title: "Tracks em Alta",
+      title: "Tracks analisadas",
       value: formatCount(tracks.length),
-      change: 0,
+      caption: "Amostra real usada para esta leitura do radar.",
     },
     {
-      title: "Playlists Fonte",
-      value: formatCount(featuredPlaylists.length),
-      change: 0,
+      title: "Fontes ativas",
+      value: formatCount(activeSourceCount),
+      caption: `${featuredPlaylistCount} featured + ${activeQueryCount} buscas com retorno.`,
     },
     {
-      title: "Alta Tracao",
-      value: formatCount(highMomentumTracks.length),
-      change: 0,
+      title: "Alta tracao",
+      value: formatCount(highTractionCount),
+      caption: "Faixas com aderencia imediata para playlisting.",
     },
     {
-      title: "Avg. Popularity",
-      value: formatDecimal(averagePopularity),
-      change: 0,
+      title: "Oportunidades",
+      value: formatCount(opportunityCount),
+      caption: "Sinais com baixa saturacao e alto potencial editorial.",
     },
   ];
 }
 
-function getMomentumScore(track: AggregatedTrack, maxPlaylistsCount: number) {
-  const normalizedRecurrence =
-    maxPlaylistsCount > 0 ? track.playlistsCount / maxPlaylistsCount : 0;
-
-  return Math.round(track.popularity * 0.7 + normalizedRecurrence * 30);
-}
-
 function buildTopMovers(tracks: AggregatedTrack[]): MusicTrackHighlight[] {
-  const maxPlaylistsCount = tracks.reduce(
-    (maxValue, track) => Math.max(maxValue, track.playlistsCount),
+  const maxSignalCount = tracks.reduce(
+    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
     0,
   );
 
   return [...tracks]
     .sort((left, right) => {
-      const rightScore = getMomentumScore(right, maxPlaylistsCount);
-      const leftScore = getMomentumScore(left, maxPlaylistsCount);
+      const rightScore = getMomentumScore(right, maxSignalCount);
+      const leftScore = getMomentumScore(left, maxSignalCount);
 
-      return rightScore - leftScore;
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+
+      return right.popularity - left.popularity;
     })
     .slice(0, 6)
-    .map((track) => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists,
-      coverUrl: track.coverUrl,
-      spotifyUrl: track.spotifyUrl,
-      primaryMetric: `${getMomentumScore(track, maxPlaylistsCount)} pts`,
-      secondaryMetric: `${track.playlistsCount} playlists · ${track.popularity} pop`,
-      summary:
-        track.playlistsCount > 1
-          ? `Movendo o mercado com recorrencia em ${track.playlistsCount} playlists fonte.`
-          : "Sinal forte de tracao com performance acima da media do radar.",
-    }));
+    .map((track) => {
+      const source = getTrackSignalSource(track);
+      const signalCount = getSignalCount(track);
+
+      return {
+        id: track.id,
+        name: track.name,
+        artists: track.artists,
+        coverUrl: track.coverUrl,
+        spotifyUrl: track.spotifyUrl,
+        badgeLabel:
+          source === "hybrid"
+            ? "Dominio hibrido"
+            : source === "featured"
+              ? "Forca editorial"
+              : "Busca aquecida",
+        primaryMetric: `${getMomentumScore(track, maxSignalCount)} pts`,
+        secondaryMetric: `${signalCount} sinais · ${track.popularity} pop`,
+        summary:
+          source === "hybrid"
+            ? "Dominando playlists destaque e busca ao mesmo tempo."
+            : source === "featured"
+              ? `Ja ganhou espaco editorial e sustenta ${signalCount} sinais ativos no radar.`
+              : signalCount > 1
+                ? "Recorrencia forte nas buscas do radar, com espaco para escalar."
+                : "Faixa liderando o radar por performance acima da media.",
+      };
+    });
 }
 
-function buildNewEntries(tracks: AggregatedTrack[]): MusicTrackHighlight[] {
-  const candidates = tracks.filter(
-    (track) => track.playlistsCount <= 1 && track.popularity >= 55,
+function buildNewEntries(
+  tracks: AggregatedTrack[],
+  excludedIds: Set<string>,
+): MusicTrackHighlight[] {
+  const maxSignalCount = tracks.reduce(
+    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
+    0,
   );
-  const fallbackCandidates = tracks.filter((track) => track.playlistsCount <= 2);
+  const candidates = tracks.filter((track) => {
+    const signalCount = getSignalCount(track);
+
+    return !excludedIds.has(track.id) && signalCount <= 2 && track.popularity >= 55;
+  });
+  const fallbackCandidates = tracks.filter(
+    (track) => !excludedIds.has(track.id) && getSignalCount(track) <= 3,
+  );
   const source = candidates.length >= 6 ? candidates : fallbackCandidates;
 
   return [...source]
-    .sort((left, right) => right.popularity - left.popularity)
+    .sort((left, right) => {
+      const rightScore = getOpportunityScore(right, maxSignalCount);
+      const leftScore = getOpportunityScore(left, maxSignalCount);
+
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+
+      return right.popularity - left.popularity;
+    })
     .slice(0, 6)
-    .map((track) => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists,
-      coverUrl: track.coverUrl,
-      spotifyUrl: track.spotifyUrl,
-      primaryMetric: `${track.popularity} pop`,
-      secondaryMetric:
-        track.playlistsCount <= 1
-          ? "Baixa saturacao"
-          : `${track.playlistsCount} aparicoes no radar`,
-      summary:
-        track.playlistsCount <= 1
-          ? "Faixa ainda pouco saturada e pronta para descoberta rapida."
-          : "Entrada recente no radar com chance de crescer nas proximas viradas.",
-    }));
+    .map((track) => {
+      const signalCount = getSignalCount(track);
+      const sourceLabel = getTrackSignalSource(track);
+
+      return {
+        id: track.id,
+        name: track.name,
+        artists: track.artists,
+        coverUrl: track.coverUrl,
+        spotifyUrl: track.spotifyUrl,
+        badgeLabel: signalCount <= 1 ? "Early signal" : "Discovery wave",
+        primaryMetric: `${getOpportunityScore(track, maxSignalCount)} pts`,
+        secondaryMetric: `${getSaturationLabel(track)} · ${track.popularity} pop`,
+        summary:
+          sourceLabel === "featured"
+            ? "Entrou pelo radar editorial com pouca saturacao e bom potencial de descoberta."
+            : signalCount <= 1
+              ? "Ainda pouco saturada e pronta para discovery rapido."
+              : "Sinal fresco com recorrencia inicial e chance de subir nas proximas leituras.",
+      };
+    });
 }
 
 function buildRecurringTracks(tracks: AggregatedTrack[]): TrackInsight[] {
-  const recurring = tracks.filter((track) => track.playlistsCount >= 2);
-  const source = recurring.length > 0 ? recurring : tracks;
+  const recurring = tracks.filter(
+    (track) => track.marketSignals >= 2 || getSignalCount(track) >= 3,
+  );
+  const fallback = tracks.filter((track) => getSignalCount(track) >= 2);
+  const source = recurring.length > 0 ? recurring : fallback.length > 0 ? fallback : tracks;
 
   return buildTrackInsights(
-    [...source]
-      .sort((left, right) => {
-        if (right.playlistsCount !== left.playlistsCount) {
-          return right.playlistsCount - left.playlistsCount;
-        }
+    [...source].sort((left, right) => {
+      const rightSignals = getSignalCount(right);
+      const leftSignals = getSignalCount(left);
 
-        return right.popularity - left.popularity;
-      })
-      .slice(0, 24),
+      if (rightSignals !== leftSignals) {
+        return rightSignals - leftSignals;
+      }
+
+      return right.popularity - left.popularity;
+    }),
+    12,
   );
+}
+
+function buildWorkbenchTracks(
+  tracks: AggregatedTrack[],
+  topMoverIds: Set<string>,
+  newEntryIds: Set<string>,
+  recurringIds: Set<string>,
+): MusicWorkbenchTrack[] {
+  const maxSignalCount = tracks.reduce(
+    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
+    0,
+  );
+
+  const rankedTracks = [...tracks].sort((left, right) => {
+    const rightScore = getOpportunityScore(right, maxSignalCount);
+    const leftScore = getOpportunityScore(left, maxSignalCount);
+
+    if (rightScore !== leftScore) {
+      return rightScore - leftScore;
+    }
+
+    const rightMomentum = getMomentumScore(right, maxSignalCount);
+    const leftMomentum = getMomentumScore(left, maxSignalCount);
+
+    if (rightMomentum !== leftMomentum) {
+      return rightMomentum - leftMomentum;
+    }
+
+    return right.popularity - left.popularity;
+  });
+
+  return rankedTracks.map((track, index) => {
+    const signalCount = getSignalCount(track);
+    const source = getTrackSignalSource(track);
+    const opportunityScore = getOpportunityScore(track, maxSignalCount);
+    const highTraction =
+      track.popularity >= 75 ||
+      (track.marketSignals > 0 && track.popularity >= 68) ||
+      opportunityScore >= 82;
+    const lowSaturation = signalCount <= 2;
+    const tags = [
+      topMoverIds.has(track.id) ? "Mover" : null,
+      newEntryIds.has(track.id) ? "Nova" : null,
+      recurringIds.has(track.id) ? "Recorrente" : null,
+      lowSaturation ? "Baixa saturacao" : null,
+      track.explicit ? "Explicit" : null,
+    ].filter((tag): tag is string => Boolean(tag));
+
+    return {
+      rank: index + 1,
+      id: track.id,
+      name: track.name,
+      artists: track.artists,
+      albumName: track.albumName,
+      popularity: track.popularity,
+      signalCount,
+      durationLabel: formatDuration(track.durationMs),
+      explicit: track.explicit,
+      spotifyUrl: track.spotifyUrl,
+      coverUrl: track.coverUrl,
+      opportunityScore,
+      sourceLabel: getSignalSourceLabel(source),
+      signalSource: source,
+      tractionLabel: getTractionLabel(track),
+      saturationLabel: getSaturationLabel(track),
+      tags,
+      isMover: topMoverIds.has(track.id),
+      isNewEntry: newEntryIds.has(track.id),
+      isRecurring: recurringIds.has(track.id),
+      lowSaturation,
+      highTraction,
+    };
+  });
 }
 
 function buildOpportunities(
   tracks: AggregatedTrack[],
-  newEntries: MusicTrackHighlight[],
   countryLabel: string,
   genreLabel: string,
 ): MusicOpportunity[] {
-  const recurringTracks = tracks
-    .filter((track) => track.playlistsCount >= 2)
+  const maxSignalCount = tracks.reduce(
+    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
+    0,
+  );
+  const anchorTracks = [...tracks]
+    .filter((track) => track.marketSignals >= 1 && track.popularity >= 68)
     .sort((left, right) => {
-      if (right.playlistsCount !== left.playlistsCount) {
-        return right.playlistsCount - left.playlistsCount;
+      const rightMomentum = getMomentumScore(right, maxSignalCount);
+      const leftMomentum = getMomentumScore(left, maxSignalCount);
+
+      if (rightMomentum !== leftMomentum) {
+        return rightMomentum - leftMomentum;
       }
 
       return right.popularity - left.popularity;
     });
+  const discoveryTracks = [...tracks]
+    .filter((track) => getSignalCount(track) <= 2 && track.popularity >= 58)
+    .sort((left, right) => {
+      const rightScore = getOpportunityScore(right, maxSignalCount);
+      const leftScore = getOpportunityScore(left, maxSignalCount);
 
-  const artistFrequency = new Map<
-    string,
-    {
-      name: string;
-      count: number;
-    }
-  >();
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+
+      return right.popularity - left.popularity;
+    });
+  const artistFrequency = new Map<string, number>();
 
   for (const track of tracks) {
     for (const artist of track.artists.split(", ").filter(Boolean)) {
-      const current = artistFrequency.get(artist);
-
-      if (current) {
-        current.count += 1;
-      } else {
-        artistFrequency.set(artist, {
-          name: artist,
-          count: 1,
-        });
-      }
+      artistFrequency.set(artist, (artistFrequency.get(artist) ?? 0) + 1);
     }
   }
 
-  const topArtists = Array.from(artistFrequency.values())
-    .sort((left, right) => right.count - left.count)
-    .slice(0, 3);
-  const artistDominanceTracks = tracks.filter((track) =>
-    topArtists.some((artist) => track.artists.includes(artist.name)),
+  const topArtists = Array.from(artistFrequency.entries())
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([artist]) => artist);
+  const artistWaveTracks = tracks.filter((track) =>
+    topArtists.some((artist) => track.artists.includes(artist)),
   );
+  const focusLabel =
+    genreLabel === "Todos os generos" ? `${countryLabel} agora` : `${genreLabel} em ${countryLabel}`;
 
   return [
     {
-      title: "Playlist ancora de alta tracao",
-      description: `Monte uma playlist ${genreLabel === "Todos os generos" ? "mainstream de mercado" : `de ${genreLabel}`} para ${countryLabel} com as faixas que ja dominaram o radar externo.`,
+      title: "Frente ancora de alta tracao",
+      description: `Monte uma playlist principal para ${focusLabel} usando as faixas que ja ganharam aderencia editorial no radar.`,
       rationale:
-        recurringTracks.length > 0
-          ? `Essas faixas ja se repetem nas playlists fonte e ajudam a entrar com aderencia imediata.`
-          : "Mesmo sem grande recorrencia, esse bloco concentra as faixas mais fortes para abrir uma nova playlist.",
-      badge: "High traction",
-      seeds: buildSeedTracks(recurringTracks.length > 0 ? recurringTracks : tracks),
+        anchorTracks.length > 0
+          ? "As seeds abaixo ja performam com equilibrio entre popularidade e contexto de mercado."
+          : "Quando faltarem anchors fortes, use os movers como bloco de teste inicial.",
+      badge: "Anchor build",
+      playlistAngle: "Mainstream com entrada rapida",
+      potential: anchorTracks.length >= 3 ? "Alta conversao" : "Conversao moderada",
+      risk: anchorTracks.length >= 3 ? "Saturacao controlada" : "Base curta",
+      callToAction: "Abrir shortlist de anchors",
+      seeds: buildSeedTracks(anchorTracks.length > 0 ? anchorTracks : tracks),
     },
     {
-      title: "Janela de descoberta",
+      title: "Janela de discovery",
       description:
-        "Use sinais ainda pouco saturados para criar uma playlist de descoberta e capturar tendencia antes da concorrencia.",
+        "Use entradas frescas com baixa saturacao para capturar tendencia antes de virar consenso editorial.",
       rationale:
-        newEntries.length > 0
-          ? "As seeds abaixo aparecem como entradas frescas com alto potencial de crescimento."
-          : "O radar ainda nao mostrou entradas frescas suficientes, entao use os movers para discovery.",
-      badge: "Early signal",
-      seeds: buildSeedTracks(
-        tracks.filter((track) =>
-          newEntries.some((entry) => entry.id === track.id),
-        ),
-      ),
+        discoveryTracks.length > 0
+          ? "Essas faixas ainda nao estao saturadas e ajudam a abrir uma frente de descoberta."
+          : "Se o discovery estiver curto, trabalhe com os movers menos recorrentes para criar janela cedo.",
+      badge: "Early discovery",
+      playlistAngle: "Discovery / baixa saturacao",
+      potential: discoveryTracks.length >= 3 ? "Alta chance de descoberta" : "Leitura inicial",
+      risk: discoveryTracks.length >= 3 ? "Conversao instavel" : "Pouca amostra",
+      callToAction: "Montar shortlist de discovery",
+      seeds: buildSeedTracks(discoveryTracks.length > 0 ? discoveryTracks : tracks),
     },
     {
       title: "Dominio de artista",
       description:
-        "Crie uma frente editorial baseada nos artistas que mais estao puxando o mercado agora.",
+        "Crie uma frente editorial baseada no cluster de artistas que mais esta empurrando o radar neste recorte.",
       rationale:
         topArtists.length > 0
-          ? `Os nomes mais presentes agora sao ${topArtists.map((artist) => artist.name).join(", ")}.`
-          : "Ainda nao ha artistas dominantes suficientes para fechar esse cluster.",
+          ? `Os nomes que mais aparecem agora sao ${topArtists.join(", ")}.`
+          : "Ainda nao houve concentracao forte em poucos artistas para formar um cluster.",
       badge: "Artist wave",
+      playlistAngle: "Cluster por artista dominante",
+      potential: topArtists.length >= 3 ? "Alta afinidade editorial" : "Afinidade moderada",
+      risk: topArtists.length >= 3 ? "Dependencia de poucos nomes" : "Cluster disperso",
+      callToAction: "Testar frente por artista",
       seeds: buildSeedTracks(
-        artistDominanceTracks.length > 0 ? artistDominanceTracks : tracks,
+        artistWaveTracks.length > 0 ? artistWaveTracks : tracks,
       ),
     },
   ];
@@ -564,22 +875,87 @@ function buildOpportunities(
 function buildMarketHighlight(
   countryLabel: string,
   genreLabel: string,
-  featuredPlaylists: FeaturedPlaylistInsight[],
-  featuredIntersectionCount: number,
+  sourceMode: MusicSignalSource,
+  featuredPlaylistCount: number,
+  activeQueryCount: number,
+  hybridCount: number,
 ) {
-  if (featuredPlaylists.length === 0) {
-    return "Sem leitura de mercado suficiente para este recorte agora.";
-  }
+  const focusLabel =
+    genreLabel === "Todos os generos" ? `mercado aberto de ${countryLabel}` : `${genreLabel} em ${countryLabel}`;
 
-  if (genreLabel === "Todos os generos") {
-    return `Radar montado a partir das playlists em destaque do Spotify em ${countryLabel}.`;
+  switch (sourceMode) {
+    case "hybrid":
+      return `${hybridCount} faixas cruzam playlists destaque com busca editorial no recorte ${focusLabel}.`;
+    case "featured":
+      return `Leitura baseada nas ${featuredPlaylistCount} playlists destaque do Spotify para ${focusLabel}.`;
+    case "search":
+      return `Sem playlists destaque suficientes; radar sustentado por ${activeQueryCount} buscas editoriais em ${focusLabel}.`;
+    default:
+      return `Ainda sem sinal suficiente para produzir um radar confiavel em ${focusLabel}.`;
   }
+}
 
-  if (featuredIntersectionCount > 0) {
-    return `${featuredIntersectionCount} faixas do recorte ${genreLabel} tambem aparecem nas playlists em destaque de ${countryLabel}.`;
-  }
+function buildDataTrustContext({
+  tracks,
+  featuredPlaylistCount,
+  activeQueryCount,
+  countryLabel,
+  genreLabel,
+}: {
+  tracks: AggregatedTrack[];
+  featuredPlaylistCount: number;
+  activeQueryCount: number;
+  countryLabel: string;
+  genreLabel: string;
+}): MusicDataTrustContext {
+  const sourceMode = getSourceMode(featuredPlaylistCount, activeQueryCount);
+  const featuredOnlyCount = tracks.filter(
+    (track) => track.marketSignals > 0 && track.searchSignals === 0,
+  ).length;
+  const searchOnlyCount = tracks.filter(
+    (track) => track.marketSignals === 0 && track.searchSignals > 0,
+  ).length;
+  const hybridCount = tracks.filter(
+    (track) => track.marketSignals > 0 && track.searchSignals > 0,
+  ).length;
+  const explicitCount = tracks.filter((track) => track.explicit).length;
+  const topTrack =
+    sortTracks(tracks)[0]?.name ?? "Sem faixa lider ainda";
+  const activeSourceCount = featuredPlaylistCount + activeQueryCount;
 
-  return `Leitura por ${genreLabel} em ${countryLabel}, mesmo quando o Spotify ainda nao empurrou esse som para as playlists destaque.`;
+  return {
+    sourceMode,
+    sourceModeLabel: getSourceModeLabel(sourceMode),
+    sourceModeDescription: getSourceModeDescription(sourceMode),
+    fallbackActive: sourceMode === "search",
+    updatedAtLabel: new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date()),
+    sampleSize: tracks.length,
+    activeSourceCount,
+    featuredPlaylistCount,
+    queryCount: activeQueryCount,
+    featuredOnlyCount,
+    searchOnlyCount,
+    hybridCount,
+    marketHighlight: buildMarketHighlight(
+      countryLabel,
+      genreLabel,
+      sourceMode,
+      featuredPlaylistCount,
+      activeQueryCount,
+      hybridCount,
+    ),
+    topTrackName: topTrack,
+    explicitShare:
+      tracks.length > 0
+        ? `${Math.round((explicitCount / tracks.length) * 100)}%`
+        : "0%",
+    countryLabel,
+    genreLabel,
+  };
 }
 
 async function loadFeaturedPlaylistTracks(
@@ -605,6 +981,7 @@ async function loadFeaturedPlaylistTracks(
       featuredPlaylists: buildFeaturedPlaylistInsights(featuredPlaylists),
       aggregatedTracks: aggregateTracks(
         playlistTrackGroups.filter((group) => group.length > 0),
+        "market",
       ),
     };
   } catch {
@@ -618,25 +995,50 @@ async function loadFeaturedPlaylistTracks(
 async function loadGenreTracks(
   queries: string[],
   country: string,
-): Promise<AggregatedTrack[]> {
+): Promise<{
+  aggregatedTracks: AggregatedTrack[];
+  activeQueryCount: number;
+}> {
   if (queries.length === 0) {
-    return [];
+    return {
+      aggregatedTracks: [],
+      activeQueryCount: 0,
+    };
   }
 
   try {
     const groups = await Promise.all(
       queries.map(async (query) => {
         try {
-          return await fetchSpotifyTracksByGenre(query, country, 20);
+          const tracks = await fetchSpotifyTracksByGenre(query, country, 20);
+
+          return {
+            query,
+            tracks,
+          };
         } catch {
-          return [];
+          return {
+            query,
+            tracks: [] as SpotifyTrackRecord[],
+          };
         }
       }),
     );
 
-    return aggregateTracks(groups.filter((group) => group.length > 0));
+    const nonEmptyGroups = groups.filter((group) => group.tracks.length > 0);
+
+    return {
+      aggregatedTracks: aggregateTracks(
+        nonEmptyGroups.map((group) => group.tracks),
+        "search",
+      ),
+      activeQueryCount: nonEmptyGroups.length,
+    };
   } catch {
-    return [];
+    return {
+      aggregatedTracks: [],
+      activeQueryCount: 0,
+    };
   }
 }
 
@@ -671,22 +1073,42 @@ export async function getMusicChartsData({
     genreOption.value === "all"
       ? MARKET_PROBE_QUERIES[marketOption.value] ?? MARKET_PROBE_QUERIES.BR
       : genreOption.queries;
-  const searchedTracks = await loadGenreTracks(fallbackQueries, marketOption.value);
+  const genreData = await loadGenreTracks(fallbackQueries, marketOption.value);
   const focusTracks =
     marketData.aggregatedTracks.length > 0
-      ? mergeGenreAndMarketTracks(marketData.aggregatedTracks, searchedTracks)
-      : searchedTracks;
+      ? mergeGenreAndMarketTracks(
+          marketData.aggregatedTracks,
+          genreData.aggregatedTracks,
+          genreOption.value === "all",
+        )
+      : genreData.aggregatedTracks;
   const topMovers = buildTopMovers(focusTracks);
-  const newEntries = buildNewEntries(focusTracks);
+  const topMoverIds = new Set(topMovers.map((track) => track.id));
+  const newEntries = buildNewEntries(focusTracks, topMoverIds);
+  const newEntryIds = new Set(newEntries.map((track) => track.id));
   const recurringTracks = buildRecurringTracks(focusTracks);
-  const marketTrackIds = new Set(marketData.aggregatedTracks.map((track) => track.id));
-  const featuredIntersectionCount = focusTracks.filter((track) =>
-    marketTrackIds.has(track.id),
-  ).length;
-  const explicitTracks = focusTracks.filter((track) => track.explicit);
+  const recurringIds = new Set(recurringTracks.map((track) => track.id));
+  const workbenchTracks = buildWorkbenchTracks(
+    focusTracks,
+    topMoverIds,
+    newEntryIds,
+    recurringIds,
+  );
+  const dataTrust = buildDataTrustContext({
+    tracks: focusTracks,
+    featuredPlaylistCount: marketData.featuredPlaylists.length,
+    activeQueryCount: genreData.activeQueryCount,
+    countryLabel: marketOption.label,
+    genreLabel: genreOption.label,
+  });
 
   return {
-    metrics: buildMetrics(focusTracks, marketData.featuredPlaylists),
+    summaryCards: buildSummaryCards(
+      focusTracks,
+      workbenchTracks,
+      marketData.featuredPlaylists.length,
+      genreData.activeQueryCount,
+    ),
     topTracks: buildTopTracks(focusTracks),
     artistDistribution: buildArtistDistribution(focusTracks),
     popularityHealth: buildPopularityHealth(focusTracks),
@@ -694,28 +1116,17 @@ export async function getMusicChartsData({
     topMovers,
     newEntries,
     recurringTracks,
+    workbenchTracks,
     opportunities: buildOpportunities(
       focusTracks,
-      newEntries,
       marketOption.label,
       genreOption.label,
     ),
     featuredPlaylists: marketData.featuredPlaylists,
+    dataTrust,
     countryValue: marketOption.value,
     countryLabel: marketOption.label,
     genreValue: genreOption.value,
     genreLabel: genreOption.label,
-    topTrackName: topMovers[0]?.name ?? focusTracks[0]?.name ?? "Sem faixa lider ainda",
-    explicitShare:
-      focusTracks.length > 0
-        ? `${Math.round((explicitTracks.length / focusTracks.length) * 100)}%`
-        : "0%",
-    marketHighlight: buildMarketHighlight(
-      marketOption.label,
-      genreOption.label,
-      marketData.featuredPlaylists,
-      featuredIntersectionCount,
-    ),
-    sourcePlaylistsCount: marketData.featuredPlaylists.length,
   };
 }

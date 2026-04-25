@@ -3,6 +3,23 @@ import ChartTitle from "@/components/chart-blocks/components/chart-title";
 import Container from "@/components/container";
 import type { MusicOpportunity } from "@/types/music-charts";
 
+function OpportunityMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-background/80 p-3">
+      <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
 export default function MusicOpportunitiesPanel({
   opportunities,
 }: {
@@ -17,8 +34,8 @@ export default function MusicOpportunitiesPanel({
             icon={Lightbulb}
           />
           <p className="mt-1 text-sm text-muted-foreground">
-            Leitura editorial pronta para transformar o radar do mercado em
-            novas frentes de curadoria e playlist building.
+            Blocos executaveis para transformar o radar do mercado em novas
+            frentes de curadoria, discovery e playlist building.
           </p>
         </div>
 
@@ -36,7 +53,23 @@ export default function MusicOpportunitiesPanel({
               <p className="mt-2 text-sm text-muted-foreground">
                 {opportunity.description}
               </p>
-              <p className="mt-3 text-sm">{opportunity.rationale}</p>
+              <p className="mt-4 text-sm">{opportunity.rationale}</p>
+
+              <div className="mt-4 grid gap-3">
+                <OpportunityMeta
+                  label="Angulo editorial"
+                  value={opportunity.playlistAngle}
+                />
+                <OpportunityMeta
+                  label="Potencial"
+                  value={opportunity.potential}
+                />
+                <OpportunityMeta label="Risco" value={opportunity.risk} />
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-border bg-background/80 p-3 text-sm font-medium">
+                {opportunity.callToAction}
+              </div>
 
               <div className="mt-4 grid gap-3">
                 {opportunity.seeds.length === 0 ? (
