@@ -89,12 +89,53 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
 
+function formatSignedCount(value: number) {
+  const roundedValue = Math.round(value);
+
+  if (roundedValue > 0) {
+    return `+${formatCount(roundedValue)}`;
+  }
+
+  if (roundedValue < 0) {
+    return `-${formatCount(Math.abs(roundedValue))}`;
+  }
+
+  return "0";
+}
+
 function formatSignedValue(value: number) {
   if (value > 0) {
     return `+${value}`;
   }
 
   return `${value}`;
+}
+
+function formatStreamsValue(value: number | null) {
+  return value === null ? "Sem dado de streams" : `${formatCount(value)} streams 24h`;
+}
+
+function formatStreamRankValue(value: number | null) {
+  return value === null ? "Sem dado de streams" : `#${value} por streams`;
+}
+
+function formatStreamGrowthValue(
+  dailyStreams: number | null,
+  streamGrowth: number | null,
+) {
+  if (dailyStreams === null) {
+    return "Sem dado de streams";
+  }
+
+  if (streamGrowth === null) {
+    return "Sem historico";
+  }
+
+  if (streamGrowth === 0) {
+    return "0 em streams";
+  }
+
+  return `${formatSignedCount(streamGrowth)} em streams`;
 }
 
 function formatPercentage(value: number) {
@@ -281,6 +322,10 @@ function buildRadarRows(
       genre: track.genre,
       albumName: track.albumName,
       popularity: track.popularity,
+      dailyStreams: track.dailyStreams,
+      streamRank: track.streamRank,
+      streamGrowth: track.streamGrowth,
+      streamVelocityLabel: track.streamVelocityLabel,
       popularityChange: track.popularityChange,
       previousRank: track.previousRank,
       rankChange: track.rankChange,
@@ -346,17 +391,27 @@ function buildRadarMusicSummary(
   const opportunities = rows.filter(
     (row) => row.lowSaturation && row.opportunityScore >= 70,
   ).length;
+  const firstNewEntry = rows.find(
+    (row) => row.movement.type === "new" || row.movement.type === "reentry",
+  );
+  const topOpportunity = rows.find(
+    (row) => row.lowSaturation && row.opportunityScore >= 70,
+  );
 
   return [
     {
       title: "Top musica agora",
       value: topTrack?.name ?? "Sem dado",
-      helper: topTrack ? `Rank #${topTrack.rank} · score ${topTrack.opportunityScore}` : "Sem leitura",
+      helper: topTrack
+        ? topTrack.dailyStreams === null
+          ? "Sem dado de streams"
+          : `${formatStreamsValue(topTrack.dailyStreams)} · ${formatStreamRankValue(topTrack.streamRank)}`
+        : "Sem leitura",
       tone: "green" as const,
       coverUrl: topTrack?.coverUrl ?? null,
       accentLabel: topTrack?.artists ?? "Mercado em leitura",
       detail: topTrack
-        ? `${topTrack.genre} · ${topTrack.popularity} de popularidade e ${topTrack.daysOnRadar} dias no radar`
+        ? `${topTrack.genre} · variação ${topTrack.rankChange === null ? topTrack.movement.label : formatSignedValue(topTrack.rankChange)} · ${formatStreamGrowthValue(topTrack.dailyStreams, topTrack.streamGrowth)}`
         : "Sem faixa lider agora",
     },
     {
@@ -364,13 +419,13 @@ function buildRadarMusicSummary(
       value: biggestRise?.name ?? "Historico em coleta",
       helper:
         biggestRise && biggestRise.rankChange !== null
-          ? `${formatSignedValue(biggestRise.rankChange)} posicoes`
+          ? `${formatSignedValue(biggestRise.rankChange)} posicoes · ${formatStreamsValue(biggestRise.dailyStreams)}`
           : "Sem comparacao valida ainda",
       tone: "green" as const,
       coverUrl: biggestRise?.coverUrl ?? null,
       accentLabel: biggestRise?.movement.label ?? "Sem movimento",
       detail: biggestRise
-        ? `${biggestRise.artists} ganhou espaco no chart`
+        ? `${biggestRise.artists} ganhou espaco no chart · ${formatStreamGrowthValue(biggestRise.dailyStreams, biggestRise.streamGrowth)}`
         : hasSufficientHistory
           ? "Nenhuma faixa acelerou acima da media neste recorte."
           : "Historico insuficiente para leitura de subida. Continue coletando snapshots.",
@@ -380,13 +435,13 @@ function buildRadarMusicSummary(
       value: biggestDrop?.name ?? "Historico em coleta",
       helper:
         biggestDrop && biggestDrop.rankChange !== null
-          ? `${formatSignedValue(biggestDrop.rankChange)} posicoes`
+          ? `${formatSignedValue(biggestDrop.rankChange)} posicoes · ${formatStreamsValue(biggestDrop.dailyStreams)}`
           : "Sem comparacao valida ainda",
       tone: "red" as const,
       coverUrl: biggestDrop?.coverUrl ?? null,
       accentLabel: biggestDrop?.movement.label ?? "Sem movimento",
       detail: biggestDrop
-        ? `${biggestDrop.artists} perdeu tracao neste recorte`
+        ? `${biggestDrop.artists} perdeu tracao neste recorte · ${formatStreamGrowthValue(biggestDrop.dailyStreams, biggestDrop.streamGrowth)}`
         : hasSufficientHistory
           ? "Mercado estavel: nenhuma queda forte apareceu neste recorte."
           : "Historico insuficiente para leitura de queda. Continue coletando snapshots.",
@@ -396,24 +451,22 @@ function buildRadarMusicSummary(
       value: formatCount(newEntries),
       helper: "Novas ou retornando",
       tone: "purple" as const,
-      coverUrl:
-        rows.find(
-          (row) =>
-            row.movement.type === "new" || row.movement.type === "reentry",
-        )?.coverUrl ?? null,
+      coverUrl: firstNewEntry?.coverUrl ?? null,
       accentLabel: `${newEntries} tracks`,
-      detail: "Entrada fresca para discovery e playlist building.",
+      detail: firstNewEntry
+        ? `${formatStreamsValue(firstNewEntry.dailyStreams)} · ${formatStreamRankValue(firstNewEntry.streamRank)}`
+        : "Entrada fresca para discovery e playlist building.",
     },
     {
       title: "Oportunidades",
       value: formatCount(opportunities),
       helper: "Baixa saturacao",
       tone: "yellow" as const,
-      coverUrl:
-        rows.find((row) => row.lowSaturation && row.opportunityScore >= 70)
-          ?.coverUrl ?? null,
+      coverUrl: topOpportunity?.coverUrl ?? null,
       accentLabel: `${opportunities} janelas`,
-      detail: "Faixas prontas para virar recorte editorial novo.",
+      detail: topOpportunity
+        ? `${formatStreamsValue(topOpportunity.dailyStreams)} · ${formatStreamGrowthValue(topOpportunity.dailyStreams, topOpportunity.streamGrowth)}`
+        : "Faixas prontas para virar recorte editorial novo.",
     },
   ];
 }
@@ -436,13 +489,6 @@ function buildRadarMusicEditorialHero({
   dominantArtists: MusicArtistDominance[];
 }): RadarMusicEditorialHero {
   const leader = rows[0];
-  const risingCount = rows.filter((row) => row.movement.type === "up").length;
-  const newEntries = rows.filter(
-    (row) => row.movement.type === "new" || row.movement.type === "reentry",
-  ).length;
-  const opportunities = rows.filter(
-    (row) => row.lowSaturation && row.opportunityScore >= 70,
-  ).length;
 
   if (!leader) {
     return {
@@ -519,18 +565,29 @@ function buildRadarMusicEditorialHero({
     spotifyUrl: leader.spotifyUrl,
     stats: [
       {
-        label: "Novas entradas",
-        value: formatCount(newEntries),
+        label: "Streams 24h",
+        value:
+          leader.dailyStreams === null
+            ? "Sem dado de streams"
+            : formatCount(leader.dailyStreams),
         tone: "purple",
       },
       {
-        label: "Faixas subindo",
-        value: formatCount(risingCount),
+        label: "Rank streams",
+        value:
+          leader.streamRank === null
+            ? "Sem dado de streams"
+            : `#${leader.streamRank}`,
         tone: "green",
       },
       {
-        label: "Oportunidades",
-        value: formatCount(opportunities),
+        label: "Cresc. 24h",
+        value:
+          leader.dailyStreams === null
+            ? "Sem dado de streams"
+            : leader.streamGrowth === null
+              ? "Sem historico"
+              : formatSignedCount(leader.streamGrowth),
         tone: "yellow",
       },
     ],

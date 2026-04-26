@@ -40,12 +40,86 @@ function formatPopularityChange(value: number | null) {
   return `${value}`;
 }
 
+function formatCount(value: number) {
+  return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+}
+
+function formatSignedCount(value: number) {
+  const roundedValue = Math.round(value);
+
+  if (roundedValue > 0) {
+    return `+${formatCount(roundedValue)}`;
+  }
+
+  if (roundedValue < 0) {
+    return `-${formatCount(Math.abs(roundedValue))}`;
+  }
+
+  return "0";
+}
+
 function getMovementValue(row: RadarMusicRow) {
   if (row.rankChange === null) {
     return row.movement.valueLabel;
   }
 
   return `${row.movement.valueLabel} ${formatRankChange(row.rankChange)}`;
+}
+
+function getPositionContext(row: RadarMusicRow) {
+  if (row.previousRank === null) {
+    return "Sem historico";
+  }
+
+  return `#${row.previousRank} -> #${row.rank}`;
+}
+
+function formatDailyStreams(value: number | null) {
+  return value === null ? "Sem dado de streams" : formatCount(value);
+}
+
+function formatStreamRank(row: RadarMusicRow) {
+  if (row.dailyStreams === null) {
+    return "Sem dado de streams";
+  }
+
+  if (row.streamRank === null) {
+    return "Sem historico";
+  }
+
+  return `#${row.streamRank}`;
+}
+
+function formatStreamGrowth(row: RadarMusicRow) {
+  if (row.dailyStreams === null) {
+    return "Sem dado de streams";
+  }
+
+  if (row.streamGrowth === null) {
+    return "Sem historico";
+  }
+
+  return formatSignedCount(row.streamGrowth);
+}
+
+function getStreamGrowthClass(row: RadarMusicRow) {
+  if (row.dailyStreams === null) {
+    return "text-muted-foreground";
+  }
+
+  if (row.streamGrowth === null) {
+    return "text-slate-300";
+  }
+
+  if (row.streamGrowth > 0) {
+    return "text-emerald-300";
+  }
+
+  if (row.streamGrowth < 0) {
+    return "text-red-300";
+  }
+
+  return "text-slate-300";
 }
 
 export default function RadarMusicTable({
@@ -69,7 +143,7 @@ export default function RadarMusicTable({
       </div>
 
       <div className="overflow-x-auto rounded-[28px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
-        <table className="min-w-[1240px] w-full divide-y divide-border text-left">
+        <table className="min-w-[1500px] w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="px-4 py-3">Rank</th>
@@ -78,6 +152,9 @@ export default function RadarMusicTable({
               <th className="px-4 py-3">Artista</th>
               <th className="px-4 py-3">Genero</th>
               <th className="px-4 py-3">Popularidade</th>
+              <th className="px-4 py-3">Streams 24h</th>
+              <th className="px-4 py-3">Rank streams</th>
+              <th className="px-4 py-3">Cresc. 24h</th>
               <th className="px-4 py-3">Pop Δ</th>
               <th className="px-4 py-3">Dias</th>
               <th className="px-4 py-3">Sat.</th>
@@ -90,7 +167,7 @@ export default function RadarMusicTable({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={15}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma faixa encontrada para esse filtro agora.
@@ -111,6 +188,9 @@ export default function RadarMusicTable({
                       </StatusBadge>
                       <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                         {row.movement.label}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getPositionContext(row)}
                       </div>
                     </div>
                   </td>
@@ -161,6 +241,28 @@ export default function RadarMusicTable({
                   </td>
                   <td className="px-4 py-4 text-sm font-medium">
                     {row.popularity}
+                  </td>
+                  <td className="px-4 py-4 text-sm font-medium">
+                    <div className={row.dailyStreams === null ? "text-muted-foreground" : ""}>
+                      {formatDailyStreams(row.dailyStreams)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-sm font-medium">
+                    <div
+                      className={
+                        row.dailyStreams === null ? "text-muted-foreground" : ""
+                      }
+                    >
+                      {formatStreamRank(row)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-sm font-medium">
+                    <div className={getStreamGrowthClass(row)}>
+                      {formatStreamGrowth(row)}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {row.dailyStreams === null ? "Sem dado de streams" : row.streamVelocityLabel}
+                    </div>
                   </td>
                   <td className="px-4 py-4 text-sm font-medium">
                     <span
