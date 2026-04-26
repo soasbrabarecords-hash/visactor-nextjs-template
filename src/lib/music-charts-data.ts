@@ -891,7 +891,7 @@ function buildRecurringTracks(
   const historicalRecurring = tracks.filter((track) => {
     const history = historyMeta.historyByTrack.get(track.id);
 
-    return Boolean(history) && history.snapshotCount >= 2;
+    return history ? history.snapshotCount >= 2 : false;
   });
   const currentRecurring = tracks.filter(
     (track) => track.marketSignals >= 2 || getSignalCount(track) >= 3,
