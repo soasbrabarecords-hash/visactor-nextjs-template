@@ -2,8 +2,9 @@ import Container from "@/components/container";
 import MusicFilters from "@/components/charts/music-filters";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
-import HeroInsightPanel from "@/components/workspace/hero-insight";
-import MetricGrid from "@/components/workspace/metric-grid";
+import RadarMusicEditorialHero from "@/components/workspace/radar-music-editorial-hero";
+import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
+import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
 import RadarMusicTable from "@/components/workspace/radar-music-table";
 import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarMusicPageData } from "@/lib/workspace-data";
@@ -55,15 +56,9 @@ export default async function RadarMusicPage({
         }
       />
 
-      <HeroInsightPanel insight={data.heroInsight} />
-      <MetricGrid
-        metrics={data.summaryCards.map((card) => ({
-          title: card.title,
-          value: card.value,
-          helper: card.helper,
-          tone: card.tone,
-        }))}
-      />
+      <RadarMusicEditorialHero hero={data.editorialHero} />
+      <RadarMusicGenreRail items={data.genreSpotlights} />
+      <RadarMusicHighlightGrid highlights={data.summaryCards} />
 
       <Container className="border-b border-border py-6">
         <div className="grid gap-4 laptop:grid-cols-[1.3fr_0.7fr]">
@@ -72,41 +67,47 @@ export default async function RadarMusicPage({
               Insight principal
             </div>
             <h2 className="mt-3 text-3xl font-semibold">
-              Ranking com leitura real de movimento
+              Ranking com leitura visual de chart
             </h2>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Aqui o foco e chart: posicao, ganho, perda, recorrencia e chance
-              editorial. Tudo que nao ajuda decisao imediata ficou em segundo plano.
+              O topo da pagina ficou editorial e colorido para discovery rapido. Abaixo, a tabela segura a leitura analitica com rank, movimento, capa, oportunidade e score.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <StatusBadge tone="purple">{data.filters.selectedGenreLabel}</StatusBadge>
+              <StatusBadge tone="blue">{data.filters.selectedCountryLabel}</StatusBadge>
+              <StatusBadge tone="green">{data.editorialHero.periodLabel}</StatusBadge>
+            </div>
           </article>
 
           <article className="rounded-3xl border border-border bg-card/70 p-6">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Confianca do dado
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <StatusBadge tone="blue">{data.support.sourceModeLabel}</StatusBadge>
-              <StatusBadge tone="yellow">
-                {data.support.historyDaysTracked} dias
-              </StatusBadge>
-              <StatusBadge tone="green">
-                {data.support.sampleSize} tracks
-              </StatusBadge>
+            <div className="mt-4 grid gap-3">
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge tone="blue">{data.support.sourceModeLabel}</StatusBadge>
+                <StatusBadge tone="yellow">
+                  {data.support.historyDaysTracked} dias de historico
+                </StatusBadge>
+                <StatusBadge tone="green">
+                  {data.support.sampleSize} tracks lidas
+                </StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {data.support.sourceModeDescription}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {data.support.marketHighlight}
+              </p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Atualizado em {data.support.updatedAtLabel}
+              </p>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              {data.support.sourceModeDescription}
-            </p>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {data.support.marketHighlight}
-            </p>
-            <p className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-              Atualizado em {data.support.updatedAtLabel}
-            </p>
           </article>
         </div>
       </Container>
 
-      <RadarMusicTable rows={data.rows} />
+      <RadarMusicTable rows={data.rows} selectedGenreLabel={data.filters.selectedGenreLabel} />
     </div>
   );
 }

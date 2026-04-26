@@ -29,8 +29,11 @@ import type {
   PeriodFilter,
   PlaylistBaseData,
   PlaylistBaseRow,
+  RadarMusicEditorialHero,
+  RadarMusicGenreSpotlight,
   RadarMusicPageData,
   RadarMusicRow,
+  RadarMusicSummaryCard,
   RadarPlaylistRow,
   RadarPlaylistsData,
   RadarStatusFilter,
@@ -52,6 +55,34 @@ const STATUS_OPTIONS = [
   { value: "recurring", label: "Recorrentes" },
   { value: "low-saturation", label: "Baixa saturacao" },
 ] as const;
+
+const RADAR_GENRE_LANES: Record<string, string[]> = {
+  BR: ["trap", "funk", "rap", "pop", "sertanejo"],
+  US: ["hip-hop", "rap", "pop", "r-n-b", "electronic"],
+  MX: ["latin", "reggaeton", "pop", "rap", "indie"],
+  AR: ["trap", "latin", "pop", "reggaeton", "indie"],
+  CO: ["reggaeton", "latin", "trap", "pop", "rap"],
+  ES: ["reggaeton", "latin", "pop", "indie", "house"],
+  PT: ["trap", "hip-hop", "pop", "house", "electronic"],
+  FR: ["rap", "pop", "electronic", "house", "r-n-b"],
+  GB: ["hip-hop", "house", "pop", "electronic", "r-n-b"],
+};
+
+const GENRE_CHIP_COPY: Record<string, string> = {
+  all: "Radar amplo",
+  trap: "Trap em foco",
+  funk: "Funk em foco",
+  rap: "Rap em foco",
+  "hip-hop": "Hip hop em foco",
+  pop: "Pop em foco",
+  sertanejo: "Sertanejo em foco",
+  latin: "Latin em foco",
+  reggaeton: "Reggaeton em foco",
+  electronic: "Electronic em foco",
+  house: "House em foco",
+  indie: "Indie em foco",
+  "r-n-b": "R&B em foco",
+};
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -117,6 +148,10 @@ function getPeriodDays(period: PeriodFilter) {
     default:
       return 7;
   }
+}
+
+function getPeriodLabel(period: PeriodFilter) {
+  return PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? "7 dias";
 }
 
 function normalizePeriod(value?: string): PeriodFilter {
@@ -406,7 +441,7 @@ function filterRadarRows(
   }
 }
 
-function buildRadarMusicSummary(rows: RadarMusicRow[]) {
+function buildRadarMusicSummary(rows: RadarMusicRow[]): RadarMusicSummaryCard[] {
   const topTrack = rows[0];
   const biggestRise = [...rows]
     .filter((row) => (row.rankChange ?? 0) > 0)
@@ -427,6 +462,11 @@ function buildRadarMusicSummary(rows: RadarMusicRow[]) {
       value: topTrack?.name ?? "Sem dado",
       helper: topTrack ? `Rank #${topTrack.rank}` : "Sem leitura",
       tone: "green" as const,
+      coverUrl: topTrack?.coverUrl ?? null,
+      accentLabel: topTrack?.artists ?? "Mercado em leitura",
+      detail: topTrack
+        ? `${topTrack.popularity} de popularidade e ${topTrack.daysOnRadar} dias no radar`
+        : "Sem faixa lider agora",
     },
     {
       title: "Maior subida",
@@ -436,6 +476,11 @@ function buildRadarMusicSummary(rows: RadarMusicRow[]) {
           ? `${formatSignedValue(biggestRise.rankChange)} posicoes`
           : "Sem historico",
       tone: "green" as const,
+      coverUrl: biggestRise?.coverUrl ?? null,
+      accentLabel: biggestRise?.movement.label ?? "Sem movimento",
+      detail: biggestRise
+        ? `${biggestRise.artists} ganhou espaco no chart`
+        : "Ainda sem alta registrada",
     },
     {
       title: "Maior queda",
@@ -445,20 +490,188 @@ function buildRadarMusicSummary(rows: RadarMusicRow[]) {
           ? `${formatSignedValue(biggestDrop.rankChange)} posicoes`
           : "Sem historico",
       tone: "red" as const,
+      coverUrl: biggestDrop?.coverUrl ?? null,
+      accentLabel: biggestDrop?.movement.label ?? "Sem movimento",
+      detail: biggestDrop
+        ? `${biggestDrop.artists} perdeu tracao neste recorte`
+        : "Ainda sem queda registrada",
     },
     {
       title: "Novas entradas",
       value: formatCount(newEntries),
       helper: "Novas ou retornando",
       tone: "purple" as const,
+      coverUrl:
+        rows.find(
+          (row) =>
+            row.movement.type === "new" || row.movement.type === "reentry",
+        )?.coverUrl ?? null,
+      accentLabel: `${newEntries} tracks`,
+      detail: "Entrada fresca para discovery e playlist building.",
     },
     {
       title: "Oportunidades",
       value: formatCount(opportunities),
       helper: "Baixa saturacao",
       tone: "yellow" as const,
+      coverUrl:
+        rows.find((row) => row.lowSaturation && row.opportunityScore >= 70)
+          ?.coverUrl ?? null,
+      accentLabel: `${opportunities} janelas`,
+      detail: "Faixas prontas para virar recorte editorial novo.",
     },
   ];
+}
+
+function buildRadarMusicEditorialHero({
+  rows,
+  countryLabel,
+  genreLabel,
+  periodLabel,
+}: {
+  rows: RadarMusicRow[];
+  countryLabel: string;
+  genreLabel: string;
+  periodLabel: string;
+}): RadarMusicEditorialHero {
+  const leader = rows[0];
+  const risingCount = rows.filter((row) => row.movement.type === "up").length;
+  const newEntries = rows.filter(
+    (row) => row.movement.type === "new" || row.movement.type === "reentry",
+  ).length;
+  const opportunities = rows.filter(
+    (row) => row.lowSaturation && row.opportunityScore >= 70,
+  ).length;
+
+  if (!leader) {
+    return {
+      badge: "Mercado em observacao",
+      headline: "Ainda sem um lider claro para destacar neste radar",
+      summary:
+        "Assim que o sistema receber sinais suficientes, a capa e o destaque principal aparecem aqui com prioridade editorial.",
+      coverUrl: null,
+      trackName: "Sem lider",
+      artists: "Mercado em leitura",
+      rankLabel: "Sem rank",
+      movementLabel: "Sem historico",
+      genreLabel,
+      countryLabel,
+      periodLabel,
+      spotifyUrl: "#",
+      stats: [
+        {
+          label: "Faixas ativas",
+          value: formatCount(rows.length),
+          tone: "blue",
+        },
+      ],
+    };
+  }
+
+  return {
+    badge: `${countryLabel} · ${periodLabel}`,
+    headline: `${leader.name} puxa ${genreLabel.toLowerCase()} com cara de #1 absoluto`,
+    summary:
+      "A hero area agora destaca a track lider com capa grande, contexto de mercado e os sinais que mais importam para uma leitura tipo chart musical.",
+    coverUrl: leader.coverUrl,
+    trackName: leader.name,
+    artists: leader.artists,
+    rankLabel: `#${leader.rank} no radar`,
+    movementLabel:
+      leader.rankChange === null
+        ? leader.movement.label
+        : `${leader.movement.label} ${formatSignedValue(leader.rankChange)}`,
+    genreLabel,
+    countryLabel,
+    periodLabel,
+    spotifyUrl: leader.spotifyUrl,
+    stats: [
+      {
+        label: "Novas entradas",
+        value: formatCount(newEntries),
+        tone: "purple",
+      },
+      {
+        label: "Faixas subindo",
+        value: formatCount(risingCount),
+        tone: "green",
+      },
+      {
+        label: "Oportunidades",
+        value: formatCount(opportunities),
+        tone: "yellow",
+      },
+    ],
+  };
+}
+
+function buildRadarMusicGenreSpotlights({
+  rows,
+  countryValue,
+  countryLabel,
+  selectedGenre,
+  selectedGenreLabel,
+  selectedPeriod,
+}: {
+  rows: RadarMusicRow[];
+  countryValue: string;
+  countryLabel: string;
+  selectedGenre: string;
+  selectedGenreLabel: string;
+  selectedPeriod: PeriodFilter;
+}): RadarMusicGenreSpotlight[] {
+  const genreOptions = getMusicGenreOptions();
+  const spotlightValues = Array.from(
+    new Set(
+      [
+        selectedGenre === "all" ? "all" : selectedGenre,
+        ...(RADAR_GENRE_LANES[countryValue] ?? RADAR_GENRE_LANES.BR),
+      ].filter(Boolean),
+    ),
+  ).slice(0, 5);
+
+  return spotlightValues.map((value, index) => {
+    const option =
+      genreOptions.find((item) => item.value === value) ??
+      genreOptions.find((item) => item.value === "all") ??
+      genreOptions[0];
+    const sampleRow =
+      value === selectedGenre
+        ? rows[0]
+        : rows[Math.min(index + 1, Math.max(rows.length - 1, 0))];
+    const params = new URLSearchParams({
+      country: countryValue,
+      genre: option.value,
+      period: selectedPeriod,
+      status: "all",
+    });
+
+    return {
+      value: option.value,
+      label: option.label,
+      description:
+        option.value === selectedGenre
+          ? `${selectedGenreLabel} lidera o radar em ${countryLabel}.`
+          : `Abrir recorte editorial de ${option.label.toLowerCase()} em ${countryLabel}.`,
+      href: `/radar-music?${params.toString()}`,
+      coverUrl: sampleRow?.coverUrl ?? null,
+      chipLabel:
+        option.value === selectedGenre
+          ? "Recorte ativo"
+          : GENRE_CHIP_COPY[option.value] ?? "Radar editorial",
+      tone:
+        option.value === selectedGenre
+          ? "green"
+          : option.value === "funk" || option.value === "sertanejo"
+            ? "yellow"
+            : option.value === "rap" || option.value === "trap"
+              ? "purple"
+              : option.value === "pop"
+                ? "blue"
+                : "slate",
+      isActive: option.value === selectedGenre,
+    };
+  });
 }
 
 function buildPlaylistMetrics(playlists: PlaylistRecord[]): WorkspaceMetric[] {
@@ -793,6 +1006,7 @@ export async function getRadarMusicPageData({
   const selectedPeriod = normalizePeriod(period);
   const selectedStatus = normalizeStatus(status);
   const periodDays = getPeriodDays(selectedPeriod);
+  const periodLabel = getPeriodLabel(selectedPeriod);
   const [musicData, chartsData] = await Promise.all([
     getMusicChartsData({ country, genre }),
     getChartsData(),
@@ -814,7 +1028,7 @@ export async function getRadarMusicPageData({
   return {
     hero: {
       eyebrow: "Mercado externo",
-      title: "Radar Music",
+      title: "Radar Music Charts",
       description:
         "Chart musical para ler o que esta subindo, o que esta caindo e onde existe espaco real para discovery e construcao de novas playlists.",
       primaryCtaLabel: "Ir para Curadoria",
@@ -823,13 +1037,29 @@ export async function getRadarMusicPageData({
       secondaryCtaHref: "/radar-playlists",
     },
     heroInsight: buildRadarMusicHeroInsight(rows),
+    editorialHero: buildRadarMusicEditorialHero({
+      rows,
+      countryLabel: musicData.countryLabel,
+      genreLabel: musicData.genreLabel,
+      periodLabel,
+    }),
+    genreSpotlights: buildRadarMusicGenreSpotlights({
+      rows,
+      countryValue: musicData.countryValue,
+      countryLabel: musicData.countryLabel,
+      selectedGenre: musicData.genreValue,
+      selectedGenreLabel: musicData.genreLabel,
+      selectedPeriod,
+    }),
     filters: {
       countryOptions: getMusicMarketOptions(),
       genreOptions: getMusicGenreOptions(),
       periodOptions: [...PERIOD_OPTIONS],
       statusOptions: [...STATUS_OPTIONS],
       selectedCountry: musicData.countryValue,
+      selectedCountryLabel: musicData.countryLabel,
       selectedGenre: musicData.genreValue,
+      selectedGenreLabel: musicData.genreLabel,
       selectedPeriod,
       selectedStatus,
     },

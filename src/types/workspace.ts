@@ -87,6 +87,40 @@ export type RadarMusicSummaryCard = {
   value: string;
   helper: string;
   tone: StatusTone;
+  coverUrl: string | null;
+  accentLabel: string;
+  detail: string;
+};
+
+export type RadarMusicEditorialHero = {
+  badge: string;
+  headline: string;
+  summary: string;
+  coverUrl: string | null;
+  trackName: string;
+  artists: string;
+  rankLabel: string;
+  movementLabel: string;
+  genreLabel: string;
+  countryLabel: string;
+  periodLabel: string;
+  spotifyUrl: string;
+  stats: Array<{
+    label: string;
+    value: string;
+    tone: StatusTone;
+  }>;
+};
+
+export type RadarMusicGenreSpotlight = {
+  value: string;
+  label: string;
+  description: string;
+  href: string;
+  coverUrl: string | null;
+  chipLabel: string;
+  tone: StatusTone;
+  isActive: boolean;
 };
 
 export type RadarMusicRow = {
@@ -123,13 +157,17 @@ export type RadarMusicSupport = {
 export type RadarMusicPageData = {
   hero: WorkspaceInsight;
   heroInsight: HeroInsight;
+  editorialHero: RadarMusicEditorialHero;
+  genreSpotlights: RadarMusicGenreSpotlight[];
   filters: {
     countryOptions: MusicFilterOption[];
     genreOptions: MusicFilterOption[];
     periodOptions: MusicFilterOption[];
     statusOptions: MusicFilterOption[];
     selectedCountry: string;
+    selectedCountryLabel: string;
     selectedGenre: string;
+    selectedGenreLabel: string;
     selectedPeriod: PeriodFilter;
     selectedStatus: RadarStatusFilter;
   };

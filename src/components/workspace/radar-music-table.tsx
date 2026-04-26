@@ -30,8 +30,10 @@ function formatRankChange(value: number | null) {
 
 export default function RadarMusicTable({
   rows,
+  selectedGenreLabel,
 }: {
   rows: RadarMusicRow[];
+  selectedGenreLabel: string;
 }) {
   return (
     <Container className="border-b border-border py-6">
@@ -46,7 +48,7 @@ export default function RadarMusicTable({
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
+      <div className="overflow-x-auto rounded-[28px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
         <table className="min-w-[1240px] w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -76,21 +78,38 @@ export default function RadarMusicTable({
             ) : (
               rows.map((row) => (
                 <tr key={row.trackId} className="hover:bg-muted/10">
-                  <td className="px-4 py-4 text-lg font-semibold">{row.rank}</td>
                   <td className="px-4 py-4">
-                    <StatusBadge tone={row.movement.tone}>
-                      {row.movement.valueLabel} {formatRankChange(row.rankChange)}
-                    </StatusBadge>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background/60 text-lg font-semibold">
+                      {row.rank}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="space-y-2">
+                      <StatusBadge tone={row.movement.tone} className="min-w-[88px] justify-center">
+                        {row.movement.valueLabel} {formatRankChange(row.rankChange)}
+                      </StatusBadge>
+                      <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        {row.movement.label}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-12 w-12 rounded-xl bg-muted"
+                        className="h-14 w-14 rounded-2xl border border-border bg-muted shadow-lg"
                         style={coverStyle(row.coverUrl)}
                       />
-                      <div>
-                        <div className="font-semibold">{row.name}</div>
-                        <div className="mt-1 flex flex-wrap gap-2">
+                      <div className="space-y-2">
+                        <div>
+                          <div className="font-semibold">{row.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {row.artists}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedGenreLabel !== "Todos os generos" ? (
+                            <StatusBadge tone="blue">{selectedGenreLabel}</StatusBadge>
+                          ) : null}
                           {row.statusTags.slice(0, 2).map((tag) => (
                             <StatusBadge
                               key={tag}
@@ -111,8 +130,12 @@ export default function RadarMusicTable({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-sm">{row.artists}</td>
-                  <td className="px-4 py-4 text-sm">{row.albumName}</td>
+                  <td className="px-4 py-4 text-sm">
+                    <div className="max-w-[220px] leading-6">{row.artists}</div>
+                  </td>
+                  <td className="px-4 py-4 text-sm">
+                    <div className="max-w-[220px] leading-6">{row.albumName}</div>
+                  </td>
                   <td className="px-4 py-4 text-sm font-medium">
                     {row.popularity}
                   </td>
@@ -125,7 +148,7 @@ export default function RadarMusicTable({
                   <td className="px-4 py-4 text-sm">{row.daysOnRadar}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
+                      <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full rounded-full bg-primary"
                           style={{ width: `${Math.max(0, Math.min(row.opportunityScore, 100))}%` }}
@@ -137,7 +160,7 @@ export default function RadarMusicTable({
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {row.scoreBreakdown.map((item) => (
-                        <StatusBadge key={item.label} tone={item.tone}>
+                        <StatusBadge key={item.label} tone={item.tone} className="normal-case tracking-[0.04em]">
                           {item.label}
                         </StatusBadge>
                       ))}
