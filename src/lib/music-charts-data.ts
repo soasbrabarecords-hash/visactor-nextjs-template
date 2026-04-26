@@ -29,8 +29,8 @@ import {
 import { upsertMusicChartMovements } from "./music-movement-store";
 import {
   fetchMusicTrackSnapshots,
-  upsertMusicTrackSnapshots,
-  type MusicChartSnapshotInput,
+  saveMusicTrackSnapshots,
+  type MusicTrackSnapshotInput,
 } from "./music-snapshot-store";
 
 type MusicGenreOption = MusicFilterOption & {
@@ -642,24 +642,22 @@ function buildSnapshotRows(
   tracks: ChartCandidate[],
   snapshotDate: string,
   capturedAt: string,
-): MusicChartSnapshotInput[] {
-  return tracks.map((track, index) => ({
-    spotify_track_id: track.trackId,
+): MusicTrackSnapshotInput[] {
+  return tracks.map((track) => ({
+    market: track.country,
+    genre: track.scopeGenre,
+    track_id: track.trackId,
+    snapshot_date: snapshotDate,
+    captured_at: capturedAt,
     track_name: track.trackName,
-    artist_name: track.artistName,
-    artist_ids: track.artistIds,
+    artists: track.artistName,
     album_name: track.albumName,
-    image_url: track.imageUrl,
+    cover_url: track.imageUrl,
     spotify_url: track.spotifyUrl,
     popularity: track.popularity,
-    rank_position: index + 1,
-    source_type: track.sourceType,
-    source_name: track.sourceName,
-    country: track.country,
-    genre: track.scopeGenre,
-    saturation_count: track.saturationCount,
-    snapshot_day: snapshotDate,
-    captured_at: capturedAt,
+    signal_count: track.saturationCount,
+    source_mode: track.sourceType,
+    explicit: track.explicit,
   }));
 }
 
@@ -1247,7 +1245,7 @@ export async function getMusicChartsData({
   });
 
   if (chartCandidates.length > 0) {
-    await upsertMusicTrackSnapshots(
+    await saveMusicTrackSnapshots(
       buildSnapshotRows(chartCandidates, snapshotDate, capturedAt),
     );
   }

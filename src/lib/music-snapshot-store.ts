@@ -40,6 +40,8 @@ type LegacyMusicTrackSnapshotInput = {
   explicit: boolean;
 };
 
+export type MusicTrackSnapshotInput = LegacyMusicTrackSnapshotInput;
+
 export type MusicChartSnapshotRow = MusicChartSnapshotRecord & {
   id?: string | null;
 };
@@ -185,6 +187,10 @@ function toLegacySnapshotInputs(
   }));
 }
 
+function logSnapshotPersistenceError(message: string) {
+  process.stderr.write(`[music_track_snapshots] ${message}\n`);
+}
+
 async function postJson({
   env,
   table,
@@ -269,6 +275,39 @@ export async function upsertMusicTrackSnapshots(
   });
 
   return Boolean(legacyResponse?.ok);
+}
+
+export async function saveMusicTrackSnapshots(
+  rows: MusicTrackSnapshotInput[],
+): Promise<boolean> {
+  const env = getSupabaseEnv();
+
+  if (!env || rows.length === 0) {
+    return false;
+  }
+
+  const response = await postJson({
+    env,
+    table: "music_track_snapshots",
+    rows,
+    onConflict: "market,genre,track_id,snapshot_date",
+  });
+
+  if (response?.ok) {
+    return true;
+  }
+
+  if (!response) {
+    logSnapshotPersistenceError("request failed before receiving a response");
+    return false;
+  }
+
+  const errorBody = await response.text().catch(() => "");
+  const details = errorBody ? ` ${errorBody}` : "";
+
+  logSnapshotPersistenceError(`upsert failed with status ${response.status}.${details}`);
+
+  return false;
 }
 
 export async function fetchMusicTrackSnapshots({
