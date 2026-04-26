@@ -8,6 +8,7 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith("/icon") ||
     pathname.startsWith("/images") ||
     pathname.startsWith("/api/auth") ||
+    pathname === "/api/import/spotify-charts" ||
     /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$/.test(pathname)
   );
 }
