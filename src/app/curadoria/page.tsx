@@ -2,8 +2,8 @@ import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
 import CurationTable from "@/components/workspace/curation-table";
+import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
-import StatusBadge from "@/components/workspace/status-badge";
 import { getCurationPageData } from "@/lib/workspace-data";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export default async function CuradoriaPage() {
         description={data.hero.description}
       />
 
+      <HeroInsightPanel insight={data.heroInsight} />
       <MetricGrid metrics={data.metrics} />
 
       <Container className="border-b border-border py-6">

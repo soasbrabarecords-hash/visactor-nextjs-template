@@ -18,7 +18,7 @@ function coverStyle(coverUrl: string | null) {
 
 function formatRankChange(value: number | null) {
   if (value === null) {
-    return "Sem historico";
+    return "NEW";
   }
 
   if (value > 0) {
@@ -79,7 +79,7 @@ export default function RadarMusicTable({
                   <td className="px-4 py-4 text-lg font-semibold">{row.rank}</td>
                   <td className="px-4 py-4">
                     <StatusBadge tone={row.movement.tone}>
-                      {row.movement.icon} {row.movement.label}
+                      {row.movement.valueLabel} {formatRankChange(row.rankChange)}
                     </StatusBadge>
                   </td>
                   <td className="px-4 py-4">
@@ -134,6 +134,13 @@ export default function RadarMusicTable({
                       <span className="text-sm font-medium">
                         {row.opportunityScore}
                       </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {row.scoreBreakdown.map((item) => (
+                        <StatusBadge key={item.label} tone={item.tone}>
+                          {item.label}
+                        </StatusBadge>
+                      ))}
                     </div>
                   </td>
                   <td className="px-4 py-4">

@@ -3,7 +3,9 @@ import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
 import BasePlaylistsTable from "@/components/workspace/base-playlists-table";
+import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
+import PlaylistComparisonTable from "@/components/workspace/playlist-comparison-table";
 import StatusBadge from "@/components/workspace/status-badge";
 import { getBasePlaylistsPageData } from "@/lib/workspace-data";
 
@@ -21,6 +23,7 @@ export default async function BasePlaylistsPage() {
         description={data.hero.description}
       />
 
+      <HeroInsightPanel insight={data.heroInsight} />
       <MetricGrid metrics={data.metrics} />
       <AddPlaylistForm />
 
@@ -42,6 +45,7 @@ export default async function BasePlaylistsPage() {
       </Container>
 
       <BasePlaylistsTable rows={data.rows} />
+      <PlaylistComparisonTable rows={data.comparisonRows} />
     </div>
   );
 }

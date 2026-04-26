@@ -12,6 +12,10 @@ import {
   fetchPlaylistSnapshots,
   type PlaylistSnapshotRow,
 } from "@/lib/playlist-snapshot-store";
+import {
+  extractSpotifyPlaylistId,
+  fetchSpotifyPlaylistTracks,
+} from "@/lib/spotify";
 import type { PlaylistRecord } from "@/types/dashboard";
 import type { TrackInsight } from "@/types/charts";
 import type { MusicWorkbenchTrack } from "@/types/music-charts";
@@ -19,6 +23,7 @@ import type {
   CurationPageData,
   DashboardWorkspaceData,
   DecisionTrack,
+  HeroInsight,
   MovementDescriptor,
   MovementType,
   PeriodFilter,
@@ -58,6 +63,12 @@ function formatSignedValue(value: number) {
   }
 
   return `${value}`;
+}
+
+function formatPercentage(value: number) {
+  return `${new Intl.NumberFormat("pt-BR", {
+    maximumFractionDigits: 1,
+  }).format(value)}%`;
 }
 
 function formatDateLabel(value: string | null | undefined) {
@@ -133,6 +144,7 @@ function buildMovementDescriptor(type: MovementType): MovementDescriptor {
         label: "Subiu",
         icon: "▲",
         tone: "green",
+        valueLabel: "▲",
       };
     case "down":
       return {
@@ -140,13 +152,15 @@ function buildMovementDescriptor(type: MovementType): MovementDescriptor {
         label: "Caiu",
         icon: "▼",
         tone: "red",
+        valueLabel: "▼",
       };
     case "same":
       return {
         type,
         label: "Estavel",
         icon: "●",
-        tone: "blue",
+        tone: "slate",
+        valueLabel: "●",
       };
     case "reentry":
       return {
@@ -154,6 +168,7 @@ function buildMovementDescriptor(type: MovementType): MovementDescriptor {
         label: "RE",
         icon: "RE",
         tone: "purple",
+        valueLabel: "RE",
       };
     default:
       return {
@@ -161,8 +176,55 @@ function buildMovementDescriptor(type: MovementType): MovementDescriptor {
         label: "NEW",
         icon: "NEW",
         tone: "purple",
+        valueLabel: "NEW",
       };
   }
+}
+
+function getMovementComponentScore(
+  movementType: MovementType,
+  rankChange: number | null,
+) {
+  if (movementType === "new") {
+    return 82;
+  }
+
+  if (movementType === "reentry") {
+    return 74;
+  }
+
+  if (rankChange === null) {
+    return 50;
+  }
+
+  return clamp(50 + rankChange * 6, 0, 100);
+}
+
+function getFitComponentScore(fitLabel: string) {
+  switch (fitLabel) {
+    case "Fit alto":
+      return 88;
+    case "Fit medio":
+      return 64;
+    default:
+      return 36;
+  }
+}
+
+function getBreakdownTone(value: number): StatusTone {
+  if (value >= 75) {
+    return "green";
+  }
+
+  if (value >= 55) {
+    return "yellow";
+  }
+
+  if (value >= 40) {
+    return "blue";
+  }
+
+  return "red";
 }
 
 function buildSnapshotRanking(
@@ -239,12 +301,15 @@ function buildRadarRows(
   workbenchTracks: MusicWorkbenchTrack[],
   snapshotRows: MusicTrackSnapshotRow[],
   periodDays: number,
+  playlistTracks: TrackInsight[],
+  dominantArtists: string[],
 ): RadarMusicRow[] {
   const { currentDate, previousDate } = getLatestSnapshotDates(snapshotRows);
   const previousRankMap = previousDate
     ? buildSnapshotRanking(snapshotRows, previousDate)
     : new Map<string, number>();
   const daysByTrack = buildDaysOnRadar(snapshotRows, currentDate, periodDays);
+  const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
 
   return workbenchTracks.map((track) => {
     const previousRank = previousRankMap.get(track.id) ?? null;
@@ -260,6 +325,16 @@ function buildRadarRows(
           (row) => row.track_id === track.id && row.snapshot_date === previousDate,
         )
       : false;
+    const alreadyInPlaylists = playlistTrackIds.has(track.id);
+    const normalizedArtists = track.artists.toLowerCase();
+    const artistFit = dominantArtists.some((artist) =>
+      normalizedArtists.includes(artist.toLowerCase()),
+    );
+    const fitLabel = alreadyInPlaylists || artistFit
+      ? "Fit alto"
+      : track.lowSaturation || daysOnRadar >= 3
+        ? "Fit medio"
+        : "Fit baixo";
     const rankChange = previousRank === null ? null : previousRank - track.rank;
 
     let movementType: MovementType;
@@ -295,7 +370,16 @@ function buildRadarRows(
       statusTags: track.tags,
       lowSaturation: track.lowSaturation,
       recurring: daysOnRadar >= 3 || track.isRecurring,
-      alreadyInPlaylists: false,
+      alreadyInPlaylists,
+      fitLabel,
+      scoreBreakdown: buildScoreBreakdown({
+        popularity: track.popularity,
+        movementType,
+        rankChange,
+        lowSaturation: track.lowSaturation,
+        recurring: daysOnRadar >= 3 || track.isRecurring,
+        fitLabel,
+      }),
     };
   });
 }
@@ -453,6 +537,162 @@ function buildPlaylistGrowth(
   };
 }
 
+function buildScoreBreakdown({
+  popularity,
+  movementType,
+  rankChange,
+  lowSaturation,
+  recurring,
+  fitLabel,
+}: {
+  popularity: number;
+  movementType: MovementType;
+  rankChange: number | null;
+  lowSaturation: boolean;
+  recurring: boolean;
+  fitLabel: string;
+}) {
+  const popularityScore = clamp(popularity, 0, 100);
+  const movementScore = getMovementComponentScore(movementType, rankChange);
+  const saturationScore = lowSaturation ? 84 : 48;
+  const recurrenceScore = recurring ? 78 : 44;
+  const fitScore = getFitComponentScore(fitLabel);
+
+  return [
+    {
+      label: `Pop ${popularityScore}`,
+      value: `${popularityScore}`,
+      tone: getBreakdownTone(popularityScore),
+    },
+    {
+      label:
+        rankChange === null
+          ? movementType === "reentry"
+            ? "Mov RE"
+            : "Mov NEW"
+          : `Mov ${formatSignedValue(rankChange)}`,
+      value: `${movementScore}`,
+      tone: getBreakdownTone(movementScore),
+    },
+    {
+      label: lowSaturation ? "Sat baixa" : "Sat media",
+      value: `${saturationScore}`,
+      tone: getBreakdownTone(saturationScore),
+    },
+    {
+      label: recurring ? "Rec forte" : "Rec leve",
+      value: `${recurrenceScore}`,
+      tone: getBreakdownTone(recurrenceScore),
+    },
+    {
+      label: fitLabel,
+      value: `${fitScore}`,
+      tone: getBreakdownTone(fitScore),
+    },
+  ];
+}
+
+function buildRadarMusicHeroInsight(rows: RadarMusicRow[]): HeroInsight {
+  const topTen = rows.slice(0, 10);
+  const artistCounts = new Map<string, number>();
+
+  for (const row of topTen) {
+    const leadArtist = row.artists.split(",")[0]?.trim() || row.artists;
+    artistCounts.set(leadArtist, (artistCounts.get(leadArtist) ?? 0) + 1);
+  }
+
+  const leadingArtist = Array.from(artistCounts.entries()).sort(
+    (left, right) => right[1] - left[1],
+  )[0];
+  const newEntries = rows.filter(
+    (row) => row.movement.type === "new" || row.movement.type === "reentry",
+  ).length;
+  const risingCount = rows.filter((row) => row.movement.type === "up").length;
+
+  if (leadingArtist && leadingArtist[1] >= 3) {
+    return {
+      headline: `${leadingArtist[0]} domina o radar com ${leadingArtist[1]} faixas no top 10`,
+      summary:
+        "O topo do chart esta concentrado em poucos artistas, indicando dominancia clara de repertorio neste recorte.",
+      tone: "green",
+      supportingPoints: [
+        `${newEntries} novas entradas`,
+        `${risingCount} faixas subindo`,
+        `${rows.length} faixas ativas no ranking`,
+      ],
+    };
+  }
+
+  return {
+    headline: `${newEntries} novas entradas indicam alta renovacao do mercado`,
+    summary:
+      "O radar mostra troca rapida no topo e abre espaco para discovery antes da saturacao plena.",
+    tone: newEntries >= 5 ? "purple" : "yellow",
+    supportingPoints: [
+      `${risingCount} faixas em alta`,
+      `${rows.filter((row) => row.recurring).length} recorrentes`,
+      `${rows[0]?.name ?? "Sem lider definido"} lidera agora`,
+    ],
+  };
+}
+
+function buildRadarPlaylistsHeroInsight(rows: RadarPlaylistRow[]): HeroInsight {
+  const leader = rows[0];
+
+  return {
+    headline: leader
+      ? `${leader.name} lidera a base aparecendo em ${leader.playlistsCount} playlists`
+      : "A base ainda nao tem uma faixa lider consolidada",
+    summary:
+      "Esse painel mostra o consenso interno da sua curadoria e revela quais faixas estao virando linguagem comum entre playlists diferentes.",
+    tone: leader && leader.playlistsCount >= 3 ? "green" : "blue",
+    supportingPoints: [
+      `${rows.filter((row) => row.status.label === "Shared momentum").length} em shared momentum`,
+      `${rows.filter((row) => row.playlistsCount >= 3).length} faixas core`,
+      `${rows.length} faixas mapeadas`,
+    ],
+  };
+}
+
+function buildBasePlaylistsHeroInsight(rows: PlaylistBaseRow[]): HeroInsight {
+  const leader = [...rows].sort(
+    (left, right) => right.playlist.score - left.playlist.score,
+  )[0];
+
+  return {
+    headline: leader
+      ? `${leader.playlist.name} puxa a base com score ${leader.playlist.score}`
+      : "Sua base ainda esta em formacao",
+    summary:
+      "A leitura operacional destaca quem lidera em performance, onde existe crescimento e quais playlists precisam de reforco.",
+    tone: leader && leader.playlist.score >= 80 ? "green" : "yellow",
+    supportingPoints: [
+      `${rows.length} playlists monitoradas`,
+      `${rows.filter((row) => row.growthTone === "green").length} em crescimento`,
+      `${rows.filter((row) => row.growthTone === "red").length} pedem atencao`,
+    ],
+  };
+}
+
+function buildCurationHeroInsight(rows: DecisionTrack[]): HeroInsight {
+  const addNow = rows.filter((row) => row.recommendedAction === "add");
+  const topTrack = addNow[0] ?? rows[0];
+
+  return {
+    headline: topTrack
+      ? `${topTrack.name} e a prioridade editorial numero um agora`
+      : "Sem prioridade critica definida para hoje",
+    summary:
+      "A mesa de curadoria transforma o radar em decisao pratica: o que entra, o que fica em observacao e o que perde espaco.",
+    tone: topTrack ? topTrack.movement.tone : "slate",
+    supportingPoints: [
+      `${addNow.length} prontas para adicionar`,
+      `${rows.filter((row) => row.recommendedAction === "observe").length} em observacao`,
+      `${rows.filter((row) => row.recommendedAction === "remove").length} pedem limpeza`,
+    ],
+  };
+}
+
 function buildCurationRows(
   radarRows: RadarMusicRow[],
   playlistTracks: TrackInsight[],
@@ -528,6 +768,7 @@ function buildCurationRows(
       fitLabel,
       decisionScore,
       recommendedAction,
+      scoreBreakdown: row.scoreBreakdown,
     };
   });
 }
@@ -552,13 +793,23 @@ export async function getRadarMusicPageData({
   const selectedPeriod = normalizePeriod(period);
   const selectedStatus = normalizeStatus(status);
   const periodDays = getPeriodDays(selectedPeriod);
-  const musicData = await getMusicChartsData({ country, genre });
+  const [musicData, chartsData] = await Promise.all([
+    getMusicChartsData({ country, genre }),
+    getChartsData(),
+  ]);
   const snapshotRows = await fetchMusicTrackSnapshots({
     market: musicData.countryValue,
     genre: musicData.genreValue,
     days: 30,
   });
-  const rows = buildRadarRows(musicData.workbenchTracks, snapshotRows, periodDays);
+  const rows = buildRadarRows(
+    musicData.workbenchTracks,
+    snapshotRows,
+    periodDays,
+    chartsData.tracks,
+    chartsData.artistDistribution.map((artist) => artist.type),
+  );
+  const filteredRows = filterRadarRows(rows, selectedStatus);
 
   return {
     hero: {
@@ -571,6 +822,7 @@ export async function getRadarMusicPageData({
       secondaryCtaLabel: "Ver Radar Playlists",
       secondaryCtaHref: "/radar-playlists",
     },
+    heroInsight: buildRadarMusicHeroInsight(rows),
     filters: {
       countryOptions: getMusicMarketOptions(),
       genreOptions: getMusicGenreOptions(),
@@ -582,7 +834,7 @@ export async function getRadarMusicPageData({
       selectedStatus,
     },
     summaryCards: buildRadarMusicSummary(rows),
-    rows: filterRadarRows(rows, selectedStatus),
+    rows: filteredRows,
     support: {
       sourceModeLabel: musicData.dataTrust.sourceModeLabel,
       sourceModeDescription: musicData.dataTrust.sourceModeDescription,
@@ -650,6 +902,7 @@ export async function getRadarPlaylistsPageData(): Promise<RadarPlaylistsData> {
       secondaryCtaLabel: "Ir para Curadoria",
       secondaryCtaHref: "/curadoria",
     },
+    heroInsight: buildRadarPlaylistsHeroInsight(rows),
     metrics: [
       {
         title: "Faixas monitoradas",
@@ -699,6 +952,87 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
       lastUpdatedLabel: growth.lastUpdatedLabel,
     };
   });
+  const playlistTrackGroups = await Promise.all(
+    dashboardData.playlists.map(async (playlist) => {
+      const spotifyPlaylistId = extractSpotifyPlaylistId(playlist.url);
+
+      if (!spotifyPlaylistId) {
+        return {
+          playlist,
+          tracks: [],
+        };
+      }
+
+      try {
+        const tracks = await fetchSpotifyPlaylistTracks(spotifyPlaylistId);
+
+        return {
+          playlist,
+          tracks,
+        };
+      } catch {
+        return {
+          playlist,
+          tracks: [],
+        };
+      }
+    }),
+  );
+  const globalTrackFrequency = new Map<string, number>();
+
+  for (const group of playlistTrackGroups) {
+    const uniqueTrackIds = new Set(group.tracks.map((track) => track.id));
+
+    for (const trackId of uniqueTrackIds) {
+      globalTrackFrequency.set(trackId, (globalTrackFrequency.get(trackId) ?? 0) + 1);
+    }
+  }
+
+  const comparisonRows = playlistTrackGroups
+    .map((group) => {
+      const repeatedTracks = group.tracks.filter(
+        (track) => (globalTrackFrequency.get(track.id) ?? 0) > 1,
+      ).length;
+      const averagePopularity =
+        group.tracks.length > 0
+          ? group.tracks.reduce((sum, track) => sum + track.popularity, 0) /
+            group.tracks.length
+          : 0;
+      const repetitionRate =
+        group.tracks.length > 0 ? (repeatedTracks / group.tracks.length) * 100 : 0;
+      const growth = buildPlaylistGrowth(group.playlist, playlistSnapshots);
+      const growthNumeric =
+        growth.growthTone === "green"
+          ? 10
+          : growth.growthTone === "blue"
+            ? 5
+            : growth.growthTone === "purple"
+              ? 7
+              : 0;
+      const performance = clamp(
+        Math.round(
+          group.playlist.score * 0.45 +
+            averagePopularity * 0.25 +
+            repetitionRate * 0.15 +
+            growthNumeric * 2,
+        ),
+        0,
+        100,
+      );
+
+      return {
+        playlistId: group.playlist.id,
+        playlistName: group.playlist.name,
+        coverUrl: group.playlist.coverUrl,
+        scoreAverageLabel: `${group.playlist.score}`,
+        repetitionRateLabel: formatPercentage(repetitionRate),
+        averagePopularityLabel: averagePopularity.toFixed(1),
+        followerGrowthLabel: growth.growthLabel,
+        followerGrowthTone: growth.growthTone,
+        performanceLabel: `${performance} pts`,
+      };
+    })
+    .sort((left, right) => Number(right.performanceLabel.replace(/\D/g, "")) - Number(left.performanceLabel.replace(/\D/g, "")));
 
   return {
     hero: {
@@ -711,6 +1045,7 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
       secondaryCtaLabel: "Ver Radar Playlists",
       secondaryCtaHref: "/radar-playlists",
     },
+    heroInsight: buildBasePlaylistsHeroInsight(rows),
     metrics: buildPlaylistMetrics(dashboardData.playlists),
     rows,
     healthSummary: [
@@ -738,6 +1073,7 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
         tone: "red",
       },
     ],
+    comparisonRows,
   };
 }
 
@@ -765,6 +1101,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
       secondaryCtaLabel: "Ver Base de Playlists",
       secondaryCtaHref: "/base-playlists",
     },
+    heroInsight: buildCurationHeroInsight(rows),
     metrics: [
       {
         title: "Adicionar agora",
@@ -838,6 +1175,25 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
       primaryCtaHref: "/curadoria",
       secondaryCtaLabel: "Abrir Radar Music",
       secondaryCtaHref: "/radar-music",
+    },
+    heroInsight: {
+      headline: addNow[0]
+        ? `${addNow[0].artists.split(",")[0]} puxa a decisao com ${addNow[0].name}`
+        : "O mercado ainda nao definiu uma prioridade absoluta hoje",
+      summary:
+        "Esse destaque resume a melhor oportunidade do sistema agora com base em movimento, saturacao, recorrencia e aderencia editorial.",
+      tone: addNow[0]?.movement.tone ?? "yellow",
+      supportingPoints: [
+        `${addNowQueue.length} faixas prontas para adicionar`,
+        `${radarMusic.rows.filter((row) => row.movement.type === "up").length} subindo`,
+        `${baseData.rows.length} playlists monitoradas`,
+      ],
+    },
+    primaryAction: {
+      track: addNow[0] ?? null,
+      reason: addNow[0]
+        ? `${addNow[0].name} combina score ${addNow[0].decisionScore}, ${addNow[0].chartDeltaLabel.toLowerCase()} e ${addNow[0].fitLabel.toLowerCase()} com a sua base.`
+        : "Ainda nao houve combinacao forte o suficiente entre radar e base para uma acao unica.",
     },
     metrics: [
       {

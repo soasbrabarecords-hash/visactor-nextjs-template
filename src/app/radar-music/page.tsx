@@ -2,9 +2,9 @@ import Container from "@/components/container";
 import MusicFilters from "@/components/charts/music-filters";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
+import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
 import RadarMusicTable from "@/components/workspace/radar-music-table";
-import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarMusicPageData } from "@/lib/workspace-data";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +54,7 @@ export default async function RadarMusicPage({
         }
       />
 
+      <HeroInsightPanel insight={data.heroInsight} />
       <MetricGrid
         metrics={data.summaryCards.map((card) => ({
           title: card.title,

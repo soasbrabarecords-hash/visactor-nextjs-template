@@ -120,7 +120,14 @@ export default function CurationTable({
                     </StatusBadge>
                   </td>
                   <td className="px-4 py-4 text-sm font-semibold">
-                    {row.decisionScore}
+                    <div>{row.decisionScore}</div>
+                    <div className="mt-2 flex max-w-[260px] flex-wrap gap-2">
+                      {row.scoreBreakdown.map((item) => (
+                        <StatusBadge key={`${row.trackId}-${item.label}`} tone={item.tone}>
+                          {item.label}
+                        </StatusBadge>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">

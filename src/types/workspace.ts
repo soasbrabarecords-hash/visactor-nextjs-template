@@ -26,6 +26,13 @@ export type WorkspaceInsight = {
   secondaryCtaHref?: string;
 };
 
+export type HeroInsight = {
+  headline: string;
+  summary: string;
+  tone: StatusTone;
+  supportingPoints: string[];
+};
+
 export type RecommendedAction = {
   title: string;
   summary: string;
@@ -33,9 +40,16 @@ export type RecommendedAction = {
   items: string[];
 };
 
+export type PrimaryAction = {
+  track: DecisionTrack | null;
+  reason: string;
+};
+
 export type DashboardWorkspaceData = {
   hero: WorkspaceInsight;
+  heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
+  primaryAction: PrimaryAction;
   recommendedActions: RecommendedAction[];
   addNow: DecisionTrack[];
   observe: DecisionTrack[];
@@ -58,6 +72,13 @@ export type MovementDescriptor = {
   type: MovementType;
   label: string;
   icon: string;
+  tone: StatusTone;
+  valueLabel: string;
+};
+
+export type ScoreBreakdownItem = {
+  label: string;
+  value: string;
   tone: StatusTone;
 };
 
@@ -86,6 +107,8 @@ export type RadarMusicRow = {
   lowSaturation: boolean;
   recurring: boolean;
   alreadyInPlaylists: boolean;
+  fitLabel: string;
+  scoreBreakdown: ScoreBreakdownItem[];
 };
 
 export type RadarMusicSupport = {
@@ -99,6 +122,7 @@ export type RadarMusicSupport = {
 
 export type RadarMusicPageData = {
   hero: WorkspaceInsight;
+  heroInsight: HeroInsight;
   filters: {
     countryOptions: MusicFilterOption[];
     genreOptions: MusicFilterOption[];
@@ -132,6 +156,7 @@ export type RadarPlaylistRow = {
 
 export type RadarPlaylistsData = {
   hero: WorkspaceInsight;
+  heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
   rows: RadarPlaylistRow[];
   sharedMomentum: RadarPlaylistRow[];
@@ -149,12 +174,24 @@ export type PlaylistBaseRow = {
 
 export type PlaylistBaseData = {
   hero: WorkspaceInsight;
+  heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
   rows: PlaylistBaseRow[];
   healthSummary: Array<{
     label: string;
     value: string;
     tone: StatusTone;
+  }>;
+  comparisonRows: Array<{
+    playlistId: string;
+    playlistName: string;
+    coverUrl: string | null;
+    scoreAverageLabel: string;
+    repetitionRateLabel: string;
+    averagePopularityLabel: string;
+    followerGrowthLabel: string;
+    followerGrowthTone: StatusTone;
+    performanceLabel: string;
   }>;
 };
 
@@ -176,10 +213,12 @@ export type DecisionTrack = {
   fitLabel: string;
   decisionScore: number;
   recommendedAction: DecisionAction;
+  scoreBreakdown: ScoreBreakdownItem[];
 };
 
 export type CurationPageData = {
   hero: WorkspaceInsight;
+  heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
   rows: DecisionTrack[];
 };

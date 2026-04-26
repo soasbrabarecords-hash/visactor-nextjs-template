@@ -1,6 +1,8 @@
 import PageIntro from "@/components/page-intro";
 import DecisionTrackList from "@/components/workspace/decision-track-list";
+import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
+import PrimaryActionCard from "@/components/workspace/primary-action-card";
 import RecommendedActions from "@/components/workspace/recommended-actions";
 import { getDashboardWorkspaceData } from "@/lib/workspace-data";
 
@@ -17,7 +19,9 @@ export default async function Home() {
         description={dashboard.hero.description}
       />
 
+      <HeroInsightPanel insight={dashboard.heroInsight} />
       <MetricGrid metrics={dashboard.metrics} />
+      <PrimaryActionCard action={dashboard.primaryAction} />
       <RecommendedActions actions={dashboard.recommendedActions} />
       <DecisionTrackList
         title="Adicionar agora"

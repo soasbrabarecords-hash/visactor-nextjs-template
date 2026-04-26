@@ -1,9 +1,9 @@
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
+import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
 import RadarPlaylistsTable from "@/components/workspace/radar-playlists-table";
-import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarPlaylistsPageData } from "@/lib/workspace-data";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ export default async function RadarPlaylistsPage() {
         description={data.hero.description}
       />
 
+      <HeroInsightPanel insight={data.heroInsight} />
       <MetricGrid metrics={data.metrics} />
 
       <Container className="border-b border-border py-6">
