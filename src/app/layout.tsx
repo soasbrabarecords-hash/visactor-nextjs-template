@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Gabarito } from "next/font/google";
-import { SideNav } from "@/components/nav";
+import AppShell from "@/components/app-shell";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import "@/style/globals.css";
@@ -19,13 +19,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className={cn("bg-background font-sans", gabarito.variable)}>
         <Providers>
-          <div className="flex min-h-[100dvh]">
-            <SideNav />
-            <div className="flex-grow overflow-auto">{children}</div>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

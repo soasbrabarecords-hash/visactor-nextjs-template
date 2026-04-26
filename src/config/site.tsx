@@ -15,8 +15,8 @@ export type Navigation = {
 };
 
 export const siteConfig = {
-  title: "So as Braba Curation System",
-  description: "Radar profissional de curadoria musical e inteligencia de playlists.",
+  title: "SÓ AS BRABA System",
+  description: "Sistema profissional de curadoria musical, radar de charts e inteligencia de playlists.",
 };
 
 export const navigations: Navigation[] = [

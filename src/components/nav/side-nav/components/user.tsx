@@ -8,14 +8,14 @@ export default function User() {
         <div className="flex items-center">
           <Image
             src="/avatar.png"
-            alt="User"
+            alt="SÓ AS BRABA"
             className="mr-2 rounded-full"
             width={36}
             height={36}
           />
           <div className="flex flex-col">
-            <span className="text-sm font-medium">Name</span>
-            <span className="text-xs text-muted-foreground">Agent Admin</span>
+            <span className="text-sm font-medium">SÓ AS BRABA</span>
+            <span className="text-xs text-muted-foreground">System Admin</span>
           </div>
         </div>
         <ChevronDown size={16} />
