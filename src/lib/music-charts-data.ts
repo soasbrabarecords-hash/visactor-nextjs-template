@@ -26,6 +26,12 @@ import {
   type SpotifyFeaturedPlaylist,
   type SpotifyTrackRecord,
 } from "./spotify";
+import {
+  fetchLatestSpotifyChartEntries,
+  fetchTrackStreamSnapshots,
+  type SpotifyChartEntryRow,
+  type TrackStreamSnapshotRow,
+} from "./spotify-charts-store";
 import { upsertMusicChartMovements } from "./music-movement-store";
 import {
   fetchMusicTrackSnapshots,
@@ -57,6 +63,11 @@ type AggregatedTrack = {
   searchSignals: number;
   sourceNames: string[];
   genreHints: string[];
+  dailyStreams: number | null;
+  streamRank: number | null;
+  streamGrowth: number | null;
+  streamVelocityLabel: string;
+  streamScore: number | null;
 };
 
 const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
@@ -220,6 +231,22 @@ function getSnapshotDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function parseStoreNumber(value: number | string | null | undefined) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsedValue = Number(value);
+
+    if (Number.isFinite(parsedValue)) {
+      return parsedValue;
+    }
+  }
+
+  return null;
+}
+
 function formatSignedValue(value: number) {
   if (value > 0) {
     return `+${value}`;
@@ -255,6 +282,51 @@ function getSignalSourceLabel(source: MusicSignalSource) {
     default:
       return "Sem fonte";
   }
+}
+
+function hasStreamData(tracks: AggregatedTrack[]) {
+  return tracks.some((track) => typeof track.dailyStreams === "number");
+}
+
+function getStreamVelocityLabel(
+  track: Pick<AggregatedTrack, "dailyStreams" | "streamGrowth">,
+) {
+  if (track.dailyStreams === null) {
+    return "Sem leitura de streams";
+  }
+
+  if (track.streamGrowth === null) {
+    return "Sem historico";
+  }
+
+  if (track.streamGrowth > 0) {
+    return "Acelerando";
+  }
+
+  if (track.streamGrowth < 0) {
+    return "Perdendo forca";
+  }
+
+  return "Fluxo estavel";
+}
+
+function normalizeStreamScores(tracks: AggregatedTrack[]) {
+  const maxDailyStreams = tracks.reduce((maxValue, track) => {
+    const dailyStreams = track.dailyStreams ?? 0;
+    return Math.max(maxValue, dailyStreams);
+  }, 0);
+
+  return tracks.map((track) => ({
+    ...track,
+    streamScore:
+      track.dailyStreams !== null && maxDailyStreams > 0
+        ? clamp(
+            Math.round((track.dailyStreams / maxDailyStreams) * 100),
+            0,
+            100,
+          )
+        : null,
+  }));
 }
 
 function getSourceMode(
@@ -335,9 +407,16 @@ function getMomentumScore(track: AggregatedTrack, maxSignalCount: number) {
     maxSignalCount > 0 ? getSignalCount(track) / maxSignalCount : 0;
   const editorialBonus = track.marketSignals > 0 ? 8 : 0;
   const hybridBonus = track.marketSignals > 0 && track.searchSignals > 0 ? 6 : 0;
+  const streamBonus = track.streamScore !== null ? track.streamScore * 0.24 : 0;
 
   return clamp(
-    Math.round(track.popularity * 0.6 + normalizedSignals * 26 + editorialBonus + hybridBonus),
+    Math.round(
+      track.popularity * 0.6 +
+        normalizedSignals * 26 +
+        editorialBonus +
+        hybridBonus +
+        streamBonus,
+    ),
     0,
     100,
   );
@@ -352,6 +431,11 @@ function getOpportunityScore(track: AggregatedTrack, maxSignalCount: number) {
   const editorialBonus = track.marketSignals > 0 ? 10 : 0;
   const hybridBonus = track.marketSignals > 0 && track.searchSignals > 0 ? 6 : 0;
   const saturationPenalty = getSignalCount(track) >= 5 ? 8 : 0;
+  const streamBonus = track.streamScore !== null ? track.streamScore * 0.2 : 0;
+  const streamGrowthBonus =
+    track.streamGrowth !== null && track.streamGrowth > 0
+      ? Math.min(12, Math.log10(track.streamGrowth + 1) * 4)
+      : 0;
 
   return clamp(
     Math.round(
@@ -361,7 +445,9 @@ function getOpportunityScore(track: AggregatedTrack, maxSignalCount: number) {
         discoveryBonus +
         editorialBonus +
         hybridBonus -
-        saturationPenalty,
+        saturationPenalty +
+        streamBonus +
+        streamGrowthBonus,
     ),
     0,
     100,
@@ -369,7 +455,18 @@ function getOpportunityScore(track: AggregatedTrack, maxSignalCount: number) {
 }
 
 function sortTracks(tracks: AggregatedTrack[]) {
+  const streamAwareRanking = hasStreamData(tracks);
+
   return [...tracks].sort((left, right) => {
+    if (streamAwareRanking) {
+      const rightDailyStreams = right.dailyStreams ?? -1;
+      const leftDailyStreams = left.dailyStreams ?? -1;
+
+      if (rightDailyStreams !== leftDailyStreams) {
+        return rightDailyStreams - leftDailyStreams;
+      }
+    }
+
     const signalDifference = getSignalCount(right) - getSignalCount(left);
 
     if (signalDifference !== 0) {
@@ -425,6 +522,11 @@ function aggregateTracks(
           searchSignals: 0,
           sourceNames: [group.sourceName],
           genreHints: group.genreHint ? [group.genreHint] : [],
+          dailyStreams: null,
+          streamRank: null,
+          streamGrowth: null,
+          streamVelocityLabel: "Sem leitura de streams",
+          streamScore: null,
         });
       }
 
@@ -445,7 +547,7 @@ function aggregateTracks(
     }
   }
 
-  return sortTracks(Array.from(trackMap.values()));
+  return normalizeStreamScores(sortTracks(Array.from(trackMap.values())));
 }
 
 function buildTopTracks(tracks: AggregatedTrack[]): ConversionDatum[] {
@@ -550,6 +652,26 @@ function mergeTracks(left: AggregatedTrack, right: AggregatedTrack): AggregatedT
     searchSignals: left.searchSignals + right.searchSignals,
     sourceNames: Array.from(new Set([...left.sourceNames, ...right.sourceNames])),
     genreHints: Array.from(new Set([...left.genreHints, ...right.genreHints])),
+    dailyStreams:
+      left.dailyStreams !== null && right.dailyStreams !== null
+        ? Math.max(left.dailyStreams, right.dailyStreams)
+        : left.dailyStreams ?? right.dailyStreams,
+    streamRank:
+      left.streamRank !== null && right.streamRank !== null
+        ? Math.min(left.streamRank, right.streamRank)
+        : left.streamRank ?? right.streamRank,
+    streamGrowth:
+      left.streamGrowth !== null && right.streamGrowth !== null
+        ? Math.max(left.streamGrowth, right.streamGrowth)
+        : left.streamGrowth ?? right.streamGrowth,
+    streamVelocityLabel:
+      left.dailyStreams !== null
+        ? left.streamVelocityLabel
+        : right.streamVelocityLabel,
+    streamScore:
+      left.streamScore !== null && right.streamScore !== null
+        ? Math.max(left.streamScore, right.streamScore)
+        : left.streamScore ?? right.streamScore,
   };
 }
 
@@ -559,11 +681,11 @@ function mergeGenreAndMarketTracks(
   includeMarketUnion: boolean,
 ): AggregatedTrack[] {
   if (genreTracks.length === 0) {
-    return sortTracks(marketTracks);
+    return normalizeStreamScores(sortTracks(marketTracks));
   }
 
   if (marketTracks.length === 0) {
-    return sortTracks(genreTracks);
+    return normalizeStreamScores(sortTracks(genreTracks));
   }
 
   const marketTrackMap = new Map(
@@ -571,13 +693,13 @@ function mergeGenreAndMarketTracks(
   );
 
   if (!includeMarketUnion) {
-    return sortTracks(
+    return normalizeStreamScores(sortTracks(
       genreTracks.map((track) => {
         const marketTrack = marketTrackMap.get(track.id);
 
         return marketTrack ? mergeTracks(track, marketTrack) : track;
       }),
-    );
+    ));
   }
 
   const mergedMap = new Map(
@@ -594,7 +716,111 @@ function mergeGenreAndMarketTracks(
     }
   }
 
-  return sortTracks(Array.from(mergedMap.values()));
+  return normalizeStreamScores(sortTracks(Array.from(mergedMap.values())));
+}
+
+function buildLatestStreamEntryMap(rows: SpotifyChartEntryRow[]) {
+  const entriesByTrack = new Map<string, SpotifyChartEntryRow>();
+
+  for (const row of rows) {
+    if (!row.spotify_track_id) {
+      continue;
+    }
+
+    const existing = entriesByTrack.get(row.spotify_track_id);
+
+    if (
+      !existing ||
+      (row.captured_at ?? "").localeCompare(existing.captured_at ?? "") > 0
+    ) {
+      entriesByTrack.set(row.spotify_track_id, row);
+    }
+  }
+
+  return entriesByTrack;
+}
+
+function buildPreviousStreamSnapshotMap(
+  rows: TrackStreamSnapshotRow[],
+  latestChartDate: string,
+) {
+  const snapshotsByTrack = new Map<string, TrackStreamSnapshotRow>();
+
+  for (const row of rows) {
+    if (!row.spotify_track_id || !row.chart_date || row.chart_date >= latestChartDate) {
+      continue;
+    }
+
+    const existing = snapshotsByTrack.get(row.spotify_track_id);
+
+    if (
+      !existing ||
+      row.chart_date > (existing.chart_date ?? "") ||
+      (row.chart_date === existing.chart_date &&
+        (row.captured_at ?? "").localeCompare(existing.captured_at ?? "") > 0)
+    ) {
+      snapshotsByTrack.set(row.spotify_track_id, row);
+    }
+  }
+
+  return snapshotsByTrack;
+}
+
+function enrichTracksWithStreamData({
+  tracks,
+  chartEntries,
+  streamSnapshots,
+}: {
+  tracks: AggregatedTrack[];
+  chartEntries: SpotifyChartEntryRow[];
+  streamSnapshots: TrackStreamSnapshotRow[];
+}) {
+  if (chartEntries.length === 0) {
+    return tracks;
+  }
+
+  const latestChartDate = chartEntries[0]?.chart_date;
+
+  if (!latestChartDate) {
+    return tracks;
+  }
+
+  const latestEntriesByTrack = buildLatestStreamEntryMap(chartEntries);
+  const previousSnapshotsByTrack = buildPreviousStreamSnapshotMap(
+    streamSnapshots,
+    latestChartDate,
+  );
+
+  return normalizeStreamScores(
+    sortTracks(
+      tracks.map((track) => {
+        const latestEntry = latestEntriesByTrack.get(track.id);
+
+        if (!latestEntry) {
+          return track;
+        }
+
+        const currentStreams = parseStoreNumber(latestEntry.daily_streams);
+        const previousSnapshot = previousSnapshotsByTrack.get(track.id);
+        const previousStreams = parseStoreNumber(previousSnapshot?.daily_streams);
+        const streamGrowth =
+          currentStreams === null || previousStreams === null
+            ? null
+            : currentStreams - previousStreams;
+
+        return {
+          ...track,
+          dailyStreams: currentStreams,
+          streamRank: parseStoreNumber(latestEntry.rank_position),
+          streamGrowth,
+          streamVelocityLabel: getStreamVelocityLabel({
+            dailyStreams: currentStreams,
+            streamGrowth,
+          }),
+        };
+      }),
+    ),
+  );
 }
 
 function buildChartCandidates({
@@ -634,6 +860,11 @@ function buildChartCandidates({
       genreHints: track.genreHints.length > 0 ? track.genreHints : [trackGenre],
       saturationCount,
       explicit: track.explicit,
+      dailyStreams: track.dailyStreams,
+      streamRank: track.streamRank,
+      streamGrowth: track.streamGrowth,
+      streamVelocityLabel: track.streamVelocityLabel,
+      streamScore: track.streamScore,
     };
   });
 }
@@ -871,6 +1102,10 @@ function buildWorkbenchTracks(
       genre: getGenreLabel(track.genre),
       albumName: track.albumName,
       popularity: track.popularityCurrent,
+      dailyStreams: track.dailyStreams,
+      streamRank: track.streamRank,
+      streamGrowth: track.streamGrowth,
+      streamVelocityLabel: track.streamVelocityLabel,
       popularityChange: track.popularityChange,
       previousRank: track.previousRank,
       rankChange: track.rankChange,
@@ -1236,10 +1471,32 @@ export async function getMusicChartsData({
           genreOption.value === "all",
         )
       : genreData.aggregatedTracks;
+  const latestSpotifyChartEntries = await fetchLatestSpotifyChartEntries({
+    country: marketOption.value,
+    chartName: "top-songs",
+    limit: 200,
+  });
+  const latestChartTrackIds = latestSpotifyChartEntries
+    .map((row) => row.spotify_track_id)
+    .filter((trackId): trackId is string => Boolean(trackId));
+  const streamSnapshots =
+    latestChartTrackIds.length > 0
+      ? await fetchTrackStreamSnapshots({
+          trackIds: latestChartTrackIds,
+          country: marketOption.value,
+          chartName: "top-songs",
+          limit: 1000,
+        })
+      : [];
+  const streamAwareFocusTracks = enrichTracksWithStreamData({
+    tracks: focusTracks,
+    chartEntries: latestSpotifyChartEntries,
+    streamSnapshots,
+  });
   const snapshotDate = getSnapshotDateKey(new Date());
   const capturedAt = new Date().toISOString();
   const chartCandidates = buildChartCandidates({
-    tracks: focusTracks,
+    tracks: streamAwareFocusTracks,
     market: marketOption.value,
     genre: genreOption.value,
   });
@@ -1286,7 +1543,7 @@ export async function getMusicChartsData({
   const recurringTracks = buildRecurringTracks(enrichedMovements);
   const workbenchTracks = buildWorkbenchTracks(enrichedMovements);
   const dataTrust = buildDataTrustContext({
-    tracks: focusTracks,
+    tracks: streamAwareFocusTracks,
     featuredPlaylistCount: marketData.featuredPlaylists.length,
     activeQueryCount: genreData.activeQueryCount,
     historyDaysTracked: movementResult.context.historyDaysTracked,
@@ -1296,20 +1553,20 @@ export async function getMusicChartsData({
 
   return {
     summaryCards: buildSummaryCards(
-      focusTracks,
+      streamAwareFocusTracks,
       workbenchTracks,
       movementResult.context,
     ),
-    topTracks: buildTopTracks(focusTracks),
-    artistDistribution: buildArtistDistribution(focusTracks),
-    popularityHealth: buildPopularityHealth(focusTracks),
-    tracks: buildTrackInsights(focusTracks),
+    topTracks: buildTopTracks(streamAwareFocusTracks),
+    artistDistribution: buildArtistDistribution(streamAwareFocusTracks),
+    popularityHealth: buildPopularityHealth(streamAwareFocusTracks),
+    tracks: buildTrackInsights(streamAwareFocusTracks),
     topMovers,
     newEntries,
     recurringTracks,
     workbenchTracks,
     opportunities: buildOpportunities(
-      focusTracks,
+      streamAwareFocusTracks,
       marketOption.label,
       genreOption.label,
     ),

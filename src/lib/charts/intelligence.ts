@@ -6,6 +6,8 @@ export type OpportunityScoreInput = {
   popularityChange: number | null;
   daysOnChart: number;
   saturationCount: number;
+  streamScore?: number | null;
+  streamGrowth?: number | null;
 };
 
 export type IntelligenceTagInput = OpportunityScoreInput & {
@@ -26,13 +28,23 @@ export function calculateOpportunityScore({
   popularityChange,
   daysOnChart,
   saturationCount,
+  streamScore = null,
+  streamGrowth = null,
 }: OpportunityScoreInput) {
+  const streamScoreBonus =
+    typeof streamScore === "number" ? streamScore * 0.22 : 0;
+  const streamGrowthBonus =
+    typeof streamGrowth === "number" && streamGrowth > 0
+      ? Math.min(12, Math.log10(streamGrowth + 1) * 4)
+      : 0;
   const score =
     popularity * 0.3 +
     Math.max(rankChange ?? 0, 0) * 2.5 +
     Math.max(popularityChange ?? 0, 0) * 3 +
     daysOnChart * 1.5 +
-    (1 / Math.max(saturationCount, 1)) * 20;
+    (1 / Math.max(saturationCount, 1)) * 20 +
+    streamScoreBonus +
+    streamGrowthBonus;
 
   return clampNumber(Math.round(score), 0, 100);
 }

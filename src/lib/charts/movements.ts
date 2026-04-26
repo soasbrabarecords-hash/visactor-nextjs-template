@@ -23,6 +23,11 @@ export type ChartCandidate = {
   genreHints: string[];
   saturationCount: number;
   explicit: boolean;
+  dailyStreams: number | null;
+  streamRank: number | null;
+  streamGrowth: number | null;
+  streamVelocityLabel: string;
+  streamScore: number | null;
 };
 
 export type MusicChartSnapshotRecord = {
@@ -177,6 +182,8 @@ export function buildChartMovements({
       popularityChange,
       daysOnChart: Math.max(daysOnChart, 1),
       saturationCount: Math.max(track.saturationCount, 1),
+      streamScore: track.streamScore,
+      streamGrowth: track.streamGrowth,
     });
 
     return {

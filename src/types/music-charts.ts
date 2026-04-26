@@ -78,6 +78,10 @@ export type MusicWorkbenchTrack = {
   genre: string;
   albumName: string;
   popularity: number;
+  dailyStreams: number | null;
+  streamRank: number | null;
+  streamGrowth: number | null;
+  streamVelocityLabel: string;
   popularityChange: number | null;
   previousRank: number | null;
   rankChange: number | null;
