@@ -188,7 +188,7 @@ export default function MusicWorkbenchTable({
                         {track.signalCount} sinais
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {track.tractionLabel}
+                        {track.historyLabel}
                       </div>
                     </td>
                     <td className="px-4 py-4">

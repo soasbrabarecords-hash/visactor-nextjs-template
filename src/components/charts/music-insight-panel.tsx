@@ -104,12 +104,16 @@ export default function MusicInsightPanel({
             {context.marketHighlight}
           </p>
 
-          <div className="mt-4 grid gap-3 tablet:grid-cols-3">
+          <div className="mt-4 grid gap-3 tablet:grid-cols-4">
             <MiniStat label="Mercado" value={context.countryLabel} />
             <MiniStat label="Genero" value={context.genreLabel} />
             <MiniStat
               label="Amostra"
               value={`${context.sampleSize} tracks`}
+            />
+            <MiniStat
+              label="Historico"
+              value={`${context.historyDaysTracked} dias`}
             />
           </div>
         </div>

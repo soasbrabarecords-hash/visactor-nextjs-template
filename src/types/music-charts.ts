@@ -31,6 +31,7 @@ export type MusicDataTrustContext = {
   featuredOnlyCount: number;
   searchOnlyCount: number;
   hybridCount: number;
+  historyDaysTracked: number;
   marketHighlight: string;
   topTrackName: string;
   explicitShare: string;
@@ -85,6 +86,7 @@ export type MusicWorkbenchTrack = {
   signalSource: MusicSignalSource;
   tractionLabel: string;
   saturationLabel: string;
+  historyLabel: string;
   tags: string[];
   isMover: boolean;
   isNewEntry: boolean;

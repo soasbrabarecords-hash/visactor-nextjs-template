@@ -82,7 +82,7 @@ export default async function ChartsMusicPage({
         <div className="laptop:col-span-2">
           <MusicTrackGrid
             title="Top Movers"
-            description="Faixas com maior momentum no radar, combinando popularidade, contexto editorial e recorrencia dos sinais."
+            description="Faixas que mais subiram desde as ultimas capturas, com leitura temporal real do radar."
             tracks={chartsData.topMovers}
             emptyMessage="Ainda sem movers fortes para esse mercado."
           />
@@ -91,7 +91,7 @@ export default async function ChartsMusicPage({
         <div className="laptop:col-span-1">
           <MusicTrackGrid
             title="Novas Entradas"
-            description="Sinais frescos com baixa saturacao e potencial de crescimento rapido para discovery."
+            description="Faixas que entraram agora no radar e nao apareciam na leitura anterior deste recorte."
             tracks={chartsData.newEntries}
             emptyMessage="Ainda sem novas entradas fortes neste recorte."
           />
@@ -102,9 +102,9 @@ export default async function ChartsMusicPage({
         <TracksTable
           tracks={chartsData.recurringTracks}
           title="Faixas Recorrentes por Mercado"
-          description={`Faixas que persistem no radar de ${chartsData.countryLabel} e ajudam a separar tendencia real de ruido momentaneo.`}
+          description={`Faixas que persistem ao longo das ultimas capturas em ${chartsData.countryLabel} e ajudam a separar tendencia real de ruido momentaneo.`}
           emptyMessage="Ainda nao encontramos recorrencia suficiente neste radar."
-          countLabel="Recorrencia"
+          countLabel="Dias"
         />
       </div>
 
