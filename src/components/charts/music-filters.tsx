@@ -41,23 +41,49 @@ function FilterSelect({
 export default function MusicFilters({
   countryOptions,
   genreOptions,
+  periodOptions,
+  statusOptions,
   selectedCountry,
   selectedGenre,
+  selectedPeriod,
+  selectedStatus,
 }: {
   countryOptions: MusicFilterOption[];
   genreOptions: MusicFilterOption[];
+  periodOptions?: MusicFilterOption[];
+  statusOptions?: MusicFilterOption[];
   selectedCountry: string;
   selectedGenre: string;
+  selectedPeriod?: string;
+  selectedStatus?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  function updateParams(nextCountry: string, nextGenre: string) {
+  function updateParams({
+    nextCountry = selectedCountry,
+    nextGenre = selectedGenre,
+    nextPeriod = selectedPeriod,
+    nextStatus = selectedStatus,
+  }: {
+    nextCountry?: string;
+    nextGenre?: string;
+    nextPeriod?: string;
+    nextStatus?: string;
+  }) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("country", nextCountry);
     params.set("genre", nextGenre);
+
+    if (nextPeriod) {
+      params.set("period", nextPeriod);
+    }
+
+    if (nextStatus) {
+      params.set("status", nextStatus);
+    }
 
     startTransition(() => {
       router.replace(`${pathname}?${params.toString()}`, {
@@ -73,15 +99,33 @@ export default function MusicFilters({
         value={selectedCountry}
         options={countryOptions}
         disabled={isPending}
-        onValueChange={(value) => updateParams(value, selectedGenre)}
+        onValueChange={(value) => updateParams({ nextCountry: value })}
       />
       <FilterSelect
         label="Genero"
         value={selectedGenre}
         options={genreOptions}
         disabled={isPending}
-        onValueChange={(value) => updateParams(selectedCountry, value)}
+        onValueChange={(value) => updateParams({ nextGenre: value })}
       />
+      {periodOptions && selectedPeriod ? (
+        <FilterSelect
+          label="Periodo"
+          value={selectedPeriod}
+          options={periodOptions}
+          disabled={isPending}
+          onValueChange={(value) => updateParams({ nextPeriod: value })}
+        />
+      ) : null}
+      {statusOptions && selectedStatus ? (
+        <FilterSelect
+          label="Status"
+          value={selectedStatus}
+          options={statusOptions}
+          disabled={isPending}
+          onValueChange={(value) => updateParams({ nextStatus: value })}
+        />
+      ) : null}
     </div>
   );
 }

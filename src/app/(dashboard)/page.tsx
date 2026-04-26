@@ -1,49 +1,42 @@
-import {
-  AverageTicketsCreated,
-  Conversions,
-  CustomerSatisfication,
-  Metrics,
-  TicketByChannels,
-} from "@/components/chart-blocks";
-import Container from "@/components/container";
-import AddPlaylistForm from "@/components/dashboard/add-playlist-form";
-import PlaylistTable from "@/components/dashboard/playlist-table";
-import { getDashboardData } from "@/lib/dashboard-data";
+import PageIntro from "@/components/page-intro";
+import DecisionTrackList from "@/components/workspace/decision-track-list";
+import MetricGrid from "@/components/workspace/metric-grid";
+import RecommendedActions from "@/components/workspace/recommended-actions";
+import { getDashboardWorkspaceData } from "@/lib/workspace-data";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const dashboardData = await getDashboardData();
+  const dashboard = await getDashboardWorkspaceData();
 
   return (
-    <div>
-      <Metrics metrics={dashboardData.metrics} />
-      <AddPlaylistForm />
+    <main>
+      <PageIntro
+        eyebrow={dashboard.hero.eyebrow}
+        title={dashboard.hero.title}
+        description={dashboard.hero.description}
+      />
 
-      <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-3 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
-        <Container className="py-4 laptop:col-span-2">
-          <AverageTicketsCreated data={dashboardData.playlistActivity} />
-        </Container>
-
-        <Container className="py-4 laptop:col-span-1">
-          <Conversions data={dashboardData.topFollowers} />
-        </Container>
-      </div>
-
-      <div className="grid grid-cols-1 divide-y border-b border-border laptop:grid-cols-2 laptop:divide-x laptop:divide-y-0 laptop:divide-border">
-        <Container className="py-4 laptop:col-span-1">
-          <TicketByChannels data={dashboardData.scoreDistribution} />
-        </Container>
-
-        <Container className="py-4 laptop:col-span-1">
-          <CustomerSatisfication
-            customerSatisfication={dashboardData.scoreHealth}
-            totalCustomers={dashboardData.playlistCount}
-          />
-        </Container>
-      </div>
-
-      <div className="border-b border-border">
-        <PlaylistTable playlists={dashboardData.playlists} />
-      </div>
-    </div>
+      <MetricGrid metrics={dashboard.metrics} />
+      <RecommendedActions actions={dashboard.recommendedActions} />
+      <DecisionTrackList
+        title="Adicionar agora"
+        description="Faixas com melhor combinacao entre movimento, baixa saturacao e prontidao editorial."
+        tracks={dashboard.addNow}
+        tone="green"
+      />
+      <DecisionTrackList
+        title="Observar"
+        description="Sinais que merecem acompanhamento antes de uma entrada definitiva na base."
+        tracks={dashboard.observe}
+        tone="yellow"
+      />
+      <DecisionTrackList
+        title="Remover ou testar"
+        description="Faixas que pedem ajuste de repertorio ou teste controlado nas playlists monitoradas."
+        tracks={dashboard.removeOrTest}
+        tone="red"
+      />
+    </main>
   );
 }

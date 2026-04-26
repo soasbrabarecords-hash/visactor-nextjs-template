@@ -9,16 +9,24 @@ export default function Navigation() {
   const pathname = usePathname();
 
   function isActive(href: string) {
-    if (href === "/charts/music") {
-      return pathname === "/charts/music";
+    if (href === "/radar-music") {
+      return pathname === "/radar-music" || pathname === "/charts/music";
     }
 
-    if (href === "/charts") {
-      return pathname === "/charts";
+    if (href === "/radar-playlists") {
+      return pathname === "/radar-playlists" || pathname === "/charts";
     }
 
-    if (href === "/playlists-monitoradas") {
-      return pathname === "/playlists-monitoradas" || pathname.startsWith("/playlists/");
+    if (href === "/base-playlists") {
+      return (
+        pathname === "/base-playlists" ||
+        pathname === "/playlists-monitoradas" ||
+        pathname.startsWith("/playlists/")
+      );
+    }
+
+    if (href === "/curadoria") {
+      return pathname === "/curadoria";
     }
 
     return pathname === href;

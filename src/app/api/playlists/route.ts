@@ -51,7 +51,10 @@ export async function POST(request: Request) {
     const insertedPlaylist = await insertPlaylistIntoSupabase(payload);
 
     revalidatePath("/");
-    revalidatePath("/charts");
+    revalidatePath("/base-playlists");
+    revalidatePath("/radar-playlists");
+    revalidatePath("/curadoria");
+    revalidatePath("/radar-music");
 
     return NextResponse.json(insertedPlaylist, { status: 201 });
   } catch (error) {

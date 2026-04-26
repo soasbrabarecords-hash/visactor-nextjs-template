@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Compass,
   Gauge,
   ListMusic,
   Radio,
@@ -14,8 +15,8 @@ export type Navigation = {
 };
 
 export const siteConfig = {
-  title: "VisActor Next Template",
-  description: "Template for VisActor and Next.js",
+  title: "So as Braba Curation System",
+  description: "Radar profissional de curadoria musical e inteligencia de playlists.",
 };
 
 export const navigations: Navigation[] = [
@@ -25,18 +26,23 @@ export const navigations: Navigation[] = [
     href: "/",
   },
   {
-    icon: BarChart3,
-    name: "Charts Playlists",
-    href: "/charts",
+    icon: Radio,
+    name: "Radar Music",
+    href: "/radar-music",
   },
   {
-    icon: Radio,
-    name: "Charts Music",
-    href: "/charts/music",
+    icon: BarChart3,
+    name: "Radar Playlists",
+    href: "/radar-playlists",
   },
   {
     icon: ListMusic,
-    name: "Playlists Monitoradas",
-    href: "/playlists-monitoradas",
+    name: "Base de Playlists",
+    href: "/base-playlists",
+  },
+  {
+    icon: Compass,
+    name: "Curadoria",
+    href: "/curadoria",
   },
 ];
