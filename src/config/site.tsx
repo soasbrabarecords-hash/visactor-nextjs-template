@@ -23,7 +23,7 @@ export const navigations: Navigation[] = [
   {
     icon: Gauge,
     name: "Dashboard",
-    href: "/",
+    href: "/dashboard",
   },
   {
     icon: Radio,

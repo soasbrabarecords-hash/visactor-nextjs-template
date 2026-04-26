@@ -4,6 +4,7 @@ import PageIntro from "@/components/page-intro";
 import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
 import RadarPlaylistsTable from "@/components/workspace/radar-playlists-table";
+import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarPlaylistsPageData } from "@/lib/workspace-data";
 
 export const dynamic = "force-dynamic";

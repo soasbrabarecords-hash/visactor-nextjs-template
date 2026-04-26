@@ -1,12 +1,55 @@
-import Link from "next/link";
+"use client";
+
 import { LockKeyhole, Music4 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
 
 export const dynamic = "force-dynamic";
 
+const FRIENDLY_AUTH_ERROR =
+  "Nao foi possivel entrar. Confira seu e-mail e senha e tente novamente.";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorMessage(error.message || FRIENDLY_AUTH_ERROR);
+      return;
+    }
+
+    const nextPath = searchParams.get("next");
+    const destination =
+      nextPath && nextPath.startsWith("/") && nextPath !== "/login"
+        ? nextPath
+        : "/dashboard";
+
+    router.push(destination);
+    router.refresh();
+  }
+
   return (
     <main className="min-h-[100dvh] bg-background">
       <Container className="grid min-h-[100dvh] items-center py-10">
@@ -68,31 +111,50 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="email">
                   E-mail
                 </label>
-                <Input id="email" type="email" placeholder="voce@soasbraba.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="voce@soasbraba.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="password">
                   Senha
                 </label>
-                <Input id="password" type="password" placeholder="••••••••" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
               </div>
 
-              <Button className="w-full" type="submit">
-                Entrar
+              {errorMessage ? (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 dark:text-red-300">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              <Button className="w-full" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Entrando..." : "Entrar"}
               </Button>
             </form>
 
-            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-              <span>Login visual pronto para integrar com auth.</span>
-              <Link className="text-primary hover:underline" href="/">
-                Ir para o sistema
-              </Link>
+            <div className="mt-4 text-sm text-muted-foreground">
+              Use seu e-mail e senha para acessar a area interna da equipe.
             </div>
           </section>
         </div>

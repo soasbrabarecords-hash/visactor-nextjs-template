@@ -9,6 +9,10 @@ export default function Navigation() {
   const pathname = usePathname();
 
   function isActive(href: string) {
+    if (href === "/dashboard") {
+      return pathname === "/" || pathname === "/dashboard";
+    }
+
     if (href === "/radar-music") {
       return pathname === "/radar-music" || pathname === "/charts/music";
     }
