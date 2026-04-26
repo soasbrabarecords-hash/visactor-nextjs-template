@@ -266,12 +266,16 @@ function buildRadarRows(
 
     if (previousRank === null) {
       movementType = seenBefore && !seenInPreviousSnapshot ? "reentry" : "new";
-    } else if (rankChange > 0) {
-      movementType = "up";
-    } else if (rankChange < 0) {
-      movementType = "down";
     } else {
-      movementType = "same";
+      const resolvedRankChange = previousRank - track.rank;
+
+      if (resolvedRankChange > 0) {
+        movementType = "up";
+      } else if (resolvedRankChange < 0) {
+        movementType = "down";
+      } else {
+        movementType = "same";
+      }
     }
 
     return {
