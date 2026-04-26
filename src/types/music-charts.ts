@@ -4,6 +4,7 @@ import type {
   ScoreBreakdown,
 } from "@/types/dashboard";
 import type { FeaturedPlaylistInsight, TrackInsight } from "@/types/charts";
+import type { MovementType } from "@/types/workspace";
 
 export type MusicFilterOption = {
   value: string;
@@ -74,8 +75,15 @@ export type MusicWorkbenchTrack = {
   id: string;
   name: string;
   artists: string;
+  genre: string;
   albumName: string;
   popularity: number;
+  popularityChange: number | null;
+  previousRank: number | null;
+  rankChange: number | null;
+  movementType: MovementType;
+  daysOnChart: number;
+  saturationCount: number;
   signalCount: number;
   durationLabel: string;
   explicit: boolean;
@@ -88,11 +96,42 @@ export type MusicWorkbenchTrack = {
   saturationLabel: string;
   historyLabel: string;
   tags: string[];
+  intelligenceTags: string[];
+  sourceNames: string[];
   isMover: boolean;
   isNewEntry: boolean;
   isRecurring: boolean;
   lowSaturation: boolean;
   highTraction: boolean;
+};
+
+export type MusicMovementContext = {
+  historyDaysTracked: number;
+  previousSnapshotDay: string | null;
+  hasSufficientHistory: boolean;
+  returningTrackCount: number;
+};
+
+export type MusicGenreHeat = {
+  genre: string;
+  genreLabel: string;
+  genreHeatScore: number;
+  opportunityCount: number;
+  trackCount: number;
+  leaderTrackId: string | null;
+  leaderTrackName: string | null;
+  leaderCoverUrl: string | null;
+};
+
+export type MusicArtistDominance = {
+  artistName: string;
+  top20Count: number;
+  top50Count: number;
+  averagePopularity: number;
+  averageOpportunityScore: number;
+  dominanceScore: number;
+  tags: string[];
+  genres: string[];
 };
 
 export type MusicChartsData = {
@@ -108,6 +147,9 @@ export type MusicChartsData = {
   opportunities: MusicOpportunity[];
   featuredPlaylists: FeaturedPlaylistInsight[];
   dataTrust: MusicDataTrustContext;
+  movementContext: MusicMovementContext;
+  hottestGenres: MusicGenreHeat[];
+  dominantArtists: MusicArtistDominance[];
   countryValue: string;
   countryLabel: string;
   genreValue: string;

@@ -13,17 +13,24 @@ import type {
   MusicWorkbenchTrack,
 } from "@/types/music-charts";
 import {
+  applyArtistIntelligenceTags,
+  buildArtistDominanceInsights,
+  buildGenreHeatInsights,
+} from "./charts/genres";
+import type { ChartCandidate, ChartMovementContext, ChartMovementRecord } from "./charts/movements";
+import { buildChartMovements } from "./charts/movements";
+import {
   fetchFeaturedPlaylists,
   fetchSpotifyPlaylistTracks,
   fetchSpotifyTracksByGenre,
   type SpotifyFeaturedPlaylist,
   type SpotifyTrackRecord,
 } from "./spotify";
+import { upsertMusicChartMovements } from "./music-movement-store";
 import {
   fetchMusicTrackSnapshots,
   upsertMusicTrackSnapshots,
-  type MusicTrackSnapshotInput,
-  type MusicTrackSnapshotRow,
+  type MusicChartSnapshotInput,
 } from "./music-snapshot-store";
 
 type MusicGenreOption = MusicFilterOption & {
@@ -48,21 +55,8 @@ type AggregatedTrack = {
   coverUrl: string | null;
   marketSignals: number;
   searchSignals: number;
-};
-
-type TrackHistoryStats = {
-  snapshotCount: number;
-  previousDaySeen: boolean;
-  popularityDelta: number;
-  signalDelta: number;
-  latestSnapshot: MusicTrackSnapshotRow | null;
-  previousSnapshot: MusicTrackSnapshotRow | null;
-};
-
-type SnapshotHistoryMeta = {
-  historyByTrack: Map<string, TrackHistoryStats>;
-  historyDaysTracked: number;
-  previousSnapshotDate: string | null;
+  sourceNames: string[];
+  genreHints: string[];
 };
 
 const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
@@ -201,15 +195,25 @@ function getGenreOption(genre?: string) {
   );
 }
 
-function getSignalCount(track: Pick<AggregatedTrack, "marketSignals" | "searchSignals">) {
-  return track.marketSignals + track.searchSignals;
+function getGenreLabel(genre?: string) {
+  return getGenreOption(genre).label;
 }
 
-function parseSnapshotNumber(value: number | string | null) {
-  const parsedValue =
-    typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
+function getGenreHintFromQuery(query: string) {
+  const normalized = query.toLowerCase().replace(/"/g, "");
 
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
+  return (
+    MUSIC_GENRE_OPTIONS.find((option) =>
+      option.value !== "all" &&
+      option.queries.some((candidate) =>
+        normalized.includes(candidate.toLowerCase().replace(/"/g, "")),
+      ),
+    )?.value ?? null
+  );
+}
+
+function getSignalCount(track: Pick<AggregatedTrack, "marketSignals" | "searchSignals">) {
+  return track.marketSignals + track.searchSignals;
 }
 
 function getSnapshotDateKey(date: Date) {
@@ -377,7 +381,11 @@ function sortTracks(tracks: AggregatedTrack[]) {
 }
 
 function aggregateTracks(
-  trackGroups: SpotifyTrackRecord[][],
+  trackGroups: Array<{
+    tracks: SpotifyTrackRecord[];
+    sourceName: string;
+    genreHint: string | null;
+  }>,
   source: "market" | "search",
 ): AggregatedTrack[] {
   const trackMap = new Map<string, AggregatedTrack>();
@@ -385,7 +393,7 @@ function aggregateTracks(
   for (const group of trackGroups) {
     const seenInGroup = new Set<string>();
 
-    for (const track of group) {
+    for (const track of group.tracks) {
       const existing = trackMap.get(track.id);
       const artists = track.artists.join(", ");
 
@@ -394,6 +402,12 @@ function aggregateTracks(
         existing.explicit = existing.explicit || track.explicit;
         existing.coverUrl = existing.coverUrl ?? track.coverUrl ?? null;
         existing.albumName = existing.albumName || track.albumName || "Unknown album";
+        if (!existing.sourceNames.includes(group.sourceName)) {
+          existing.sourceNames.push(group.sourceName);
+        }
+        if (group.genreHint && !existing.genreHints.includes(group.genreHint)) {
+          existing.genreHints.push(group.genreHint);
+        }
       } else {
         trackMap.set(track.id, {
           id: track.id,
@@ -409,6 +423,8 @@ function aggregateTracks(
           coverUrl: track.coverUrl,
           marketSignals: 0,
           searchSignals: 0,
+          sourceNames: [group.sourceName],
+          genreHints: group.genreHint ? [group.genreHint] : [],
         });
       }
 
@@ -532,6 +548,8 @@ function mergeTracks(left: AggregatedTrack, right: AggregatedTrack): AggregatedT
     albumName: left.albumName || right.albumName || "Unknown album",
     marketSignals: left.marketSignals + right.marketSignals,
     searchSignals: left.searchSignals + right.searchSignals,
+    sourceNames: Array.from(new Set([...left.sourceNames, ...right.sourceNames])),
+    genreHints: Array.from(new Set([...left.genreHints, ...right.genreHints])),
   };
 }
 
@@ -579,121 +597,97 @@ function mergeGenreAndMarketTracks(
   return sortTracks(Array.from(mergedMap.values()));
 }
 
+function buildChartCandidates({
+  tracks,
+  market,
+  genre,
+}: {
+  tracks: AggregatedTrack[];
+  market: string;
+  genre: string;
+}): ChartCandidate[] {
+  return sortTracks(tracks).map((track) => {
+    const trackGenre =
+      genre === "all" ? track.genreHints[0] ?? "all" : genre;
+    const sourceType = getTrackSignalSource(track);
+    const sourceNames = Array.from(new Set(track.sourceNames));
+    const saturationCount = Math.max(sourceNames.length, getSignalCount(track), 1);
+
+    return {
+      trackId: track.id,
+      trackName: track.name,
+      artistName: track.artists,
+      artistIds: track.artistIds,
+      albumName: track.albumName,
+      imageUrl: track.coverUrl,
+      spotifyUrl: track.spotifyUrl,
+      popularity: track.popularity,
+      sourceType,
+      sourceName:
+        sourceNames.length > 1
+          ? `${sourceNames[0]} +${sourceNames.length - 1}`
+          : sourceNames[0] ?? getSignalSourceLabel(sourceType),
+      sourceNames,
+      country: market,
+      genre: trackGenre,
+      scopeGenre: genre,
+      genreHints: track.genreHints.length > 0 ? track.genreHints : [trackGenre],
+      saturationCount,
+      explicit: track.explicit,
+    };
+  });
+}
+
 function buildSnapshotRows(
-  tracks: AggregatedTrack[],
-  market: string,
-  genre: string,
+  tracks: ChartCandidate[],
   snapshotDate: string,
   capturedAt: string,
-): MusicTrackSnapshotInput[] {
-  return tracks.map((track) => ({
-    market,
-    genre,
-    track_id: track.id,
-    snapshot_date: snapshotDate,
-    captured_at: capturedAt,
-    track_name: track.name,
-    artists: track.artists,
+): MusicChartSnapshotInput[] {
+  return tracks.map((track, index) => ({
+    spotify_track_id: track.trackId,
+    track_name: track.trackName,
+    artist_name: track.artistName,
+    artist_ids: track.artistIds,
     album_name: track.albumName,
-    cover_url: track.coverUrl,
+    image_url: track.imageUrl,
     spotify_url: track.spotifyUrl,
     popularity: track.popularity,
-    signal_count: getSignalCount(track),
-    source_mode: getTrackSignalSource(track),
-    explicit: track.explicit,
+    rank_position: index + 1,
+    source_type: track.sourceType,
+    source_name: track.sourceName,
+    country: track.country,
+    genre: track.scopeGenre,
+    saturation_count: track.saturationCount,
+    snapshot_day: snapshotDate,
+    captured_at: capturedAt,
   }));
 }
 
-function buildSnapshotHistoryMeta(
-  rows: MusicTrackSnapshotRow[],
-  currentSnapshotDate: string,
-): SnapshotHistoryMeta {
-  const uniqueDates = Array.from(
-    new Set(
-      rows
-        .map((row) => row.snapshot_date)
-        .filter((date): date is string => Boolean(date)),
-    ),
-  )
-    .sort((left, right) => right.localeCompare(left));
-  const previousSnapshotDate =
-    uniqueDates.find((date) => date < currentSnapshotDate) ?? null;
-  const rowsByTrack = new Map<string, MusicTrackSnapshotRow[]>();
-
-  for (const row of rows) {
-    const trackId = row.track_id;
-
-    if (!trackId) {
-      continue;
-    }
-
-    const trackRows = rowsByTrack.get(trackId);
-
-    if (trackRows) {
-      trackRows.push(row);
-    } else {
-      rowsByTrack.set(trackId, [row]);
-    }
-  }
-
-  const historyByTrack = new Map<string, TrackHistoryStats>();
-
-  for (const [trackId, trackRows] of rowsByTrack.entries()) {
-    const sortedRows = [...trackRows].sort((left, right) => {
-      const rightDate = right.snapshot_date ?? "";
-      const leftDate = left.snapshot_date ?? "";
-
-      if (rightDate !== leftDate) {
-        return rightDate.localeCompare(leftDate);
-      }
-
-      return (right.captured_at ?? "").localeCompare(left.captured_at ?? "");
-    });
-    const latestSnapshot = sortedRows[0] ?? null;
-    const previousSnapshot =
-      sortedRows.find(
-        (row) =>
-          Boolean(row.snapshot_date) &&
-          (row.snapshot_date ?? "") < currentSnapshotDate,
-      ) ?? null;
-    const snapshotCount = new Set(
-      sortedRows
-        .map((row) => row.snapshot_date)
-        .filter((date): date is string => Boolean(date)),
-    ).size;
-    const previousDaySeen = previousSnapshotDate
-      ? sortedRows.some((row) => row.snapshot_date === previousSnapshotDate)
-      : false;
-
-    historyByTrack.set(trackId, {
-      snapshotCount,
-      previousDaySeen,
-      popularityDelta:
-        latestSnapshot && previousSnapshot
-          ? parseSnapshotNumber(latestSnapshot.popularity) -
-            parseSnapshotNumber(previousSnapshot.popularity)
-          : 0,
-      signalDelta:
-        latestSnapshot && previousSnapshot
-          ? parseSnapshotNumber(latestSnapshot.signal_count) -
-            parseSnapshotNumber(previousSnapshot.signal_count)
-          : 0,
-      latestSnapshot,
-      previousSnapshot,
-    });
-  }
-
-  return {
-    historyByTrack,
-    historyDaysTracked: uniqueDates.length,
-    previousSnapshotDate,
-  };
+function buildMovementRows(movements: ChartMovementRecord[]) {
+  return movements.map((movement) => ({
+    spotify_track_id: movement.trackId,
+    current_rank: movement.currentRank,
+    previous_rank: movement.previousRank,
+    rank_change: movement.rankChange,
+    movement_type: movement.movementType,
+    popularity_current: movement.popularityCurrent,
+    popularity_previous: movement.popularityPrevious,
+    popularity_change: movement.popularityChange,
+    days_on_chart: movement.daysOnChart,
+    saturation_count: movement.saturationCount,
+    opportunity_score: movement.opportunityScore,
+    intelligence_tags: movement.intelligenceTags,
+    country: movement.country,
+    genre: movement.scopeGenre,
+    snapshot_day: movement.snapshotDay,
+    calculated_at: movement.calculatedAt,
+  }));
 }
 
 function buildSummaryCards(
   tracks: AggregatedTrack[],
   workbenchTracks: MusicWorkbenchTrack[],
-  historyDaysTracked: number,
+  movementContext: ChartMovementContext,
 ): MusicWorkbenchMetric[] {
   const highTractionCount = workbenchTracks.filter((track) => track.highTraction).length;
   const opportunityCount = workbenchTracks.filter(
@@ -708,9 +702,9 @@ function buildSummaryCards(
     },
     {
       title: "Dias rastreados",
-      value: formatCount(historyDaysTracked),
+      value: formatCount(movementContext.historyDaysTracked),
       caption:
-        historyDaysTracked > 1
+        movementContext.hasSufficientHistory
           ? "Base temporal valida para ler subida, entrada e persistencia."
           : "Historico ainda curto e em fase inicial de coleta.",
     },
@@ -728,304 +722,192 @@ function buildSummaryCards(
 }
 
 function buildTopMovers(
-  tracks: AggregatedTrack[],
-  historyMeta: SnapshotHistoryMeta,
+  movements: ChartMovementRecord[],
+  movementContext: ChartMovementContext,
 ): MusicTrackHighlight[] {
-  const maxSignalCount = tracks.reduce(
-    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
-    0,
-  );
-  const hasHistory = historyMeta.historyDaysTracked > 1;
-  const historyCandidates = tracks.filter((track) => {
-    const history = historyMeta.historyByTrack.get(track.id);
-
-    return Boolean(history?.previousSnapshot) && (history?.signalDelta ?? 0) > 0;
-  });
   const source =
-    hasHistory && historyCandidates.length > 0 ? historyCandidates : tracks;
+    movementContext.hasSufficientHistory
+      ? movements.filter(
+          (track) =>
+            (track.rankChange ?? 0) > 0 ||
+            (track.popularityChange ?? 0) > 0,
+        )
+      : movements;
 
-  return [...source]
+  return [...(source.length > 0 ? source : movements)]
     .sort((left, right) => {
-      const rightHistory = historyMeta.historyByTrack.get(right.id);
-      const leftHistory = historyMeta.historyByTrack.get(left.id);
-      const rightScore = rightHistory?.previousSnapshot
-        ? rightHistory.signalDelta * 18 +
-          rightHistory.popularityDelta * 4 +
-          rightHistory.snapshotCount * 2
-        : getMomentumScore(right, maxSignalCount);
-      const leftScore = leftHistory?.previousSnapshot
-        ? leftHistory.signalDelta * 18 +
-          leftHistory.popularityDelta * 4 +
-          leftHistory.snapshotCount * 2
-        : getMomentumScore(left, maxSignalCount);
+      const rightScore =
+        Math.max(right.rankChange ?? 0, 0) * 10 +
+        Math.max(right.popularityChange ?? 0, 0) * 4 +
+        right.opportunityScore;
+      const leftScore =
+        Math.max(left.rankChange ?? 0, 0) * 10 +
+        Math.max(left.popularityChange ?? 0, 0) * 4 +
+        left.opportunityScore;
 
       if (rightScore !== leftScore) {
         return rightScore - leftScore;
       }
 
-      return right.popularity - left.popularity;
+      return right.popularityCurrent - left.popularityCurrent;
     })
     .slice(0, 6)
     .map((track) => {
-      const source = getTrackSignalSource(track);
-      const signalCount = getSignalCount(track);
-      const history = historyMeta.historyByTrack.get(track.id);
-      const hasPreviousSnapshot = Boolean(history?.previousSnapshot);
-
       return {
-        id: track.id,
-        name: track.name,
-        artists: track.artists,
-        coverUrl: track.coverUrl,
+        id: track.trackId,
+        name: track.trackName,
+        artists: track.artistName,
+        coverUrl: track.imageUrl,
         spotifyUrl: track.spotifyUrl,
-        badgeLabel:
-          source === "hybrid"
-            ? "Dominio hibrido"
-            : source === "featured"
-              ? "Forca editorial"
-              : "Busca aquecida",
-        primaryMetric: hasPreviousSnapshot
-          ? `${formatSignedValue(history?.signalDelta ?? 0)} sinais`
-          : `${getMomentumScore(track, maxSignalCount)} pts`,
-        secondaryMetric: hasPreviousSnapshot
-          ? `${history?.snapshotCount ?? 1} dias · ${formatSignedValue(history?.popularityDelta ?? 0)} pop`
-          : `${signalCount} sinais · ${track.popularity} pop`,
+        badgeLabel: track.movementType === "up" ? "Subida forte" : "Radar quente",
+        primaryMetric:
+          track.rankChange === null
+            ? "Sem historico"
+            : `▲ ${formatSignedValue(track.rankChange)}`,
+        secondaryMetric:
+          track.popularityChange === null
+            ? `${track.daysOnChart} dias · ${track.popularityCurrent} pop`
+            : `${formatSignedValue(track.popularityChange)} pop · ${track.daysOnChart} dias`,
         summary:
-          hasPreviousSnapshot
-            ? `Subiu ${formatSignedValue(history?.signalDelta ?? 0)} sinais e ${formatSignedValue(history?.popularityDelta ?? 0)} pontos de popularidade desde a ultima captura.`
-            : source === "hybrid"
-              ? "Dominando playlists destaque e busca ao mesmo tempo."
-              : source === "featured"
-                ? `Ja ganhou espaco editorial e sustenta ${signalCount} sinais ativos no radar.`
-                : signalCount > 1
-                  ? "Recorrencia forte nas buscas do radar, com espaco para escalar."
-                  : "Faixa liderando o radar por performance acima da media.",
+          track.rankChange === null
+            ? "Historico insuficiente para leitura de movimento. Continue coletando snapshots."
+            : `${track.trackName} ganhou ${formatSignedValue(track.rankChange)} posicoes e virou leitura quente de curadoria.`,
       };
     });
 }
 
 function buildNewEntries(
-  tracks: AggregatedTrack[],
+  movements: ChartMovementRecord[],
   excludedIds: Set<string>,
-  historyMeta: SnapshotHistoryMeta,
 ): MusicTrackHighlight[] {
-  const maxSignalCount = tracks.reduce(
-    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
-    0,
+  const entryCandidates = movements.filter(
+    (track) =>
+      !excludedIds.has(track.trackId) &&
+      (track.movementType === "new" || track.movementType === "reentry"),
   );
-  const hasHistoricalBaseline = Boolean(historyMeta.previousSnapshotDate);
-  const historicalCandidates = tracks.filter((track) => {
-    const history = historyMeta.historyByTrack.get(track.id);
-
-    return !excludedIds.has(track.id) && !history?.previousDaySeen;
-  });
-  const candidates = tracks.filter((track) => {
-    const signalCount = getSignalCount(track);
-
-    return !excludedIds.has(track.id) && signalCount <= 2 && track.popularity >= 55;
-  });
-  const fallbackCandidates = tracks.filter(
-    (track) => !excludedIds.has(track.id) && getSignalCount(track) <= 3,
+  const fallbackCandidates = movements.filter(
+    (track) => !excludedIds.has(track.trackId) && track.saturationCount <= 3,
   );
-  const source = hasHistoricalBaseline
-    ? historicalCandidates.length >= 4
-      ? historicalCandidates
-      : candidates.length >= 6
-        ? candidates
-        : fallbackCandidates
-    : candidates.length >= 6
-      ? candidates
-      : fallbackCandidates;
 
-  return [...source]
+  return [...(entryCandidates.length > 0 ? entryCandidates : fallbackCandidates)]
     .sort((left, right) => {
-      const rightScore = getOpportunityScore(right, maxSignalCount);
-      const leftScore = getOpportunityScore(left, maxSignalCount);
-
-      if (rightScore !== leftScore) {
-        return rightScore - leftScore;
+      if (right.opportunityScore !== left.opportunityScore) {
+        return right.opportunityScore - left.opportunityScore;
       }
 
-      return right.popularity - left.popularity;
+      return right.popularityCurrent - left.popularityCurrent;
     })
     .slice(0, 6)
     .map((track) => {
-      const signalCount = getSignalCount(track);
-      const sourceLabel = getTrackSignalSource(track);
-      const history = historyMeta.historyByTrack.get(track.id);
-      const isNewToday = hasHistoricalBaseline && !history?.previousDaySeen;
-
       return {
-        id: track.id,
-        name: track.name,
-        artists: track.artists,
-        coverUrl: track.coverUrl,
+        id: track.trackId,
+        name: track.trackName,
+        artists: track.artistName,
+        coverUrl: track.imageUrl,
         spotifyUrl: track.spotifyUrl,
-        badgeLabel: isNewToday
-          ? "Nova no radar"
-          : signalCount <= 1
-            ? "Early signal"
-            : "Discovery wave",
-        primaryMetric: isNewToday
-          ? "Nova hoje"
-          : `${getOpportunityScore(track, maxSignalCount)} pts`,
-        secondaryMetric: isNewToday
-          ? `${history?.snapshotCount ?? 1} dia · ${track.popularity} pop`
-          : `${getSaturationLabel(track)} · ${track.popularity} pop`,
+        badgeLabel:
+          track.movementType === "reentry" ? "Reentrada" : "Nova no radar",
+        primaryMetric:
+          track.movementType === "reentry" ? "Voltou ao radar" : "NEW",
+        secondaryMetric: `${track.saturationCount} fontes · ${track.popularityCurrent} pop`,
         summary:
-          isNewToday
-            ? "Nao aparecia na ultima leitura e entrou agora no radar deste mercado."
-            : sourceLabel === "featured"
-              ? "Entrou pelo radar editorial com pouca saturacao e bom potencial de descoberta."
-              : signalCount <= 1
-                ? "Ainda pouco saturada e pronta para discovery rapido."
-                : "Sinal fresco com recorrencia inicial e chance de subir nas proximas leituras.",
+          track.movementType === "reentry"
+            ? "A musica saiu do radar em snapshots anteriores e voltou a ganhar tracao agora."
+            : "Entrada fresca no chart, com espaco real para teste editorial antes de saturar.",
       };
     });
 }
 
 function buildRecurringTracks(
-  tracks: AggregatedTrack[],
-  historyMeta: SnapshotHistoryMeta,
+  movements: ChartMovementRecord[],
 ): TrackInsight[] {
-  const historicalRecurring = tracks.filter((track) => {
-    const history = historyMeta.historyByTrack.get(track.id);
+  const source = movements.filter((track) => track.daysOnChart >= 3);
 
-    return history ? history.snapshotCount >= 2 : false;
-  });
-  const currentRecurring = tracks.filter(
-    (track) => track.marketSignals >= 2 || getSignalCount(track) >= 3,
-  );
-  const fallback = tracks.filter((track) => getSignalCount(track) >= 2);
-  const source =
-    historicalRecurring.length > 0
-      ? historicalRecurring
-      : currentRecurring.length > 0
-        ? currentRecurring
-        : fallback.length > 0
-          ? fallback
-          : tracks;
-
-  return [...source]
+  return [...(source.length > 0 ? source : movements)]
     .sort((left, right) => {
-      const rightHistory = historyMeta.historyByTrack.get(right.id);
-      const leftHistory = historyMeta.historyByTrack.get(left.id);
-      const rightCount = rightHistory?.snapshotCount ?? 1;
-      const leftCount = leftHistory?.snapshotCount ?? 1;
-
-      if (rightCount !== leftCount) {
-        return rightCount - leftCount;
+      if (right.daysOnChart !== left.daysOnChart) {
+        return right.daysOnChart - left.daysOnChart;
       }
 
-      const rightSignals = getSignalCount(right);
-      const leftSignals = getSignalCount(left);
-
-      if (rightSignals !== leftSignals) {
-        return rightSignals - leftSignals;
+      if (right.saturationCount !== left.saturationCount) {
+        return right.saturationCount - left.saturationCount;
       }
 
-      return right.popularity - left.popularity;
+      return right.popularityCurrent - left.popularityCurrent;
     })
     .slice(0, 12)
     .map((track) => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists,
+      id: track.trackId,
+      name: track.trackName,
+      artists: track.artistName,
       artistIds: track.artistIds,
       albumName: track.albumName,
-      popularity: track.popularity,
-      playlistsCount: historyMeta.historyByTrack.get(track.id)?.snapshotCount ?? 1,
-      durationLabel: formatDuration(track.durationMs),
+      popularity: track.popularityCurrent,
+      playlistsCount: track.daysOnChart,
+      durationLabel: "n/a",
       explicit: track.explicit,
       spotifyUrl: track.spotifyUrl,
-      coverUrl: track.coverUrl,
+      coverUrl: track.imageUrl,
     }));
 }
 
 function buildWorkbenchTracks(
-  tracks: AggregatedTrack[],
-  topMoverIds: Set<string>,
-  newEntryIds: Set<string>,
-  recurringIds: Set<string>,
-  historyMeta: SnapshotHistoryMeta,
+  movements: ChartMovementRecord[],
 ): MusicWorkbenchTrack[] {
-  const maxSignalCount = tracks.reduce(
-    (maxValue, track) => Math.max(maxValue, getSignalCount(track)),
-    0,
-  );
-
-  const rankedTracks = [...tracks].sort((left, right) => {
-    const rightHistory = historyMeta.historyByTrack.get(right.id);
-    const leftHistory = historyMeta.historyByTrack.get(left.id);
-    const rightScore =
-      getOpportunityScore(right, maxSignalCount) +
-      Math.max((rightHistory?.signalDelta ?? 0) * 8, 0) +
-      Math.max((rightHistory?.popularityDelta ?? 0) * 2, 0) +
-      (rightHistory?.snapshotCount ?? 1);
-    const leftScore =
-      getOpportunityScore(left, maxSignalCount) +
-      Math.max((leftHistory?.signalDelta ?? 0) * 8, 0) +
-      Math.max((leftHistory?.popularityDelta ?? 0) * 2, 0) +
-      (leftHistory?.snapshotCount ?? 1);
-
-    if (rightScore !== leftScore) {
-      return rightScore - leftScore;
-    }
-
-    const rightMomentum = getMomentumScore(right, maxSignalCount);
-    const leftMomentum = getMomentumScore(left, maxSignalCount);
-
-    if (rightMomentum !== leftMomentum) {
-      return rightMomentum - leftMomentum;
-    }
-
-    return right.popularity - left.popularity;
-  });
-
-  return rankedTracks.map((track, index) => {
-    const signalCount = getSignalCount(track);
-    const source = getTrackSignalSource(track);
-    const history = historyMeta.historyByTrack.get(track.id);
-    const opportunityScore = getOpportunityScore(track, maxSignalCount);
+  return movements.map((track) => {
+    const lowSaturation = track.saturationCount <= 3;
+    const isRecurring = track.daysOnChart >= 3;
+    const isNewEntry =
+      track.movementType === "new" || track.movementType === "reentry";
+    const isMover = track.movementType === "up" && (track.rankChange ?? 0) > 0;
     const highTraction =
-      track.popularity >= 75 ||
-      (track.marketSignals > 0 && track.popularity >= 68) ||
-      opportunityScore >= 82;
-    const lowSaturation = signalCount <= 2;
-    const tags = [
-      topMoverIds.has(track.id) ? "Mover" : null,
-      newEntryIds.has(track.id) ? "Nova" : null,
-      recurringIds.has(track.id) ? "Recorrente" : null,
-      lowSaturation ? "Baixa saturacao" : null,
-      track.explicit ? "Explicit" : null,
-    ].filter((tag): tag is string => Boolean(tag));
+      track.popularityCurrent >= 75 ||
+      track.opportunityScore >= 82 ||
+      track.intelligenceTags.includes("Hit forte");
 
     return {
-      rank: index + 1,
-      id: track.id,
-      name: track.name,
-      artists: track.artists,
+      rank: track.currentRank,
+      id: track.trackId,
+      name: track.trackName,
+      artists: track.artistName,
+      genre: getGenreLabel(track.genre),
       albumName: track.albumName,
-      popularity: track.popularity,
-      signalCount,
-      durationLabel: formatDuration(track.durationMs),
+      popularity: track.popularityCurrent,
+      popularityChange: track.popularityChange,
+      previousRank: track.previousRank,
+      rankChange: track.rankChange,
+      movementType: track.movementType,
+      daysOnChart: track.daysOnChart,
+      saturationCount: track.saturationCount,
+      signalCount: track.saturationCount,
+      durationLabel: "n/a",
       explicit: track.explicit,
       spotifyUrl: track.spotifyUrl,
-      coverUrl: track.coverUrl,
-      opportunityScore,
-      sourceLabel: getSignalSourceLabel(source),
-      signalSource: source,
-      tractionLabel: getTractionLabel(track),
-      saturationLabel: getSaturationLabel(track),
-      historyLabel: history?.previousSnapshot
-        ? `${history.snapshotCount} dias · ${formatSignedValue(history.signalDelta)} sinais`
-        : history && history.snapshotCount > 1
-          ? `${history.snapshotCount} dias no historico`
-          : "Ainda sem base historica",
-      tags,
-      isMover: topMoverIds.has(track.id),
-      isNewEntry: newEntryIds.has(track.id),
-      isRecurring: recurringIds.has(track.id),
+      coverUrl: track.imageUrl,
+      opportunityScore: track.opportunityScore,
+      sourceLabel: getSignalSourceLabel(track.sourceType),
+      signalSource: track.sourceType,
+      tractionLabel: track.intelligenceTags.includes("Explodindo")
+        ? "Explodindo"
+        : track.intelligenceTags.includes("Subindo")
+          ? "Subindo"
+          : "Estavel",
+      saturationLabel:
+        track.saturationCount <= 3
+          ? "Baixa saturacao"
+          : track.saturationCount >= 15
+            ? "Saturada"
+            : "Saturacao moderada",
+      historyLabel:
+        track.previousRank === null
+          ? "Historico insuficiente"
+          : `${track.daysOnChart} dias · ${formatSignedValue(track.rankChange ?? 0)} pos`,
+      tags: track.intelligenceTags,
+      intelligenceTags: track.intelligenceTags,
+      sourceNames: track.sourceNames,
+      isMover,
+      isNewEntry,
+      isRecurring,
       lowSaturation,
       highTraction,
     };
@@ -1234,9 +1116,17 @@ async function loadFeaturedPlaylistTracks(
     const playlistTrackGroups = await Promise.all(
       featuredPlaylists.map(async (playlist) => {
         try {
-          return await fetchSpotifyPlaylistTracks(playlist.id, country);
+          return {
+            sourceName: playlist.name,
+            genreHint: null as string | null,
+            tracks: await fetchSpotifyPlaylistTracks(playlist.id, country),
+          };
         } catch {
-          return [];
+          return {
+            sourceName: playlist.name,
+            genreHint: null as string | null,
+            tracks: [] as SpotifyTrackRecord[],
+          };
         }
       }),
     );
@@ -1244,7 +1134,7 @@ async function loadFeaturedPlaylistTracks(
     return {
       featuredPlaylists: buildFeaturedPlaylistInsights(featuredPlaylists),
       aggregatedTracks: aggregateTracks(
-        playlistTrackGroups.filter((group) => group.length > 0),
+        playlistTrackGroups.filter((group) => group.tracks.length > 0),
         "market",
       ),
     };
@@ -1277,12 +1167,14 @@ async function loadGenreTracks(
           const tracks = await fetchSpotifyTracksByGenre(query, country, 20);
 
           return {
-            query,
+            sourceName: query,
+            genreHint: getGenreHintFromQuery(query),
             tracks,
           };
         } catch {
           return {
-            query,
+            sourceName: query,
+            genreHint: getGenreHintFromQuery(query),
             tracks: [] as SpotifyTrackRecord[],
           };
         }
@@ -1293,7 +1185,7 @@ async function loadGenreTracks(
 
     return {
       aggregatedTracks: aggregateTracks(
-        nonEmptyGroups.map((group) => group.tracks),
+        nonEmptyGroups,
         "search",
       ),
       activeQueryCount: nonEmptyGroups.length,
@@ -1348,45 +1240,58 @@ export async function getMusicChartsData({
       : genreData.aggregatedTracks;
   const snapshotDate = getSnapshotDateKey(new Date());
   const capturedAt = new Date().toISOString();
+  const chartCandidates = buildChartCandidates({
+    tracks: focusTracks,
+    market: marketOption.value,
+    genre: genreOption.value,
+  });
 
-  if (focusTracks.length > 0) {
+  if (chartCandidates.length > 0) {
     await upsertMusicTrackSnapshots(
-      buildSnapshotRows(
-        focusTracks,
-        marketOption.value,
-        genreOption.value,
-        snapshotDate,
-        capturedAt,
-      ),
+      buildSnapshotRows(chartCandidates, snapshotDate, capturedAt),
     );
   }
 
-  const historyMeta = buildSnapshotHistoryMeta(
-    await fetchMusicTrackSnapshots({
-      market: marketOption.value,
-      genre: genreOption.value,
-      days: 30,
-    }),
-    snapshotDate,
+  const snapshotRows = await fetchMusicTrackSnapshots({
+    market: marketOption.value,
+    genre: genreOption.value,
+    days: 30,
+  });
+  const movementResult = buildChartMovements({
+    currentTracks: chartCandidates,
+    snapshotRows,
+    snapshotDay: snapshotDate,
+    calculatedAt: capturedAt,
+  });
+  const genreHeat = buildGenreHeatInsights({
+    movements: movementResult.movements,
+    getGenreLabel,
+  });
+  const dominantArtists = buildArtistDominanceInsights(
+    movementResult.movements,
   );
-  const topMovers = buildTopMovers(focusTracks, historyMeta);
+  const enrichedMovements = applyArtistIntelligenceTags({
+    movements: movementResult.movements,
+    artists: dominantArtists,
+  });
+
+  if (enrichedMovements.length > 0) {
+    await upsertMusicChartMovements(buildMovementRows(enrichedMovements));
+  }
+
+  const topMovers = buildTopMovers(
+    enrichedMovements,
+    movementResult.context,
+  );
   const topMoverIds = new Set(topMovers.map((track) => track.id));
-  const newEntries = buildNewEntries(focusTracks, topMoverIds, historyMeta);
-  const newEntryIds = new Set(newEntries.map((track) => track.id));
-  const recurringTracks = buildRecurringTracks(focusTracks, historyMeta);
-  const recurringIds = new Set(recurringTracks.map((track) => track.id));
-  const workbenchTracks = buildWorkbenchTracks(
-    focusTracks,
-    topMoverIds,
-    newEntryIds,
-    recurringIds,
-    historyMeta,
-  );
+  const newEntries = buildNewEntries(enrichedMovements, topMoverIds);
+  const recurringTracks = buildRecurringTracks(enrichedMovements);
+  const workbenchTracks = buildWorkbenchTracks(enrichedMovements);
   const dataTrust = buildDataTrustContext({
     tracks: focusTracks,
     featuredPlaylistCount: marketData.featuredPlaylists.length,
     activeQueryCount: genreData.activeQueryCount,
-    historyDaysTracked: historyMeta.historyDaysTracked,
+    historyDaysTracked: movementResult.context.historyDaysTracked,
     countryLabel: marketOption.label,
     genreLabel: genreOption.label,
   });
@@ -1395,7 +1300,7 @@ export async function getMusicChartsData({
     summaryCards: buildSummaryCards(
       focusTracks,
       workbenchTracks,
-      historyMeta.historyDaysTracked,
+      movementResult.context,
     ),
     topTracks: buildTopTracks(focusTracks),
     artistDistribution: buildArtistDistribution(focusTracks),
@@ -1412,6 +1317,9 @@ export async function getMusicChartsData({
     ),
     featuredPlaylists: marketData.featuredPlaylists,
     dataTrust,
+    movementContext: movementResult.context,
+    hottestGenres: genreHeat,
+    dominantArtists,
     countryValue: marketOption.value,
     countryLabel: marketOption.label,
     genreValue: genreOption.value,

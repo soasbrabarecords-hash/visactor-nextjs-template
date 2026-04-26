@@ -5,10 +5,6 @@ import { getChartsData } from "@/lib/charts-data";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { getMusicChartsData, getMusicGenreOptions, getMusicMarketOptions } from "@/lib/music-charts-data";
 import {
-  fetchMusicTrackSnapshots,
-  type MusicTrackSnapshotRow,
-} from "@/lib/music-snapshot-store";
-import {
   fetchPlaylistSnapshots,
   type PlaylistSnapshotRow,
 } from "@/lib/playlist-snapshot-store";
@@ -18,7 +14,12 @@ import {
 } from "@/lib/spotify";
 import type { PlaylistRecord } from "@/types/dashboard";
 import type { TrackInsight } from "@/types/charts";
-import type { MusicWorkbenchTrack } from "@/types/music-charts";
+import type {
+  MusicArtistDominance,
+  MusicGenreHeat,
+  MusicMovementContext,
+  MusicWorkbenchTrack,
+} from "@/types/music-charts";
 import type {
   CurationPageData,
   DashboardWorkspaceData,
@@ -139,17 +140,6 @@ function clamp(value: number, minValue: number, maxValue: number) {
   return Math.min(Math.max(value, minValue), maxValue);
 }
 
-function getPeriodDays(period: PeriodFilter) {
-  switch (period) {
-    case "today":
-      return 1;
-    case "30d":
-      return 30;
-    default:
-      return 7;
-  }
-}
-
 function getPeriodLabel(period: PeriodFilter) {
   return PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? "7 dias";
 }
@@ -262,104 +252,14 @@ function getBreakdownTone(value: number): StatusTone {
   return "red";
 }
 
-function buildSnapshotRanking(
-  rows: MusicTrackSnapshotRow[],
-  snapshotDate: string,
-): Map<string, number> {
-  const rankingRows = rows
-    .filter(
-      (row): row is MusicTrackSnapshotRow & { track_id: string } =>
-        row.snapshot_date === snapshotDate && Boolean(row.track_id),
-    )
-    .sort((left, right) => {
-      const signalDifference =
-        toNumber(right.signal_count) - toNumber(left.signal_count);
-
-      if (signalDifference !== 0) {
-        return signalDifference;
-      }
-
-      const popularityDifference =
-        toNumber(right.popularity) - toNumber(left.popularity);
-
-      if (popularityDifference !== 0) {
-        return popularityDifference;
-      }
-
-      return (left.track_name ?? "").localeCompare(right.track_name ?? "");
-    });
-
-  return new Map(
-    rankingRows.map((row, index) => [row.track_id, index + 1] as const),
-  );
-}
-
-function buildDaysOnRadar(
-  rows: MusicTrackSnapshotRow[],
-  currentDate: string,
-  periodDays: number,
-): Map<string, Set<string>> {
-  const cutoff = subDays(new Date(`${currentDate}T12:00:00.000Z`), periodDays - 1)
-    .toISOString()
-    .slice(0, 10);
-  const daysByTrack = new Map<string, Set<string>>();
-
-  for (const row of rows) {
-    if (!row.track_id || !row.snapshot_date || row.snapshot_date < cutoff) {
-      continue;
-    }
-
-    const trackDays = daysByTrack.get(row.track_id) ?? new Set<string>();
-    trackDays.add(row.snapshot_date);
-    daysByTrack.set(row.track_id, trackDays);
-  }
-
-  return daysByTrack;
-}
-
-function getLatestSnapshotDates(rows: MusicTrackSnapshotRow[]) {
-  const uniqueDates = Array.from(
-    new Set(
-      rows
-        .map((row) => row.snapshot_date)
-        .filter((date): date is string => Boolean(date)),
-    ),
-  ).sort((left, right) => right.localeCompare(left));
-
-  return {
-    currentDate: uniqueDates[0] ?? new Date().toISOString().slice(0, 10),
-    previousDate: uniqueDates[1] ?? null,
-  };
-}
-
 function buildRadarRows(
   workbenchTracks: MusicWorkbenchTrack[],
-  snapshotRows: MusicTrackSnapshotRow[],
-  periodDays: number,
   playlistTracks: TrackInsight[],
   dominantArtists: string[],
 ): RadarMusicRow[] {
-  const { currentDate, previousDate } = getLatestSnapshotDates(snapshotRows);
-  const previousRankMap = previousDate
-    ? buildSnapshotRanking(snapshotRows, previousDate)
-    : new Map<string, number>();
-  const daysByTrack = buildDaysOnRadar(snapshotRows, currentDate, periodDays);
   const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
 
   return workbenchTracks.map((track) => {
-    const previousRank = previousRankMap.get(track.id) ?? null;
-    const daysOnRadar = daysByTrack.get(track.id)?.size ?? 1;
-    const seenBefore = snapshotRows.some(
-      (row) =>
-        row.track_id === track.id &&
-        Boolean(row.snapshot_date) &&
-        (row.snapshot_date ?? "") < currentDate,
-    );
-    const seenInPreviousSnapshot = previousDate
-      ? snapshotRows.some(
-          (row) => row.track_id === track.id && row.snapshot_date === previousDate,
-        )
-      : false;
     const alreadyInPlaylists = playlistTrackIds.has(track.id);
     const normalizedArtists = track.artists.toLowerCase();
     const artistFit = dominantArtists.some((artist) =>
@@ -367,26 +267,10 @@ function buildRadarRows(
     );
     const fitLabel = alreadyInPlaylists || artistFit
       ? "Fit alto"
-      : track.lowSaturation || daysOnRadar >= 3
+      : track.lowSaturation || track.daysOnChart >= 3
         ? "Fit medio"
         : "Fit baixo";
-    const rankChange = previousRank === null ? null : previousRank - track.rank;
-
-    let movementType: MovementType;
-
-    if (previousRank === null) {
-      movementType = seenBefore && !seenInPreviousSnapshot ? "reentry" : "new";
-    } else {
-      const resolvedRankChange = previousRank - track.rank;
-
-      if (resolvedRankChange > 0) {
-        movementType = "up";
-      } else if (resolvedRankChange < 0) {
-        movementType = "down";
-      } else {
-        movementType = "same";
-      }
-    }
+    const movementType = track.movementType;
 
     return {
       rank: track.rank,
@@ -394,25 +278,29 @@ function buildRadarRows(
       trackId: track.id,
       name: track.name,
       artists: track.artists,
+      genre: track.genre,
       albumName: track.albumName,
       popularity: track.popularity,
-      previousRank,
-      rankChange,
-      daysOnRadar,
+      popularityChange: track.popularityChange,
+      previousRank: track.previousRank,
+      rankChange: track.rankChange,
+      daysOnRadar: track.daysOnChart,
+      saturationCount: track.saturationCount,
       opportunityScore: track.opportunityScore,
       spotifyUrl: track.spotifyUrl,
       coverUrl: track.coverUrl,
       statusTags: track.tags,
+      intelligenceTags: track.intelligenceTags,
       lowSaturation: track.lowSaturation,
-      recurring: daysOnRadar >= 3 || track.isRecurring,
+      recurring: track.daysOnChart >= 3 || track.isRecurring,
       alreadyInPlaylists,
       fitLabel,
       scoreBreakdown: buildScoreBreakdown({
         popularity: track.popularity,
         movementType,
-        rankChange,
+        rankChange: track.rankChange,
         lowSaturation: track.lowSaturation,
-        recurring: daysOnRadar >= 3 || track.isRecurring,
+        recurring: track.daysOnChart >= 3 || track.isRecurring,
         fitLabel,
       }),
     };
@@ -441,7 +329,10 @@ function filterRadarRows(
   }
 }
 
-function buildRadarMusicSummary(rows: RadarMusicRow[]): RadarMusicSummaryCard[] {
+function buildRadarMusicSummary(
+  rows: RadarMusicRow[],
+  hasSufficientHistory: boolean,
+): RadarMusicSummaryCard[] {
   const topTrack = rows[0];
   const biggestRise = [...rows]
     .filter((row) => (row.rankChange ?? 0) > 0)
@@ -460,41 +351,45 @@ function buildRadarMusicSummary(rows: RadarMusicRow[]): RadarMusicSummaryCard[] 
     {
       title: "Top musica agora",
       value: topTrack?.name ?? "Sem dado",
-      helper: topTrack ? `Rank #${topTrack.rank}` : "Sem leitura",
+      helper: topTrack ? `Rank #${topTrack.rank} · score ${topTrack.opportunityScore}` : "Sem leitura",
       tone: "green" as const,
       coverUrl: topTrack?.coverUrl ?? null,
       accentLabel: topTrack?.artists ?? "Mercado em leitura",
       detail: topTrack
-        ? `${topTrack.popularity} de popularidade e ${topTrack.daysOnRadar} dias no radar`
+        ? `${topTrack.genre} · ${topTrack.popularity} de popularidade e ${topTrack.daysOnRadar} dias no radar`
         : "Sem faixa lider agora",
     },
     {
       title: "Maior subida",
-      value: biggestRise?.name ?? "Sem alta",
+      value: biggestRise?.name ?? "Historico em coleta",
       helper:
         biggestRise && biggestRise.rankChange !== null
           ? `${formatSignedValue(biggestRise.rankChange)} posicoes`
-          : "Sem historico",
+          : "Sem comparacao valida ainda",
       tone: "green" as const,
       coverUrl: biggestRise?.coverUrl ?? null,
       accentLabel: biggestRise?.movement.label ?? "Sem movimento",
       detail: biggestRise
         ? `${biggestRise.artists} ganhou espaco no chart`
-        : "Ainda sem alta registrada",
+        : hasSufficientHistory
+          ? "Nenhuma faixa acelerou acima da media neste recorte."
+          : "Historico insuficiente para leitura de subida. Continue coletando snapshots.",
     },
     {
       title: "Maior queda",
-      value: biggestDrop?.name ?? "Sem queda",
+      value: biggestDrop?.name ?? "Historico em coleta",
       helper:
         biggestDrop && biggestDrop.rankChange !== null
           ? `${formatSignedValue(biggestDrop.rankChange)} posicoes`
-          : "Sem historico",
+          : "Sem comparacao valida ainda",
       tone: "red" as const,
       coverUrl: biggestDrop?.coverUrl ?? null,
       accentLabel: biggestDrop?.movement.label ?? "Sem movimento",
       detail: biggestDrop
         ? `${biggestDrop.artists} perdeu tracao neste recorte`
-        : "Ainda sem queda registrada",
+        : hasSufficientHistory
+          ? "Mercado estavel: nenhuma queda forte apareceu neste recorte."
+          : "Historico insuficiente para leitura de queda. Continue coletando snapshots.",
     },
     {
       title: "Novas entradas",
@@ -528,11 +423,17 @@ function buildRadarMusicEditorialHero({
   countryLabel,
   genreLabel,
   periodLabel,
+  movementContext,
+  hottestGenres,
+  dominantArtists,
 }: {
   rows: RadarMusicRow[];
   countryLabel: string;
   genreLabel: string;
   periodLabel: string;
+  movementContext: MusicMovementContext;
+  hottestGenres: MusicGenreHeat[];
+  dominantArtists: MusicArtistDominance[];
 }): RadarMusicEditorialHero {
   const leader = rows[0];
   const risingCount = rows.filter((row) => row.movement.type === "up").length;
@@ -568,11 +469,42 @@ function buildRadarMusicEditorialHero({
     };
   }
 
+  const dominantArtist = dominantArtists.find((artist) => artist.top20Count >= 3);
+  const hottestGenre = hottestGenres[0];
+  const biggestRise = [...rows]
+    .filter((row) => (row.rankChange ?? 0) > 0)
+    .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
+
+  let headline = `${leader.name} lidera o radar com score ${leader.opportunityScore}`;
+  let summary =
+    "A leitura atual cruza rank, movimento, recorrencia e saturacao para apontar o que merece playlist agora.";
+
+  if (!movementContext.hasSufficientHistory) {
+    headline = `${leader.name} lidera o radar com score ${leader.opportunityScore}`;
+    summary =
+      "Historico insuficiente para leitura de movimento. Continue coletando snapshots para liberar setas de subida, queda e reentrada com confianca.";
+  } else if (dominantArtist) {
+    headline = `${dominantArtist.artistName} domina o chart com ${dominantArtist.top20Count} faixas no top 20`;
+    summary =
+      "Concentracao forte de repertorio em um mesmo artista, sinal de dominio claro do recorte atual.";
+  } else if (
+    hottestGenre &&
+    hottestGenre.genre !== "all" &&
+    hottestGenre.opportunityCount >= 3
+  ) {
+    headline = `${hottestGenre.genreLabel} esta aquecendo com ${hottestGenre.opportunityCount} oportunidades`;
+    summary =
+      "O genero mais quente do radar combina score alto com baixa saturacao e abre frente boa para playlist building.";
+  } else if (biggestRise && (biggestRise.rankChange ?? 0) >= 5) {
+    headline = `${biggestRise.name} subiu ${biggestRise.rankChange} posicoes e virou prioridade de curadoria`;
+    summary =
+      "A maior alta do periodo ganhou terreno real no chart e merece teste imediato nas playlists certas.";
+  }
+
   return {
     badge: `${countryLabel} · ${periodLabel}`,
-    headline: `${leader.name} puxa ${genreLabel.toLowerCase()} com cara de #1 absoluto`,
-    summary:
-      "A hero area agora destaca a track lider com capa grande, contexto de mercado e os sinais que mais importam para uma leitura tipo chart musical.",
+    headline,
+    summary,
     coverUrl: leader.coverUrl,
     trackName: leader.name,
     artists: leader.artists,
@@ -612,6 +544,7 @@ function buildRadarMusicGenreSpotlights({
   selectedGenre,
   selectedGenreLabel,
   selectedPeriod,
+  hottestGenres,
 }: {
   rows: RadarMusicRow[];
   countryValue: string;
@@ -619,12 +552,14 @@ function buildRadarMusicGenreSpotlights({
   selectedGenre: string;
   selectedGenreLabel: string;
   selectedPeriod: PeriodFilter;
+  hottestGenres: MusicGenreHeat[];
 }): RadarMusicGenreSpotlight[] {
   const genreOptions = getMusicGenreOptions();
   const spotlightValues = Array.from(
     new Set(
       [
         selectedGenre === "all" ? "all" : selectedGenre,
+        ...hottestGenres.map((genre) => genre.genre),
         ...(RADAR_GENRE_LANES[countryValue] ?? RADAR_GENRE_LANES.BR),
       ].filter(Boolean),
     ),
@@ -635,6 +570,7 @@ function buildRadarMusicGenreSpotlights({
       genreOptions.find((item) => item.value === value) ??
       genreOptions.find((item) => item.value === "all") ??
       genreOptions[0];
+    const genreInsight = hottestGenres.find((genre) => genre.genre === option.value);
     const sampleRow =
       value === selectedGenre
         ? rows[0]
@@ -652,9 +588,11 @@ function buildRadarMusicGenreSpotlights({
       description:
         option.value === selectedGenre
           ? `${selectedGenreLabel} lidera o radar em ${countryLabel}.`
-          : `Abrir recorte editorial de ${option.label.toLowerCase()} em ${countryLabel}.`,
+          : genreInsight
+            ? `${genreInsight.opportunityCount} oportunidades abertas em ${option.label.toLowerCase()}.`
+            : `Abrir recorte editorial de ${option.label.toLowerCase()} em ${countryLabel}.`,
       href: `/radar-music?${params.toString()}`,
-      coverUrl: sampleRow?.coverUrl ?? null,
+      coverUrl: genreInsight?.leaderCoverUrl ?? sampleRow?.coverUrl ?? null,
       chipLabel:
         option.value === selectedGenre
           ? "Recorte ativo"
@@ -805,26 +743,44 @@ function buildScoreBreakdown({
   ];
 }
 
-function buildRadarMusicHeroInsight(rows: RadarMusicRow[]): HeroInsight {
-  const topTen = rows.slice(0, 10);
-  const artistCounts = new Map<string, number>();
-
-  for (const row of topTen) {
-    const leadArtist = row.artists.split(",")[0]?.trim() || row.artists;
-    artistCounts.set(leadArtist, (artistCounts.get(leadArtist) ?? 0) + 1);
-  }
-
-  const leadingArtist = Array.from(artistCounts.entries()).sort(
-    (left, right) => right[1] - left[1],
-  )[0];
+function buildRadarMusicHeroInsight({
+  rows,
+  movementContext,
+  hottestGenres,
+  dominantArtists,
+}: {
+  rows: RadarMusicRow[];
+  movementContext: MusicMovementContext;
+  hottestGenres: MusicGenreHeat[];
+  dominantArtists: MusicArtistDominance[];
+}): HeroInsight {
   const newEntries = rows.filter(
     (row) => row.movement.type === "new" || row.movement.type === "reentry",
   ).length;
   const risingCount = rows.filter((row) => row.movement.type === "up").length;
+  const dominantArtist = dominantArtists.find((artist) => artist.top20Count >= 3);
+  const hottestGenre = hottestGenres[0];
+  const biggestRise = [...rows]
+    .filter((row) => (row.rankChange ?? 0) > 0)
+    .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
 
-  if (leadingArtist && leadingArtist[1] >= 3) {
+  if (!movementContext.hasSufficientHistory) {
     return {
-      headline: `${leadingArtist[0]} domina o radar com ${leadingArtist[1]} faixas no top 10`,
+      headline: "Historico insuficiente para leitura de movimento. Continue coletando snapshots.",
+      summary:
+        "O radar ja mostra o ranking atual, mas precisa de mais capturas para confirmar subidas, quedas e reentradas com seguranca.",
+      tone: "blue",
+      supportingPoints: [
+        `${rows.length} faixas ativas`,
+        `${newEntries} novas entradas`,
+        `${hottestGenre?.genreLabel ?? "Mercado aberto"} em foco`,
+      ],
+    };
+  }
+
+  if (dominantArtist) {
+    return {
+      headline: `${dominantArtist.artistName} domina o radar com ${dominantArtist.top20Count} faixas no top 20`,
       summary:
         "O topo do chart esta concentrado em poucos artistas, indicando dominancia clara de repertorio neste recorte.",
       tone: "green",
@@ -836,8 +792,25 @@ function buildRadarMusicHeroInsight(rows: RadarMusicRow[]): HeroInsight {
     };
   }
 
+  if (biggestRise && (biggestRise.rankChange ?? 0) >= 5) {
+    return {
+      headline: `${biggestRise.name} subiu ${biggestRise.rankChange} posicoes e virou prioridade de curadoria`,
+      summary:
+        "A maior alta do periodo ganhou terreno real no chart e merece teste rapido nas playlists certas.",
+      tone: "green",
+      supportingPoints: [
+        `${biggestRise.genre} em destaque`,
+        `${newEntries} novas entradas`,
+        `${rows.filter((row) => row.recurring).length} recorrentes`,
+      ],
+    };
+  }
+
   return {
-    headline: `${newEntries} novas entradas indicam alta renovacao do mercado`,
+    headline:
+      hottestGenre && hottestGenre.genre !== "all"
+        ? `${hottestGenre.genreLabel} esta aquecendo com ${hottestGenre.opportunityCount} oportunidades`
+        : `${newEntries} novas entradas indicam alta renovacao do mercado`,
     summary:
       "O radar mostra troca rapida no topo e abre espaco para discovery antes da saturacao plena.",
     tone: newEntries >= 5 ? "purple" : "yellow",
@@ -1005,23 +978,15 @@ export async function getRadarMusicPageData({
 }): Promise<RadarMusicPageData> {
   const selectedPeriod = normalizePeriod(period);
   const selectedStatus = normalizeStatus(status);
-  const periodDays = getPeriodDays(selectedPeriod);
   const periodLabel = getPeriodLabel(selectedPeriod);
   const [musicData, chartsData] = await Promise.all([
     getMusicChartsData({ country, genre }),
     getChartsData(),
   ]);
-  const snapshotRows = await fetchMusicTrackSnapshots({
-    market: musicData.countryValue,
-    genre: musicData.genreValue,
-    days: 30,
-  });
   const rows = buildRadarRows(
     musicData.workbenchTracks,
-    snapshotRows,
-    periodDays,
     chartsData.tracks,
-    chartsData.artistDistribution.map((artist) => artist.type),
+    musicData.dominantArtists.map((artist) => artist.artistName),
   );
   const filteredRows = filterRadarRows(rows, selectedStatus);
 
@@ -1036,12 +1001,20 @@ export async function getRadarMusicPageData({
       secondaryCtaLabel: "Ver Radar Playlists",
       secondaryCtaHref: "/radar-playlists",
     },
-    heroInsight: buildRadarMusicHeroInsight(rows),
+    heroInsight: buildRadarMusicHeroInsight({
+      rows,
+      movementContext: musicData.movementContext,
+      hottestGenres: musicData.hottestGenres,
+      dominantArtists: musicData.dominantArtists,
+    }),
     editorialHero: buildRadarMusicEditorialHero({
       rows,
       countryLabel: musicData.countryLabel,
       genreLabel: musicData.genreLabel,
       periodLabel,
+      movementContext: musicData.movementContext,
+      hottestGenres: musicData.hottestGenres,
+      dominantArtists: musicData.dominantArtists,
     }),
     genreSpotlights: buildRadarMusicGenreSpotlights({
       rows,
@@ -1050,6 +1023,7 @@ export async function getRadarMusicPageData({
       selectedGenre: musicData.genreValue,
       selectedGenreLabel: musicData.genreLabel,
       selectedPeriod,
+      hottestGenres: musicData.hottestGenres,
     }),
     filters: {
       countryOptions: getMusicMarketOptions(),
@@ -1063,7 +1037,10 @@ export async function getRadarMusicPageData({
       selectedPeriod,
       selectedStatus,
     },
-    summaryCards: buildRadarMusicSummary(rows),
+    summaryCards: buildRadarMusicSummary(
+      rows,
+      musicData.movementContext.hasSufficientHistory,
+    ),
     rows: filteredRows,
     support: {
       sourceModeLabel: musicData.dataTrust.sourceModeLabel,
