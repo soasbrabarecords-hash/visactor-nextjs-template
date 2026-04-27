@@ -2,10 +2,13 @@ import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
 import CurationTable from "@/components/workspace/curation-table";
 import SpotifyAccountPlaylistsPanel from "@/components/workspace/spotify-account-playlists-panel";
+import { getCurationPageData } from "@/lib/workspace-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function CuradoriaPage() {
+  const data = await getCurationPageData();
+
   return (
     <div>
       <TopNav title="Curadoria" />
@@ -21,7 +24,7 @@ export default async function CuradoriaPage() {
         description="A conexao solicita leitura das playlists e permissoes de edicao para futuramente ajustar titulo, descricao, capa e lista de musicas."
       />
 
-      <CurationTable rows={[]} />
+      <CurationTable rows={data.rows} />
     </div>
   );
 }
