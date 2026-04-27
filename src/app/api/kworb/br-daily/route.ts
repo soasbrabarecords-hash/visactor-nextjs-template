@@ -17,9 +17,6 @@ export type BrDailyResponse = {
   entries: BrDailyEntry[];
 };
 
-// Cache em memória — TTL de 6h
-const cache: { data: BrDailyResponse; expiresAt: number } | null = (globalThis as Record<string, unknown>)._kworbBrDailyCache as typeof cache ?? null;
-
 function parseNumber(str: string): number | null {
   const cleaned = str.replace(/[^\d]/g, "");
   if (!cleaned) return null;

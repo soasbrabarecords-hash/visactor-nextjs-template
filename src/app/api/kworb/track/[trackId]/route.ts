@@ -127,7 +127,7 @@ export async function GET(
     cache.set(trackId, { data, expiresAt: now + 24 * 60 * 60 * 1000 });
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     const empty: KworbTrackData = {
       trackId,
       dailyStreams: null,

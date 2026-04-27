@@ -44,7 +44,6 @@ const ARTIST_GENRE: Record<string, string> = {
   "mc ig": "funk",
   "mc marks": "funk",
   "mc gw": "funk",
-  "mc hariel": "funk",
   "mc davi": "funk",
   "mc livinho": "funk",
   "mc don juan": "funk",
