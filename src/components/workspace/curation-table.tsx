@@ -468,13 +468,13 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
             da sua conta para acelerar a decisao editorial.
           </p>
         </div>
-        <Button type="button" variant="outline" onClick={loadPlaylists} disabled={isPending}>
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Atualizar playlists
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => window.location.reload()}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Atualizar charts
         </Button>
       </div>
 
