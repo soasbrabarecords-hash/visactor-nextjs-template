@@ -38,6 +38,8 @@ type PlaylistSuggestion = {
   hasFit: boolean;
 };
 
+type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "unknown";
+
 function coverStyle(coverUrl: string | null) {
   if (!coverUrl) {
     return undefined;
@@ -65,35 +67,75 @@ function normalizeText(value: string) {
     .toLowerCase();
 }
 
-function detectTrackStyle(row: DecisionTrack) {
+function countMatches(text: string, terms: string[]) {
+  return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
+}
+
+function detectTrackStyle(row: DecisionTrack): TrackStyle {
   const text = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
+  const funkScore = countMatches(text, [
+    "mc",
+    "dj",
+    "funk",
+    "baile",
+    "mandelao",
+    "automotivo",
+    "proibidao",
+    "rave",
+    "japa nk",
+    "meno k",
+    "mc ryan sp",
+    "mc ig",
+    "mc luuky",
+    "mc gu",
+    "lele jp",
+    "poze do rodo",
+  ]);
+  const sertanejoStrongScore = countMatches(text, [
+    "modao",
+    "agro",
+    "universitario",
+    "ze neto",
+    "cristiano",
+    "felipe",
+    "rodrigo",
+    "murilo huff",
+    "marilia mendonca",
+    "clayton",
+    "romario",
+  ]);
+  const sertanejoScore =
+    sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
+  const pagodeScore = countMatches(text, ["pagode", "samba"]);
+  const rapScore = countMatches(text, ["trap", "rap", "drill"]);
 
-  if (["funk", "mandelao", "automotivo", "rave", "proibidao"].some((term) => text.includes(term))) {
-    return "funk";
-  }
-
-  if (["trap", "rap", "drill"].some((term) => text.includes(term))) {
-    return "rap";
-  }
-
-  if (["sertanejo", "modao", "agro"].some((term) => text.includes(term))) {
+  if (sertanejoScore > 0) {
     return "sertanejo";
   }
 
-  if (["pagode", "samba"].some((term) => text.includes(term))) {
+  if (pagodeScore > 0) {
     return "pagode";
+  }
+
+  if (funkScore > 0) {
+    return "funk";
+  }
+
+  if (rapScore > 0) {
+    return "rap";
   }
 
   return "unknown";
 }
 
-function playlistScore(playlist: SpotifyAccountPlaylist, style: string) {
+function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "discovery") {
   const name = normalizeText(playlist.name);
   const styleTerms: Record<string, string[]> = {
-    funk: ["funk", "baile", "mandela", "automotivo"],
+    funk: ["funk", "baile", "mandela", "mandelao", "automotivo", "rave", "proibidao"],
     rap: ["trap", "rap", "drill"],
-    sertanejo: ["sertanejo", "modao", "agro"],
+    sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
+    discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
   };
 
   return (styleTerms[style] ?? []).reduce(
@@ -116,12 +158,25 @@ function buildPlaylistSuggestion(
   };
 
   if (style === "unknown") {
+    const discoveryMatch =
+      playlists.find((playlist) => playlistScore(playlist, "discovery") > 0) ?? null;
+
+    if (discoveryMatch) {
+      return {
+        playlist: discoveryMatch,
+        label: discoveryMatch.name,
+        style,
+        hasFit: true,
+        reason: "Genero indefinido; sugestao de descoberta para teste editorial.",
+      };
+    }
+
     return {
       playlist: null,
-      label: "Sem fit",
+      label: "Observar",
       style,
       hasFit: false,
-      reason: "Genero/contexto insuficiente para sugerir playlist com seguranca.",
+      reason: "Genero indefinido; observar antes de adicionar.",
     };
   }
 
