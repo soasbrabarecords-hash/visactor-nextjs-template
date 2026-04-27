@@ -45,18 +45,20 @@ type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | 
 // Spotify retorna strings como "funk carioca", "trap brasileiro", "sertanejo universitario"
 const SPOTIFY_GENRE_MAP: Array<[RegExp, TrackStyle]> = [
   [/funk\s*(carioca|ostenta|mandelao|150|melody|proibid|bh|brasil)?/i, "funk"],
-  [/trap\s*(brasileiro|br|nacional)?/i, "funk"], // trap BR = funk no contexto
   [/baile\s*funk/i, "funk"],
-  [/rap\s*(nacional|brasileiro|consciente|underground)?/i, "rap"],
+  [/trap\s*(brasileiro|br|nacional|funk)?/i, "funk"], // trap BR = funk
+  [/rap\s*(nacional|brasileiro|consciente|underground|acustico|acústico)?/i, "rap"],
   [/hip.?hop\s*(brasileiro|nacional)?/i, "rap"],
   [/sertanejo\s*(universitario|pop|tradicional|romantico)?/i, "sertanejo"],
   [/pagode/i, "pagode"],
   [/samba/i, "pagode"],
   [/forro|piseiro|pisadinha|xote|bai[oa]o/i, "piseiro"],
   [/axe/i, "pagode"],
+  [/reggae\s*(brasileiro|nacional|roots)?/i, "pagode"], // reggae → pagode slot (sem categoria própria)
   [/k.?pop/i, "pop"],
   [/pop\s*(brasileiro|nacional|latino|dance)?/i, "pop"],
   [/reggaeton/i, "pop"],
+  [/rock\s*(brasileiro|nacional|alternativo|classico)?/i, "rap"], // rock br → rap slot
 ];
 
 function mapSpotifyGenresToStyle(genres: string[]): TrackStyle {
@@ -120,6 +122,22 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "poze do rodo",
     "pedro sampaio",
     "anitta",
+    "veigh",
+    "matue",
+    "matuê",
+    "sotam",
+    "mc cabelinho",
+    "kayblack",
+    "supernova ent",
+    "marina sena",
+  ]);
+  const rapScore2 = countMatches(text, [
+    "racionais",
+    "bk",
+    "nada tsunami",
+    "nadatsunami",
+    "poesia acustica",
+    "poesia acústica",
   ]);
   const sertanejoStrongScore = countMatches(text, [
     "modao",
@@ -141,7 +159,24 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "matheus e kauan",
     "matheus & kauan",
     "lauana prado",
-    "zé neto",
+    "ze neto",
+    "simone mendes",
+    "luan santana",
+    "felipe e rodrigo",
+    "felipe & rodrigo",
+    "clayton e romario",
+    "clayton & romario",
+    "henrique e juliano",
+    "henrique & juliano",
+    "ze felipe",
+    "zé felipe",
+    "maiara e maraisa",
+    "maiara & maraisa",
+    "joao gustavo e murilo",
+    "guilherme e benuto",
+    "guilherme & benuto",
+    "diego e victor hugo",
+    "diego & victor hugo",
   ]);
   const sertanejoScore =
     sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
@@ -156,6 +191,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "turma do pagode",
     "mumuzinho",
     "molejo",
+    "natiruts",
+    "o rappa",
+    "legiao urbana",
+    "legião urbana",
   ]);
   const piseiroScore = countMatches(text, [
     "piseiro",
@@ -188,7 +227,7 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     return "funk";
   }
 
-  if (rapScore > 0) {
+  if (rapScore > 0 || rapScore2 > 0) {
     return "rap";
   }
 
@@ -462,10 +501,10 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
           <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Mesa de decisao
           </div>
-          <h2 className="mt-2 text-2xl font-semibold">Fila de curadoria</h2>
+          <h2 className="mt-2 text-2xl font-semibold">Top 200 Brasil</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Leitura Kworb BR organizada por streams, com sugestao automatica de playlist
-            da sua conta para acelerar a decisao editorial.
+            Top 200 músicas mais ouvidas no Brasil hoje (Kworb), com sugestão automática
+            de playlist da sua conta para acelerar a decisão editorial.
           </p>
         </div>
         <Button
