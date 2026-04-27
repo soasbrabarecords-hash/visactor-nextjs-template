@@ -90,6 +90,13 @@ function getSpotifyCredentialsHeader(clientId: string, clientSecret: string) {
   return `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf-8").toString("base64")}`;
 }
 
+export function getSpotifyRedirectUri(origin: string) {
+  return (
+    process.env.SPOTIFY_REDIRECT_URI?.trim() ||
+    `${origin}/api/spotify/auth/callback`
+  );
+}
+
 export function buildSpotifyAuthorizeUrl({
   origin,
   state,
@@ -106,7 +113,7 @@ export function buildSpotifyAuthorizeUrl({
   const params = new URLSearchParams({
     client_id: env.clientId,
     response_type: "code",
-    redirect_uri: `${origin}/api/spotify/auth/callback`,
+    redirect_uri: getSpotifyRedirectUri(origin),
     scope:
       "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email",
     state,

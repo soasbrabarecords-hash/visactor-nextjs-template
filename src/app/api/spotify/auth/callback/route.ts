@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   clearSpotifyStateCookie,
   exchangeSpotifyCode,
+  getSpotifyRedirectUri,
   getSpotifyStateCookie,
   setSpotifyAuthCookies,
 } from "@/lib/spotify-user";
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
   try {
     const token = await exchangeSpotifyCode({
       code,
-      redirectUri: `${url.origin}/api/spotify/auth/callback`,
+      redirectUri: getSpotifyRedirectUri(url.origin),
     });
     redirectUrl.searchParams.set("spotify", "connected");
     const response = NextResponse.redirect(redirectUrl);
