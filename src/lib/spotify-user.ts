@@ -7,6 +7,8 @@ import type { NextResponse } from "next/server";
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
 const SPOTIFY_STATE_COOKIE = "spotify_auth_state";
+const SPOTIFY_PRODUCTION_REDIRECT_URI =
+  "https://system.soasbraba.com/api/spotify/auth/callback";
 
 type SpotifyOAuthTokenResponse = {
   access_token: string;
@@ -93,6 +95,9 @@ function getSpotifyCredentialsHeader(clientId: string, clientSecret: string) {
 export function getSpotifyRedirectUri(origin: string) {
   const redirectUri =
     process.env.SPOTIFY_REDIRECT_URI?.trim() ||
+    (process.env.NODE_ENV === "production"
+      ? SPOTIFY_PRODUCTION_REDIRECT_URI
+      : null) ||
     `${origin}/api/spotify/auth/callback`;
 
   return redirectUri.replace(/\/+$/, "");
@@ -117,6 +122,7 @@ export function buildSpotifyAuthorizeUrl({
     redirect_uri: getSpotifyRedirectUri(origin),
     scope:
       "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email",
+    show_dialog: "true",
     state,
   });
 
