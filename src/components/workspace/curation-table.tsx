@@ -140,8 +140,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "charlie brown",
     "charlie brown jr",
     "bk",
-    "nada tsunami",
-    "nadatsunami",
+    "nanda tsunami",
+    "nandatsunami",
+    "2zdnizz",
+    "hhr",
     "poesia acustica",
     "poesia acústica",
   ]);
@@ -183,6 +185,8 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "guilherme & benuto",
     "diego e victor hugo",
     "diego & victor hugo",
+    "zeze di camargo",
+    "zezé di camargo",
   ]);
   const sertanejoScore =
     sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
@@ -210,8 +214,11 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "nattan",
     "ze vaqueiro",
     "zé vaqueiro",
+    "mari fernandez",
+    "grelo",
+    "natanzinho lima",
   ]);
-  const popScore = countMatches(text, ["bts", "pop", "kpop"]);
+  const popScore = countMatches(text, ["bts", "pop", "kpop", "michael jackson", "justin bieber"]);
   const rapScore = countMatches(text, ["trap", "rap", "drill"]);
 
   if (sertanejoScore > 0) {
