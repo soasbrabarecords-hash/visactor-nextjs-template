@@ -7,6 +7,11 @@ import {
 } from "@/lib/spotify-charts-importer";
 
 type CsvRecord = Record<string, string>;
+type CsvImportDefaults = {
+  country?: string;
+  genre?: string;
+  chartDate?: string;
+};
 
 function normalizeHeader(value: string) {
   return value
@@ -93,36 +98,110 @@ function getField(
   return null;
 }
 
+function extractSpotifyTrackId(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+
+  if (normalized.startsWith("spotify:track:")) {
+    return normalized.replace("spotify:track:", "");
+  }
+
+  const trackUrlMatch = normalized.match(/spotify\.com\/track\/([A-Za-z0-9]+)/i);
+
+  if (trackUrlMatch?.[1]) {
+    return trackUrlMatch[1];
+  }
+
+  if (/^[A-Za-z0-9]{22}$/.test(normalized)) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function buildSpotifyUrlFromValue(value: string | null) {
+  const trackId = extractSpotifyTrackId(value);
+
+  if (!trackId) {
+    return null;
+  }
+
+  return `https://open.spotify.com/track/${trackId}`;
+}
+
+function normalizeChartDate(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
+function parseChartDateFromFilename(filename: string) {
+  const match = filename.match(/(\d{4}-\d{2}-\d{2})/);
+  return normalizeChartDate(match?.[1]);
+}
+
 function mapCsvRowToImportRow(
   record: CsvRecord,
-  defaults: {
-    country?: string;
-    genre?: string;
-  },
+  defaults: CsvImportDefaults,
 ): SpotifyChartImportRow {
+  const trackReference = getField(record, [
+    "spotify_track_id",
+    "track_id",
+    "spotify_id",
+    "id",
+    "uri",
+    "spotify_uri",
+    "track_uri",
+    "spotify_url",
+    "url",
+    "track_url",
+  ]);
+  const spotifyTrackId = extractSpotifyTrackId(trackReference);
+  const spotifyUrl =
+    getField(record, ["spotify_url", "url", "track_url"]) ??
+    buildSpotifyUrlFromValue(trackReference);
+
   return {
-    spotify_track_id: getField(record, [
-      "spotify_track_id",
-      "track_id",
-      "spotify_id",
-      "id",
-    ]),
+    spotify_track_id: spotifyTrackId,
     track_name: getField(record, ["track_name", "music", "song_name", "name"]),
-    artist_name: getField(record, ["artist_name", "artist", "artists"]),
+    artist_name: getField(record, [
+      "artist_name",
+      "artist",
+      "artists",
+      "artist_names",
+    ]),
     artist_ids: getField(record, ["artist_ids"]),
     album_name: getField(record, ["album_name", "album"]),
     image_url: getField(record, ["image_url", "cover_url", "album_image"]),
-    spotify_url: getField(record, ["spotify_url", "url", "track_url"]),
-    country: getField(record, ["country", "market"]) ?? defaults.country ?? null,
+    spotify_url: spotifyUrl,
+    country:
+      getField(record, ["country", "market", "region"]) ??
+      defaults.country ??
+      null,
     genre: getField(record, ["genre"]) ?? defaults.genre ?? null,
-    chart_name: getField(record, ["chart_name", "source_name"]) ?? "top-songs",
-    source_type:
-      getField(record, ["source_type", "source"]) ?? "spotify_chart",
+    chart_name: getField(record, ["chart_name", "chart", "chart_type"]) ?? "top-songs",
+    source_type: getField(record, ["source_type"]) ?? "spotify_chart",
     chart_date:
       getField(record, ["chart_date", "date", "snapshot_date"]) ??
+      defaults.chartDate ??
       new Date().toISOString().slice(0, 10),
     rank_position: getField(record, ["rank_position", "rank", "position"]),
-    previous_rank: getField(record, ["previous_rank", "last_rank"]),
+    previous_rank: getField(record, [
+      "previous_rank",
+      "last_rank",
+      "previous_position",
+    ]),
     movement_type: getField(record, ["movement_type", "movement"]),
     daily_streams: getField(record, [
       "daily_streams",
@@ -139,16 +218,19 @@ export async function importSpotifyChartsCsvContent({
   csvText,
   country,
   genre,
+  chartDate,
 }: {
   csvText: string;
   country?: string;
   genre?: string;
+  chartDate?: string;
 }): Promise<SpotifyChartsImportResult> {
   const parsedRows = parseCsv(csvText);
   const mappedRows = parsedRows.map((record) =>
     mapCsvRowToImportRow(record, {
       country,
       genre: genre && genre !== "all" ? genre : undefined,
+      chartDate: normalizeChartDate(chartDate),
     }),
   );
 
@@ -159,10 +241,12 @@ export async function importSpotifyChartsCsvFromUrl({
   csvUrl,
   country,
   genre,
+  chartDate,
 }: {
   csvUrl: string;
   country?: string;
   genre?: string;
+  chartDate?: string;
 }): Promise<SpotifyChartsImportResult> {
   const response = await fetch(csvUrl, {
     cache: "no-store",
@@ -178,5 +262,8 @@ export async function importSpotifyChartsCsvFromUrl({
     csvText,
     country,
     genre,
+    chartDate,
   });
 }
+
+export { parseChartDateFromFilename };

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { importSpotifyChartsCsvContent } from "@/lib/spotify-charts-csv";
+import {
+  importSpotifyChartsCsvContent,
+  parseChartDateFromFilename,
+} from "@/lib/spotify-charts-csv";
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +30,7 @@ export async function POST(request: Request) {
       csvText,
       country: typeof countryValue === "string" ? countryValue : undefined,
       genre: typeof genreValue === "string" ? genreValue : undefined,
+      chartDate: parseChartDateFromFilename(file.name),
     });
 
     return NextResponse.json({
