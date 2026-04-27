@@ -719,6 +719,80 @@ function mergeGenreAndMarketTracks(
   return normalizeStreamScores(sortTracks(Array.from(mergedMap.values())));
 }
 
+function buildTracksFromSpotifyChartEntries({
+  rows,
+  country,
+  genre,
+}: {
+  rows: SpotifyChartEntryRow[];
+  country: string;
+  genre: string;
+}): AggregatedTrack[] {
+  const trackMap = new Map<string, AggregatedTrack>();
+
+  for (const row of rows) {
+    const trackId = row.spotify_track_id?.trim();
+    const trackName = row.track_name?.trim();
+    const artistName = row.artist_name?.trim();
+    const spotifyUrl = row.spotify_url?.trim();
+    const rowCountry = row.country?.trim();
+    const rowGenre = row.genre?.trim() ?? null;
+
+    if (!trackId || !trackName || !artistName || !spotifyUrl) {
+      continue;
+    }
+
+    if (rowCountry && rowCountry !== country) {
+      continue;
+    }
+
+    if (genre !== "all" && rowGenre !== genre) {
+      continue;
+    }
+
+    const currentStreams = parseStoreNumber(row.daily_streams);
+    const streamRank = parseStoreNumber(row.rank_position);
+    const sourceName =
+      row.chart_name?.trim() || `Spotify Charts ${country}`;
+    const genreHints = rowGenre ? [rowGenre] : [];
+    const existing = trackMap.get(trackId);
+
+    const nextTrack: AggregatedTrack = {
+      id: trackId,
+      name: trackName,
+      artists: artistName,
+      artistIds: row.artist_ids ?? [],
+      albumName: row.album_name?.trim() || "Spotify Charts",
+      popularity: 0,
+      playlistsCount: 1,
+      durationMs: 0,
+      explicit: false,
+      spotifyUrl,
+      coverUrl: row.image_url?.trim() || null,
+      marketSignals: 1,
+      searchSignals: 0,
+      sourceNames: [sourceName],
+      genreHints,
+      dailyStreams: currentStreams,
+      streamRank,
+      streamGrowth: null,
+      streamVelocityLabel: getStreamVelocityLabel({
+        dailyStreams: currentStreams,
+        streamGrowth: null,
+      }),
+      streamScore: null,
+    };
+
+    if (existing) {
+      trackMap.set(trackId, mergeTracks(existing, nextTrack));
+    } else {
+      trackMap.set(trackId, nextTrack);
+    }
+  }
+
+  return normalizeStreamScores(sortTracks(Array.from(trackMap.values())));
+}
+
 function buildLatestStreamEntryMap(rows: SpotifyChartEntryRow[]) {
   const entriesByTrack = new Map<string, SpotifyChartEntryRow>();
 
@@ -1476,6 +1550,19 @@ export async function getMusicChartsData({
     chartName: "top-songs",
     limit: 200,
   });
+  const importedChartTracks = buildTracksFromSpotifyChartEntries({
+    rows: latestSpotifyChartEntries,
+    country: marketOption.value,
+    genre: genreOption.value,
+  });
+  const radarSeedTracks =
+    importedChartTracks.length > 0
+      ? mergeGenreAndMarketTracks(
+          importedChartTracks,
+          focusTracks,
+          true,
+        )
+      : focusTracks;
   const latestChartTrackIds = latestSpotifyChartEntries
     .map((row) => row.spotify_track_id)
     .filter((trackId): trackId is string => Boolean(trackId));
@@ -1489,7 +1576,7 @@ export async function getMusicChartsData({
         })
       : [];
   const streamAwareFocusTracks = enrichTracksWithStreamData({
-    tracks: focusTracks,
+    tracks: radarSeedTracks,
     chartEntries: latestSpotifyChartEntries,
     streamSnapshots,
   });
