@@ -16,30 +16,6 @@ function coverStyle(coverUrl: string | null) {
   };
 }
 
-function formatRankChange(value: number | null) {
-  if (value === null) {
-    return "NEW";
-  }
-
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return `${value}`;
-}
-
-function formatPopularityChange(value: number | null) {
-  if (value === null) {
-    return "NEW";
-  }
-
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return `${value}`;
-}
-
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
@@ -59,107 +35,101 @@ function formatSignedCount(value: number) {
 }
 
 function getMovementValue(row: RadarMusicRow) {
-  if (row.rankChange === null) {
-    return row.movement.valueLabel;
+  if (row.previousRank === null || row.rankChange === null) {
+    return "NEW";
   }
 
-  return `${row.movement.valueLabel} ${formatRankChange(row.rankChange)}`;
+  if (row.rankChange > 0) {
+    return `↑ ${row.rankChange}`;
+  }
+
+  if (row.rankChange < 0) {
+    return `↓ ${Math.abs(row.rankChange)}`;
+  }
+
+  return "—";
 }
 
-function getPositionContext(row: RadarMusicRow) {
-  if (row.previousRank === null) {
-    return "Sem historico";
+function getMovementTone(row: RadarMusicRow) {
+  if (row.previousRank === null || row.rankChange === null) {
+    return "purple";
   }
 
-  return `#${row.previousRank} -> #${row.rank}`;
+  if (row.rankChange > 0) {
+    return "green";
+  }
+
+  if (row.rankChange < 0) {
+    return "red";
+  }
+
+  return "slate";
 }
 
 function formatDailyStreams(value: number | null) {
   return value === null ? "Sem dado de streams" : formatCount(value);
 }
 
-function formatStreamRank(row: RadarMusicRow) {
-  if (row.dailyStreams === null) {
-    return "Sem dado de streams";
-  }
-
-  if (row.streamRank === null) {
-    return "Sem historico";
-  }
-
-  return `#${row.streamRank}`;
+function formatPeakLabel() {
+  return "Pico —";
 }
 
-function formatStreamGrowth(row: RadarMusicRow) {
-  if (row.dailyStreams === null) {
-    return "Sem dado de streams";
-  }
-
-  if (row.streamGrowth === null) {
-    return "Sem historico";
-  }
-
-  return formatSignedCount(row.streamGrowth);
+function formatDaysOnChart(value: number) {
+  return `${value} dias`;
 }
 
-function getStreamGrowthClass(row: RadarMusicRow) {
-  if (row.dailyStreams === null) {
-    return "text-muted-foreground";
+function getOpportunityTags(row: RadarMusicRow) {
+  const tags: string[] = [];
+
+  if (row.previousRank === null) {
+    tags.push("Nova entrada");
   }
 
-  if (row.streamGrowth === null) {
-    return "text-slate-300";
+  if (row.lowSaturation) {
+    tags.push("Baixa saturacao");
   }
 
-  if (row.streamGrowth > 0) {
-    return "text-emerald-300";
+  if (row.popularity >= 85) {
+    tags.push("Hit forte");
   }
 
-  if (row.streamGrowth < 0) {
-    return "text-red-300";
+  if (row.rankChange !== null && row.rankChange > 0) {
+    tags.push("Subindo");
   }
 
-  return "text-slate-300";
+  return tags.slice(0, 2);
 }
 
 export default function RadarMusicTable({
   rows,
-  selectedGenreLabel,
 }: {
   rows: RadarMusicRow[];
-  selectedGenreLabel: string;
 }) {
   return (
     <Container className="border-b border-border py-6">
       <div className="mb-5">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Chart principal
+          Chart principal BR
         </div>
         <h2 className="mt-2 text-2xl font-semibold">Ranking do radar</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Tabela principal para leitura de posicao, movimento, persistencia e
-          oportunidade, com linguagem de chart musical real.
+          Leitura editorial inspirada em Spotify Charts: posicao, movimento,
+          streams, pico, permanencia e oportunidade de curadoria.
         </p>
       </div>
 
       <div className="overflow-x-auto rounded-[28px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
-        <table className="min-w-[1500px] w-full divide-y divide-border text-left">
+        <table className="min-w-[980px] w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-4 py-3">Rank</th>
-              <th className="px-4 py-3">Mov.</th>
+              <th className="px-4 py-3">Pos.</th>
+              <th className="px-4 py-3">Movimento</th>
               <th className="px-4 py-3">Musica</th>
-              <th className="px-4 py-3">Artista</th>
-              <th className="px-4 py-3">Genero</th>
-              <th className="px-4 py-3">Popularidade</th>
               <th className="px-4 py-3">Streams 24h</th>
-              <th className="px-4 py-3">Rank streams</th>
-              <th className="px-4 py-3">Cresc. 24h</th>
-              <th className="px-4 py-3">Pop Δ</th>
+              <th className="px-4 py-3">Peak</th>
               <th className="px-4 py-3">Dias</th>
-              <th className="px-4 py-3">Sat.</th>
               <th className="px-4 py-3">Oportunidade</th>
-              <th className="px-4 py-3">Tags</th>
+              <th className="px-4 py-3">Crescimento</th>
               <th className="px-4 py-3">Spotify</th>
             </tr>
           </thead>
@@ -167,7 +137,7 @@ export default function RadarMusicTable({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma faixa encontrada para esse filtro agora.
@@ -176,146 +146,77 @@ export default function RadarMusicTable({
             ) : (
               rows.map((row) => (
                 <tr key={row.trackId} className="hover:bg-muted/10">
-                  <td className="px-4 py-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background/60 text-lg font-semibold">
-                      {row.rank}
+                  <td className="px-4 py-3">
+                    <div className="text-2xl font-semibold tracking-tight">
+                      #{row.rank}
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="space-y-2">
-                      <StatusBadge tone={row.movement.tone} className="min-w-[88px] justify-center">
+                  <td className="px-4 py-3">
+                    <div className="space-y-1">
+                      <StatusBadge
+                        tone={getMovementTone(row)}
+                        className="min-w-[74px] justify-center"
+                      >
                         {getMovementValue(row)}
                       </StatusBadge>
-                      <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                        {row.movement.label}
-                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {getPositionContext(row)}
+                        {row.previousRank === null ? "Entrada nova" : `Antes #${row.previousRank}`}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-14 w-14 rounded-2xl border border-border bg-muted shadow-lg"
+                        className="h-12 w-12 rounded-xl border border-border bg-muted shadow-lg"
                         style={coverStyle(row.coverUrl)}
                       />
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-1">
                         <div>
-                          <div className="font-semibold">{row.name}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="truncate font-semibold">{row.name}</div>
+                          <div className="truncate text-sm text-muted-foreground">
                             {row.artists}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {selectedGenreLabel !== "Todos os generos" ? (
-                            <StatusBadge tone="blue">{selectedGenreLabel}</StatusBadge>
+                          {row.previousRank === null ? (
+                            <StatusBadge tone="purple">NEW</StatusBadge>
                           ) : null}
-                          {row.intelligenceTags.slice(0, 2).map((tag) => (
-                            <StatusBadge
-                              key={tag}
-                              tone={
-                                tag === "Nova entrada" || tag === "Reentrada"
-                                  ? "purple"
-                                  : tag === "Subindo" || tag === "Explodindo"
-                                    ? "green"
-                                    : tag === "Recorrente"
-                                      ? "blue"
-                                      : tag === "Caindo" || tag === "Evitar agora"
-                                        ? "red"
-                                      : "yellow"
-                              }
-                            >
-                              {tag}
-                            </StatusBadge>
-                          ))}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-sm">
-                    <div className="max-w-[220px] leading-6">{row.artists}</div>
-                  </td>
-                  <td className="px-4 py-4 text-sm">
-                    <StatusBadge tone="blue">{row.genre}</StatusBadge>
-                  </td>
-                  <td className="px-4 py-4 text-sm font-medium">
-                    {row.popularity}
-                  </td>
-                  <td className="px-4 py-4 text-sm font-medium">
+                  <td className="px-4 py-3 text-sm font-medium">
                     <div className={row.dailyStreams === null ? "text-muted-foreground" : ""}>
                       {formatDailyStreams(row.dailyStreams)}
                     </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm font-medium">
                     <div
-                      className={
-                        row.dailyStreams === null ? "text-muted-foreground" : ""
-                      }
+                      className={`mt-1 text-xs ${row.streamRank === null ? "text-muted-foreground" : "text-slate-300"}`}
                     >
-                      {formatStreamRank(row)}
+                      {row.dailyStreams === null
+                        ? "Sem dado de streams"
+                        : row.streamRank === null
+                          ? "Rank streams indisponivel"
+                          : `#${row.streamRank} por streams`}
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-sm font-medium">
-                    <div className={getStreamGrowthClass(row)}>
-                      {formatStreamGrowth(row)}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {row.dailyStreams === null ? "Sem dado de streams" : row.streamVelocityLabel}
-                    </div>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {formatPeakLabel()}
                   </td>
-                  <td className="px-4 py-4 text-sm font-medium">
-                    <span
-                      className={
-                        row.popularityChange === null
-                          ? "text-violet-300"
-                          : row.popularityChange > 0
-                            ? "text-emerald-300"
-                            : row.popularityChange < 0
-                              ? "text-red-300"
-                              : "text-slate-300"
-                      }
-                    >
-                      {formatPopularityChange(row.popularityChange)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-sm">{row.daysOnRadar}</td>
-                  <td className="px-4 py-4 text-sm">{row.saturationCount}</td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.max(0, Math.min(row.opportunityScore, 100))}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium">
-                        {row.opportunityScore}
-                      </span>
+                  <td className="px-4 py-3 text-sm">{formatDaysOnChart(row.daysOnRadar)}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-sm font-medium">
+                      {row.opportunityScore}/100
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {row.scoreBreakdown.map((item) => (
-                        <StatusBadge key={item.label} tone={item.tone} className="normal-case tracking-[0.04em]">
-                          {item.label}
-                        </StatusBadge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex max-w-[220px] flex-wrap gap-2">
-                      {row.intelligenceTags.slice(0, 4).map((tag) => (
+                      {getOpportunityTags(row).map((tag) => (
                         <StatusBadge
                           key={tag}
                           tone={
-                            tag === "Subindo" || tag === "Explodindo" || tag === "Teste editorial"
+                            tag === "Subindo" || tag === "Hit forte"
                               ? "green"
-                              : tag === "Caindo" || tag === "Evitar agora"
-                                ? "red"
-                                : tag === "Nova entrada" || tag === "Reentrada"
-                                  ? "purple"
-                                  : tag === "Recorrente"
-                                    ? "blue"
-                                    : "yellow"
+                              : tag === "Nova entrada"
+                                ? "purple"
+                                : "yellow"
                           }
                           className="normal-case tracking-[0.04em]"
                         >
@@ -324,12 +225,34 @@ export default function RadarMusicTable({
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-3 text-sm">
+                    <div
+                      className={
+                        row.previousRank === null || row.rankChange === null
+                          ? "text-violet-300"
+                          : row.rankChange > 0
+                            ? "text-emerald-300"
+                            : row.rankChange < 0
+                              ? "text-red-300"
+                              : "text-slate-300"
+                      }
+                    >
+                      {getMovementValue(row)}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {row.dailyStreams === null
+                        ? "Sem dado de streams"
+                        : row.streamGrowth === null
+                          ? row.streamVelocityLabel
+                          : `${formatSignedCount(row.streamGrowth)} streams`}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
                     <Link
                       href={row.spotifyUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-sm text-primary hover:bg-muted/40"
                     >
                       Abrir
                       <ExternalLink className="h-3.5 w-3.5" />

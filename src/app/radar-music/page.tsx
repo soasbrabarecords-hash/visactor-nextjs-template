@@ -114,7 +114,7 @@ export default async function RadarMusicPage({
         </div>
       </Container>
 
-      <RadarMusicTable rows={data.rows} selectedGenreLabel={data.filters.selectedGenreLabel} />
+      <RadarMusicTable rows={data.rows} />
     </div>
   );
 }
