@@ -1,515 +1,413 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, Music2, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
-import type { DecisionTrack } from "@/types/workspace";
 import StatusBadge from "./status-badge";
+import type { BrDailyEntry, BrDailyResponse } from "@/app/api/kworb/br-daily/route";
 
-type SpotifyAccountPlaylist = {
+type SpotifyPlaylist = {
   id: string;
   name: string;
-  imageUrl: string | null;
-  tracksTotal: number;
+  images?: { url: string }[];
 };
 
-type SpotifyPlaylistsResponse =
-  | {
-      connected: true;
-      playlists: SpotifyAccountPlaylist[];
+// ---------------------------------------------------------------------------
+// Genre → playlist keyword mapping
+// Keywords that appear in playlist NAMES to identify their genre
+// ---------------------------------------------------------------------------
+const PLAYLIST_GENRE_KEYWORDS: Record<string, string[]> = {
+  funk: ["funk", "baile funk", "bregafunk"],
+  sertanejo: ["sertanejo", "caipira", "universitário", "universitario"],
+  pagode: ["pagode", "samba", "axé", "axe"],
+  rap: ["rap", "hip hop", "hip-hop", "trap", "drill"],
+  pop: ["pop"],
+  forró: ["forró", "forro", "nordeste", "piseiro", "pisadinha"],
+  gospel: ["gospel", "louvor", "cristã", "crista", "worship"],
+  rock: ["rock", "indie", "alternativo"],
+  eletronica: ["eletronica", "eletrônica", "house", "techno"],
+};
+
+// ---------------------------------------------------------------------------
+// Artist → genre map for the most common BR chart artists
+// Used to infer genre when track name doesn't contain genre keywords
+// ---------------------------------------------------------------------------
+const ARTIST_GENRE: Record<string, string> = {
+  // Funk / Baile Funk
+  "mc ryan sp": "funk",
+  "mc cabelinho": "funk",
+  "mc poze do rodo": "funk",
+  "mc binn": "funk",
+  "mc kadu": "funk",
+  "mc ig": "funk",
+  "mc marks": "funk",
+  "mc gw": "funk",
+  "mc hariel": "funk",
+  "mc davi": "funk",
+  "mc livinho": "funk",
+  "mc don juan": "funk",
+  "mc kevin": "funk",
+  "mc magal": "funk",
+  "mc g15": "funk",
+  "mc nd": "funk",
+  "mc kako": "funk",
+  "mc bm": "funk",
+  "mc joãozinho vt": "funk",
+  "joãozinho vt": "funk",
+  "mc leozinho zs": "funk",
+  "mc menor mt": "funk",
+  "mc lele jp": "funk",
+  "mc menigão": "funk",
+  "mc tuto": "funk",
+  "mc kitinho": "funk",
+  "mc rodolfinho": "funk",
+  "mc bruninho": "funk",
+  "mc phe": "funk",
+  "pk": "funk",
+  "2t": "funk",
+  "tribo da periferia": "funk",
+  // Sertanejo / Universitário
+  "gusttavo lima": "sertanejo",
+  "marilia mendonca": "sertanejo",
+  "marília mendonça": "sertanejo",
+  "henrique e julianos": "sertanejo",
+  "henrique & juliano": "sertanejo",
+  "israel novaes": "sertanejo",
+  "jorge & mateus": "sertanejo",
+  "jorge e mateus": "sertanejo",
+  "zé neto & cristiano": "sertanejo",
+  "ze neto e cristiano": "sertanejo",
+  "matheus e kauan": "sertanejo",
+  "matheus & kauan": "sertanejo",
+  "maiara e maraisa": "sertanejo",
+  "maiara & maraisa": "sertanejo",
+  "fernando e sorocaba": "sertanejo",
+  "luan santana": "sertanejo",
+  "victor e leo": "sertanejo",
+  "victor & leo": "sertanejo",
+  "leonardo": "sertanejo",
+  "chitaozinho e xororo": "sertanejo",
+  "ana castela": "sertanejo",
+  "brenno e rodolfo": "sertanejo",
+  "simone e simaria": "sertanejo",
+  "simone & simaria": "sertanejo",
+  "lauana prado": "sertanejo",
+  "murillo huff": "sertanejo",
+  "thiago nigro": "sertanejo",
+  "dilsinho": "pagode",
+  // Pagode / Samba
+  "thiaguinho": "pagode",
+  "sorriso maroto": "pagode",
+  "grupo menos é mais": "pagode",
+  "menos é mais": "pagode",
+  "turma do pagode": "pagode",
+  "ferrugem": "pagode",
+  "mumuzinho": "pagode",
+  "belo": "pagode",
+  "exaltasamba": "pagode",
+  "molejo": "pagode",
+  // Rap / Trap BR
+  "mc hariel": "rap",
+  "coruja bc1": "rap",
+  "emicida": "rap",
+  "racionais mcs": "rap",
+  "djonga": "rap",
+  "bk": "rap",
+  "filipe ret": "rap",
+  "orochi": "rap",
+  "poze do rodo": "rap",
+  "xamã": "rap",
+  "chefin": "rap",
+  "lil tecca": "rap",
+  // Forró / Piseiro
+  "vitor fernandes": "forró",
+  "xand avião": "forró",
+  "wesley safadão": "forró",
+  "barões da pisadinha": "forró",
+  "george henrique e rodrigo": "forró",
+  "raí saia rodada": "forró",
+  "tierry": "forró",
+  "nattan": "forró",
+  "danniel vieira": "forró",
+  // Gospel
+  "gabriela rocha": "gospel",
+  "aline barros": "gospel",
+  "fernandinho": "gospel",
+  "isadora pompeo": "gospel",
+  "thalles roberto": "gospel",
+  "anderson freire": "gospel",
+  "bruna karla": "gospel",
+  "preto no branco": "gospel",
+  "kemuel": "gospel",
+  "ministério zoe": "gospel",
+};
+
+/**
+ * Infer genre from track name + artist.
+ * 1. Check artist name against known artist→genre map (most reliable)
+ * 2. Check track name + artist text for genre keywords in playlist map
+ * Returns a set of matched genre keys, or empty set if nothing found.
+ */
+function inferTrackGenres(trackName: string, artist: string): Set<string> {
+  const genres = new Set<string>();
+  const artistLower = artist.toLowerCase();
+  const trackLower = trackName.toLowerCase();
+  const fullText = `${trackLower} ${artistLower}`;
+
+  // 1. Artist lookup — most reliable signal
+  for (const [artistKey, genre] of Object.entries(ARTIST_GENRE)) {
+    if (artistLower.includes(artistKey)) {
+      genres.add(genre);
     }
-  | {
-      connected: false;
-      playlists: [];
-      message: string;
-    };
-
-type PlaylistTrackIdsResponse = {
-  trackIds?: string[];
-};
-
-type PlaylistSuggestion = {
-  playlist: SpotifyAccountPlaylist | null;
-  label: string;
-  reason: string;
-  style: string;
-  hasFit: boolean;
-};
-
-type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "unknown";
-
-function coverStyle(coverUrl: string | null) {
-  if (!coverUrl) {
-    return undefined;
   }
 
-  return {
-    backgroundImage: `url(${coverUrl})`,
-    backgroundPosition: "center",
-    backgroundSize: "cover",
-  };
+  // 2. Keyword scan on track name + artist text
+  for (const [genre, keywords] of Object.entries(PLAYLIST_GENRE_KEYWORDS)) {
+    if (keywords.some((kw) => fullText.includes(kw))) {
+      genres.add(genre);
+    }
+  }
+
+  return genres;
 }
 
-function formatCount(value: number | null) {
-  if (value === null) {
-    return "Sem dado";
+/**
+ * Suggest playlists based on track genre.
+ * Only returns playlists where there is a confirmed genre match —
+ * no partial/fallback scoring that pollutes results.
+ */
+function suggestPlaylists(
+  trackName: string,
+  artist: string,
+  playlists: SpotifyPlaylist[],
+): SpotifyPlaylist[] {
+  if (playlists.length === 0) return [];
+
+  const trackGenres = inferTrackGenres(trackName, artist);
+
+  // No genre detected → no suggestions (better than wrong suggestions)
+  if (trackGenres.size === 0) return [];
+
+  const results: { pl: SpotifyPlaylist; score: number }[] = [];
+
+  for (const pl of playlists) {
+    const plName = pl.name.toLowerCase();
+    let score = 0;
+
+    for (const genre of trackGenres) {
+      const keywords = PLAYLIST_GENRE_KEYWORDS[genre] ?? [];
+      // Count how many keywords from this genre appear in the playlist name
+      const hits = keywords.filter((kw) => plName.includes(kw)).length;
+      if (hits > 0) {
+        score += hits * 2; // each keyword hit adds weight
+      }
+    }
+
+    if (score > 0) {
+      results.push({ pl, score });
+    }
   }
 
-  return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+  return results
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((x) => x.pl);
 }
 
-function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+function formatStreams(n: number | null): string {
+  if (n === null) return "—";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toString();
 }
 
-function countMatches(text: string, terms: string[]) {
-  return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
-}
-
-function detectTrackStyle(row: DecisionTrack): TrackStyle {
-  const text = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
-  const funkScore = countMatches(text, [
-    "mc",
-    "dj",
-    "funk",
-    "baile",
-    "mandelao",
-    "automotivo",
-    "proibidao",
-    "rave",
-    "japa nk",
-    "meno k",
-    "mc ryan sp",
-    "mc ig",
-    "mc luuky",
-    "mc gu",
-    "lele jp",
-    "poze do rodo",
-  ]);
-  const sertanejoStrongScore = countMatches(text, [
-    "modao",
-    "agro",
-    "universitario",
-    "ze neto",
-    "cristiano",
-    "felipe",
-    "rodrigo",
-    "murilo huff",
-    "marilia mendonca",
-    "clayton",
-    "romario",
-  ]);
-  const sertanejoScore =
-    sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
-  const pagodeScore = countMatches(text, ["pagode", "samba"]);
-  const rapScore = countMatches(text, ["trap", "rap", "drill"]);
-
-  if (sertanejoScore > 0) {
-    return "sertanejo";
-  }
-
-  if (pagodeScore > 0) {
-    return "pagode";
-  }
-
-  if (funkScore > 0) {
-    return "funk";
-  }
-
-  if (rapScore > 0) {
-    return "rap";
-  }
-
-  return "unknown";
-}
-
-function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "discovery") {
-  const name = normalizeText(playlist.name);
-  const styleTerms: Record<string, string[]> = {
-    funk: ["funk", "baile", "mandela", "mandelao", "automotivo", "rave", "proibidao"],
-    rap: ["trap", "rap", "drill"],
-    sertanejo: ["sertanejo", "modao", "agro", "universitario"],
-    pagode: ["pagode", "samba"],
-    discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
-  };
-
-  return (styleTerms[style] ?? []).reduce(
-    (score, term) => score + (name.includes(term) ? 1 : 0),
-    0,
+function RankBadge({ rank }: { rank: number }) {
+  const color =
+    rank <= 10
+      ? "text-yellow-400"
+      : rank <= 50
+        ? "text-emerald-400"
+        : "text-muted-foreground";
+  return (
+    <span className={`text-sm font-bold tabular-nums ${color}`}>
+      #{rank}
+    </span>
   );
 }
 
-function buildPlaylistSuggestion(
-  row: DecisionTrack,
-  playlists: SpotifyAccountPlaylist[],
-): PlaylistSuggestion {
-  const style = detectTrackStyle(row);
-  const styleLabel: Record<string, string> = {
-    funk: "Funk",
-    rap: "Trap/Rap",
-    sertanejo: "Sertanejo",
-    pagode: "Pagode/Samba",
-    unknown: "Sem genero claro",
-  };
+export default function CurationTable() {
+  const [chart, setChart] = useState<BrDailyEntry[]>([]);
+  const [chartDate, setChartDate] = useState<string | null>(null);
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (style === "unknown") {
-    const discoveryMatch =
-      playlists.find((playlist) => playlistScore(playlist, "discovery") > 0) ?? null;
-
-    if (discoveryMatch) {
-      return {
-        playlist: discoveryMatch,
-        label: discoveryMatch.name,
-        style,
-        hasFit: true,
-        reason: "Genero indefinido; sugestao de descoberta para teste editorial.",
-      };
-    }
-
-    return {
-      playlist: null,
-      label: "Observar",
-      style,
-      hasFit: false,
-      reason: "Genero indefinido; observar antes de adicionar.",
-    };
-  }
-
-  const sortedPlaylists = [...playlists].sort(
-    (left, right) => playlistScore(right, style) - playlistScore(left, style),
-  );
-  const match = sortedPlaylists.find((playlist) => playlistScore(playlist, style) > 0) ?? null;
-
-  if (match) {
-    return {
-      playlist: match,
-      label: match.name,
-      style,
-      hasFit: true,
-      reason: `${styleLabel[style]} detectado e match com playlist da conta.`,
-    };
-  }
-
-  return {
-    playlist: null,
-    label: "Observar",
-    style,
-    hasFit: false,
-    reason: `${styleLabel[style]} detectado, mas sem playlist propria do mesmo genero.`,
-  };
-}
-
-function getDecisionLabel(row: DecisionTrack) {
-  if (row.alreadyInPlaylists) {
-    return "Ja esta em alguma playlist";
-  }
-
-  if (row.dailyStreams !== null && row.streamRank !== null && row.streamRank <= 20) {
-    return "Alta prioridade pelo Top 20 BR";
-  }
-
-  if (row.lowSaturation) {
-    return "Boa janela antes de saturar";
-  }
-
-  return "Avaliar encaixe editorial";
-}
-
-export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
-  const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
-  const [playlistTrackIdsByPlaylist, setPlaylistTrackIdsByPlaylist] = useState<
-    Record<string, string[]>
-  >({});
-  const [addingKey, setAddingKey] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const loadPlaylists = useCallback(() => {
-    startTransition(async () => {
+  useEffect(() => {
+    async function load() {
       try {
-        const response = await fetch("/api/spotify/me/playlists", {
-          cache: "no-store",
-        });
+        const [chartRes, playlistRes] = await Promise.all([
+          fetch("/api/kworb/br-daily"),
+          fetch("/api/spotify/me/playlists"),
+        ]);
 
-        if (!response.ok) {
-          throw new Error("Nao foi possivel carregar playlists do Spotify.");
+        if (chartRes.ok) {
+          const chartData: BrDailyResponse = await chartRes.json();
+          setChart(chartData.entries ?? []);
+          setChartDate(chartData.date ?? null);
         }
 
-        setPlaylistsData((await response.json()) as SpotifyPlaylistsResponse);
+        if (playlistRes.ok) {
+          const plData = await playlistRes.json();
+          // Could be { items: [...] } or just an array depending on route shape
+          const items: SpotifyPlaylist[] = Array.isArray(plData)
+            ? plData
+            : (plData.items ?? []);
+          setPlaylists(items);
+        }
       } catch {
-        setPlaylistsData({
-          connected: false,
-          playlists: [],
-          message: "Conecte o Spotify para liberar sugestoes por playlist.",
-        });
+        setError("Falha ao carregar ranking Kworb.");
+      } finally {
+        setLoading(false);
       }
-    });
-  }, [startTransition]);
-
-  useEffect(() => {
-    loadPlaylists();
-  }, [loadPlaylists]);
-
-  const playlists = useMemo(
-    () => (playlistsData?.connected ? playlistsData.playlists : []),
-    [playlistsData],
-  );
-  const sortedRows = useMemo(
-    () =>
-      [...rows].sort(
-        (left, right) =>
-          (right.dailyStreams ?? 0) - (left.dailyStreams ?? 0) ||
-          right.decisionScore - left.decisionScore,
-      ),
-    [rows],
-  );
-
-  useEffect(() => {
-    if (playlists.length === 0 || sortedRows.length === 0) {
-      return;
     }
 
-    const suggestedPlaylistIds = new Set(
-      sortedRows
-        .map((row) => buildPlaylistSuggestion(row, playlists).playlist?.id)
-        .filter((playlistId): playlistId is string => Boolean(playlistId)),
-    );
-    const missingPlaylistIds = [...suggestedPlaylistIds].filter(
-      (playlistId) => !(playlistId in playlistTrackIdsByPlaylist),
-    );
-
-    if (missingPlaylistIds.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadSuggestedPlaylistTracks() {
-      const entries = await Promise.all(
-        missingPlaylistIds.map(async (playlistId) => {
-          const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
-            cache: "no-store",
-          });
-          const payload = (await response.json().catch(() => ({}))) as PlaylistTrackIdsResponse;
-
-          return [playlistId, response.ok ? payload.trackIds ?? [] : []] as const;
-        }),
-      );
-
-      if (cancelled) {
-        return;
-      }
-
-      setPlaylistTrackIdsByPlaylist((current) => ({
-        ...current,
-        ...Object.fromEntries(entries),
-      }));
-    }
-
-    void loadSuggestedPlaylistTracks();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [playlistTrackIdsByPlaylist, playlists, sortedRows]);
-
-  async function handleAddToSuggestedPlaylist(
-    row: DecisionTrack,
-    suggestion: PlaylistSuggestion,
-  ) {
-    if (!suggestion.playlist || addingKey) {
-      return;
-    }
-
-    const key = `${suggestion.playlist.id}:${row.trackId}`;
-    setAddingKey(key);
-
-    try {
-      const response = await fetch(
-        `/api/spotify/playlists/${suggestion.playlist.id}/tracks`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackUri: `spotify:track:${row.trackId}` }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Nao foi possivel adicionar a faixa.");
-      }
-
-      setPlaylistTrackIdsByPlaylist((current) => {
-        const currentIds = current[suggestion.playlist!.id] ?? [];
-
-        return {
-          ...current,
-          [suggestion.playlist!.id]: Array.from(new Set([...currentIds, row.trackId])),
-        };
-      });
-    } finally {
-      setAddingKey(null);
-    }
-  }
+    void load();
+  }, []);
 
   return (
     <Container className="border-b border-border py-6">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Mesa de decisao
-          </div>
-          <h2 className="mt-2 text-2xl font-semibold">Fila de curadoria</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Leitura Kworb BR organizada por streams, com sugestao automatica de playlist
-            da sua conta para acelerar a decisao editorial.
-          </p>
+      <div className="mb-5">
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Ranking Kworb
         </div>
-        <Button type="button" variant="outline" onClick={loadPlaylists} disabled={isPending}>
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
+        <div className="mt-2 flex items-baseline gap-3">
+          <h2 className="text-2xl font-semibold">Top 200 Daily BR — Spotify</h2>
+          {chartDate && (
+            <span className="text-xs text-muted-foreground">{chartDate}</span>
           )}
-          Atualizar playlists
-        </Button>
+        </div>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+          Streams diários do Kworb.net com sugestão de playlist baseada no
+          gênero da faixa e nos títulos das suas playlists conectadas.
+        </p>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-        <table className="min-w-[980px] w-full divide-y divide-border text-left">
-          <thead className="bg-muted/20">
-            <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-4 py-3">Rank</th>
-              <th className="px-4 py-3">Musica</th>
-              <th className="px-4 py-3">Streams 24h</th>
-              <th className="px-4 py-3">Playlist sugerida</th>
-              <th className="px-4 py-3">Motivo</th>
-              <th className="px-4 py-3">Acao</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {sortedRows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-10 text-center text-sm text-muted-foreground"
-                >
-                  Nenhuma recomendacao disponivel agora.
-                </td>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Carregando ranking…
+        </div>
+      ) : error ? (
+        <div className="rounded-xl border border-border bg-card/60 px-4 py-8 text-center text-sm text-muted-foreground">
+          {error}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
+          <table className="min-w-[1080px] w-full divide-y divide-border text-left">
+            <thead className="bg-muted/20">
+              <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <th className="px-4 py-3">Rank</th>
+                <th className="px-4 py-3">Faixa</th>
+                <th className="px-4 py-3">Streams hoje</th>
+                <th className="px-4 py-3">Playlist sugerida</th>
+                <th className="px-4 py-3">Abrir</th>
               </tr>
-            ) : (
-              sortedRows.map((row, index) => {
-                const suggestion = buildPlaylistSuggestion(row, playlists);
-                const isAlreadyInSuggestedPlaylist = suggestion.playlist
-                  ? (playlistTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
-                  : false;
-                const addKey = suggestion.playlist
-                  ? `${suggestion.playlist.id}:${row.trackId}`
-                  : null;
+            </thead>
+            <tbody className="divide-y divide-border">
+              {chart.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
+                  >
+                    Nenhum dado disponível. Tente novamente em instantes.
+                  </td>
+                </tr>
+              ) : (
+                chart.map((entry) => {
+                  const suggested = suggestPlaylists(
+                    entry.trackName,
+                    entry.artist,
+                    playlists,
+                  );
+                  const spotifyUrl = `https://open.spotify.com/track/${entry.trackId}`;
 
-                return (
-                  <tr key={row.trackId} className="hover:bg-muted/10">
-                    <td className="px-4 py-4 align-top">
-                      <div className="text-2xl font-semibold text-white">
-                        #{row.streamRank ?? index + 1}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-14 w-14 shrink-0 rounded-xl border border-border bg-muted shadow-lg"
-                          style={coverStyle(row.coverUrl)}
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold">{row.name}</div>
-                          <div className="mt-1 max-w-[360px] truncate text-sm text-muted-foreground">
-                            {row.artists}
-                          </div>
+                  return (
+                    <tr key={entry.trackId} className="hover:bg-muted/10">
+                      {/* Rank */}
+                      <td className="px-4 py-3">
+                        <RankBadge rank={entry.rank} />
+                      </td>
+
+                      {/* Track info */}
+                      <td className="px-4 py-3">
+                        <div className="font-semibold leading-tight">
+                          {entry.trackName}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="text-sm font-semibold">
-                        {formatCount(row.dailyStreams)}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Kworb BR
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-3">
-                        {suggestion.playlist?.imageUrl ? (
-                          <div
-                            className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
-                            style={coverStyle(suggestion.playlist.imageUrl)}
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-                            <Music2 className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="max-w-[260px] truncate text-sm font-semibold">
-                            {suggestion.label}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {suggestion.playlist
-                              ? `${formatCount(suggestion.playlist.tracksTotal)} tracks`
-                              : "Sem playlist compativel"}
-                          </div>
+                        <div className="text-sm text-muted-foreground">
+                          {entry.artist}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="max-w-[300px] text-sm text-muted-foreground">
-                        {getDecisionLabel(row)}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <StatusBadge tone="blue">{suggestion.reason}</StatusBadge>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex flex-wrap gap-2">
-                        {isAlreadyInSuggestedPlaylist ? (
-                          <StatusBadge tone="green">Ja esta na playlist</StatusBadge>
-                        ) : !suggestion.hasFit ? (
-                          <StatusBadge tone="yellow">Observar</StatusBadge>
+                      </td>
+
+                      {/* Daily streams */}
+                      <td className="px-4 py-3 text-sm font-medium tabular-nums">
+                        {entry.dailyStreams !== null ? (
+                          <span className="text-emerald-400">
+                            {formatStreams(entry.dailyStreams)}
+                          </span>
                         ) : (
-                          <Button
-                            size="sm"
-                            disabled={!suggestion.playlist || addingKey === addKey}
-                            onClick={() => void handleAddToSuggestedPlaylist(row, suggestion)}
-                          >
-                            {addingKey === addKey ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : null}
-                            Adicionar
-                          </Button>
+                          <span className="text-muted-foreground">—</span>
                         )}
-                        <Button size="sm" variant="outline">
-                          Observar
-                        </Button>
+                      </td>
+
+                      {/* Suggested playlists */}
+                      <td className="px-4 py-3">
+                        {suggested.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {suggested.map((pl) => (
+                              <Link
+                                key={pl.id}
+                                href={`/curadoria/playlists/${pl.id}`}
+                              >
+                                <StatusBadge tone="green">
+                                  {pl.name}
+                                </StatusBadge>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : playlists.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            Conecte o Spotify para ver sugestões
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Sem match direto
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Open in Spotify */}
+                      <td className="px-4 py-3">
                         <Button asChild size="sm" variant="outline">
-                          <Link href={row.spotifyUrl} target="_blank" rel="noreferrer">
+                          <Link
+                            href={spotifyUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Link>
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {playlistsData && !playlistsData.connected ? (
-        <p className="mt-3 text-sm text-muted-foreground">{playlistsData.message}</p>
-      ) : null}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Container>
   );
 }
