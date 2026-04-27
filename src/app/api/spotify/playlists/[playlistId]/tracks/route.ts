@@ -138,19 +138,20 @@ export async function GET(
 ) {
   try {
     const { playlistId } = await params;
-    let { token, refreshTok, clientId, clientSecret, refreshedTokenData } =
-      await getSpotifyToken();
+    const auth = await getSpotifyToken();
+    const { refreshTok, clientId, clientSecret } = auth;
+    let { token, refreshedTokenData } = auth;
 
     let trackIds: string[];
     try {
       trackIds = await fetchTrackIds(token, playlistId);
-    } catch (err) {
+    } catch (error) {
       if (refreshTok && !refreshedTokenData) {
         refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
         token = refreshedTokenData.access_token;
         trackIds = await fetchTrackIds(token, playlistId);
       } else {
-        throw err;
+        throw error;
       }
     }
 
@@ -178,19 +179,20 @@ export async function POST(
       return NextResponse.json({ message: "trackUri é obrigatório." }, { status: 400 });
     }
 
-    let { token, refreshTok, clientId, clientSecret, refreshedTokenData } =
-      await getSpotifyToken();
+    const auth = await getSpotifyToken();
+    const { refreshTok, clientId, clientSecret } = auth;
+    let { token, refreshedTokenData } = auth;
 
     let result: { alreadyExists: boolean };
     try {
       result = await addTrack(token, playlistId, trackUri);
-    } catch (err) {
+    } catch (error) {
       if (refreshTok && !refreshedTokenData) {
         refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
         token = refreshedTokenData.access_token;
         result = await addTrack(token, playlistId, trackUri);
       } else {
-        throw err;
+        throw error;
       }
     }
 

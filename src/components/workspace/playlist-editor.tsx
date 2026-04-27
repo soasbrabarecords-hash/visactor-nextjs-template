@@ -117,7 +117,7 @@ function EditableField({
 function reorderWithBlock(
   tracks: TrackWithStreams[],
   selectedSet: Set<number>,
-  dragFromIndex: number,
+  _dragFromIndex: number,
   dropIndex: number,
 ): { nextTracks: TrackWithStreams[]; nextSelected: Set<number> } {
   // Índices selecionados em ordem
@@ -128,20 +128,6 @@ function reorderWithBlock(
 
   // Lista sem o bloco
   const rest = tracks.filter((_, i) => !selectedSet.has(i));
-
-  // Quantas selecionadas estavam antes do dragFromIndex
-  // (para ajustar o ponto de inserção)
-  const selBefore = selIndices.filter((i) => i < dragFromIndex).length;
-
-  // Posição no `rest` equivalente ao dropIndex original
-  // Conta quantos itens não-selecionados estavam antes de dropIndex
-  let insertAt = 0;
-  let nonSelCount = 0;
-  for (let i = 0; i <= tracks.length - 1; i++) {
-    if (nonSelCount === dropIndex - selBefore + (dropIndex >= dragFromIndex ? 0 : 0)) break;
-    if (!selectedSet.has(i)) nonSelCount++;
-    insertAt++;
-  }
 
   // Abordagem mais simples e correta:
   // Conta quantos itens não-selecionados existem antes de dropIndex
@@ -548,7 +534,6 @@ export default function PlaylistEditor({
     return 0;
   }
 
-  const isDraggingAny = dragFrom !== null;
   const isActivelyDragging = dragFrom !== null && dragTo !== null;
 
   // ── Render ────────────────────────────────────────────────────────────────

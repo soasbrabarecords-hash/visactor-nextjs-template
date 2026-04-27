@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, Lock } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import { Button } from "@/components/ui/button";

@@ -205,7 +205,10 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
     loadPlaylists();
   }, [loadPlaylists]);
 
-  const playlists = playlistsData?.connected ? playlistsData.playlists : [];
+  const playlists = useMemo(
+    () => (playlistsData?.connected ? playlistsData.playlists : []),
+    [playlistsData],
+  );
   const sortedRows = useMemo(
     () =>
       [...rows].sort(
