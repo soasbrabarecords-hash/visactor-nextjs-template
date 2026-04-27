@@ -901,7 +901,7 @@ export async function createSpotifyPlaylist(
 ): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
   const { data: playlistId, refreshedToken } = await withSpotifyToken(async (token) => {
     const user = await fetchSpotifyCurrentUserWithToken(token);
-    const id = await createPlaylistWithToken(token, user.id, name, description, isPublic);
+    const id = await createPlaylistWithToken(token, user.id ?? "", name, description, isPublic);
     if (base64CoverJpeg) {
       await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
     }
