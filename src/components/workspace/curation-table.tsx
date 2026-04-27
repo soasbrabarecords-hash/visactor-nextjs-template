@@ -411,7 +411,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
               <th className="px-3 py-3">Musica</th>
               <th className="px-3 py-3">Streams 24h</th>
               <th className="px-3 py-3">Playlist sugerida</th>
-              <th className="px-3 py-3">Genero</th>
+              <th className="px-3 py-3">Gênero</th>
               <th className="px-3 py-3">Acao</th>
             </tr>
           </thead>
@@ -487,23 +487,39 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle">
-                      <StatusBadge tone="blue">
-                        <span className="whitespace-nowrap">
-                          {suggestion.style === "funk" ? "Funk" :
-                           suggestion.style === "rap" ? "Rap" :
-                           suggestion.style === "sertanejo" ? "Sertanejo" :
-                           suggestion.style === "pagode" ? "Pagode" :
-                           suggestion.style === "pop" ? "Pop" :
-                           "—"}
-                        </span>
-                      </StatusBadge>
+                      {suggestion.style === "unknown" ? (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      ) : (
+                        <StatusBadge
+                          tone={
+                            suggestion.style === "funk" ? "slate" :
+                            suggestion.style === "rap" ? "yellow" :
+                            suggestion.style === "sertanejo" ? "blue" :
+                            suggestion.style === "pagode" ? "green" :
+                            "purple"
+                          }
+                          className={
+                            suggestion.style === "funk"
+                              ? "!border-orange-500/30 !bg-orange-500/10 !text-orange-400"
+                              : undefined
+                          }
+                        >
+                          <span className="whitespace-nowrap">
+                            {suggestion.style === "funk" ? "Funk" :
+                             suggestion.style === "rap" ? "Rap" :
+                             suggestion.style === "sertanejo" ? "Sertanejo" :
+                             suggestion.style === "pagode" ? "Pagode" :
+                             "Pop"}
+                          </span>
+                        </StatusBadge>
+                      )}
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                         {isAlreadyInSuggestedPlaylist ? (
                           <StatusBadge tone="green">On playlist</StatusBadge>
                         ) : !suggestion.hasFit ? (
-                          <StatusBadge tone="yellow">—</StatusBadge>
+                          <span className="text-sm text-muted-foreground">—</span>
                         ) : (
                           <Button
                             size="sm"
