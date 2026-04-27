@@ -203,6 +203,8 @@ export default function PlaylistEditor({
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const draggingFrom = useRef<number | null>(null);
   const dragStartY = useRef(0);
+  const dragStarted = useRef(false);
+  const ignoreNextClick = useRef(false);
   const rowHeight = useRef(60);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragTo, setDragTo] = useState<number | null>(null);
@@ -243,6 +245,10 @@ export default function PlaylistEditor({
   function handleRowClick(e: React.MouseEvent, index: number) {
     // Não seleciona se clicou num botão/link de ação
     if ((e.target as HTMLElement).closest("a, button")) return;
+    if (ignoreNextClick.current) {
+      ignoreNextClick.current = false;
+      return;
+    }
 
     if (e.shiftKey && lastClickedIndex.current !== null) {
       // Range selection: do último clicado até aqui
@@ -272,7 +278,7 @@ export default function PlaylistEditor({
   // ── Drag (pointer events) ─────────────────────────────────────────────────
   function handlePointerDown(e: React.PointerEvent, index: number) {
     const target = e.target as HTMLElement;
-    if (!target.closest("[data-grip]")) return;
+    if (target.closest("a, button, input, textarea")) return;
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
@@ -284,6 +290,7 @@ export default function PlaylistEditor({
 
     draggingFrom.current = index;
     dragStartY.current = e.clientY;
+    dragStarted.current = false;
 
     if (tbodyRef.current) {
       const firstRow = tbodyRef.current.querySelector("tr");
@@ -291,13 +298,15 @@ export default function PlaylistEditor({
     }
 
     setDragFrom(index);
-    setDragTo(index);
+    setDragTo(null);
   }
 
   function handlePointerMove(e: React.PointerEvent, index: number) {
     if (draggingFrom.current !== index) return;
     e.preventDefault();
     const deltaY = e.clientY - dragStartY.current;
+    if (!dragStarted.current && Math.abs(deltaY) < 6) return;
+    dragStarted.current = true;
     const deltaRows = Math.round(deltaY / rowHeight.current);
     const newIndex = Math.max(0, Math.min(tracks.length - 1, index + deltaRows));
     setDragTo(newIndex);
@@ -308,10 +317,20 @@ export default function PlaylistEditor({
     e.preventDefault();
 
     const deltaY = e.clientY - dragStartY.current;
+    if (!dragStarted.current && Math.abs(deltaY) < 6) {
+      draggingFrom.current = null;
+      dragStarted.current = false;
+      setDragFrom(null);
+      setDragTo(null);
+      return;
+    }
+
     const deltaRows = Math.round(deltaY / rowHeight.current);
     const newIndex = Math.max(0, Math.min(tracks.length - 1, index + deltaRows));
 
     draggingFrom.current = null;
+    dragStarted.current = false;
+    ignoreNextClick.current = true;
     setDragFrom(null);
     setDragTo(null);
 
@@ -530,6 +549,7 @@ export default function PlaylistEditor({
   }
 
   const isDraggingAny = dragFrom !== null;
+  const isActivelyDragging = dragFrom !== null && dragTo !== null;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -620,6 +640,7 @@ export default function PlaylistEditor({
             {tracks.length > 0 ? tracks.map((track, index) => {
               const isSelected = selectedSet.has(index);
               const isDraggingThis = dragFrom === index;
+              const isInsertTarget = isActivelyDragging && dragTo === index;
               const isDeleting = deletingIndices.has(index);
               const translateY = getTranslateY(index);
 
@@ -632,26 +653,27 @@ export default function PlaylistEditor({
                   onPointerUp={(e) => handlePointerUp(e, index)}
                   style={{
                     transform: `translateY(${translateY}px)`,
-                    transition: isDraggingAny && isSelected ? "none" : "transform 120ms ease",
+                    transition: isActivelyDragging && isSelected ? "none" : "transform 120ms ease",
                     opacity: isDeleting ? 0.3 : isDraggingThis ? 0.5 : 1,
-                    cursor: isDraggingThis ? "grabbing" : "pointer",
+                    cursor: isDraggingThis && isActivelyDragging ? "grabbing" : "grab",
                     position: "relative",
-                    zIndex: isSelected && isDraggingAny ? 20 : isDraggingAny ? 1 : "auto",
+                    zIndex: isSelected && isActivelyDragging ? 20 : isActivelyDragging ? 1 : "auto",
                   }}
                   className={[
-                    "h-16 select-none overflow-hidden",
+                    "group h-16 select-none overflow-hidden",
                     isSelected
-                      ? isDraggingAny
+                      ? isActivelyDragging
                         ? "bg-primary/15"
-                        : "bg-primary/10 hover:bg-primary/12"
-                      : "hover:bg-muted/5",
+                        : "bg-primary/10 hover:bg-muted/15"
+                      : "hover:bg-muted/15",
+                    isInsertTarget ? "shadow-[inset_0_2px_0_hsl(var(--primary))]" : "",
                     isDeleting ? "pointer-events-none" : "",
                   ].filter(Boolean).join(" ")}
                 >
                   {/* Grip */}
                   <td className="h-16 overflow-hidden px-3 py-0 align-middle">
                     <div data-grip="true"
-                      className="flex cursor-grab items-center active:cursor-grabbing"
+                      className="flex cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100"
                       title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
                       <GripVertical className="h-4 w-4 pointer-events-none text-muted-foreground/50" />
                     </div>
