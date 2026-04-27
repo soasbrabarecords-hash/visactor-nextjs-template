@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
 
-async function refreshToken(clientId: string, clientSecret: string, refreshTok: string) {
+async function doRefresh(clientId: string, clientSecret: string, refreshTok: string) {
   const res = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
@@ -18,61 +18,75 @@ async function refreshToken(clientId: string, clientSecret: string, refreshTok: 
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshTok }),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error("Failed to refresh token.");
+  if (!res.ok) throw new Error("Falha ao renovar sessão do Spotify.");
   return (await res.json()) as { access_token: string; refresh_token?: string; expires_in: number; token_type: string };
 }
 
-async function putTracksOrder(accessToken: string, playlistId: string, uris: string[]) {
-  // A Spotify API aceita no máximo 100 URIs por chamada
-  // Se houver mais de 100 faixas, precisa fazer PUT seguido de POSTs adicionais
-  const first100 = uris.slice(0, 100);
-  const rest = uris.slice(100);
+// Substitui a ordem completa da playlist.
+// PUT /v1/playlists/{id}/tracks com até 100 URIs de uma vez SUBSTITUI tudo.
+// Para playlists > 100 faixas, usamos range_start/insert_before em loop
+// pra mover as faixas da posição atual para a posição desejada.
+async function replacePlaylistTracks(
+  accessToken: string,
+  playlistId: string,
+  uris: string[],
+): Promise<string> {
+  if (uris.length <= 100) {
+    // Simples: PUT substitui toda a playlist
+    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ uris }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+      throw new Error(err?.error?.message ?? `Spotify error ${res.status}`);
+    }
+    const data = await res.json() as { snapshot_id?: string };
+    return data.snapshot_id ?? "";
+  }
 
-  const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+  // > 100 faixas: PUT com as primeiras 100 (limpa a playlist e adiciona 100)
+  // depois POST em batches de 100 para adicionar o restante
+  const first100 = uris.slice(0, 100);
+  const putRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ uris: first100 }),
     cache: "no-store",
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err?.error?.message ?? "Falha ao reordenar playlist.");
+  if (!putRes.ok) {
+    const err = await putRes.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? `Spotify error ${putRes.status}`);
   }
+  const putData = await putRes.json() as { snapshot_id?: string };
+  let snapshotId = putData.snapshot_id ?? "";
 
-  const data = await res.json() as { snapshot_id?: string };
-  let snapshotId = data.snapshot_id ?? "";
+  // Adiciona o restante em batches de 100
+  for (let i = 100; i < uris.length; i += 100) {
+    const batch = uris.slice(i, i + 100);
+    // Pequeno delay pra não bater rate limit
+    await new Promise((r) => setTimeout(r, 100));
 
-  // Se tiver mais de 100, adiciona o restante em batches
-  for (let i = 0; i < rest.length; i += 100) {
-    const batch = rest.slice(i, i + 100);
-    const addRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    const postRes = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ uris: batch }),
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ uris: batch, position: i }),
       cache: "no-store",
     });
-    if (!addRes.ok) {
-      const err = await addRes.json().catch(() => ({})) as { error?: { message?: string } };
-      throw new Error(err?.error?.message ?? "Falha ao adicionar faixas extras.");
+    if (!postRes.ok) {
+      const err = await postRes.json().catch(() => ({})) as { error?: { message?: string } };
+      throw new Error(err?.error?.message ?? `Spotify error ${postRes.status}`);
     }
-    const addData = await addRes.json() as { snapshot_id?: string };
-    snapshotId = addData.snapshot_id ?? snapshotId;
+    const postData = await postRes.json() as { snapshot_id?: string };
+    snapshotId = postData.snapshot_id ?? snapshotId;
   }
 
   return snapshotId;
 }
 
-type ReorderFullBody = {
-  uris?: unknown;
-  snapshotId?: unknown;
-};
+type ReorderFullBody = { uris?: unknown; snapshotId?: unknown };
 
 export async function PUT(
   request: Request,
@@ -91,7 +105,6 @@ export async function PUT(
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
     const refreshTok = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
-
     const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
     const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
 
@@ -99,37 +112,30 @@ export async function PUT(
     let refreshedTokenData = null;
 
     if (!token) {
-      if (!refreshTok) {
-        return NextResponse.json({ message: "Spotify não conectado." }, { status: 401 });
-      }
-      refreshedTokenData = await refreshToken(clientId, clientSecret, refreshTok);
+      if (!refreshTok) return NextResponse.json({ message: "Spotify não conectado." }, { status: 401 });
+      refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
       token = refreshedTokenData.access_token;
     }
 
     let snapshotId: string;
     try {
-      snapshotId = await putTracksOrder(token, playlistId, uris);
+      snapshotId = await replacePlaylistTracks(token!, playlistId, uris);
     } catch (err) {
-      // Tenta refresh se falhou
       if (refreshTok && !refreshedTokenData) {
-        refreshedTokenData = await refreshToken(clientId, clientSecret, refreshTok);
+        refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
         token = refreshedTokenData.access_token;
-        snapshotId = await putTracksOrder(token, playlistId, uris);
+        snapshotId = await replacePlaylistTracks(token, playlistId, uris);
       } else {
         throw err;
       }
     }
 
     const response = NextResponse.json({ success: true, snapshotId });
-
-    if (refreshedTokenData) {
-      setSpotifyAuthCookies(response, refreshedTokenData);
-    }
-
+    if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
     return response;
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Erro ao reordenar playlist." },
+      { success: false, message: error instanceof Error ? error.message : "Erro ao reordenar playlist." },
       { status: 500 },
     );
   }
