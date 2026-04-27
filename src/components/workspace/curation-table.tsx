@@ -38,7 +38,7 @@ type PlaylistSuggestion = {
   hasFit: boolean;
 };
 
-type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "pop" | "unknown";
+type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | "unknown";
 
 function coverStyle(coverUrl: string | null) {
   if (!coverUrl) {
@@ -90,6 +90,8 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "mc gu",
     "lele jp",
     "poze do rodo",
+    "pedro sampaio",
+    "anitta",
   ]);
   const sertanejoStrongScore = countMatches(text, [
     "modao",
@@ -97,12 +99,21 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "universitario",
     "ze neto",
     "cristiano",
-    "felipe",
-    "rodrigo",
     "murilo huff",
     "marilia mendonca",
-    "clayton",
-    "romario",
+    "panda",
+    "mj records",
+    "gusttavo lima",
+    "danilo e davi",
+    "danilo & davi",
+    "junior e cezar",
+    "junior & cezar",
+    "diego e vitor hugo",
+    "diego & vitor hugo",
+    "matheus e kauan",
+    "matheus & kauan",
+    "lauana prado",
+    "zé neto",
   ]);
   const sertanejoScore =
     sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
@@ -114,8 +125,17 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "ferrugem",
     "thiaguinho",
     "sorriso maroto",
+    "turma do pagode",
     "mumuzinho",
     "molejo",
+  ]);
+  const piseiroScore = countMatches(text, [
+    "piseiro",
+    "pisadinha",
+    "vitinho imperator",
+    "nattan",
+    "ze vaqueiro",
+    "zé vaqueiro",
   ]);
   const popScore = countMatches(text, ["bts", "pop", "kpop"]);
   const rapScore = countMatches(text, ["trap", "rap", "drill"]);
@@ -126,6 +146,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
 
   if (pagodeScore > 0) {
     return "pagode";
+  }
+
+  if (piseiroScore > 0) {
+    return "piseiro";
   }
 
   if (popScore > 0) {
@@ -150,6 +174,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
     rap: ["trap", "rap", "drill"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
+    piseiro: ["piseiro", "pisadinha", "forro", "forró", "nordeste"],
     pop: ["pop", "hits", "top", "viral", "mundial"],
     discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
   };
@@ -170,6 +195,7 @@ function buildPlaylistSuggestion(
     rap: "Trap/Rap",
     sertanejo: "Sertanejo",
     pagode: "Pagode/Samba",
+    piseiro: "Piseiro/Forro",
     pop: "Pop",
     unknown: "Sem genero claro",
   };
@@ -496,11 +522,14 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                             suggestion.style === "rap" ? "yellow" :
                             suggestion.style === "sertanejo" ? "blue" :
                             suggestion.style === "pagode" ? "green" :
+                            suggestion.style === "piseiro" ? "slate" :
                             "purple"
                           }
                           className={
                             suggestion.style === "funk"
                               ? "!border-orange-500/30 !bg-orange-500/10 !text-orange-400"
+                              : suggestion.style === "piseiro"
+                              ? "!border-lime-500/30 !bg-lime-500/10 !text-lime-400"
                               : undefined
                           }
                         >
@@ -509,6 +538,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                              suggestion.style === "rap" ? "Rap" :
                              suggestion.style === "sertanejo" ? "Sertanejo" :
                              suggestion.style === "pagode" ? "Pagode" :
+                             suggestion.style === "piseiro" ? "Piseiro" :
                              "Pop"}
                           </span>
                         </StatusBadge>
