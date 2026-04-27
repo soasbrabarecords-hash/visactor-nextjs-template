@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, LogOut, Music2, RefreshCw } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  LogOut,
+  Music2,
+  Pencil,
+  RefreshCw,
+} from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "./status-badge";
@@ -10,6 +17,7 @@ import StatusBadge from "./status-badge";
 type SpotifyAccountPlaylist = {
   id: string;
   name: string;
+  ownerId: string;
   ownerName: string;
   imageUrl: string | null;
   tracksTotal: number;
@@ -150,11 +158,11 @@ export default function SpotifyAccountPlaylistsPanel({
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Playlists importadas
+                Playlists editaveis
               </div>
               <h3 className="mt-2 text-xl font-semibold">
                 {data?.connected
-                  ? `${formatCount(playlists.length)} playlists encontradas`
+                  ? `${formatCount(playlists.length)} playlists proprias`
                   : "Aguardando conexao"}
               </h3>
             </div>
@@ -189,6 +197,13 @@ export default function SpotifyAccountPlaylistsPanel({
                       <StatusBadge tone="slate">Privada</StatusBadge>
                     )}
                     <Link
+                      href={`/curadoria/playlists/${playlist.id}`}
+                      className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-primary hover:bg-muted/40"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Link>
+                    <Link
                       href={playlist.spotifyUrl}
                       target="_blank"
                       rel="noreferrer"
@@ -201,7 +216,7 @@ export default function SpotifyAccountPlaylistsPanel({
               ))
             ) : (
               <div className="rounded-xl border border-border bg-background/40 px-4 py-8 text-center text-sm text-muted-foreground">
-                Conecte o Spotify para listar as playlists da conta aqui.
+                Conecte o Spotify para listar somente playlists criadas por essa conta.
               </div>
             )}
           </div>
