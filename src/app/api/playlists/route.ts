@@ -52,6 +52,7 @@ export async function POST(request: Request) {
 
     revalidatePath("/");
     revalidatePath("/dashboard");
+    revalidatePath("/playlists-concorrentes");
     revalidatePath("/playlists-monitoradas");
     revalidatePath("/curadoria");
     revalidatePath("/radar-music");

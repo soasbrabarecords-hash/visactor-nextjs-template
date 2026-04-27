@@ -8,7 +8,15 @@ import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function AddPlaylistForm() {
+export default function AddPlaylistForm({
+  title = "Adicionar Playlist",
+  description = "Cole a URL de uma playlist do Spotify e o sistema busca nome, followers e quantidade de faixas automaticamente antes de salvar no Supabase.",
+  buttonLabel = "Adicionar Playlist",
+}: {
+  title?: string;
+  description?: string;
+  buttonLabel?: string;
+}) {
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -69,11 +77,9 @@ export default function AddPlaylistForm() {
     <Container className="border-b border-border py-4">
       <section className="grid gap-4 rounded-2xl border border-border bg-muted/10 p-5 laptop:grid-cols-[1.2fr_1fr] laptop:items-center">
         <div className="space-y-2">
-          <ChartTitle title="Adicionar Playlist" icon={Music2} />
+          <ChartTitle title={title} icon={Music2} />
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Cole a URL de uma playlist do Spotify e o sistema busca nome,
-            followers e quantidade de faixas automaticamente antes de salvar no
-            Supabase.
+            {description}
           </p>
         </div>
 
@@ -87,7 +93,7 @@ export default function AddPlaylistForm() {
             />
             <Button type="submit" disabled={isPending}>
               <Plus />
-              {isPending ? "Adicionando..." : "Adicionar Playlist"}
+              {isPending ? "Adicionando..." : buttonLabel}
             </Button>
           </div>
 

@@ -3,5 +3,5 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default async function RadarPlaylistsPage() {
-  redirect("/playlists-monitoradas");
+  redirect("/playlists-concorrentes");
 }

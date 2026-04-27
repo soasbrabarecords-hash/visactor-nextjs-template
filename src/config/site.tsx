@@ -31,8 +31,8 @@ export const navigations: Navigation[] = [
   },
   {
     icon: ListMusic,
-    name: "Playlists Monitoradas",
-    href: "/playlists-monitoradas",
+    name: "Playlists Concorrentes",
+    href: "/playlists-concorrentes",
   },
   {
     icon: Compass,

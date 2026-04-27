@@ -17,8 +17,9 @@ export default function Navigation() {
       return pathname === "/radar-music" || pathname === "/charts/music";
     }
 
-    if (href === "/playlists-monitoradas") {
+    if (href === "/playlists-concorrentes") {
       return (
+        pathname === "/playlists-concorrentes" ||
         pathname === "/playlists-monitoradas" ||
         pathname === "/base-playlists" ||
         pathname === "/radar-playlists" ||

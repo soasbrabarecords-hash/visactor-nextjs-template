@@ -45,7 +45,15 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
 
-export default function SpotifyAccountPlaylistsPanel() {
+export default function SpotifyAccountPlaylistsPanel({
+  eyebrow = "Spotify na curadoria",
+  title = "Playlists da conta",
+  description = "Conecte o Spotify para puxar suas playlists e usar o Radar Music como base de decisao editorial.",
+}: {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+}) {
   const [data, setData] = useState<SpotifyPlaylistsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -88,14 +96,11 @@ export default function SpotifyAccountPlaylistsPanel() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Spotify na curadoria
+                {eyebrow}
               </div>
-              <h2 className="mt-2 text-2xl font-semibold">
-                Playlists da conta
-              </h2>
+              <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Conecte o Spotify para puxar suas playlists e usar o Radar Music
-                como base de decisao editorial.
+                {description}
               </p>
             </div>
             <StatusBadge tone={data?.connected ? "green" : "blue"}>

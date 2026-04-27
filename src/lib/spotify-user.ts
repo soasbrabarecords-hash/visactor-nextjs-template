@@ -107,7 +107,8 @@ export function buildSpotifyAuthorizeUrl({
     client_id: env.clientId,
     response_type: "code",
     redirect_uri: `${origin}/api/spotify/auth/callback`,
-    scope: "playlist-read-private playlist-read-collaborative user-read-email",
+    scope:
+      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email",
     state,
   });
 

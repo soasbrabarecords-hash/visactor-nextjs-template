@@ -33,6 +33,26 @@ function getActionVariant(
   }
 }
 
+function getSuggestedPlaylistLabel(row: DecisionTrack) {
+  if (row.alreadyInPlaylists) {
+    return "Playlist onde ja aparece";
+  }
+
+  if (row.fitLabel === "Fit alto") {
+    return "Playlist principal do nicho";
+  }
+
+  if (row.lowSaturation) {
+    return "Playlist de descoberta";
+  }
+
+  if (row.recurring) {
+    return "Playlist de manutencao";
+  }
+
+  return "Testar em playlist menor";
+}
+
 export default function CurationTable({
   rows,
 }: {
@@ -60,6 +80,7 @@ export default function CurationTable({
               <th className="px-4 py-3">Popularidade</th>
               <th className="px-4 py-3">Chart</th>
               <th className="px-4 py-3">Fit</th>
+              <th className="px-4 py-3">Playlist sugerida</th>
               <th className="px-4 py-3">Ja na base</th>
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3">Acoes</th>
@@ -69,7 +90,7 @@ export default function CurationTable({
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma recomendacao disponivel agora.
@@ -113,6 +134,9 @@ export default function CurationTable({
                     >
                       {row.fitLabel}
                     </StatusBadge>
+                  </td>
+                  <td className="px-4 py-4 text-sm text-muted-foreground">
+                    {getSuggestedPlaylistLabel(row)}
                   </td>
                   <td className="px-4 py-4">
                     <StatusBadge tone={row.alreadyInPlaylists ? "blue" : "purple"}>

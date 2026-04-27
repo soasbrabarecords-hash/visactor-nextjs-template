@@ -1055,8 +1055,8 @@ export async function getRadarMusicPageData({
         "Chart musical para ler o que esta subindo, o que esta caindo e onde existe espaco real para discovery e construcao de novas playlists.",
       primaryCtaLabel: "Ir para Curadoria",
       primaryCtaHref: "/curadoria",
-      secondaryCtaLabel: "Ver Playlists Monitoradas",
-      secondaryCtaHref: "/playlists-monitoradas",
+      secondaryCtaLabel: "Ver Playlists Concorrentes",
+      secondaryCtaHref: "/playlists-concorrentes",
     },
     heroInsight: buildRadarMusicHeroInsight({
       rows,
@@ -1158,7 +1158,7 @@ export async function getRadarPlaylistsPageData(): Promise<RadarPlaylistsData> {
   return {
     hero: {
       eyebrow: "Radar interno",
-      title: "Playlists Monitoradas",
+      title: "Playlists Concorrentes",
       description:
         "Leitura cruzada das playlists monitoradas para saber quais faixas realmente estao se repetindo na sua base e quais tambem estao acelerando no radar externo.",
       primaryCtaLabel: "Abrir Radar Music",
@@ -1301,7 +1301,7 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
   return {
     hero: {
       eyebrow: "Base monitorada",
-      title: "Playlists Monitoradas",
+      title: "Playlists Concorrentes",
       description:
         "Area dedicada para cadastrar novas URLs, acompanhar score, monitorar a saude da base e abrir a analise individual de cada playlist.",
       primaryCtaLabel: "Abrir Curadoria",
@@ -1362,8 +1362,8 @@ export async function getCurationPageData(): Promise<CurationPageData> {
         "Fila final de decisao com score editorial, leitura de movimento e fit com a sua base para acelerar adicao, observacao e limpeza de repertorio.",
       primaryCtaLabel: "Abrir Radar Music",
       primaryCtaHref: "/radar-music",
-      secondaryCtaLabel: "Ver Playlists Monitoradas",
-      secondaryCtaHref: "/playlists-monitoradas",
+      secondaryCtaLabel: "Ver Playlists Concorrentes",
+      secondaryCtaHref: "/playlists-concorrentes",
     },
     heroInsight: buildCurationHeroInsight(rows),
     metrics: [

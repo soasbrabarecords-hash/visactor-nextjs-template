@@ -7,7 +7,7 @@ import type { PlaylistRecord } from "@/types/dashboard";
 
 export default function PlaylistTable({
   playlists,
-  title = "Playlists Monitoradas",
+  title = "Playlists Concorrentes",
   description = "Dados reais do Spotify e do Supabase dentro da estrutura visual do dashboard.",
   emptyMessage = "No playlists found in Supabase yet.",
 }: {
