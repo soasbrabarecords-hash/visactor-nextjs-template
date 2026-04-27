@@ -12,6 +12,18 @@ function formatCount(value: number | null) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
 
+function coverStyle(coverUrl: string | null) {
+  if (!coverUrl) {
+    return undefined;
+  }
+
+  return {
+    backgroundImage: `url(${coverUrl})`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
+}
+
 function movementLabel(row: RadarMusicRow) {
   if (row.previousRank === null || row.rankChange === null) {
     return "NEW";
@@ -87,7 +99,20 @@ export default function DashboardTopTracksTable({
                     {movementLabel(row)}
                   </StatusBadge>
                 </td>
-                <td className="px-4 py-3 font-semibold">{row.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-11 w-11 shrink-0 rounded-xl border border-border bg-muted shadow-lg"
+                      style={coverStyle(row.coverUrl)}
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{row.name}</div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground md:hidden">
+                        {row.artists}
+                      </div>
+                    </div>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">
                   {row.artists}
                 </td>
