@@ -80,6 +80,10 @@ type SpotifySearchTracksResponse = {
   };
 };
 
+type SpotifyTracksResponse = {
+  tracks?: Array<SpotifyTrackObject | null>;
+};
+
 export type SpotifyPlaylistMetadata = {
   playlistId: string;
   name: string;
@@ -360,6 +364,50 @@ export async function searchSpotifyTracks(
 
       seenTrackIds.add(mappedTrack.id);
       tracks.push(mappedTrack);
+    }
+  }
+
+  return tracks;
+}
+
+export async function fetchSpotifyTracksByIds(
+  trackIds: string[],
+  market = "BR",
+): Promise<SpotifyTrackRecord[]> {
+  const uniqueTrackIds = Array.from(
+    new Set(
+      trackIds
+        .map((trackId) => trackId.trim())
+        .filter((trackId) => trackId.length > 0),
+    ),
+  );
+
+  if (uniqueTrackIds.length === 0) {
+    return [];
+  }
+
+  const tracks: SpotifyTrackRecord[] = [];
+
+  for (let index = 0; index < uniqueTrackIds.length; index += 50) {
+    const chunk = uniqueTrackIds.slice(index, index + 50);
+    const searchParams = new URLSearchParams({
+      ids: chunk.join(","),
+      market,
+    });
+    const payload = await spotifyFetch<SpotifyTracksResponse>(
+      `https://api.spotify.com/v1/tracks?${searchParams.toString()}`,
+    );
+
+    for (const track of payload.tracks ?? []) {
+      if (!track) {
+        continue;
+      }
+
+      const mappedTrack = mapSpotifyTrack(track);
+
+      if (mappedTrack) {
+        tracks.push(mappedTrack);
+      }
     }
   }
 

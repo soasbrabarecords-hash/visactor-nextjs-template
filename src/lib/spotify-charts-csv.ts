@@ -1,6 +1,10 @@
 import "server-only";
 
 import {
+  fetchSpotifyTracksByIds,
+  type SpotifyTrackRecord,
+} from "@/lib/spotify";
+import {
   importSpotifyChartRows,
   type SpotifyChartImportRow,
   type SpotifyChartsImportResult,
@@ -214,6 +218,58 @@ function mapCsvRowToImportRow(
   };
 }
 
+function buildTrackRecordMap(tracks: SpotifyTrackRecord[]) {
+  return new Map(tracks.map((track) => [track.id, track] as const));
+}
+
+async function enrichRowsWithSpotifyMetadata(
+  rows: SpotifyChartImportRow[],
+  market = "BR",
+) {
+  const trackIds = rows
+    .map((row) => row.spotify_track_id?.trim() ?? "")
+    .filter((trackId) => trackId.length > 0);
+
+  if (trackIds.length === 0) {
+    return rows;
+  }
+
+  try {
+    const spotifyTracks = await fetchSpotifyTracksByIds(trackIds, market);
+    const tracksById = buildTrackRecordMap(spotifyTracks);
+
+    return rows.map((row) => {
+      const trackId = row.spotify_track_id?.trim() ?? "";
+      const spotifyTrack = tracksById.get(trackId);
+
+      if (!spotifyTrack) {
+        return row;
+      }
+
+      return {
+        ...row,
+        track_name: spotifyTrack.name || row.track_name,
+        artist_name:
+          spotifyTrack.artists.join(", ") || row.artist_name,
+        artist_ids:
+          spotifyTrack.artistIds.length > 0
+            ? spotifyTrack.artistIds
+            : row.artist_ids,
+        album_name: spotifyTrack.albumName || row.album_name,
+        image_url: spotifyTrack.coverUrl ?? row.image_url ?? null,
+        spotify_url: spotifyTrack.spotifyUrl || row.spotify_url,
+      };
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown Spotify metadata error.";
+    process.stderr.write(
+      `Failed to enrich spotify chart rows with Spotify metadata: ${message}\n`,
+    );
+    return rows;
+  }
+}
+
 export async function importSpotifyChartsCsvContent({
   csvText,
   country,
@@ -233,8 +289,12 @@ export async function importSpotifyChartsCsvContent({
       chartDate: normalizeChartDate(chartDate),
     }),
   );
+  const enrichedRows = await enrichRowsWithSpotifyMetadata(
+    mappedRows,
+    country ?? "BR",
+  );
 
-  return importSpotifyChartRows(mappedRows);
+  return importSpotifyChartRows(enrichedRows);
 }
 
 export async function importSpotifyChartsCsvFromUrl({
