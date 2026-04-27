@@ -35,6 +35,7 @@ type PlaylistSuggestion = {
   label: string;
   reason: string;
   style: string;
+  hasFit: boolean;
 };
 
 function coverStyle(coverUrl: string | null) {
@@ -67,55 +68,35 @@ function normalizeText(value: string) {
 function detectTrackStyle(row: DecisionTrack) {
   const text = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
 
-  if (
-    [
-      "funk",
-      "mc ",
-      " dj ",
-      "mandela",
-      "automotivo",
-      "montagem",
-      "beat fino",
-      "phonk",
-      "bruxaria",
-      "tuto",
-      "joaozinho",
-      "mk",
-    ].some((term) => text.includes(term))
-  ) {
+  if (["funk", "mandelao", "automotivo", "rave", "proibidao"].some((term) => text.includes(term))) {
     return "funk";
   }
 
-  if (
-    ["trap", "rap", "veigh", "matue", "orochi", "oruan", "chefin", "kayblack"].some(
-      (term) => text.includes(term),
-    )
-  ) {
+  if (["trap", "rap", "drill"].some((term) => text.includes(term))) {
     return "rap";
   }
 
-  if (["dance", "remix", "house", "eletron", "pop"].some((term) => text.includes(term))) {
-    return "dance";
-  }
-
-  if (["sertanejo", "ze neto", "cristiano", "ana castela"].some((term) => text.includes(term))) {
+  if (["sertanejo", "modao", "agro"].some((term) => text.includes(term))) {
     return "sertanejo";
   }
 
-  return "discovery";
+  if (["pagode", "samba"].some((term) => text.includes(term))) {
+    return "pagode";
+  }
+
+  return "unknown";
 }
 
 function playlistScore(playlist: SpotifyAccountPlaylist, style: string) {
   const name = normalizeText(playlist.name);
   const styleTerms: Record<string, string[]> = {
     funk: ["funk", "baile", "mandela", "automotivo"],
-    rap: ["trap", "rap", "hip hop"],
-    dance: ["dance", "remix", "eletron", "pop"],
-    sertanejo: ["sertanejo", "agro"],
-    discovery: ["hits", "brasil", "viral", "top", "novidades"],
+    rap: ["trap", "rap", "drill"],
+    sertanejo: ["sertanejo", "modao", "agro"],
+    pagode: ["pagode", "samba"],
   };
 
-  return (styleTerms[style] ?? styleTerms.discovery).reduce(
+  return (styleTerms[style] ?? []).reduce(
     (score, term) => score + (name.includes(term) ? 1 : 0),
     0,
   );
@@ -126,32 +107,45 @@ function buildPlaylistSuggestion(
   playlists: SpotifyAccountPlaylist[],
 ): PlaylistSuggestion {
   const style = detectTrackStyle(row);
+  const styleLabel: Record<string, string> = {
+    funk: "Funk",
+    rap: "Trap/Rap",
+    sertanejo: "Sertanejo",
+    pagode: "Pagode/Samba",
+    unknown: "Sem genero claro",
+  };
+
+  if (style === "unknown") {
+    return {
+      playlist: null,
+      label: "Sem fit",
+      style,
+      hasFit: false,
+      reason: "Genero/contexto insuficiente para sugerir playlist com seguranca.",
+    };
+  }
+
   const sortedPlaylists = [...playlists].sort(
     (left, right) => playlistScore(right, style) - playlistScore(left, style),
   );
   const match = sortedPlaylists.find((playlist) => playlistScore(playlist, style) > 0) ?? null;
-  const styleLabel: Record<string, string> = {
-    funk: "Funk / Baile",
-    rap: "Rap / Trap",
-    dance: "Dance / Pop",
-    sertanejo: "Sertanejo",
-    discovery: "Discovery",
-  };
 
   if (match) {
     return {
       playlist: match,
       label: match.name,
       style,
+      hasFit: true,
       reason: `${styleLabel[style]} detectado e match com playlist da conta.`,
     };
   }
 
   return {
     playlist: null,
-    label: "Playlist de descoberta",
+    label: "Observar",
     style,
-    reason: `${styleLabel[style]} detectado, mas sem playlist propria com nome compativel.`,
+    hasFit: false,
+    reason: `${styleLabel[style]} detectado, mas sem playlist propria do mesmo genero.`,
   };
 }
 
@@ -409,7 +403,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                           <div className="mt-1 text-xs text-muted-foreground">
                             {suggestion.playlist
                               ? `${formatCount(suggestion.playlist.tracksTotal)} tracks`
-                              : "Criar/usar playlist de descoberta"}
+                              : "Sem playlist compativel"}
                           </div>
                         </div>
                       </div>
@@ -426,6 +420,8 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                       <div className="flex flex-wrap gap-2">
                         {isAlreadyInSuggestedPlaylist ? (
                           <StatusBadge tone="green">Ja esta na playlist</StatusBadge>
+                        ) : !suggestion.hasFit ? (
+                          <StatusBadge tone="yellow">Observar</StatusBadge>
                         ) : (
                           <Button
                             size="sm"
