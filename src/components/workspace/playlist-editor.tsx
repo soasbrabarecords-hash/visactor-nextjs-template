@@ -639,17 +639,17 @@ export default function PlaylistEditor({
                     zIndex: isSelected && isDraggingAny ? 20 : isDraggingAny ? 1 : "auto",
                   }}
                   className={[
-                    "select-none",
+                    "h-16 select-none overflow-hidden",
                     isSelected
                       ? isDraggingAny
-                        ? "bg-primary/20"
-                        : "bg-primary/10 hover:bg-primary/15"
-                      : "hover:bg-muted/10",
+                        ? "bg-primary/15"
+                        : "bg-primary/10 hover:bg-primary/12"
+                      : "hover:bg-muted/5",
                     isDeleting ? "pointer-events-none" : "",
                   ].filter(Boolean).join(" ")}
                 >
                   {/* Grip */}
-                  <td className="px-3 py-3">
+                  <td className="h-16 overflow-hidden px-3 py-0 align-middle">
                     <div data-grip="true"
                       className="flex cursor-grab items-center active:cursor-grabbing"
                       title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
@@ -658,7 +658,7 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* # */}
-                  <td className="px-4 py-3 text-sm tabular-nums text-muted-foreground">
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground">
                     {isDeleting
                       ? <Loader2 className="h-4 w-4 animate-spin" />
                       : <span className={isSelected ? "text-primary font-semibold" : ""}>{index + 1}</span>
@@ -666,15 +666,15 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Música */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
+                  <td className="h-16 min-w-0 overflow-hidden px-4 py-0 align-middle">
+                    <div className="flex min-w-0 items-center gap-3 overflow-hidden">
                       <div
                         className={["h-11 w-11 shrink-0 rounded-xl border bg-muted",
                           isSelected ? "border-primary/40" : "border-border"].join(" ")}
                         style={coverStyle(track.imageUrl)}
                       />
-                      <div className="min-w-0">
-                        <div className={["truncate font-semibold", isSelected ? "text-primary" : ""].join(" ")}>
+                      <div className="min-w-0 overflow-hidden">
+                        <div className={["overflow-hidden text-ellipsis whitespace-nowrap font-semibold", isSelected ? "text-primary" : ""].join(" ")}>
                           {track.name}
                         </div>
                       </div>
@@ -682,13 +682,13 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Artistas */}
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{track.artists}</td>
+                  <td className="h-16 min-w-0 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground">{track.artists}</td>
 
                   {/* Álbum */}
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{track.albumName}</td>
+                  <td className="h-16 min-w-0 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground">{track.albumName}</td>
 
                   {/* Popularidade */}
-                  <td className="px-4 py-3">
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
                     <div className="flex items-center gap-2">
                       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                         <div className="h-full rounded-full bg-primary" style={{ width: `${track.popularity}%` }} />
@@ -698,10 +698,10 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Duração */}
-                  <td className="px-4 py-3 text-sm tabular-nums text-muted-foreground">{track.durationLabel}</td>
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground">{track.durationLabel}</td>
 
                   {/* Streams */}
-                  <td className="px-4 py-3">
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
                     {track.streamsLoading
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
                       : (
@@ -721,7 +721,7 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Ações */}
-                  <td className="px-4 py-3">
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
                     <div className="flex items-center gap-2">
                       <button type="button"
                         onClick={(e) => { e.stopPropagation(); void handleDelete(isSelected ? selectedSet : new Set([index])); }}
