@@ -899,21 +899,14 @@ export async function createSpotifyPlaylist(
   isPublic: boolean,
   base64CoverJpeg: string | null,
 ): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
-  // Precisamos do userId primeiro
-  const { data: userId, refreshedToken: rt1 } = await withSpotifyToken((token) =>
-    fetchSpotifyCurrentUserWithToken(token).then((u) => u.id),
-  );
+  const { data: playlistId, refreshedToken } = await withSpotifyToken(async (token) => {
+    const user = await fetchSpotifyCurrentUserWithToken(token);
+    const id = await createPlaylistWithToken(token, user.id, name, description, isPublic);
+    if (base64CoverJpeg) {
+      await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
+    }
+    return id;
+  });
 
-  const accessToken = rt1?.access_token ?? (await (async () => {
-    const cookieStore = await cookies();
-    return cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value ?? "";
-  })());
-
-  const playlistId = await createPlaylistWithToken(accessToken, userId, name, description, isPublic);
-
-  if (base64CoverJpeg) {
-    await uploadPlaylistCoverWithToken(accessToken, playlistId, base64CoverJpeg);
-  }
-
-  return { playlistId, refreshedToken: rt1 };
+  return { playlistId, refreshedToken };
 }
