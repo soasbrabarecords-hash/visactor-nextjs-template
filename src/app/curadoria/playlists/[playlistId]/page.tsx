@@ -1,19 +1,20 @@
 import Link from "next/link";
-import { ExternalLink, Lock, Music2 } from "lucide-react";
+import { ExternalLink, Lock } from "lucide-react";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import { Button } from "@/components/ui/button";
 import PageIntro from "@/components/page-intro";
 import StatusBadge from "@/components/workspace/status-badge";
-import { fetchSpotifyEditablePlaylist } from "@/lib/spotify-user";
+import PlaylistEditor from "@/components/workspace/playlist-editor";
+import {
+  fetchSpotifyEditablePlaylist,
+  fetchPlaylistSnapshotId,
+} from "@/lib/spotify-user";
 
 export const dynamic = "force-dynamic";
 
 function coverStyle(coverUrl: string | null) {
-  if (!coverUrl) {
-    return undefined;
-  }
-
+  if (!coverUrl) return undefined;
   return {
     backgroundImage: `url(${coverUrl})`,
     backgroundPosition: "center",
@@ -58,13 +59,19 @@ export default async function SpotifyPlaylistEditorPage({
 
   const { playlist } = result;
 
+  // Busca snapshot_id atual para operações de edição
+  const { snapshotId } = await fetchPlaylistSnapshotId(playlistId).catch(() => ({
+    snapshotId: "",
+    refreshedToken: null,
+  }));
+
   return (
     <div>
       <TopNav title="Editar playlist" />
       <PageIntro
         eyebrow="Curadoria Spotify"
         title={playlist.name}
-        description="Painel preparado para editar playlists criadas pela conta Spotify conectada. Nesta fase, o sistema faz a leitura segura da playlist e deixa as acoes prontas para ativacao."
+        description="Selecione uma faixa com o mouse ou teclado. Pressione Delete para remover. Arraste pelo grip para reordenar. Clique no nome ou descrição para editar."
       />
 
       <Container className="border-b border-border py-6">
@@ -83,6 +90,7 @@ export default async function SpotifyPlaylistEditorPage({
                 <StatusBadge tone="purple">Colaborativa</StatusBadge>
               ) : null}
               <StatusBadge tone="blue">Criada pela conta</StatusBadge>
+              <StatusBadge tone="green">Fase 2 ativa</StatusBadge>
             </div>
 
             <div className="grid gap-3 laptop:grid-cols-3">
@@ -106,20 +114,10 @@ export default async function SpotifyPlaylistEditorPage({
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   Edicao
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-lg font-semibold">
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  Fase 2
+                <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-green-500">
+                  Ativa
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-card/70 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Descricao
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {playlist.description || "Sem descricao cadastrada."}
-              </p>
             </div>
           </div>
 
@@ -143,86 +141,20 @@ export default async function SpotifyPlaylistEditorPage({
       </Container>
 
       <Container className="border-b border-border py-6">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Lista de musicas
-            </div>
-            <h2 className="mt-2 text-2xl font-semibold">
-              Faixas atuais da playlist
-            </h2>
+        <div className="mb-6">
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Editor de playlist
           </div>
-          <StatusBadge tone="yellow">Edicao em breve</StatusBadge>
+          <h2 className="mt-2 text-2xl font-semibold">Faixas e edição</h2>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-          <table className="min-w-[860px] w-full divide-y divide-border text-left">
-            <thead className="bg-muted/20">
-              <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                <th className="px-4 py-3">Musica</th>
-                <th className="px-4 py-3">Artistas</th>
-                <th className="px-4 py-3">Album</th>
-                <th className="px-4 py-3">Pop.</th>
-                <th className="px-4 py-3">Duracao</th>
-                <th className="px-4 py-3">Spotify</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {playlist.tracks.length > 0 ? (
-                playlist.tracks.map((track) => (
-                  <tr key={track.id} className="hover:bg-muted/10">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-11 w-11 shrink-0 rounded-xl border border-border bg-muted"
-                          style={coverStyle(track.imageUrl)}
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold">
-                            {track.name}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {track.artists}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {track.albumName}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {track.popularity}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {track.durationLabel}
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={track.spotifyUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 text-sm font-medium text-primary"
-                      >
-                        Abrir
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-10 text-center text-sm text-muted-foreground"
-                  >
-                    <Music2 className="mx-auto mb-3 h-5 w-5" />
-                    Nenhuma faixa encontrada nesta playlist.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <PlaylistEditor
+          playlistId={playlistId}
+          initialTracks={playlist.tracks}
+          initialSnapshotId={snapshotId}
+          initialName={playlist.name}
+          initialDescription={playlist.description}
+        />
       </Container>
     </div>
   );

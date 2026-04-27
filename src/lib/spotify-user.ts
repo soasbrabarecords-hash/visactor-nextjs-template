@@ -626,3 +626,215 @@ export async function fetchSpotifyEditablePlaylist(
     };
   }
 }
+
+// ─── Edição de Playlist ───────────────────────────────────────────────────────
+
+export type SpotifyMutationResult =
+  | { success: true }
+  | { success: false; message: string };
+
+export type SpotifyMutationResponse = {
+  result: SpotifyMutationResult;
+  refreshedToken: SpotifyOAuthTokenResponse | null;
+};
+
+async function withSpotifyToken<T>(
+  fn: (accessToken: string) => Promise<T>,
+): Promise<{ data: T; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
+  const refreshToken = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
+
+  if (!accessToken && !refreshToken) {
+    throw new Error("Spotify ainda nao conectado.");
+  }
+
+  if (accessToken) {
+    try {
+      return { data: await fn(accessToken), refreshedToken: null };
+    } catch (err) {
+      if (!refreshToken) throw err;
+    }
+  }
+
+  if (!refreshToken) throw new Error("Spotify session unavailable.");
+
+  const refreshedToken = await refreshSpotifyToken(refreshToken);
+  return { data: await fn(refreshedToken.access_token), refreshedToken };
+}
+
+async function removeTrackFromPlaylistWithToken(
+  accessToken: string,
+  playlistId: string,
+  trackUri: string,
+  snapshotId: string,
+) {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tracks: [{ uri: trackUri }],
+        snapshot_id: snapshotId,
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? "Falha ao remover faixa da playlist.");
+  }
+}
+
+async function reorderPlaylistTracksWithToken(
+  accessToken: string,
+  playlistId: string,
+  rangeStart: number,
+  insertBefore: number,
+  snapshotId: string,
+) {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        range_start: rangeStart,
+        insert_before: insertBefore,
+        range_length: 1,
+        snapshot_id: snapshotId,
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? "Falha ao reordenar faixas da playlist.");
+  }
+
+  const data = await response.json() as { snapshot_id?: string };
+  return data.snapshot_id ?? snapshotId;
+}
+
+async function updatePlaylistDetailsWithToken(
+  accessToken: string,
+  playlistId: string,
+  name: string,
+  description: string,
+) {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, description }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? "Falha ao atualizar detalhes da playlist.");
+  }
+}
+
+async function fetchPlaylistSnapshotIdWithToken(
+  accessToken: string,
+  playlistId: string,
+): Promise<string> {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=snapshot_id`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) throw new Error("Falha ao buscar snapshot_id da playlist.");
+  const data = await response.json() as { snapshot_id?: string };
+  return data.snapshot_id ?? "";
+}
+
+export async function removeTrackFromPlaylist(
+  playlistId: string,
+  trackUri: string,
+  snapshotId: string,
+): Promise<SpotifyMutationResponse> {
+  try {
+    const { refreshedToken } = await withSpotifyToken((token) =>
+      removeTrackFromPlaylistWithToken(token, playlistId, trackUri, snapshotId),
+    );
+    return { result: { success: true }, refreshedToken };
+  } catch (error) {
+    return {
+      result: {
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao remover faixa.",
+      },
+      refreshedToken: null,
+    };
+  }
+}
+
+export async function reorderPlaylistTracks(
+  playlistId: string,
+  rangeStart: number,
+  insertBefore: number,
+  snapshotId: string,
+): Promise<{ result: { success: true; snapshotId: string } | { success: false; message: string }; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+  try {
+    const { data: newSnapshotId, refreshedToken } = await withSpotifyToken((token) =>
+      reorderPlaylistTracksWithToken(token, playlistId, rangeStart, insertBefore, snapshotId),
+    );
+    return { result: { success: true, snapshotId: newSnapshotId }, refreshedToken };
+  } catch (error) {
+    return {
+      result: {
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao reordenar faixas.",
+      },
+      refreshedToken: null,
+    };
+  }
+}
+
+export async function updatePlaylistDetails(
+  playlistId: string,
+  name: string,
+  description: string,
+): Promise<SpotifyMutationResponse> {
+  try {
+    const { refreshedToken } = await withSpotifyToken((token) =>
+      updatePlaylistDetailsWithToken(token, playlistId, name, description),
+    );
+    return { result: { success: true }, refreshedToken };
+  } catch (error) {
+    return {
+      result: {
+        success: false,
+        message: error instanceof Error ? error.message : "Erro ao atualizar playlist.",
+      },
+      refreshedToken: null,
+    };
+  }
+}
+
+export async function fetchPlaylistSnapshotId(
+  playlistId: string,
+): Promise<{ snapshotId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+  const { data: snapshotId, refreshedToken } = await withSpotifyToken((token) =>
+    fetchPlaylistSnapshotIdWithToken(token, playlistId),
+  );
+  return { snapshotId, refreshedToken };
+}
