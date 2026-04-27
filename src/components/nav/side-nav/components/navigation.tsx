@@ -17,14 +17,12 @@ export default function Navigation() {
       return pathname === "/radar-music" || pathname === "/charts/music";
     }
 
-    if (href === "/radar-playlists") {
-      return pathname === "/radar-playlists" || pathname === "/charts";
-    }
-
-    if (href === "/base-playlists") {
+    if (href === "/playlists-monitoradas") {
       return (
-        pathname === "/base-playlists" ||
         pathname === "/playlists-monitoradas" ||
+        pathname === "/base-playlists" ||
+        pathname === "/radar-playlists" ||
+        pathname === "/charts" ||
         pathname.startsWith("/playlists/")
       );
     }

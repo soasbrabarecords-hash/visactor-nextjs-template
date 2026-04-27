@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ChartsRedirectPage() {
-  redirect("/radar-playlists");
+  redirect("/playlists-monitoradas");
 }

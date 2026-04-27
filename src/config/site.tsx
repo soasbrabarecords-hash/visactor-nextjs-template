@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Compass,
   Gauge,
   ListMusic,
@@ -31,14 +30,9 @@ export const navigations: Navigation[] = [
     href: "/radar-music",
   },
   {
-    icon: BarChart3,
-    name: "Radar Playlists",
-    href: "/radar-playlists",
-  },
-  {
     icon: ListMusic,
-    name: "Base de Playlists",
-    href: "/base-playlists",
+    name: "Playlists Monitoradas",
+    href: "/playlists-monitoradas",
   },
   {
     icon: Compass,
