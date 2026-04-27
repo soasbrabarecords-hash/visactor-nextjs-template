@@ -6,6 +6,7 @@ import { ExternalLink, Loader2, Music2, RefreshCw } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import type { DecisionTrack } from "@/types/workspace";
+import type { ArtistGenresResponse } from "@/app/api/spotify/artists/genres/route";
 import StatusBadge from "./status-badge";
 
 type SpotifyAccountPlaylist = {
@@ -39,6 +40,33 @@ type PlaylistSuggestion = {
 };
 
 type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | "unknown";
+
+// Mapeamento de strings de gênero Spotify → TrackStyle interno
+// Spotify retorna strings como "funk carioca", "trap brasileiro", "sertanejo universitario"
+const SPOTIFY_GENRE_MAP: Array<[RegExp, TrackStyle]> = [
+  [/funk\s*(carioca|ostenta|mandelao|150|melody|proibid|bh|brasil)?/i, "funk"],
+  [/trap\s*(brasileiro|br|nacional)?/i, "funk"], // trap BR = funk no contexto
+  [/baile\s*funk/i, "funk"],
+  [/rap\s*(nacional|brasileiro|consciente|underground)?/i, "rap"],
+  [/hip.?hop\s*(brasileiro|nacional)?/i, "rap"],
+  [/sertanejo\s*(universitario|pop|tradicional|romantico)?/i, "sertanejo"],
+  [/pagode/i, "pagode"],
+  [/samba/i, "pagode"],
+  [/forro|piseiro|pisadinha|xote|bai[oa]o/i, "piseiro"],
+  [/axe/i, "pagode"],
+  [/k.?pop/i, "pop"],
+  [/pop\s*(brasileiro|nacional|latino|dance)?/i, "pop"],
+  [/reggaeton/i, "pop"],
+];
+
+function mapSpotifyGenresToStyle(genres: string[]): TrackStyle {
+  for (const genre of genres) {
+    for (const [pattern, style] of SPOTIFY_GENRE_MAP) {
+      if (pattern.test(genre)) return style;
+    }
+  }
+  return "unknown";
+}
 
 function coverStyle(coverUrl: string | null) {
   if (!coverUrl) {
@@ -188,8 +216,11 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
 function buildPlaylistSuggestion(
   row: DecisionTrack,
   playlists: SpotifyAccountPlaylist[],
+  spotifyGenres: string[] = [],
 ): PlaylistSuggestion {
-  const style = detectTrackStyle(row);
+  // Tentar gênero real do Spotify primeiro; fallback para detecção por texto
+  const spotifyStyle = mapSpotifyGenresToStyle(spotifyGenres);
+  const style = spotifyStyle !== "unknown" ? spotifyStyle : detectTrackStyle(row);
   const styleLabel: Record<string, string> = {
     funk: "Funk",
     rap: "Trap/Rap",
@@ -264,6 +295,7 @@ function getDecisionLabel(row: DecisionTrack) {
 }
 
 export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
+  const [artistGenres, setArtistGenres] = useState<ArtistGenresResponse>({});
   const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
   const [playlistTrackIdsByPlaylist, setPlaylistTrackIdsByPlaylist] = useState<
     Record<string, string[]>
@@ -296,6 +328,31 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
   useEffect(() => {
     loadPlaylists();
   }, [loadPlaylists]);
+
+  // Buscar gêneros reais do Spotify para todos os artistIds únicos das rows
+  useEffect(() => {
+    const allIds = [...new Set(rows.flatMap((r) => r.artistIds))].filter(Boolean);
+    if (allIds.length === 0) return;
+
+    let cancelled = false;
+    async function fetchGenres() {
+      const chunkSize = 50;
+      const merged: ArtistGenresResponse = {};
+      for (let i = 0; i < allIds.length; i += chunkSize) {
+        const chunk = allIds.slice(i, i + chunkSize);
+        try {
+          const res = await fetch(`/api/spotify/artists/genres?ids=${chunk.join(",")}`);
+          if (res.ok) {
+            const data = (await res.json()) as ArtistGenresResponse;
+            Object.assign(merged, data);
+          }
+        } catch { /* silencioso — fallback por texto */ }
+      }
+      if (!cancelled) setArtistGenres(merged);
+    }
+    void fetchGenres();
+    return () => { cancelled = true; };
+  }, [rows]);
 
   const playlists = useMemo(
     () => (playlistsData?.connected ? playlistsData.playlists : []),
@@ -453,7 +510,8 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
               </tr>
             ) : (
               sortedRows.map((row, index) => {
-                const suggestion = buildPlaylistSuggestion(row, playlists);
+                const rowArtistGenres = row.artistIds.flatMap((id) => artistGenres[id] ?? []);
+                const suggestion = buildPlaylistSuggestion(row, playlists, rowArtistGenres);
                 const isAlreadyInSuggestedPlaylist = suggestion.playlist
                   ? (playlistTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
                   : false;

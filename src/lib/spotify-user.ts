@@ -638,7 +638,7 @@ export type SpotifyMutationResponse = {
   refreshedToken: SpotifyOAuthTokenResponse | null;
 };
 
-async function withSpotifyToken<T>(
+export async function withSpotifyToken<T>(
   fn: (accessToken: string) => Promise<T>,
 ): Promise<{ data: T; refreshedToken: SpotifyOAuthTokenResponse | null }> {
   const cookieStore = await cookies();

@@ -247,6 +247,7 @@ export type DecisionTrack = {
   trackId: string;
   name: string;
   artists: string;
+  artistIds: string[];
   albumName: string;
   coverUrl: string | null;
   spotifyUrl: string;

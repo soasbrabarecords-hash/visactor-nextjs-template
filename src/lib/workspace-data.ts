@@ -942,6 +942,7 @@ function buildCurationRows(
   dominantArtists: string[],
 ): DecisionTrack[] {
   const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
+  const trackArtistIds = new Map(playlistTracks.map((track) => [track.id, track.artistIds]));
 
   return radarRows.slice(0, 200).map((row) => {
     const alreadyInPlaylists = playlistTrackIds.has(row.trackId);
@@ -994,6 +995,7 @@ function buildCurationRows(
       trackId: row.trackId,
       name: row.name,
       artists: row.artists,
+      artistIds: trackArtistIds.get(row.trackId) ?? [],
       albumName: row.albumName,
       coverUrl: row.coverUrl,
       spotifyUrl: row.spotifyUrl,
