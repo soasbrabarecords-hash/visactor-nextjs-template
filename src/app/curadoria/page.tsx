@@ -20,7 +20,7 @@ export default async function CuradoriaPage() {
       <PageIntro
         eyebrow="Mesa de decisao"
         title="Curadoria"
-        description="Conecte a conta Spotify, escolha uma playlist e use as sugestoes do Radar Music para decidir o que adicionar, observar ou remover."
+        description="Conecte a conta Spotify, escolha uma playlist e use a leitura de streams BR para decidir o que adicionar, observar ou remover."
       />
 
       <SpotifyAccountPlaylistsPanel
@@ -33,13 +33,13 @@ export default async function CuradoriaPage() {
         <div className="grid gap-4 laptop:grid-cols-[0.9fr_1.1fr]">
           <div>
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Sugestoes do radar
+              Sugestoes Kworb
             </div>
             <h2 className="mt-2 text-2xl font-semibold">
               Faixas para avaliar antes de atualizar playlists
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Esta fila usa o Radar Music como entrada e sugere onde cada faixa
+              Esta fila usa a leitura Kworb/streams BR como entrada e sugere onde cada faixa
               pode fazer mais sentido na rotina de curadoria.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -69,7 +69,7 @@ export default async function CuradoriaPage() {
               ))
             ) : (
               <div className="rounded-xl border border-border bg-card/70 px-4 py-6 text-sm text-muted-foreground">
-                O Radar Music ainda nao trouxe uma sugestao pronta para esta fila.
+                A leitura de streams ainda nao trouxe uma sugestao pronta para esta fila.
               </div>
             )}
           </div>

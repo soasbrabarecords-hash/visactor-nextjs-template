@@ -251,6 +251,8 @@ export type DecisionTrack = {
   coverUrl: string | null;
   spotifyUrl: string;
   popularity: number;
+  dailyStreams: number | null;
+  streamRank: number | null;
   movement: MovementDescriptor;
   chartDeltaLabel: string;
   lowSaturation: boolean;

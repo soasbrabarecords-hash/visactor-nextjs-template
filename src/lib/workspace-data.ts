@@ -998,6 +998,8 @@ function buildCurationRows(
       coverUrl: row.coverUrl,
       spotifyUrl: row.spotifyUrl,
       popularity: row.popularity,
+      dailyStreams: row.dailyStreams,
+      streamRank: row.streamRank,
       movement: row.movement,
       chartDeltaLabel:
         row.rankChange === null
@@ -1342,24 +1344,27 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 }
 
 export async function getCurationPageData(): Promise<CurationPageData> {
-  const [radarMusic, chartsData] = await Promise.all([
-    getRadarMusicPageData({
+  const [musicData, chartsData] = await Promise.all([
+    getMusicChartsData({
       country: "BR",
       genre: "all",
-      period: "7d",
-      status: "all",
     }),
     getChartsData(),
   ]);
+  const chartRows = buildRadarRows(
+    musicData.workbenchTracks,
+    chartsData.tracks,
+    musicData.dominantArtists.map((artist) => artist.artistName),
+  );
   const dominantArtists = chartsData.artistDistribution.map((artist) => artist.type);
-  const rows = buildCurationRows(radarMusic.rows, chartsData.tracks, dominantArtists);
+  const rows = buildCurationRows(chartRows, chartsData.tracks, dominantArtists);
 
   return {
     hero: {
       eyebrow: "Mesa final",
       title: "Curadoria",
       description:
-        "Fila final de decisao com score editorial, leitura de movimento e fit com a sua base para acelerar adicao, observacao e limpeza de repertorio.",
+        "Fila final de decisao baseada em leitura de streams BR, fit com playlists da conta e sinais editoriais para acelerar adicao e observacao de repertorio.",
       primaryCtaLabel: "Abrir Radar Music",
       primaryCtaHref: "/radar-music",
       secondaryCtaLabel: "Ver Playlists Concorrentes",
