@@ -1055,8 +1055,8 @@ export async function getRadarMusicPageData({
         "Chart musical para ler o que esta subindo, o que esta caindo e onde existe espaco real para discovery e construcao de novas playlists.",
       primaryCtaLabel: "Ir para Curadoria",
       primaryCtaHref: "/curadoria",
-      secondaryCtaLabel: "Ver Radar Playlists",
-      secondaryCtaHref: "/radar-playlists",
+      secondaryCtaLabel: "Ver Playlists Monitoradas",
+      secondaryCtaHref: "/playlists-monitoradas",
     },
     heroInsight: buildRadarMusicHeroInsight({
       rows,
@@ -1158,7 +1158,7 @@ export async function getRadarPlaylistsPageData(): Promise<RadarPlaylistsData> {
   return {
     hero: {
       eyebrow: "Radar interno",
-      title: "Radar Playlists",
+      title: "Playlists Monitoradas",
       description:
         "Leitura cruzada das playlists monitoradas para saber quais faixas realmente estao se repetindo na sua base e quais tambem estao acelerando no radar externo.",
       primaryCtaLabel: "Abrir Radar Music",
@@ -1300,14 +1300,14 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 
   return {
     hero: {
-      eyebrow: "Base operacional",
-      title: "Base de Playlists",
+      eyebrow: "Base monitorada",
+      title: "Playlists Monitoradas",
       description:
         "Area dedicada para cadastrar novas URLs, acompanhar score, monitorar a saude da base e abrir a analise individual de cada playlist.",
       primaryCtaLabel: "Abrir Curadoria",
       primaryCtaHref: "/curadoria",
-      secondaryCtaLabel: "Ver Radar Playlists",
-      secondaryCtaHref: "/radar-playlists",
+      secondaryCtaLabel: "Abrir Radar Music",
+      secondaryCtaHref: "/radar-music",
     },
     heroInsight: buildBasePlaylistsHeroInsight(rows),
     metrics: buildPlaylistMetrics(dashboardData.playlists),
@@ -1362,8 +1362,8 @@ export async function getCurationPageData(): Promise<CurationPageData> {
         "Fila final de decisao com score editorial, leitura de movimento e fit com a sua base para acelerar adicao, observacao e limpeza de repertorio.",
       primaryCtaLabel: "Abrir Radar Music",
       primaryCtaHref: "/radar-music",
-      secondaryCtaLabel: "Ver Base de Playlists",
-      secondaryCtaHref: "/base-playlists",
+      secondaryCtaLabel: "Ver Playlists Monitoradas",
+      secondaryCtaHref: "/playlists-monitoradas",
     },
     heroInsight: buildCurationHeroInsight(rows),
     metrics: [

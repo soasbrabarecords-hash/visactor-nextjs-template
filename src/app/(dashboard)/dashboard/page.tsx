@@ -1,6 +1,5 @@
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
-import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
 import PrimaryActionCard from "@/components/workspace/primary-action-card";
 import RecommendedActions from "@/components/workspace/recommended-actions";
@@ -34,104 +33,50 @@ export default async function DashboardPage() {
         description={dashboard.hero.description}
       />
 
-      <HeroInsightPanel insight={dashboard.heroInsight} />
-      <MetricGrid metrics={dashboard.metrics} />
       <PrimaryActionCard action={dashboard.primaryAction} />
+      <MetricGrid metrics={dashboard.metrics} />
       <RecommendedActions actions={dashboard.recommendedActions} />
 
       <Container className="border-b border-border py-6">
-        <div className="grid gap-4 desktop:grid-cols-3">
-          <article className="rounded-3xl border border-border bg-card/70 p-5">
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Musicas em alta
-            </div>
-            <div className="mt-4 space-y-3">
-              {dashboard.addNow.length > 0 ? (
-                dashboard.addNow.map((track) => (
-                  <div
-                    key={track.trackId}
-                    className="rounded-2xl border border-border bg-background/40 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{track.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {track.artists}
-                        </div>
-                      </div>
-                      <StatusBadge tone="green">{track.chartDeltaLabel}</StatusBadge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-                  Nenhuma musica em alta com prioridade clara agora.
-                </div>
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-3xl border border-border bg-card/70 p-5">
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Oportunidades
-            </div>
-            <div className="mt-4 space-y-3">
-              {dashboard.observe.length > 0 ? (
-                dashboard.observe.map((track) => (
-                  <div
-                    key={track.trackId}
-                    className="rounded-2xl border border-border bg-background/40 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{track.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {track.fitLabel}
-                        </div>
-                      </div>
-                      <StatusBadge tone="yellow">{track.decisionScore}</StatusBadge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-                  Nenhuma oportunidade em observacao forte no momento.
-                </div>
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-3xl border border-border bg-card/70 p-5">
+        <div className="grid gap-4 laptop:grid-cols-[0.85fr_1.15fr]">
+          <div>
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Playlists que pedem atencao
             </div>
-            <div className="mt-4 space-y-3">
-              {playlistsNeedingAttention.length > 0 ? (
-                playlistsNeedingAttention.map((playlist) => (
-                  <div
-                    key={playlist.playlist.id}
-                    className="rounded-2xl border border-border bg-background/40 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{playlist.playlist.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Score {playlist.playlist.score} · {playlist.tracksLabel} tracks
-                        </div>
+            <h2 className="mt-2 text-2xl font-semibold">
+              Base que merece revisao hoje
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              O dashboard fica como comando do dia: uma decisao principal,
+              filas de acao e playlists que merecem manutencao.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {playlistsNeedingAttention.length > 0 ? (
+              playlistsNeedingAttention.map((playlist) => (
+                <div
+                  key={playlist.playlist.id}
+                  className="rounded-xl border border-border bg-card/70 px-4 py-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{playlist.playlist.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Score {playlist.playlist.score} · {playlist.tracksLabel} tracks
                       </div>
-                      <StatusBadge tone={playlist.growthTone}>
-                        {playlist.growthLabel}
-                      </StatusBadge>
                     </div>
+                    <StatusBadge tone={playlist.growthTone}>
+                      {playlist.growthLabel}
+                    </StatusBadge>
                   </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-border bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-                  Nenhuma playlist com alerta forte de manutencao agora.
                 </div>
-              )}
-            </div>
-          </article>
+              ))
+            ) : (
+              <div className="rounded-xl border border-border bg-card/70 px-4 py-6 text-sm text-muted-foreground">
+                Nenhuma playlist com alerta forte de manutencao agora.
+              </div>
+            )}
+          </div>
         </div>
       </Container>
     </main>

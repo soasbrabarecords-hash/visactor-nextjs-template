@@ -51,8 +51,8 @@ export async function POST(request: Request) {
     const insertedPlaylist = await insertPlaylistIntoSupabase(payload);
 
     revalidatePath("/");
-    revalidatePath("/base-playlists");
-    revalidatePath("/radar-playlists");
+    revalidatePath("/dashboard");
+    revalidatePath("/playlists-monitoradas");
     revalidatePath("/curadoria");
     revalidatePath("/radar-music");
 

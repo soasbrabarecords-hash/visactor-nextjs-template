@@ -3,7 +3,6 @@ import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
 import BasePlaylistsTable from "@/components/workspace/base-playlists-table";
-import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
 import PlaylistComparisonTable from "@/components/workspace/playlist-comparison-table";
 import RadarPlaylistsTable from "@/components/workspace/radar-playlists-table";
@@ -34,26 +33,35 @@ export default async function PlaylistsMonitoradasPage() {
         description="Centro operacional para cadastrar playlists, acompanhar a saude da base e decidir quais faixas merecem atualizacao nas playlists monitoradas."
       />
 
-      <HeroInsightPanel insight={baseData.heroInsight} />
-      <MetricGrid metrics={baseData.metrics} />
       <AddPlaylistForm />
 
       <Container className="border-b border-border py-6">
-        <div className="grid gap-4 laptop:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-3xl border border-border bg-card/70 p-6">
+        <div className="grid gap-4 laptop:grid-cols-[0.85fr_1.15fr]">
+          <article className="rounded-2xl border border-border bg-card/70 p-5">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Leitura da base
             </div>
-            <h2 className="mt-3 text-3xl font-semibold">
-              Acompanhe a saude da base e o que merece manutencao
+            <h2 className="mt-3 text-2xl font-semibold">
+              O que atualizar nas playlists agora
             </h2>
             <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Aqui voce acompanha crescimento, score, repeticao de faixas e os sinais
-              que ja apontam atualizacoes concretas nas playlists monitoradas.
+              Esta pagina junta cadastro, saude da base e sugestoes concretas de
+              refresh para as playlists que voce monitora.
             </p>
+            <div className="mt-4 grid gap-3 tablet:grid-cols-3">
+              {baseData.healthSummary.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-border bg-background/40 p-3"
+                >
+                  <StatusBadge tone={item.tone}>{item.label}</StatusBadge>
+                  <div className="mt-3 text-2xl font-semibold">{item.value}</div>
+                </div>
+              ))}
+            </div>
           </article>
 
-          <article className="rounded-3xl border border-border bg-card/70 p-6">
+          <article className="rounded-2xl border border-border bg-card/70 p-5">
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               Sugestoes de atualizacao
             </div>
@@ -89,35 +97,19 @@ export default async function PlaylistsMonitoradasPage() {
         </div>
       </Container>
 
-      <Container className="border-b border-border py-6">
-        <div className="grid gap-4 desktop:grid-cols-3">
-          {baseData.healthSummary.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-2xl border border-border bg-card/70 p-5"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-lg font-semibold">{item.label}</div>
-                <StatusBadge tone={item.tone}>{item.label}</StatusBadge>
-              </div>
-              <div className="mt-4 text-3xl font-semibold">{item.value}</div>
-            </article>
-          ))}
-        </div>
-      </Container>
-
+      <MetricGrid metrics={baseData.metrics} />
       <BasePlaylistsTable rows={baseData.rows} />
-      <PlaylistComparisonTable rows={baseData.comparisonRows} />
-      <RadarPlaylistsTable
-        rows={radarData.rows}
-        title="Consenso entre playlists"
-        description="Veja quais faixas estao se repetindo na sua base e quais ja mostram aderencia suficiente para justificar atualizacao editorial."
-      />
       <RadarPlaylistsTable
         rows={radarData.sharedMomentum}
         title="Atualizacoes sugeridas"
         description="Faixas que ja vivem na sua base e tambem estao acelerando no Radar Music, prontas para puxar refresh de repertorio."
       />
+      <RadarPlaylistsTable
+        rows={radarData.rows}
+        title="Consenso entre playlists"
+        description="Veja quais faixas estao se repetindo na sua base e quais ja mostram aderencia suficiente para justificar atualizacao editorial."
+      />
+      <PlaylistComparisonTable rows={baseData.comparisonRows} />
     </div>
   );
 }

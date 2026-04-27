@@ -81,7 +81,7 @@ export default function LoginForm({
               </article>
               <article className="rounded-2xl border border-border bg-card/70 p-4">
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Radar Playlists
+                  Playlists Monitoradas
                 </div>
                 <div className="mt-2 font-semibold">
                   Shared momentum entre sua base e o mercado
