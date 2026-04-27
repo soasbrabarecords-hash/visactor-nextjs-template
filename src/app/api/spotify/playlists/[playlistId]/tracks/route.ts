@@ -47,7 +47,163 @@ async function removeTrack(
   return data.snapshot_id ?? snapshotId;
 }
 
+async function fetchTrackIds(accessToken: string, playlistId: string): Promise<string[]> {
+  const ids: string[] = [];
+  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=items(track(id)),next&limit=50`;
+
+  while (nextUrl) {
+    const res = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+      throw new Error(err?.error?.message ?? `Spotify error ${res.status}`);
+    }
+
+    const data = await res.json() as {
+      items?: Array<{ track?: { id?: string | null } | null }>;
+      next?: string | null;
+    };
+
+    for (const item of data.items ?? []) {
+      if (item.track?.id) ids.push(item.track.id);
+    }
+
+    nextUrl = data.next ?? null;
+  }
+
+  return ids;
+}
+
+async function addTrack(accessToken: string, playlistId: string, trackUri: string) {
+  const existingIds = await fetchTrackIds(accessToken, playlistId);
+  const trackId = trackUri.replace("spotify:track:", "");
+
+  if (existingIds.includes(trackId)) {
+    return { alreadyExists: true };
+  }
+
+  const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ uris: [trackUri] }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+    throw new Error(err?.error?.message ?? `Spotify error ${res.status}`);
+  }
+
+  return { alreadyExists: false };
+}
+
 type DeleteBody = { trackUri?: unknown; snapshotId?: unknown };
+type AddBody = { trackUri?: unknown };
+
+async function getSpotifyToken() {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
+  const refreshTok = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
+  const clientId = process.env.SPOTIFY_CLIENT_ID ?? "";
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? "";
+
+  if (accessToken) {
+    return { token: accessToken, refreshTok, clientId, clientSecret, refreshedTokenData: null };
+  }
+
+  if (!refreshTok) {
+    throw new Error("Spotify não conectado.");
+  }
+
+  const refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
+
+  return {
+    token: refreshedTokenData.access_token,
+    refreshTok,
+    clientId,
+    clientSecret,
+    refreshedTokenData,
+  };
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ playlistId: string }> },
+) {
+  try {
+    const { playlistId } = await params;
+    let { token, refreshTok, clientId, clientSecret, refreshedTokenData } =
+      await getSpotifyToken();
+
+    let trackIds: string[];
+    try {
+      trackIds = await fetchTrackIds(token, playlistId);
+    } catch (err) {
+      if (refreshTok && !refreshedTokenData) {
+        refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
+        token = refreshedTokenData.access_token;
+        trackIds = await fetchTrackIds(token, playlistId);
+      } else {
+        throw err;
+      }
+    }
+
+    const response = NextResponse.json({ trackIds });
+    if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
+    return response;
+  } catch (error) {
+    return NextResponse.json(
+      { message: error instanceof Error ? error.message : "Erro ao buscar faixas." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ playlistId: string }> },
+) {
+  try {
+    const { playlistId } = await params;
+    const body = (await request.json()) as AddBody;
+    const trackUri = typeof body.trackUri === "string" ? body.trackUri.trim() : "";
+
+    if (!trackUri) {
+      return NextResponse.json({ message: "trackUri é obrigatório." }, { status: 400 });
+    }
+
+    let { token, refreshTok, clientId, clientSecret, refreshedTokenData } =
+      await getSpotifyToken();
+
+    let result: { alreadyExists: boolean };
+    try {
+      result = await addTrack(token, playlistId, trackUri);
+    } catch (err) {
+      if (refreshTok && !refreshedTokenData) {
+        refreshedTokenData = await doRefresh(clientId, clientSecret, refreshTok);
+        token = refreshedTokenData.access_token;
+        result = await addTrack(token, playlistId, trackUri);
+      } else {
+        throw err;
+      }
+    }
+
+    const response = NextResponse.json({ success: true, alreadyExists: result.alreadyExists });
+    if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
+    return response;
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, message: error instanceof Error ? error.message : "Erro ao adicionar faixa." },
+      { status: 500 },
+    );
+  }
+}
 
 export async function DELETE(
   request: Request,

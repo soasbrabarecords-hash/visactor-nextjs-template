@@ -26,6 +26,10 @@ type SpotifyPlaylistsResponse =
       message: string;
     };
 
+type PlaylistTrackIdsResponse = {
+  trackIds?: string[];
+};
+
 type PlaylistSuggestion = {
   playlist: SpotifyAccountPlaylist | null;
   label: string;
@@ -169,6 +173,10 @@ function getDecisionLabel(row: DecisionTrack) {
 
 export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
   const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
+  const [playlistTrackIdsByPlaylist, setPlaylistTrackIdsByPlaylist] = useState<
+    Record<string, string[]>
+  >({});
+  const [addingKey, setAddingKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const loadPlaylists = useCallback(() => {
@@ -207,6 +215,93 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
       ),
     [rows],
   );
+
+  useEffect(() => {
+    if (playlists.length === 0 || sortedRows.length === 0) {
+      return;
+    }
+
+    const suggestedPlaylistIds = new Set(
+      sortedRows
+        .map((row) => buildPlaylistSuggestion(row, playlists).playlist?.id)
+        .filter((playlistId): playlistId is string => Boolean(playlistId)),
+    );
+    const missingPlaylistIds = [...suggestedPlaylistIds].filter(
+      (playlistId) => !(playlistId in playlistTrackIdsByPlaylist),
+    );
+
+    if (missingPlaylistIds.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSuggestedPlaylistTracks() {
+      const entries = await Promise.all(
+        missingPlaylistIds.map(async (playlistId) => {
+          const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
+            cache: "no-store",
+          });
+          const payload = (await response.json().catch(() => ({}))) as PlaylistTrackIdsResponse;
+
+          return [playlistId, response.ok ? payload.trackIds ?? [] : []] as const;
+        }),
+      );
+
+      if (cancelled) {
+        return;
+      }
+
+      setPlaylistTrackIdsByPlaylist((current) => ({
+        ...current,
+        ...Object.fromEntries(entries),
+      }));
+    }
+
+    void loadSuggestedPlaylistTracks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playlistTrackIdsByPlaylist, playlists, sortedRows]);
+
+  async function handleAddToSuggestedPlaylist(
+    row: DecisionTrack,
+    suggestion: PlaylistSuggestion,
+  ) {
+    if (!suggestion.playlist || addingKey) {
+      return;
+    }
+
+    const key = `${suggestion.playlist.id}:${row.trackId}`;
+    setAddingKey(key);
+
+    try {
+      const response = await fetch(
+        `/api/spotify/playlists/${suggestion.playlist.id}/tracks`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trackUri: `spotify:track:${row.trackId}` }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Nao foi possivel adicionar a faixa.");
+      }
+
+      setPlaylistTrackIdsByPlaylist((current) => {
+        const currentIds = current[suggestion.playlist!.id] ?? [];
+
+        return {
+          ...current,
+          [suggestion.playlist!.id]: Array.from(new Set([...currentIds, row.trackId])),
+        };
+      });
+    } finally {
+      setAddingKey(null);
+    }
+  }
 
   return (
     <Container className="border-b border-border py-6">
@@ -256,6 +351,12 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
             ) : (
               sortedRows.map((row, index) => {
                 const suggestion = buildPlaylistSuggestion(row, playlists);
+                const isAlreadyInSuggestedPlaylist = suggestion.playlist
+                  ? (playlistTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
+                  : false;
+                const addKey = suggestion.playlist
+                  ? `${suggestion.playlist.id}:${row.trackId}`
+                  : null;
 
                 return (
                   <tr key={row.trackId} className="hover:bg-muted/10">
@@ -320,7 +421,20 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                     </td>
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm">Adicionar</Button>
+                        {isAlreadyInSuggestedPlaylist ? (
+                          <StatusBadge tone="green">Ja esta na playlist</StatusBadge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={!suggestion.playlist || addingKey === addKey}
+                            onClick={() => void handleAddToSuggestedPlaylist(row, suggestion)}
+                          >
+                            {addingKey === addKey ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : null}
+                            Adicionar
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline">
                           Observar
                         </Button>
