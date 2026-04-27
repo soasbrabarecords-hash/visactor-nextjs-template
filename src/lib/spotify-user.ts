@@ -2,7 +2,7 @@ import "server-only";
 
 import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
@@ -91,10 +91,11 @@ function getSpotifyCredentialsHeader(clientId: string, clientSecret: string) {
 }
 
 export function getSpotifyRedirectUri(origin: string) {
-  return (
+  const redirectUri =
     process.env.SPOTIFY_REDIRECT_URI?.trim() ||
-    `${origin}/api/spotify/auth/callback`
-  );
+    `${origin}/api/spotify/auth/callback`;
+
+  return redirectUri.replace(/\/+$/, "");
 }
 
 export function buildSpotifyAuthorizeUrl({

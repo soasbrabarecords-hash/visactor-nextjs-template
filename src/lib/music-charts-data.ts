@@ -374,34 +374,6 @@ function getSourceModeDescription(sourceMode: MusicSignalSource) {
   }
 }
 
-function getTractionLabel(track: AggregatedTrack) {
-  const signalCount = getSignalCount(track);
-
-  if (track.popularity >= 75 || (track.marketSignals > 0 && track.popularity >= 68)) {
-    return "Alta tracao";
-  }
-
-  if (track.popularity >= 55 || signalCount >= 3) {
-    return "Media tracao";
-  }
-
-  return "Sinal inicial";
-}
-
-function getSaturationLabel(track: AggregatedTrack) {
-  const signalCount = getSignalCount(track);
-
-  if (signalCount <= 1) {
-    return "Baixa saturacao";
-  }
-
-  if (signalCount >= 4) {
-    return "Alta saturacao";
-  }
-
-  return "Saturacao moderada";
-}
-
 function getMomentumScore(track: AggregatedTrack, maxSignalCount: number) {
   const normalizedSignals =
     maxSignalCount > 0 ? getSignalCount(track) / maxSignalCount : 0;
