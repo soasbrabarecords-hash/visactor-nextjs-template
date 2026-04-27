@@ -5,6 +5,7 @@ import PageIntro from "@/components/page-intro";
 import RadarMusicEditorialHero from "@/components/workspace/radar-music-editorial-hero";
 import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
+import RadarMusicRefreshButton from "@/components/workspace/radar-music-refresh-button";
 import RadarMusicTable from "@/components/workspace/radar-music-table";
 import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarMusicPageData } from "@/lib/workspace-data";
@@ -43,16 +44,22 @@ export default async function RadarMusicPage({
         title={data.hero.title}
         description={data.hero.description}
         action={
-          <MusicFilters
-            countryOptions={data.filters.countryOptions}
-            genreOptions={data.filters.genreOptions}
-            periodOptions={data.filters.periodOptions}
-            statusOptions={data.filters.statusOptions}
-            selectedCountry={data.filters.selectedCountry}
-            selectedGenre={data.filters.selectedGenre}
-            selectedPeriod={data.filters.selectedPeriod}
-            selectedStatus={data.filters.selectedStatus}
-          />
+          <>
+            <MusicFilters
+              countryOptions={data.filters.countryOptions}
+              genreOptions={data.filters.genreOptions}
+              periodOptions={data.filters.periodOptions}
+              statusOptions={data.filters.statusOptions}
+              selectedCountry={data.filters.selectedCountry}
+              selectedGenre={data.filters.selectedGenre}
+              selectedPeriod={data.filters.selectedPeriod}
+              selectedStatus={data.filters.selectedStatus}
+            />
+            <RadarMusicRefreshButton
+              country={data.filters.selectedCountry}
+              genre={data.filters.selectedGenre}
+            />
+          </>
         }
       />
 
