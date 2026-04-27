@@ -943,7 +943,7 @@ function buildCurationRows(
 ): DecisionTrack[] {
   const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
 
-  return radarRows.slice(0, 40).map((row) => {
+  return radarRows.slice(0, 200).map((row) => {
     const alreadyInPlaylists = playlistTrackIds.has(row.trackId);
     const normalizedArtists = row.artists.toLowerCase();
     const artistFit = dominantArtists.some((artist) =>

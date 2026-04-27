@@ -38,7 +38,7 @@ type PlaylistSuggestion = {
   hasFit: boolean;
 };
 
-type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "unknown";
+type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "pop" | "unknown";
 
 function coverStyle(coverUrl: string | null) {
   if (!coverUrl) {
@@ -106,7 +106,18 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
   ]);
   const sertanejoScore =
     sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
-  const pagodeScore = countMatches(text, ["pagode", "samba"]);
+  const pagodeScore = countMatches(text, [
+    "pagode",
+    "samba",
+    "grupo menos e mais",
+    "menos e mais",
+    "ferrugem",
+    "thiaguinho",
+    "sorriso maroto",
+    "mumuzinho",
+    "molejo",
+  ]);
+  const popScore = countMatches(text, ["bts", "pop", "kpop"]);
   const rapScore = countMatches(text, ["trap", "rap", "drill"]);
 
   if (sertanejoScore > 0) {
@@ -115,6 +126,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
 
   if (pagodeScore > 0) {
     return "pagode";
+  }
+
+  if (popScore > 0) {
+    return "pop";
   }
 
   if (funkScore > 0) {
@@ -135,6 +150,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
     rap: ["trap", "rap", "drill"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
+    pop: ["pop", "hits", "top", "viral", "mundial"],
     discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
   };
 
@@ -154,6 +170,7 @@ function buildPlaylistSuggestion(
     rap: "Trap/Rap",
     sertanejo: "Sertanejo",
     pagode: "Pagode/Samba",
+    pop: "Pop",
     unknown: "Sem genero claro",
   };
 
@@ -464,12 +481,14 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                       </div>
                     </td>
                     <td className="px-4 py-4 align-top">
-                      <div className="max-w-[300px] text-sm text-muted-foreground">
-                        {getDecisionLabel(row)}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <StatusBadge tone="blue">{suggestion.reason}</StatusBadge>
-                      </div>
+                      <StatusBadge tone="blue">
+                        {suggestion.style === "funk" ? "Funk" :
+                         suggestion.style === "rap" ? "Trap / Rap" :
+                         suggestion.style === "sertanejo" ? "Sertanejo" :
+                         suggestion.style === "pagode" ? "Pagode / Samba" :
+                         suggestion.style === "pop" ? "Pop" :
+                         "Genero nao identificado"}
+                      </StatusBadge>
                     </td>
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-wrap gap-2">
@@ -489,9 +508,6 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                             Adicionar
                           </Button>
                         )}
-                        <Button size="sm" variant="outline">
-                          Observar
-                        </Button>
                         <Button asChild size="sm" variant="outline">
                           <Link href={row.spotifyUrl} target="_blank" rel="noreferrer">
                             <ExternalLink className="h-3.5 w-3.5" />
