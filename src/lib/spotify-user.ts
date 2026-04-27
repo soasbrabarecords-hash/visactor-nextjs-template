@@ -889,7 +889,7 @@ async function uploadPlaylistCoverWithToken(
 
   if (!response.ok) {
     // Capa é opcional — não lança erro, só loga
-    console.warn("Aviso: upload de capa falhou.", response.status);
+    // upload de capa falhou — nao critico, continua
   }
 }
 
