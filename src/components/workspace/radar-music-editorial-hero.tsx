@@ -3,7 +3,7 @@ import { ExternalLink, Sparkles, TrendingUp } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { RadarMusicEditorialHero } from "@/types/workspace";
+import type { RadarMusicEditorialHero, RadarMusicRow } from "@/types/workspace";
 import StatusBadge from "./status-badge";
 
 const genreThemes = [
@@ -47,21 +47,68 @@ function coverStyle(coverUrl: string | null) {
   };
 }
 
+function formatCount(value: number) {
+  return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+}
+
+function getMovementLabel(row: RadarMusicRow | null) {
+  if (!row) {
+    return "—";
+  }
+
+  if (row.previousRank === null || row.rankChange === null) {
+    return "NEW";
+  }
+
+  if (row.previousRank > row.rank) {
+    return `↑ subiu ${row.previousRank - row.rank}`;
+  }
+
+  if (row.previousRank < row.rank) {
+    return `↓ caiu ${row.rank - row.previousRank}`;
+  }
+
+  return "estavel";
+}
+
+function getStreamsLabel(row: RadarMusicRow | null) {
+  if (!row || row.dailyStreams === null) {
+    return "Sem dado de streams";
+  }
+
+  return `${formatCount(row.dailyStreams)} streams nas ultimas 24h`;
+}
+
+function getHeroSubline(row: RadarMusicRow | null) {
+  if (!row) {
+    return "—";
+  }
+
+  const streamsLabel = getStreamsLabel(row);
+  return `${streamsLabel} · #${row.rank} no Spotify Charts BR`;
+}
+
 export default function RadarMusicEditorialHero({
   hero,
+  leadRow,
 }: {
   hero: RadarMusicEditorialHero;
+  leadRow: RadarMusicRow | null;
 }) {
+  const heroTitle = leadRow
+    ? `${hero.trackName} lidera o Brasil`
+    : "Radar Music em atualizacao";
+
   return (
-    <Container className="border-b border-border py-8">
+    <Container className="border-b border-border py-6">
       <section
         className={cn(
-          "overflow-hidden rounded-[32px] border p-6 shadow-[0_24px_60px_-32px_rgba(15,23,42,0.75)] laptop:p-8",
+          "overflow-hidden rounded-[30px] border p-5 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.72)] laptop:p-6",
           getThemeClass(hero.genreLabel),
         )}
       >
-        <div className="grid gap-8 laptop:grid-cols-[1.2fr_0.8fr] laptop:items-center">
-          <div className="space-y-6">
+        <div className="grid gap-6 laptop:grid-cols-[1.18fr_0.82fr] laptop:items-center">
+          <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.22em] text-white/80">
                 <Sparkles className="h-4 w-4 text-emerald-300" />
@@ -72,31 +119,51 @@ export default function RadarMusicEditorialHero({
               <StatusBadge tone="green">{hero.periodLabel}</StatusBadge>
             </div>
 
-            <div className="space-y-4">
-              <h2 className="max-w-5xl text-4xl font-semibold tracking-tight text-white laptop:text-6xl">
-                {hero.headline}
+            <div className="space-y-3">
+              <div className="text-sm font-medium uppercase tracking-[0.22em] text-white/55">
+                {leadRow ? `#${leadRow.rank} no Brasil` : "—"}
+              </div>
+              <h2 className="max-w-4xl text-4xl font-semibold tracking-tight text-white laptop:text-5xl">
+                {heroTitle}
               </h2>
-              <p className="max-w-3xl text-base leading-8 text-white/70 laptop:text-lg">
-                {hero.summary}
+              <div className="text-lg text-white/82">{hero.artists}</div>
+              <p className="max-w-3xl text-base leading-7 text-white/70">
+                {getHeroSubline(leadRow)}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <StatusBadge tone="green">{hero.rankLabel}</StatusBadge>
-              <StatusBadge tone="yellow">{hero.movementLabel}</StatusBadge>
-              <StatusBadge tone="blue">{hero.trackName}</StatusBadge>
+              <StatusBadge tone="green">{leadRow ? `#${leadRow.rank} no chart` : hero.rankLabel}</StatusBadge>
+              <StatusBadge tone="yellow">{getMovementLabel(leadRow)}</StatusBadge>
+              <StatusBadge tone="slate">{leadRow ? `${leadRow.opportunityScore}/100 oportunidade` : "—"}</StatusBadge>
             </div>
 
             <div className="grid gap-3 tablet:grid-cols-3">
-              {hero.stats.map((item) => (
+              {[
+                {
+                  label: "Streams 24h",
+                  value:
+                    leadRow?.dailyStreams === null || !leadRow
+                      ? "Sem dado de streams"
+                      : formatCount(leadRow.dailyStreams),
+                },
+                {
+                  label: "Movimento",
+                  value: getMovementLabel(leadRow),
+                },
+                {
+                  label: "Dias no chart",
+                  value: leadRow ? `${leadRow.daysOnRadar} dias` : "—",
+                },
+              ].map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm"
+                  className="rounded-2xl border border-white/8 bg-white/5 px-4 py-3 backdrop-blur-sm"
                 >
                   <div className="text-xs uppercase tracking-[0.18em] text-white/50">
                     {item.label}
                   </div>
-                  <div className="mt-2 text-2xl font-semibold text-white">
+                  <div className="mt-2 text-xl font-semibold text-white">
                     {item.value}
                   </div>
                 </article>
@@ -112,24 +179,26 @@ export default function RadarMusicEditorialHero({
               </Button>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70">
                 <TrendingUp className="h-4 w-4 text-emerald-300" />
-                {hero.artists}
+                {leadRow?.previousRank === null
+                  ? "Nova entrada no radar"
+                  : `Anterior #${leadRow?.previousRank ?? "—"}`}
               </div>
             </div>
           </div>
 
           <div className="flex justify-center laptop:justify-end">
-            <div className="relative w-full max-w-[360px]">
-              <div className="absolute inset-x-8 bottom-0 top-10 rounded-[28px] bg-primary/20 blur-3xl" />
-              <div className="relative rounded-[30px] border border-white/10 bg-black/25 p-4 backdrop-blur-md">
+            <div className="relative w-full max-w-[300px]">
+              <div className="absolute inset-x-8 bottom-0 top-10 rounded-[24px] bg-primary/20 blur-3xl" />
+              <div className="relative rounded-[26px] border border-white/10 bg-black/25 p-4 backdrop-blur-md">
                 <div
-                  className="aspect-square w-full rounded-[26px] bg-white/5 shadow-2xl"
+                  className="aspect-square w-full rounded-[22px] bg-white/5 shadow-2xl"
                   style={coverStyle(hero.coverUrl)}
                 />
                 <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4 text-white">
                   <div className="text-xs uppercase tracking-[0.18em] text-white/55">
-                    Em destaque agora
+                    Destaque do chart
                   </div>
-                  <div className="mt-2 text-2xl font-semibold">{hero.trackName}</div>
+                  <div className="mt-2 text-xl font-semibold">{hero.trackName}</div>
                   <div className="mt-1 text-sm text-white/70">{hero.artists}</div>
                 </div>
               </div>

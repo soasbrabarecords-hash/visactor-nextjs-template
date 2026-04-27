@@ -20,20 +20,6 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
 
-function formatSignedCount(value: number) {
-  const roundedValue = Math.round(value);
-
-  if (roundedValue > 0) {
-    return `+${formatCount(roundedValue)}`;
-  }
-
-  if (roundedValue < 0) {
-    return `-${formatCount(Math.abs(roundedValue))}`;
-  }
-
-  return "0";
-}
-
 function getMovementValue(row: RadarMusicRow) {
   if (row.previousRank === null || row.rankChange === null) {
     return "NEW";
@@ -71,7 +57,7 @@ function formatDailyStreams(value: number | null) {
 }
 
 function formatPeakLabel() {
-  return "Pico —";
+  return "—";
 }
 
 function formatDaysOnChart(value: number) {
@@ -107,29 +93,28 @@ export default function RadarMusicTable({
 }) {
   return (
     <Container className="border-b border-border py-6">
-      <div className="mb-5">
+      <div className="mb-4">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Chart principal BR
         </div>
         <h2 className="mt-2 text-2xl font-semibold">Ranking do radar</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Leitura editorial inspirada em Spotify Charts: posicao, movimento,
-          streams, pico, permanencia e oportunidade de curadoria.
+          Leitura editorial do Spotify Charts BR com foco em movimento, streams e oportunidade.
         </p>
       </div>
 
       <div className="overflow-x-auto rounded-[28px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
-        <table className="min-w-[980px] w-full divide-y divide-border text-left">
+        <table className="min-w-[1080px] w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="px-4 py-3">Pos.</th>
               <th className="px-4 py-3">Movimento</th>
               <th className="px-4 py-3">Musica</th>
+              <th className="px-4 py-3">Artistas</th>
               <th className="px-4 py-3">Streams 24h</th>
               <th className="px-4 py-3">Peak</th>
               <th className="px-4 py-3">Dias</th>
               <th className="px-4 py-3">Oportunidade</th>
-              <th className="px-4 py-3">Crescimento</th>
               <th className="px-4 py-3">Spotify</th>
             </tr>
           </thead>
@@ -146,36 +131,30 @@ export default function RadarMusicTable({
             ) : (
               rows.map((row) => (
                 <tr key={row.trackId} className="hover:bg-muted/10">
-                  <td className="px-4 py-3">
-                    <div className="text-2xl font-semibold tracking-tight">
+                  <td className="px-4 py-3 align-top">
+                    <div className="text-2xl font-semibold tracking-tight text-white">
                       #{row.rank}
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <div className="space-y-1">
                       <StatusBadge
                         tone={getMovementTone(row)}
-                        className="min-w-[74px] justify-center"
+                        className="min-w-[70px] justify-center"
                       >
                         {getMovementValue(row)}
                       </StatusBadge>
-                      <div className="text-xs text-muted-foreground">
-                        {row.previousRank === null ? "Entrada nova" : `Antes #${row.previousRank}`}
-                      </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-12 w-12 rounded-xl border border-border bg-muted shadow-lg"
+                        className="h-12 w-12 shrink-0 rounded-xl border border-border bg-muted shadow-lg"
                         style={coverStyle(row.coverUrl)}
                       />
                       <div className="min-w-0 space-y-1">
                         <div>
                           <div className="truncate font-semibold">{row.name}</div>
-                          <div className="truncate text-sm text-muted-foreground">
-                            {row.artists}
-                          </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {row.previousRank === null ? (
@@ -185,7 +164,12 @@ export default function RadarMusicTable({
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm font-medium">
+                  <td className="px-4 py-3 align-top">
+                    <div className="max-w-[220px] text-sm text-muted-foreground">
+                      {row.artists}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 align-top text-sm font-medium">
                     <div className={row.dailyStreams === null ? "text-muted-foreground" : ""}>
                       {formatDailyStreams(row.dailyStreams)}
                     </div>
@@ -195,15 +179,15 @@ export default function RadarMusicTable({
                       {row.dailyStreams === null
                         ? "Sem dado de streams"
                         : row.streamRank === null
-                          ? "Rank streams indisponivel"
+                          ? "—"
                           : `#${row.streamRank} por streams`}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                  <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                     {formatPeakLabel()}
                   </td>
-                  <td className="px-4 py-3 text-sm">{formatDaysOnChart(row.daysOnRadar)}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top text-sm">{formatDaysOnChart(row.daysOnRadar)}</td>
+                  <td className="px-4 py-3 align-top">
                     <div className="text-sm font-medium">
                       {row.opportunityScore}/100
                     </div>
@@ -225,29 +209,7 @@ export default function RadarMusicTable({
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div
-                      className={
-                        row.previousRank === null || row.rankChange === null
-                          ? "text-violet-300"
-                          : row.rankChange > 0
-                            ? "text-emerald-300"
-                            : row.rankChange < 0
-                              ? "text-red-300"
-                              : "text-slate-300"
-                      }
-                    >
-                      {getMovementValue(row)}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {row.dailyStreams === null
-                        ? "Sem dado de streams"
-                        : row.streamGrowth === null
-                          ? row.streamVelocityLabel
-                          : `${formatSignedCount(row.streamGrowth)} streams`}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 align-top">
                     <Link
                       href={row.spotifyUrl}
                       target="_blank"

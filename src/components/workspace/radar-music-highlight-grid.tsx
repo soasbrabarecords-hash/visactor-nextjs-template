@@ -36,40 +36,34 @@ export default function RadarMusicHighlightGrid({
 }) {
   return (
     <Container className="border-b border-border py-6">
-      <div className="mb-5">
+      <div className="mb-4">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Tracks em destaque
+          Destaques do chart
         </div>
-        <h2 className="mt-2 text-2xl font-semibold">Leitura rapida do chart</h2>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Os sinais mais importantes do momento com capa, cor e contexto editorial para bater o olho e decidir rapido.
-        </p>
       </div>
 
-      <div className="grid gap-4 laptop:grid-cols-12">
-        {highlights.map((card, index) => (
+      <div className="grid gap-3 laptop:grid-cols-5">
+        {highlights.map((card) => (
           <article
             key={card.title}
             className={cn(
-              "relative overflow-hidden rounded-[28px] border p-5 shadow-[0_20px_50px_-35px_rgba(15,23,42,0.9)]",
+              "relative overflow-hidden rounded-[22px] border p-4 shadow-[0_14px_34px_-24px_rgba(15,23,42,0.85)]",
               cardClasses[card.tone],
-              index < 3 ? "laptop:col-span-4" : "laptop:col-span-6",
             )}
           >
-            <div className="relative z-10 max-w-[70%] space-y-3">
+            <div className="relative z-10 max-w-[72%] space-y-2">
               <StatusBadge tone={card.tone}>{card.accentLabel}</StatusBadge>
               <div className="text-xs uppercase tracking-[0.18em] text-white/55">
                 {card.title}
               </div>
-              <div className="text-4xl font-semibold tracking-tight text-white">
+              <div className="text-3xl font-semibold tracking-tight text-white">
                 {card.value}
               </div>
               <div className="text-sm text-white/70">{card.helper}</div>
-              <p className="text-sm leading-6 text-white/65">{card.detail}</p>
             </div>
 
             <div
-              className="absolute bottom-5 right-5 h-24 w-24 rounded-[22px] border border-white/10 bg-white/10 shadow-xl"
+              className="absolute bottom-4 right-4 h-14 w-14 rounded-2xl border border-white/10 bg-white/10 shadow-lg"
               style={coverStyle(card.coverUrl)}
             />
           </article>

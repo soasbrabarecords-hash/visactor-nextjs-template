@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Container from "@/components/container";
 import { cn } from "@/lib/utils";
 import type { RadarMusicGenreSpotlight } from "@/types/workspace";
 
@@ -35,45 +34,41 @@ export default function RadarMusicGenreRail({
   items: RadarMusicGenreSpotlight[];
 }) {
   return (
-    <Container className="border-b border-border py-6">
-      <div className="mb-5">
+    <section className="rounded-3xl border border-border bg-card/50 p-5">
+      <div className="mb-4">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
           Generos em destaque
         </div>
-        <h2 className="mt-2 text-2xl font-semibold">Rotas editoriais rapidas</h2>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Atalhos visuais para navegar entre recortes do mercado sem perder o contexto do chart.
-        </p>
       </div>
 
-      <div className="grid gap-4 laptop:grid-cols-5">
+      <div className="grid gap-3 tablet:grid-cols-2">
         {items.map((item) => (
           <Link
             key={item.value}
             href={item.href}
             className={cn(
-              "group relative overflow-hidden rounded-[28px] border p-5 transition-all duration-200",
+              "group relative overflow-hidden rounded-[22px] border p-4 transition-all duration-200",
               toneClasses[item.tone],
               item.isActive ? "ring-1 ring-white/20" : "",
             )}
           >
-            <div className="relative z-10 space-y-3">
+            <div className="relative z-10 space-y-2">
               <div className="text-[11px] uppercase tracking-[0.22em] text-current/70">
                 {item.chipLabel}
               </div>
-              <div className="text-2xl font-semibold">{item.label}</div>
-              <p className="max-w-[16rem] text-sm leading-6 text-current/75">
+              <div className="pr-16 text-lg font-semibold">{item.label}</div>
+              <p className="max-w-[16rem] text-sm leading-5 text-current/75">
                 {item.description}
               </p>
             </div>
 
             <div
-              className="absolute bottom-4 right-4 h-20 w-20 rounded-2xl border border-white/10 bg-white/10 shadow-xl transition-transform duration-200 group-hover:scale-105"
+              className="absolute bottom-4 right-4 h-12 w-12 rounded-xl border border-white/10 bg-white/10 shadow-lg transition-transform duration-200 group-hover:scale-105"
               style={coverStyle(item.coverUrl)}
             />
           </Link>
         ))}
       </div>
-    </Container>
+    </section>
   );
 }

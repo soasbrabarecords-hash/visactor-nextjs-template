@@ -63,58 +63,38 @@ export default async function RadarMusicPage({
         }
       />
 
-      <RadarMusicEditorialHero hero={data.editorialHero} />
-      <RadarMusicGenreRail items={data.genreSpotlights} />
+      <RadarMusicEditorialHero
+        hero={data.editorialHero}
+        leadRow={data.rows[0] ?? null}
+      />
+
+      <RadarMusicTable rows={data.rows} />
+
       <RadarMusicHighlightGrid highlights={data.summaryCards} />
 
       <Container className="border-b border-border py-6">
-        <div className="grid gap-4 laptop:grid-cols-[1.3fr_0.7fr]">
-          <article className="rounded-3xl border border-border bg-card/70 p-6">
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Insight principal
+        <div className="grid gap-4 laptop:grid-cols-[1fr_0.9fr]">
+          <article className="rounded-3xl border border-border bg-card/50 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="blue">{data.support.sourceModeLabel}</StatusBadge>
+              <StatusBadge tone="green">
+                {data.support.sampleSize} faixas
+              </StatusBadge>
+              <StatusBadge tone="yellow">
+                {data.support.historyDaysTracked} dias
+              </StatusBadge>
             </div>
-            <h2 className="mt-3 text-3xl font-semibold">
-              Ranking com leitura visual de chart
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              O topo da pagina ficou editorial e colorido para discovery rapido. Abaixo, a tabela segura a leitura analitica com rank, movimento, capa, oportunidade e score.
+            <p className="mt-3 text-sm text-muted-foreground">
+              {data.support.marketHighlight}
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <StatusBadge tone="purple">{data.filters.selectedGenreLabel}</StatusBadge>
-              <StatusBadge tone="blue">{data.filters.selectedCountryLabel}</StatusBadge>
-              <StatusBadge tone="green">{data.editorialHero.periodLabel}</StatusBadge>
+            <div className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              Atualizado em {data.support.updatedAtLabel}
             </div>
           </article>
 
-          <article className="rounded-3xl border border-border bg-card/70 p-6">
-            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Confianca do dado
-            </div>
-            <div className="mt-4 grid gap-3">
-              <div className="flex flex-wrap gap-2">
-                <StatusBadge tone="blue">{data.support.sourceModeLabel}</StatusBadge>
-                <StatusBadge tone="yellow">
-                  {data.support.historyDaysTracked} dias de historico
-                </StatusBadge>
-                <StatusBadge tone="green">
-                  {data.support.sampleSize} tracks lidas
-                </StatusBadge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {data.support.sourceModeDescription}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {data.support.marketHighlight}
-              </p>
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                Atualizado em {data.support.updatedAtLabel}
-              </p>
-            </div>
-          </article>
+          <RadarMusicGenreRail items={data.genreSpotlights} />
         </div>
       </Container>
-
-      <RadarMusicTable rows={data.rows} />
     </div>
   );
 }
