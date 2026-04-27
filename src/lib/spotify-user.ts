@@ -838,3 +838,82 @@ export async function fetchPlaylistSnapshotId(
   );
   return { snapshotId, refreshedToken };
 }
+
+// ---------------------------------------------------------------------------
+// createPlaylist
+// ---------------------------------------------------------------------------
+async function createPlaylistWithToken(
+  accessToken: string,
+  userId: string,
+  name: string,
+  description: string,
+  isPublic: boolean,
+): Promise<string> {
+  const response = await fetch(
+    `https://api.spotify.com/v1/users/${userId}/playlists`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, description, public: isPublic }),
+    },
+  );
+
+  if (!response.ok) {
+    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(err.error?.message ?? "Erro ao criar playlist.");
+  }
+
+  const data = (await response.json()) as { id: string };
+  return data.id;
+}
+
+async function uploadPlaylistCoverWithToken(
+  accessToken: string,
+  playlistId: string,
+  base64Jpeg: string,
+): Promise<void> {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "image/jpeg",
+      },
+      body: base64Jpeg,
+    },
+  );
+
+  if (!response.ok) {
+    // Capa é opcional — não lança erro, só loga
+    console.warn("Aviso: upload de capa falhou.", response.status);
+  }
+}
+
+export async function createSpotifyPlaylist(
+  name: string,
+  description: string,
+  isPublic: boolean,
+  base64CoverJpeg: string | null,
+): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+  // Precisamos do userId primeiro
+  const { data: userId, refreshedToken: rt1 } = await withSpotifyToken((token) =>
+    fetchSpotifyCurrentUserWithToken(token).then((u) => u.id),
+  );
+
+  const accessToken = rt1?.access_token ?? (await (async () => {
+    const cookieStore = await cookies();
+    return cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value ?? "";
+  })());
+
+  const playlistId = await createPlaylistWithToken(accessToken, userId, name, description, isPublic);
+
+  if (base64CoverJpeg) {
+    await uploadPlaylistCoverWithToken(accessToken, playlistId, base64CoverJpeg);
+  }
+
+  return { playlistId, refreshedToken: rt1 };
+}
