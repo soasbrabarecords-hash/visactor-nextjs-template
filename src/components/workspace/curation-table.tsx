@@ -395,16 +395,24 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-        <table className="min-w-[980px] w-full divide-y divide-border text-left">
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60 w-full">
+        <table className="w-full divide-y divide-border text-left table-fixed">
+          <colgroup>
+            <col className="w-[60px]" />
+            <col className="w-[30%]" />
+            <col className="w-[110px]" />
+            <col className="w-[22%]" />
+            <col className="w-[90px]" />
+            <col className="w-[160px]" />
+          </colgroup>
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-4 py-3">Rank</th>
-              <th className="px-4 py-3">Musica</th>
-              <th className="px-4 py-3">Streams 24h</th>
-              <th className="px-4 py-3">Playlist sugerida</th>
-              <th className="px-4 py-3">Motivo</th>
-              <th className="px-4 py-3">Acao</th>
+              <th className="px-3 py-3">Rank</th>
+              <th className="px-3 py-3">Musica</th>
+              <th className="px-3 py-3">Streams 24h</th>
+              <th className="px-3 py-3">Playlist sugerida</th>
+              <th className="px-3 py-3">Genero</th>
+              <th className="px-3 py-3">Acao</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -429,73 +437,73 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
 
                 return (
                   <tr key={row.trackId} className="hover:bg-muted/10">
-                    <td className="px-4 py-4 align-top">
-                      <div className="text-2xl font-semibold text-white">
+                    <td className="px-3 py-3 align-middle">
+                      <div className="text-lg font-bold text-white tabular-nums whitespace-nowrap">
                         #{row.streamRank ?? index + 1}
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-3">
+                    <td className="px-3 py-3 align-middle">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div
-                          className="h-14 w-14 shrink-0 rounded-xl border border-border bg-muted shadow-lg"
+                          className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
                           style={coverStyle(row.coverUrl)}
                         />
                         <div className="min-w-0">
-                          <div className="truncate font-semibold">{row.name}</div>
-                          <div className="mt-1 max-w-[360px] truncate text-sm text-muted-foreground">
+                          <div className="truncate font-semibold text-sm leading-tight">{row.name}</div>
+                          <div className="truncate text-xs text-muted-foreground mt-0.5">
                             {row.artists}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="text-sm font-semibold">
+                    <td className="px-3 py-3 align-middle whitespace-nowrap">
+                      <div className="text-sm font-semibold tabular-nums">
                         {formatCount(row.dailyStreams)}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Kworb BR
-                      </div>
+                      <div className="text-xs text-muted-foreground">Kworb BR</div>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex items-center gap-3">
+                    <td className="px-3 py-3 align-middle">
+                      <div className="flex items-center gap-2 min-w-0">
                         {suggestion.playlist?.imageUrl ? (
                           <div
-                            className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
+                            className="h-8 w-8 shrink-0 rounded-md border border-border bg-muted"
                             style={coverStyle(suggestion.playlist.imageUrl)}
                           />
                         ) : (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-                            <Music2 className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
+                            <Music2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="max-w-[260px] truncate text-sm font-semibold">
+                          <div className="truncate text-xs font-semibold leading-tight">
                             {suggestion.label}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground">
                             {suggestion.playlist
                               ? `${formatCount(suggestion.playlist.tracksTotal)} tracks`
-                              : "Sem playlist compativel"}
+                              : "—"}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 align-top">
+                    <td className="px-3 py-3 align-middle">
                       <StatusBadge tone="blue">
-                        {suggestion.style === "funk" ? "Funk" :
-                         suggestion.style === "rap" ? "Trap / Rap" :
-                         suggestion.style === "sertanejo" ? "Sertanejo" :
-                         suggestion.style === "pagode" ? "Pagode / Samba" :
-                         suggestion.style === "pop" ? "Pop" :
-                         "Genero nao identificado"}
+                        <span className="whitespace-nowrap">
+                          {suggestion.style === "funk" ? "Funk" :
+                           suggestion.style === "rap" ? "Rap" :
+                           suggestion.style === "sertanejo" ? "Sertanejo" :
+                           suggestion.style === "pagode" ? "Pagode" :
+                           suggestion.style === "pop" ? "Pop" :
+                           "—"}
+                        </span>
                       </StatusBadge>
                     </td>
-                    <td className="px-4 py-4 align-top">
-                      <div className="flex flex-wrap gap-2">
+                    <td className="px-3 py-3 align-middle">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
                         {isAlreadyInSuggestedPlaylist ? (
-                          <StatusBadge tone="green">Ja esta na playlist</StatusBadge>
+                          <StatusBadge tone="green">On playlist</StatusBadge>
                         ) : !suggestion.hasFit ? (
-                          <StatusBadge tone="yellow">Observar</StatusBadge>
+                          <StatusBadge tone="yellow">—</StatusBadge>
                         ) : (
                           <Button
                             size="sm"
