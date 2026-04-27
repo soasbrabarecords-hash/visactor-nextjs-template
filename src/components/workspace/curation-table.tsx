@@ -39,14 +39,14 @@ type PlaylistSuggestion = {
   hasFit: boolean;
 };
 
-type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | "unknown";
+type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | "reggae" | "unknown";
 
 // Mapeamento de strings de gênero Spotify → TrackStyle interno
 // Spotify retorna strings como "funk carioca", "trap brasileiro", "sertanejo universitario"
 const SPOTIFY_GENRE_MAP: Array<[RegExp, TrackStyle]> = [
   [/funk\s*(carioca|ostenta|mandelao|150|melody|proibid|bh|brasil)?/i, "funk"],
   [/baile\s*funk/i, "funk"],
-  [/trap\s*(brasileiro|br|nacional|funk)?/i, "funk"], // trap BR = funk
+  [/trap\s*(brasileiro|br|nacional|funk)?/i, "rap"], // trap BR = rap
   [/rap\s*(nacional|brasileiro|consciente|underground|acustico|acústico)?/i, "rap"],
   [/hip.?hop\s*(brasileiro|nacional)?/i, "rap"],
   [/sertanejo\s*(universitario|pop|tradicional|romantico)?/i, "sertanejo"],
@@ -54,11 +54,11 @@ const SPOTIFY_GENRE_MAP: Array<[RegExp, TrackStyle]> = [
   [/samba/i, "pagode"],
   [/forro|piseiro|pisadinha|xote|bai[oa]o/i, "piseiro"],
   [/axe/i, "pagode"],
-  [/reggae\s*(brasileiro|nacional|roots)?/i, "pagode"], // reggae → pagode slot (sem categoria própria)
+  [/reggae\s*(brasileiro|nacional|roots|roots)?/i, "reggae"],
   [/k.?pop/i, "pop"],
   [/pop\s*(brasileiro|nacional|latino|dance)?/i, "pop"],
   [/reggaeton/i, "pop"],
-  [/rock\s*(brasileiro|nacional|alternativo|classico)?/i, "rap"], // rock br → rap slot
+  [/rock\s*(brasileiro|nacional|alternativo|classico)?/i, "rap"], // rock br → rap slot (sem categoria própria)
 ];
 
 function mapSpotifyGenresToStyle(genres: string[]): TrackStyle {
@@ -122,6 +122,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "poze do rodo",
     "pedro sampaio",
     "anitta",
+
+  ]);
+  const rapScore2 = countMatches(text, [
+    // trap BR
     "veigh",
     "matue",
     "matuê",
@@ -130,9 +134,11 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "kayblack",
     "supernova ent",
     "marina sena",
-  ]);
-  const rapScore2 = countMatches(text, [
+    // rap/consciente
     "racionais",
+    "racionais mcs",
+    "charlie brown",
+    "charlie brown jr",
     "bk",
     "nada tsunami",
     "nadatsunami",
@@ -191,10 +197,11 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     "turma do pagode",
     "mumuzinho",
     "molejo",
+  ]);
+  const reggaeScore = countMatches(text, [
     "natiruts",
+    "reggae",
     "o rappa",
-    "legiao urbana",
-    "legião urbana",
   ]);
   const piseiroScore = countMatches(text, [
     "piseiro",
@@ -231,6 +238,10 @@ function detectTrackStyle(row: DecisionTrack): TrackStyle {
     return "rap";
   }
 
+  if (reggaeScore > 0) {
+    return "reggae";
+  }
+
   return "unknown";
 }
 
@@ -243,6 +254,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
     pagode: ["pagode", "samba"],
     piseiro: ["piseiro", "pisadinha", "forro", "forró", "nordeste"],
     pop: ["pop", "hits", "top", "viral", "mundial"],
+    reggae: ["reggae", "roots", "rappa", "natiruts"],
     discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
   };
 
@@ -267,29 +279,17 @@ function buildPlaylistSuggestion(
     pagode: "Pagode/Samba",
     piseiro: "Piseiro/Forro",
     pop: "Pop",
+    reggae: "Reggae",
     unknown: "Sem genero claro",
   };
 
   if (style === "unknown") {
-    const discoveryMatch =
-      playlists.find((playlist) => playlistScore(playlist, "discovery") > 0) ?? null;
-
-    if (discoveryMatch) {
-      return {
-        playlist: discoveryMatch,
-        label: discoveryMatch.name,
-        style,
-        hasFit: true,
-        reason: "Genero indefinido; sugestao de descoberta para teste editorial.",
-      };
-    }
-
     return {
       playlist: null,
-      label: "Observar",
+      label: "—",
       style,
       hasFit: false,
-      reason: "Genero indefinido; observar antes de adicionar.",
+      reason: "Genero nao identificado.",
     };
   }
 
@@ -620,6 +620,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                             suggestion.style === "sertanejo" ? "blue" :
                             suggestion.style === "pagode" ? "green" :
                             suggestion.style === "piseiro" ? "slate" :
+                            suggestion.style === "reggae" ? "green" :
                             "purple"
                           }
                           className={
@@ -627,15 +628,18 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                               ? "!border-orange-500/30 !bg-orange-500/10 !text-orange-400"
                               : suggestion.style === "piseiro"
                               ? "!border-lime-500/30 !bg-lime-500/10 !text-lime-400"
+                              : suggestion.style === "reggae"
+                              ? "!border-teal-500/30 !bg-teal-500/10 !text-teal-400"
                               : undefined
                           }
                         >
                           <span className="whitespace-nowrap">
                             {suggestion.style === "funk" ? "Funk" :
-                             suggestion.style === "rap" ? "Rap" :
+                             suggestion.style === "rap" ? "Rap/Trap" :
                              suggestion.style === "sertanejo" ? "Sertanejo" :
                              suggestion.style === "pagode" ? "Pagode" :
                              suggestion.style === "piseiro" ? "Piseiro" :
+                             suggestion.style === "reggae" ? "Reggae" :
                              "Pop"}
                           </span>
                         </StatusBadge>
