@@ -76,7 +76,7 @@ export function detectGenre(
     "maiara e maraisa", "maiara & maraisa",
     "joao gustavo e murilo",
     "guilherme e benuto", "guilherme & benuto",
-    "zeze di camargo", "zezé di camargo", "luan pereira",
+    "zeze di camargo", "zezé di camargo", "luan pereira", "jeninho",
     "fernando & sorocaba", "fernando e sorocaba",
     "jorge & mateus", "jorge e mateus",
   ]);
