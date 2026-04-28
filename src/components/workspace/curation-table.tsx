@@ -108,7 +108,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
   const styleTerms: Record<string, string[]> = {
     funk: ["funk", "baile", "mandela", "mandelao", "automotivo", "rave", "proibidao"],
     trap: ["trap"],
-    rap: ["rap", "drill"],
+    rap: ["rap", "drill", "so as braba", "hip hop", "hip-hop"],
     rock: ["rock"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
@@ -157,10 +157,19 @@ function buildPlaylistSuggestion(
     };
   }
 
+  const effectiveStyle = style;
   const sortedPlaylists = [...playlists].sort(
-    (left, right) => playlistScore(right, style) - playlistScore(left, style),
+    (left, right) => playlistScore(right, effectiveStyle) - playlistScore(left, effectiveStyle),
   );
-  const match = sortedPlaylists.find((playlist) => playlistScore(playlist, style) > 0) ?? null;
+  let match = sortedPlaylists.find((playlist) => playlistScore(playlist, effectiveStyle) > 0) ?? null;
+
+  // trap fallback: if no trap playlist found, use rap playlist (same editorial family)
+  if (!match && style === "trap") {
+    const rapSorted = [...playlists].sort(
+      (left, right) => playlistScore(right, "rap") - playlistScore(left, "rap"),
+    );
+    match = rapSorted.find((playlist) => playlistScore(playlist, "rap") > 0) ?? null;
+  }
 
   if (match) {
     return {
