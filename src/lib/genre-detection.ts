@@ -43,7 +43,7 @@ export function detectGenre(
   trackName: string,
 ): TrackGenre {
   const firstArtist = normalizeGenreText(
-    artists.split(/[,&]|feat\.|part\./i)[0].trim(),
+    artists.split(/,|feat\.|part\./i)[0].trim(),
   );
   const name = normalizeGenreText(trackName);
   const text = `${firstArtist} ${name}`.trim();
