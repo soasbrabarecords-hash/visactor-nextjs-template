@@ -80,6 +80,36 @@ export async function getLabelArtists(): Promise<LabelArtist[]> {
   return (data ?? []) as LabelArtist[];
 }
 
+export async function getLabelArtistById(
+  id: string,
+): Promise<LabelArtist | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("label_artists")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) return null;
+  return data as LabelArtist;
+}
+
+export async function updateLabelArtist(
+  id: string,
+  input: Partial<LabelArtistInput>,
+): Promise<LabelArtist> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("label_artists")
+    .update(input)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`updateLabelArtist: ${error.message}`);
+  return data as LabelArtist;
+}
+
 export async function createLabelArtist(
   input: LabelArtistInput,
 ): Promise<LabelArtist> {
