@@ -80,6 +80,7 @@ export function detectGenre(
     "zeze di camargo", "zezé di camargo", "luan pereira", "jeninho",
     "fernando & sorocaba", "fernando e sorocaba",
     "jorge & mateus", "jorge e mateus",
+    "henrique & diego", "henrique e diego",
   ]);
   if (sertanejoScore > 0) return "sertanejo";
 
@@ -89,7 +90,7 @@ export function detectGenre(
     "grupo menos e mais", "menos e mais",
     "ferrugem", "thiaguinho", "sorriso maroto",
     "turma do pagode", "mumuzinho", "molejo",
-    "leo foguete", "yan",
+    "yan",
     "henrique casttro", "henrique castro",
   ]);
   if (pagodeScore > 0) return "pagode";
@@ -98,6 +99,7 @@ export function detectGenre(
   const pagodaoScore = countMatches(text, [
     "pagodao", "pagodão",
     "leo santana", "léo santana",
+    "leo foguete", "léo foguete",
   ]);
   if (pagodaoScore > 0) return "pagodao";
 
@@ -150,6 +152,7 @@ export function detectGenre(
     "bk",
     "nanda tsunami", "nandatsunami",
     "poesia acustica", "poesia acústica",
+    "hungria",
   ]);
   if (rapScore > 0) return "rap";
 
