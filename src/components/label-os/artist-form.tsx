@@ -3,6 +3,26 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// Converte DD/MM/AAAA → YYYY-MM-DD para salvar no banco
+function parseBrDate(value: string): string | null {
+  const clean = value.replace(/\D/g, "");
+  if (clean.length !== 8) return null;
+  const day = clean.slice(0, 2);
+  const month = clean.slice(2, 4);
+  const year = clean.slice(4, 8);
+  const d = new Date(`${year}-${month}-${day}`);
+  if (isNaN(d.getTime())) return null;
+  return `${year}-${month}-${day}`;
+}
+
+// Aplica máscara DD/MM/AAAA enquanto digita
+function maskDate(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
 type FieldProps = {
   label: string;
   name: string;
@@ -50,6 +70,7 @@ export default function ArtistForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [birthDate, setBirthDate] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,6 +88,7 @@ export default function ArtistForm() {
       apple_music_url: formData.get("apple_music_url") as string || null,
       youtube_url: formData.get("youtube_url") as string || null,
       document: formData.get("document") as string || null,
+      birth_date: parseBrDate(birthDate),
       notes: formData.get("notes") as string || null,
     };
 
@@ -109,6 +131,23 @@ export default function ArtistForm() {
         <Field label="Apple Music URL" name="apple_music_url" placeholder="https://music.apple.com/..." />
         <Field label="YouTube URL" name="youtube_url" placeholder="https://youtube.com/@artista" />
         <Field label="Documento (CPF/CNPJ)" name="document" placeholder="000.000.000-00" />
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-foreground" htmlFor="birth_date">
+            Data de nascimento
+          </label>
+          <input
+            id="birth_date"
+            name="birth_date"
+            type="text"
+            inputMode="numeric"
+            placeholder="DD/MM/AAAA"
+            value={birthDate}
+            onChange={(e) => setBirthDate(maskDate(e.target.value))}
+            maxLength={10}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
+          />
+        </div>
       </div>
 
       <Field label="Observações" name="notes" type="textarea" placeholder="Notas internas sobre o artista..." />
