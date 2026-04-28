@@ -395,6 +395,10 @@ async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
 
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({})) as { error?: { message?: string; status?: number } };
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        throw new Error(`Spotify playlists error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
+      }
       throw new Error(`Spotify playlists error ${response.status}: ${errBody?.error?.message ?? "unknown"}`);
     }
 
@@ -434,7 +438,11 @@ async function fetchSpotifyPlaylistTracksWithToken(
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch Spotify playlist tracks.");
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        throw new Error(`Spotify tracks error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
+      }
+      throw new Error(`Spotify tracks error ${response.status}: Failed to fetch Spotify playlist tracks.`);
     }
 
     const payload = (await response.json()) as SpotifyPlaylistTracksResponse;
