@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { LabelArtist } from "@/lib/label-os";
+import type { LabelEntity } from "@/lib/label-entities-types";
 import {
   parsePercentageInput,
   formatPercentage,
   sumPercentages,
   isPercentageEqual,
 } from "@/lib/percentage";
+import EntityCombobox from "@/components/label-os/entity-combobox";
 
 // ─── Constants ───────────────────────────────────────────
 
@@ -63,8 +64,8 @@ function totalBg(total: number, target: number): string {
 
 // ─── Types ───────────────────────────────────────────────
 
-// pct é string para permitir vírgula durante digitação
-type SplitRow = { artistId: string; pct: string };
+// entity é a entidade selecionada; pct é string para permitir vírgula durante digitação
+type SplitRow = { entity: LabelEntity | null; pct: string };
 
 type TrackData = {
   title: string;
@@ -122,26 +123,26 @@ function StepIndicator({ current }: { current: number }) {
 function SplitEditor({
   rows,
   onChange,
-  artists,
   target,
   label,
 }: {
   rows: SplitRow[];
   onChange: (rows: SplitRow[]) => void;
-  artists: LabelArtist[];
   target: number;
   label: string;
 }) {
   const total = sumPercentages(rows.map((r) => r.pct));
   const over = total > target + 0.01;
-  const exact = isPercentageEqual(total, target);
 
-  const addRow = () => onChange([...rows, { artistId: "", pct: "0" }]);
+  const addRow = () => onChange([...rows, { entity: null, pct: "0" }]);
 
   const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
 
-  const updateRow = (i: number, field: keyof SplitRow, value: string) =>
-    onChange(rows.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
+  const updateEntity = (i: number, entity: LabelEntity | null) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, entity } : r)));
+
+  const updatePct = (i: number, pct: string) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, pct } : r)));
 
   return (
     <div className="flex flex-col gap-3">
@@ -160,25 +161,20 @@ function SplitEditor({
 
       {rows.map((row, i) => (
         <div key={i} className="flex items-center gap-2">
-          <select
-            value={row.artistId}
-            onChange={(e) => updateRow(i, "artistId", e.target.value)}
-            className={inputCls}
-          >
-            <option value="">Selecione artista...</option>
-            {artists.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.artist_name ?? a.name}
-              </option>
-            ))}
-          </select>
-          <div className="relative w-32 shrink-0">
+          <div className="flex-1">
+            <EntityCombobox
+              value={row.entity}
+              onChange={(e) => updateEntity(i, e)}
+              placeholder="Buscar entidade..."
+            />
+          </div>
+          <div className="relative w-28 shrink-0">
             <input
               type="text"
               inputMode="decimal"
               placeholder="0"
               value={row.pct}
-              onChange={(e) => updateRow(i, "pct", e.target.value)}
+              onChange={(e) => updatePct(i, e.target.value)}
               className={inputCls}
             />
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -208,9 +204,7 @@ function SplitEditor({
 
 // ─── Main Component ──────────────────────────────────────
 
-type Props = { artists: LabelArtist[] };
-
-export default function TrackForm({ artists }: Props) {
+export default function TrackForm() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -231,11 +225,11 @@ export default function TrackForm({ artists }: Props) {
     contractFile: null,
   });
 
-  const [obraRows, setObraRows] = useState<SplitRow[]>([{ artistId: "", pct: "0" }]);
-  const [interpretes, setInterpretes] = useState<SplitRow[]>([{ artistId: "", pct: "0" }]);
-  const [produtores, setProdutores] = useState<SplitRow[]>([{ artistId: "", pct: "0" }]);
-  const [musicos, setMusicos] = useState<SplitRow[]>([{ artistId: "", pct: "0" }]);
-  const [royaltyRows, setRoyaltyRows] = useState<SplitRow[]>([{ artistId: "", pct: "0" }]);
+  const [obraRows, setObraRows] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
+  const [interpretes, setInterpretes] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
+  const [produtores, setProdutores] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
+  const [musicos, setMusicos] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
+  const [royaltyRows, setRoyaltyRows] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
 
   // ── Validações ──
 
@@ -245,8 +239,8 @@ export default function TrackForm({ artists }: Props) {
   };
 
   const validateStep2 = (): string | null => {
-    if (obraRows.some((r) => !r.artistId))
-      return "Selecione um artista em todos os campos de Obra.";
+    if (obraRows.some((r) => !r.entity))
+      return "Selecione uma entidade em todos os campos de Obra.";
     const t = sumPercentages(obraRows.map((r) => r.pct));
     if (!isPercentageEqual(t, 100))
       return `Obra: soma deve ser 100% (atual: ${formatPercentage(t)}).`;
@@ -260,8 +254,8 @@ export default function TrackForm({ artists }: Props) {
       ["Músicos", musicos, FONOGRAMA_TARGETS.musicos],
     ];
     for (const [name, rows, target] of groups) {
-      if (rows.some((r) => !r.artistId))
-        return `Selecione um artista em todos os campos de ${name}.`;
+      if (rows.some((r) => !r.entity))
+        return `Selecione uma entidade em todos os campos de ${name}.`;
       const t = sumPercentages(rows.map((r) => r.pct));
       if (!isPercentageEqual(t, target))
         return `${name}: soma deve ser ${formatPercentage(target)} (atual: ${formatPercentage(t)}).`;
@@ -270,8 +264,8 @@ export default function TrackForm({ artists }: Props) {
   };
 
   const validateStep4 = (): string | null => {
-    if (royaltyRows.some((r) => !r.artistId))
-      return "Selecione um artista em todos os campos de Royalties Share.";
+    if (royaltyRows.some((r) => !r.entity))
+      return "Selecione uma entidade em todos os campos de Royalties Share.";
     const t = sumPercentages(royaltyRows.map((r) => r.pct));
     if (!isPercentageEqual(t, 100))
       return `Royalties Share: soma deve ser 100% (atual: ${formatPercentage(t)}).`;
@@ -340,28 +334,28 @@ export default function TrackForm({ artists }: Props) {
 
       const participants = [
         ...obraRows.map((r) => ({
-          track_id: trackId, artist_id: r.artistId, role: "composer",
+          track_id: trackId, entity_id: r.entity!.id, artist_id: null, role: "composer",
           royalty_percentage: 0,
           publishing_percentage: parsePercentageInput(r.pct),
           master_percentage: 0,
         })),
         ...interpretes.map((r) => ({
-          track_id: trackId, artist_id: r.artistId, role: "main_artist",
+          track_id: trackId, entity_id: r.entity!.id, artist_id: null, role: "main_artist",
           royalty_percentage: 0, publishing_percentage: 0,
           master_percentage: parsePercentageInput(r.pct),
         })),
         ...produtores.map((r) => ({
-          track_id: trackId, artist_id: r.artistId, role: "producer",
+          track_id: trackId, entity_id: r.entity!.id, artist_id: null, role: "producer",
           royalty_percentage: 0, publishing_percentage: 0,
           master_percentage: parsePercentageInput(r.pct),
         })),
         ...musicos.map((r) => ({
-          track_id: trackId, artist_id: r.artistId, role: "other",
+          track_id: trackId, entity_id: r.entity!.id, artist_id: null, role: "other",
           royalty_percentage: 0, publishing_percentage: 0,
           master_percentage: parsePercentageInput(r.pct),
         })),
         ...royaltyRows.map((r) => ({
-          track_id: trackId, artist_id: r.artistId, role: "label",
+          track_id: trackId, entity_id: r.entity!.id, artist_id: null, role: "label",
           royalty_percentage: parsePercentageInput(r.pct),
           publishing_percentage: 0, master_percentage: 0,
         })),
@@ -492,7 +486,7 @@ export default function TrackForm({ artists }: Props) {
               className={inputCls} />
           </div>
           <div className="border-t border-border" />
-          <SplitEditor rows={obraRows} onChange={setObraRows} artists={artists}
+          <SplitEditor rows={obraRows} onChange={setObraRows}
             target={100} label="Compositores" />
         </div>
       )}
@@ -519,13 +513,13 @@ export default function TrackForm({ artists }: Props) {
             ]))} / 100%
           </div>
 
-          <SplitEditor rows={interpretes} onChange={setInterpretes} artists={artists}
+          <SplitEditor rows={interpretes} onChange={setInterpretes}
             target={FONOGRAMA_TARGETS.interpretes} label="Intérpretes — alvo: 41,70%" />
           <div className="border-t border-border" />
-          <SplitEditor rows={produtores} onChange={setProdutores} artists={artists}
+          <SplitEditor rows={produtores} onChange={setProdutores}
             target={FONOGRAMA_TARGETS.produtores} label="Produtores fonográficos — alvo: 41,70%" />
           <div className="border-t border-border" />
-          <SplitEditor rows={musicos} onChange={setMusicos} artists={artists}
+          <SplitEditor rows={musicos} onChange={setMusicos}
             target={FONOGRAMA_TARGETS.musicos} label="Músicos — alvo: 16,60%" />
         </div>
       )}
@@ -536,7 +530,7 @@ export default function TrackForm({ artists }: Props) {
           <div className="rounded-md border border-border bg-slate-50 px-4 py-3 text-sm text-muted-foreground dark:bg-slate-900">
             Distribua <strong>100%</strong> dos Royalties Share entre os envolvidos.
           </div>
-          <SplitEditor rows={royaltyRows} onChange={setRoyaltyRows} artists={artists}
+          <SplitEditor rows={royaltyRows} onChange={setRoyaltyRows}
             target={100} label="Royalties Share" />
         </div>
       )}

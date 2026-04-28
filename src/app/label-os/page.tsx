@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Library, Mic2, Music2, Radio } from "lucide-react";
+import { Building2, Library, Music2, Radio } from "lucide-react";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import StatCard from "@/components/label-os/stat-card";
@@ -21,7 +21,7 @@ export default async function LabelOsPage() {
       <Container className="py-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Total de Tracks" value={stats.totalTracks} icon={Music2} />
-          <StatCard label="Total de Artistas" value={stats.totalArtists} icon={Mic2} />
+          <StatCard label="Total de Artistas" value={stats.totalArtists} icon={Building2} />
           <StatCard label="Em Draft" value={stats.draftTracks} icon={Library} />
           <StatCard label="Lançadas" value={stats.releasedTracks} icon={Radio} />
         </div>
@@ -39,11 +39,11 @@ export default async function LabelOsPage() {
               Nova Track
             </Link>
             <Link
-              href="/label-os/artists/new"
+              href="/label-os/entities/new"
               className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
             >
-              <Mic2 size={16} className="text-muted-foreground" />
-              Novo Artista
+              <Building2 size={16} className="text-muted-foreground" />
+              Nova Entidade
             </Link>
             <Link
               href="/label-os/tracks"

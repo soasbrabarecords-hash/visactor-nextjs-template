@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import { getLabelEntities, ENTITY_TYPES } from "@/lib/label-entities";
@@ -75,6 +75,7 @@ export default async function EntitiesPage() {
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Nasc.
                   </th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -135,6 +136,15 @@ export default async function EntitiesPage() {
                       {entity.type === "artist" && entity.birth_date
                         ? new Date(entity.birth_date + "T12:00:00").toLocaleDateString("pt-BR")
                         : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/label-os/entities/${entity.id}/edit`}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <Pencil size={12} />
+                        Editar
+                      </Link>
                     </td>
                   </tr>
                 ))}

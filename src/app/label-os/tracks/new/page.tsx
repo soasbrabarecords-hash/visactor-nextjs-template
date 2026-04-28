@@ -1,13 +1,10 @@
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import TrackForm from "@/components/label-os/track-form";
-import { getLabelArtists } from "@/lib/label-os";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewTrackPage() {
-  const artists = await getLabelArtists();
-
+export default function NewTrackPage() {
   return (
     <div>
       <PageIntro
@@ -17,7 +14,7 @@ export default async function NewTrackPage() {
       />
       <Container className="py-8">
         <div className="max-w-3xl">
-          <TrackForm artists={artists} />
+          <TrackForm />
         </div>
       </Container>
     </div>
