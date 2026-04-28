@@ -113,7 +113,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
     piseiro: ["piseiro", "pisadinha", "forro", "forró", "nordeste"],
-    pop: ["pop", "hits", "top", "viral", "mundial"],
+    pop: ["pop", "hits", "viral", "mundial", "mais tocadas", "internacional"],
     reggae: ["reggae", "roots", "rappa", "natiruts"],
     discovery: ["descoberta", "discovery", "viral", "hits", "top", "brasil", "novidades"],
   };
