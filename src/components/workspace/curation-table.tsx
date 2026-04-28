@@ -91,7 +91,7 @@ function normalizeText(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\s&]/g, " ") // strip emojis and special chars
+    .replace(/[^\w\s&]/g, " ")
     .toLowerCase();
 }
 
@@ -109,7 +109,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
   const styleTerms: Record<string, string[]> = {
     funk: ["funk", "baile", "mandela", "mandelao", "automotivo", "rave", "proibidao"],
     trap: ["trap"],
-    rap: ["rap", "drill", "hip hop", "hip-hop"],
+    rap: ["rap", "drill"],
     rock: ["rock"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
