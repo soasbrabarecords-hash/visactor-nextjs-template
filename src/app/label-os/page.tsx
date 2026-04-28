@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Library, Mic2, Music2, Radio } from "lucide-react";
+import { Building2, Library, Mic2, Music2, Radio } from "lucide-react";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import StatCard from "@/components/label-os/stat-card";
@@ -58,6 +58,13 @@ export default async function LabelOsPage() {
             >
               <Radio size={16} className="text-muted-foreground" />
               Ver Artistas
+            </Link>
+            <Link
+              href="/label-os/entities"
+              className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <Building2 size={16} className="text-muted-foreground" />
+              Entidades
             </Link>
           </div>
         </div>
