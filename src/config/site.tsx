@@ -3,6 +3,7 @@ import {
   Gauge,
   ListMusic,
   Radio,
+  Library,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,5 +39,10 @@ export const navigations: Navigation[] = [
     icon: Compass,
     name: "Curadoria",
     href: "/curadoria",
+  },
+  {
+    icon: Library,
+    name: "Label OS",
+    href: "/label-os",
   },
 ];
