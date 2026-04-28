@@ -261,7 +261,8 @@ export async function exchangeSpotifyCode({
   });
 
   if (!response.ok) {
-    throw new Error("Failed to connect Spotify account.");
+    const errBody = await response.json().catch(() => ({})) as { error?: string; error_description?: string };
+    throw new Error(`Spotify auth error: ${errBody.error ?? response.status} — ${errBody.error_description ?? "unknown"}`);
   }
 
   return (await response.json()) as SpotifyOAuthTokenResponse;
@@ -393,7 +394,8 @@ async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch Spotify account playlists.");
+      const errBody = await response.json().catch(() => ({})) as { error?: { message?: string; status?: number } };
+      throw new Error(`Spotify playlists error ${response.status}: ${errBody?.error?.message ?? "unknown"}`);
     }
 
     const payload = (await response.json()) as SpotifyUserPlaylistsResponse;
