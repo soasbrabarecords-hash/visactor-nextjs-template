@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ENTITY_TYPES } from "@/lib/label-entities";
-import type { EntityType } from "@/lib/label-entities";
+import { ENTITY_TYPES } from "@/lib/label-entities-types";
+import type { EntityType } from "@/lib/label-entities-types";
 
 const INPUT_CLASS =
   "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600 w-full";
