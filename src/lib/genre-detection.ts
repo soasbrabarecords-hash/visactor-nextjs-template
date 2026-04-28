@@ -152,7 +152,7 @@ export function detectGenre(
     "japa nk", "meno k",
     "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp",
     "poze do rodo", "pedro sampaio", "anitta",
-    "dexhenry",
+    "dexhenry", "aaron modesto",
   ]);
   if (funkScore > 0) return "funk";
 
