@@ -50,39 +50,38 @@ function matches(text: string, terms: string[]) {
 // This prevents "samba" playlists from getting "pagode" suggestions and vice-versa.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// PLAYLIST_VIBE_MAP — detects vibe from playlist name/description
+// Each keyword belongs to exactly one vibe. First match wins.
+// ---------------------------------------------------------------------------
 const PLAYLIST_VIBE_MAP: Array<[string[], Vibe]> = [
-  // funk — checked before rap so "mc" doesn't bleed into rap
   [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave"], "funk"],
-  // trap — producers/beatmakers/trap BR (Matuê, Veigh, Sotam)
   [["trap"], "trap"],
-  // rap — lyrical/conscious rap (BK, Racionais, NandaTsunami)
   [["rap", "drill", "hip hop", "hip-hop"], "rap"],
-  // sertanejo
   [["sertanejo", "modao", "agro", "universitario", "caipira"], "sertanejo"],
-  // pagode — "pagode" only; "samba" is a separate entry below
-  [["pagode"], "pagode"],
-  // samba — maps to pagode vibe (same bucket) but only triggered by "samba"
-  [["samba"], "pagode"],
-  // piseiro
+  [["pagode", "samba", "axe"], "pagode"],          // pagode AND samba → same vibe
   [["piseiro", "pisadinha", "forro", "nordeste", "xote"], "piseiro"],
-  // pop
   [["pop", "hits", "viral", "top", "internacional"], "pop"],
-  // reggae
   [["reggae", "roots"], "reggae"],
 ];
 
+// ---------------------------------------------------------------------------
+// TRACK_VIBE_MAP — detects vibe from first artist + track name
+// Must mirror curation-table.tsx detectTrackStyle exactly.
+// First match wins — no artist appears in more than one entry.
+// ---------------------------------------------------------------------------
 const TRACK_VIBE_MAP: Array<[string[], Vibe]> = [
-  // funk artists/terms — "mc" prefix is a funk signal here
+  // funk
   [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave",
     "poze do rodo", "pedro sampaio", "anitta",
     "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp",
   ], "funk"],
-  // trap artists — Matuê, Veigh, Sotam, etc.
+  // trap
   [["trap",
     "matue", "matuê", "veigh", "sotam", "kayblack",
     "supernova ent", "marina sena",
   ], "trap"],
-  // rap artists — BK, NandaTsunami, Racionais, etc.
+  // rap
   [["drill", "hip hop", "hip-hop",
     "mc cabelinho", "2zdnizz", "hhr",
     "racionais", "charlie brown", "bk",
@@ -99,13 +98,11 @@ const TRACK_VIBE_MAP: Array<[string[], Vibe]> = [
     "ze felipe", "lauana prado",
     "guilherme e benuto", "guilherme & benuto",
   ], "sertanejo"],
-  // pagode — "pagode" keyword only
-  [["pagode",
+  // pagode — pagode AND samba keywords both → pagode vibe (same bucket as playlist)
+  [["pagode", "samba",
     "menos e mais", "ferrugem", "thiaguinho", "sorriso maroto",
     "turma do pagode", "mumuzinho", "molejo",
   ], "pagode"],
-  // samba — mapped to pagode vibe
-  [["samba"], "pagode"],
   // piseiro
   [["piseiro", "pisadinha", "forro",
     "vitinho imperator", "nattan", "ze vaqueiro",
@@ -202,7 +199,7 @@ export default function PlaylistKworbSuggestions({
     trap: "Trap",
     rap: "Rap",
     sertanejo: "Sertanejo",
-    pagode: "Pagode/Samba",
+    pagode: "Pagode",
     piseiro: "Piseiro/Forró",
     pop: "Pop",
     reggae: "Reggae",
