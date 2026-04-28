@@ -43,71 +43,90 @@ function matches(text: string, terms: string[]) {
   return terms.some((t) => text.includes(t));
 }
 
-/** Infer vibe from playlist name + description */
+// ---------------------------------------------------------------------------
+// Each playlist keyword maps to exactly ONE vibe — no overlaps.
+// Each artist/track keyword maps to exactly ONE vibe — no overlaps.
+// This prevents "samba" playlists from getting "pagode" suggestions and vice-versa.
+// ---------------------------------------------------------------------------
+
+const PLAYLIST_VIBE_MAP: Array<[string[], Vibe]> = [
+  // funk — checked before rap so "mc" doesn't bleed into rap
+  [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave"], "funk"],
+  // rap/trap — "trap" and "rap" each belong here exclusively
+  [["trap", "rap", "drill", "hip hop", "hip-hop"], "rap"],
+  // sertanejo
+  [["sertanejo", "modao", "agro", "universitario", "caipira"], "sertanejo"],
+  // pagode — "pagode" only; "samba" is a separate entry below
+  [["pagode"], "pagode"],
+  // samba — maps to pagode vibe (same bucket) but only triggered by "samba"
+  [["samba"], "pagode"],
+  // piseiro
+  [["piseiro", "pisadinha", "forro", "nordeste", "xote"], "piseiro"],
+  // pop
+  [["pop", "hits", "viral", "top", "internacional"], "pop"],
+  // reggae
+  [["reggae", "roots"], "reggae"],
+];
+
+const TRACK_VIBE_MAP: Array<[string[], Vibe]> = [
+  // funk artists/terms — "mc" prefix is a funk signal here
+  [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave",
+    "poze do rodo", "pedro sampaio", "anitta",
+    "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp",
+  ], "funk"],
+  // rap/trap artists — do NOT include "mc" here (MC is funk)
+  [["trap", "drill",
+    "veigh", "matue", "matuê", "sotam", "mc cabelinho", "kayblack",
+    "supernova ent", "marina sena",
+    "racionais", "charlie brown", "bk",
+    "nanda tsunami", "nandatsunami", "2zdnizz", "hhr",
+    "poesia acustica",
+  ], "rap"],
+  // sertanejo
+  [["sertanejo", "modao", "agro", "universitario",
+    "ze neto", "cristiano", "murilo huff", "marilia mendonca", "gusttavo lima",
+    "simone mendes", "luan santana", "zeze di camargo",
+    "henrique e juliano", "henrique & juliano",
+    "matheus e kauan", "matheus & kauan",
+    "maiara e maraisa", "maiara & maraisa",
+    "ze felipe", "lauana prado",
+    "guilherme e benuto", "guilherme & benuto",
+  ], "sertanejo"],
+  // pagode — "pagode" keyword only
+  [["pagode",
+    "menos e mais", "ferrugem", "thiaguinho", "sorriso maroto",
+    "turma do pagode", "mumuzinho", "molejo",
+  ], "pagode"],
+  // samba — mapped to pagode vibe
+  [["samba"], "pagode"],
+  // piseiro
+  [["piseiro", "pisadinha", "forro",
+    "vitinho imperator", "nattan", "ze vaqueiro",
+    "mari fernandez", "grelo", "natanzinho lima",
+  ], "piseiro"],
+  // pop
+  [["kpop", "michael jackson", "justin bieber", "bts"], "pop"],
+  // reggae
+  [["natiruts", "reggae", "o rappa"], "reggae"],
+];
+
+/** Infer vibe from playlist name + description — first match wins */
 function inferPlaylistVibe(name: string, description: string): Vibe {
   const t = normalize(`${name} ${description}`);
-
-  if (matches(t, ["funk", "baile", "mandelao", "automotivo", "proibidao", "rave"])) return "funk";
-  if (matches(t, ["trap", "rap", "drill", "hip hop", "hip-hop"])) return "rap";
-  if (matches(t, ["sertanejo", "modao", "agro", "universitario", "caipira"])) return "sertanejo";
-  if (matches(t, ["pagode", "samba", "axe"])) return "pagode";
-  if (matches(t, ["piseiro", "pisadinha", "forro", "nordeste", "xote"])) return "piseiro";
-  if (matches(t, ["pop", "hits", "viral", "top", "internacional"])) return "pop";
-  if (matches(t, ["reggae", "roots"])) return "reggae";
-
+  for (const [terms, vibe] of PLAYLIST_VIBE_MAP) {
+    if (matches(t, terms)) return vibe;
+  }
   return "unknown";
 }
 
-/** Check if a Kworb track matches the target vibe */
+/** Check if a Kworb track belongs to the target vibe — first match wins */
 function trackMatchesVibe(entry: BrDailyEntry, vibe: Vibe): boolean {
-  if (vibe === "unknown") return false; // don't suggest when vibe is unclear
-
+  if (vibe === "unknown") return false;
   const t = normalize(`${entry.trackName} ${entry.artist}`);
-
-  const vibeTerms: Record<Vibe, string[]> = {
-    funk: [
-      "mc", "funk", "baile", "mandelao", "automotivo", "proibidao", "rave",
-      "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp", "poze do rodo",
-      "pedro sampaio", "anitta",
-    ],
-    rap: [
-      "trap", "rap", "drill",
-      "veigh", "matue", "matuê", "sotam", "mc cabelinho", "kayblack",
-      "supernova ent", "marina sena",
-      "racionais", "charlie brown", "bk",
-      "nanda tsunami", "nandatsunami", "2zdnizz", "hhr",
-      "poesia acustica",
-    ],
-    sertanejo: [
-      "sertanejo", "modao", "agro", "universitario",
-      "ze neto", "cristiano", "murilo huff", "marilia mendonca", "gusttavo lima",
-      "simone mendes", "luan santana", "zeze di camargo",
-      "henrique e juliano", "henrique & juliano",
-      "matheus e kauan", "matheus & kauan",
-      "maiara e maraisa", "maiara & maraisa",
-      "ze felipe", "zé felipe", "lauana prado",
-      "guilherme e benuto", "guilherme & benuto",
-    ],
-    pagode: [
-      "pagode", "samba",
-      "menos e mais", "ferrugem", "thiaguinho", "sorriso maroto",
-      "turma do pagode", "mumuzinho", "molejo",
-    ],
-    piseiro: [
-      "piseiro", "pisadinha", "forro",
-      "vitinho imperator", "nattan", "ze vaqueiro", "zé vaqueiro",
-      "mari fernandez", "grelo", "natanzinho lima",
-    ],
-    pop: [
-      "bts", "kpop", "michael jackson", "justin bieber",
-    ],
-    reggae: [
-      "natiruts", "reggae", "o rappa",
-    ],
-    unknown: [],
-  };
-
-  return matches(t, vibeTerms[vibe]);
+  for (const [terms, trackVibe] of TRACK_VIBE_MAP) {
+    if (matches(t, terms)) return trackVibe === vibe;
+  }
+  return false; // no match → don't suggest
 }
 
 // ---------------------------------------------------------------------------
