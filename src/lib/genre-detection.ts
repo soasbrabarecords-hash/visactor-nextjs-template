@@ -17,6 +17,7 @@ export type TrackGenre =
   | "rap"
   | "sertanejo"
   | "pagode"
+  | "pagodao"
   | "piseiro"
   | "pop"
   | "rock"
@@ -92,6 +93,13 @@ export function detectGenre(
     "henrique casttro", "henrique castro",
   ]);
   if (pagodeScore > 0) return "pagode";
+
+  // Pagodão (subgênero diferente de pagode tradicional)
+  const pagodaoScore = countMatches(text, [
+    "pagodao", "pagodão",
+    "leo santana", "léo santana",
+  ]);
+  if (pagodaoScore > 0) return "pagodao";
 
   // Piseiro / Forró
   const piseiroScore = countMatches(text, [
@@ -185,6 +193,7 @@ export const GENRE_LABEL: Record<TrackGenre, string> = {
   rap: "Rap",
   sertanejo: "Sertanejo",
   pagode: "Pagode",
+  pagodao: "Pagodão",
   piseiro: "Piseiro",
   pop: "Pop",
   rock: "Rock",

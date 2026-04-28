@@ -112,6 +112,7 @@ function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "di
     rock: ["rock"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
+    pagodao: ["pagodao", "pagodão", "pagoda"],
     piseiro: ["piseiro", "pisadinha", "forro", "forró", "nordeste"],
     pop: ["pop", "hits", "viral", "mundial", "mais tocadas", "internacional"],
     reggae: ["reggae", "roots", "rappa", "natiruts"],
@@ -138,6 +139,7 @@ function buildPlaylistSuggestion(
     rap: "Rap",
     sertanejo: "Sertanejo",
     pagode: "Pagode",
+    pagodao: "Pagodão",
     piseiro: "Piseiro",
     pop: "Pop",
     rock: "Rock",
@@ -482,6 +484,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                             suggestion.style === "rap" ? "yellow" :
                             suggestion.style === "sertanejo" ? "blue" :
                             suggestion.style === "pagode" ? "green" :
+                            suggestion.style === "pagodao" ? "green" :
                             suggestion.style === "piseiro" ? "slate" :
                             suggestion.style === "reggae" ? "green" :
                             suggestion.style === "rock" ? "slate" :
@@ -505,6 +508,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                              suggestion.style === "rap" ? "Rap" :
                              suggestion.style === "sertanejo" ? "Sertanejo" :
                              suggestion.style === "pagode" ? "Pagode" :
+                             suggestion.style === "pagodao" ? "Pagodão" :
                              suggestion.style === "piseiro" ? "Piseiro" :
                              suggestion.style === "reggae" ? "Reggae" :
                              suggestion.style === "rock" ? "Rock" :

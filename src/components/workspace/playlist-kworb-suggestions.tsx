@@ -22,6 +22,7 @@ const GENRE_TONE: Record<TrackGenre, "blue" | "green" | "yellow" | "slate" | "pu
   rap: "yellow",
   sertanejo: "blue",
   pagode: "green",
+  pagodao: "green",
   piseiro: "slate",
   pop: "purple",
   rock: "slate",
