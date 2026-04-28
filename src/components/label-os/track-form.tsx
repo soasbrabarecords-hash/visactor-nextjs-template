@@ -50,6 +50,23 @@ const KEYS = [
   "Cm", "C#m", "Dm", "D#m", "Em", "Fm", "F#m", "Gm", "G#m", "Am", "A#m", "Bm",
 ];
 
+async function uploadFile(
+  file: File | null,
+  bucket: string,
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("bucket", bucket);
+  const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
+  if (!res.ok) {
+    const j = (await res.json()) as { error?: string };
+    throw new Error(j.error ?? `Erro no upload para ${bucket}`);
+  }
+  const json = (await res.json()) as { url: string };
+  return json.url;
+}
+
 export default function TrackForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -67,23 +84,6 @@ export default function TrackForm() {
       const coverFile = formData.get("cover") as File | null;
       const audioFile = formData.get("audio") as File | null;
       const contractFile = formData.get("contract") as File | null;
-
-      async function uploadFile(
-        file: File | null,
-        bucket: string,
-      ): Promise<string | null> {
-        if (!file || file.size === 0) return null;
-        const fd = new FormData();
-        fd.append("file", file);
-        fd.append("bucket", bucket);
-        const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
-        if (!res.ok) {
-          const j = (await res.json()) as { error?: string };
-          throw new Error(j.error ?? `Erro no upload para ${bucket}`);
-        }
-        const json = (await res.json()) as { url: string };
-        return json.url;
-      }
 
       const [cover_url, audio_url, contract_url] = await Promise.all([
         uploadFile(coverFile, "label-covers"),
