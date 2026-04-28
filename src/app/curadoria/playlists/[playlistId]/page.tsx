@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import PageIntro from "@/components/page-intro";
 import StatusBadge from "@/components/workspace/status-badge";
 import PlaylistEditor from "@/components/workspace/playlist-editor";
+import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
 import {
   fetchSpotifyEditablePlaylist,
   fetchPlaylistSnapshotId,
@@ -156,6 +157,13 @@ export default async function SpotifyPlaylistEditorPage({
           initialDescription={playlist.description}
         />
       </Container>
+
+      <PlaylistKworbSuggestions
+        playlistId={playlistId}
+        playlistName={playlist.name}
+        playlistDescription={playlist.description}
+        currentTrackIds={playlist.tracks.map((t) => t.id)}
+      />
     </div>
   );
 }
