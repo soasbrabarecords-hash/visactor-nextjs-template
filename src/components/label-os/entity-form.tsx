@@ -43,16 +43,46 @@ const Field = ({ label, name, type = "text", placeholder, required }: FieldProps
   </div>
 );
 
+// Aplica máscara DD/MM/AAAA enquanto digita
+function maskDate(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+// Converte DD/MM/AAAA → YYYY-MM-DD para o banco
+function parseBrDate(value: string): string | null {
+  const clean = value.replace(/\D/g, "");
+  if (clean.length !== 8) return null;
+  const day = clean.slice(0, 2);
+  const month = clean.slice(2, 4);
+  const year = clean.slice(4, 8);
+  const d = new Date(`${year}-${month}-${day}`);
+  if (isNaN(d.getTime())) return null;
+  return `${year}-${month}-${day}`;
+}
+
 export default function EntityForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<EntityType>("artist");
+  const [birthDate, setBirthDate] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Validar birth_date se artista
+    if (type === "artist") {
+      if (!birthDate || parseBrDate(birthDate) === null) {
+        setError("Data de nascimento é obrigatória para artistas. Use o formato DD/MM/AAAA.");
+        setLoading(false);
+        return;
+      }
+    }
 
     const formData = new FormData(e.currentTarget);
     const body = {
@@ -66,6 +96,7 @@ export default function EntityForm() {
       apple_music_url: (formData.get("apple_music_url") as string) || null,
       youtube_url: (formData.get("youtube_url") as string) || null,
       document: (formData.get("document") as string) || null,
+      birth_date: type === "artist" ? parseBrDate(birthDate) : null,
       notes: (formData.get("notes") as string) || null,
     };
 
@@ -136,6 +167,26 @@ export default function EntityForm() {
         <Field label="Email" name="email" type="email" placeholder="contato@exemplo.com" />
         <Field label="Telefone" name="phone" placeholder="+55 11 99999-9999" />
         <Field label="Documento (CPF/CNPJ)" name="document" placeholder="000.000.000-00" />
+
+        {/* Data de nascimento — apenas para artistas */}
+        {isArtist && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-foreground" htmlFor="birth_date">
+              Data de nascimento <span className="ml-0.5 text-red-500">*</span>
+            </label>
+            <input
+              id="birth_date"
+              name="birth_date"
+              type="text"
+              inputMode="numeric"
+              placeholder="DD/MM/AAAA"
+              value={birthDate}
+              onChange={(e) => setBirthDate(maskDate(e.target.value))}
+              maxLength={10}
+              className={INPUT_CLASS}
+            />
+          </div>
+        )}
 
         {/* Campos de redes — só fazem sentido para artistas, mas ficam visíveis para todos */}
         <Field label="Instagram" name="instagram" placeholder="@handle" />

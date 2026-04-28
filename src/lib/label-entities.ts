@@ -29,6 +29,7 @@ export type LabelEntity = {
   apple_music_url: string | null;
   youtube_url: string | null;
   document: string | null;
+  birth_date: string | null;
   notes: string | null;
   created_at: string;
 };

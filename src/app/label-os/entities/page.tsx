@@ -72,6 +72,9 @@ export default async function EntitiesPage() {
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Spotify
                   </th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Nasc.
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -127,6 +130,11 @@ export default async function EntitiesPage() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {entity.type === "artist" && entity.birth_date
+                        ? new Date(entity.birth_date + "T12:00:00").toLocaleDateString("pt-BR")
+                        : "—"}
                     </td>
                   </tr>
                 ))}
