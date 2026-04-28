@@ -66,7 +66,12 @@ export default async function TracksPage() {
                     className="border-b border-border last:border-0 hover:bg-slate-50 dark:hover:bg-slate-900"
                   >
                     <td className="px-4 py-3 font-medium">
-                      {track.title}
+                      <Link
+                        href={`/label-os/tracks/${track.id}`}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {track.title}
+                      </Link>
                       {track.version && (
                         <span className="ml-2 text-xs text-muted-foreground">
                           ({track.version})
