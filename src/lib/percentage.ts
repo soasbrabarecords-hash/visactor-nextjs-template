@@ -22,7 +22,7 @@ export function formatPercentage(value: number): string {
 
 /** Soma array de valores usando parsePercentageInput, arredondado em 2 casas. */
 export function sumPercentages(values: (string | number)[]): number {
-  const sum = values.reduce(
+  const sum = values.reduce<number>(
     (acc, v) => acc + parsePercentageInput(v),
     0,
   );
