@@ -24,6 +24,7 @@ import type { BrDailyEntry, BrDailyResponse } from "@/app/api/kworb/br-daily/rou
 
 type Vibe =
   | "funk"
+  | "trap"
   | "rap"
   | "sertanejo"
   | "pagode"
@@ -52,8 +53,10 @@ function matches(text: string, terms: string[]) {
 const PLAYLIST_VIBE_MAP: Array<[string[], Vibe]> = [
   // funk — checked before rap so "mc" doesn't bleed into rap
   [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave"], "funk"],
-  // rap/trap — "trap" and "rap" each belong here exclusively
-  [["trap", "rap", "drill", "hip hop", "hip-hop"], "rap"],
+  // trap — producers/beatmakers/trap BR (Matuê, Veigh, Sotam)
+  [["trap"], "trap"],
+  // rap — lyrical/conscious rap (BK, Racionais, NandaTsunami)
+  [["rap", "drill", "hip hop", "hip-hop"], "rap"],
   // sertanejo
   [["sertanejo", "modao", "agro", "universitario", "caipira"], "sertanejo"],
   // pagode — "pagode" only; "samba" is a separate entry below
@@ -74,12 +77,16 @@ const TRACK_VIBE_MAP: Array<[string[], Vibe]> = [
     "poze do rodo", "pedro sampaio", "anitta",
     "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp",
   ], "funk"],
-  // rap/trap artists — do NOT include "mc" here (MC is funk)
-  [["trap", "drill",
-    "veigh", "matue", "matuê", "sotam", "mc cabelinho", "kayblack",
+  // trap artists — Matuê, Veigh, Sotam, etc.
+  [["trap",
+    "matue", "matuê", "veigh", "sotam", "kayblack",
     "supernova ent", "marina sena",
+  ], "trap"],
+  // rap artists — BK, NandaTsunami, Racionais, etc.
+  [["drill", "hip hop", "hip-hop",
+    "mc cabelinho", "2zdnizz", "hhr",
     "racionais", "charlie brown", "bk",
-    "nanda tsunami", "nandatsunami", "2zdnizz", "hhr",
+    "nanda tsunami", "nandatsunami",
     "poesia acustica",
   ], "rap"],
   // sertanejo
@@ -187,7 +194,8 @@ export default function PlaylistKworbSuggestions({
 
   const vibeLabel: Record<Vibe, string> = {
     funk: "Funk",
-    rap: "Rap/Trap",
+    trap: "Trap",
+    rap: "Rap",
     sertanejo: "Sertanejo",
     pagode: "Pagode/Samba",
     piseiro: "Piseiro/Forró",
