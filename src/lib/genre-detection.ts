@@ -137,7 +137,7 @@ export function detectGenre(
   // Rap / Hip-hop
   const rapScore = countMatches(text, [
     "rap", "drill", "hip hop", "hip-hop",
-    "mc cabelinho", "2zdnizz", "hhr",
+    "mc cabelinho", "2zdnizz", "2zdinizz", "hhr",
     "racionais", "charlie brown",
     "bk",
     "nanda tsunami", "nandatsunami",
