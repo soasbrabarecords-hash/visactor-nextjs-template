@@ -13,8 +13,12 @@ export async function POST(
     const { id: trackId } = await params;
     const body = (await request.json()) as Omit<TrackParticipantInput, "track_id">;
 
-    if (!body.artist_id) {
-      return NextResponse.json({ error: "Artista é obrigatório." }, { status: 400 });
+    // Exige pelo menos entity_id ou artist_id
+    if (!body.entity_id && !body.artist_id) {
+      return NextResponse.json(
+        { error: "É necessário informar um participante (entity_id ou artist_id)." },
+        { status: 400 },
+      );
     }
     if (!body.role) {
       return NextResponse.json({ error: "Role é obrigatório." }, { status: 400 });

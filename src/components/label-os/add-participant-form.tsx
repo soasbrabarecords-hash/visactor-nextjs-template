@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { LabelArtist, TrackParticipant } from "@/lib/label-os";
+import type { TrackParticipant } from "@/lib/label-os";
+import type { LabelEntity } from "@/lib/label-entities-types";
 import {
   parsePercentageInput,
   formatPercentage,
   sumPercentages,
   isPercentageEqual,
 } from "@/lib/percentage";
+import EntityCombobox from "@/components/label-os/entity-combobox";
 
 const ROLES: { value: string; label: string }[] = [
   { value: "main_artist", label: "Artista Principal" },
@@ -23,7 +25,6 @@ const ROLES: { value: string; label: string }[] = [
 
 type Props = {
   trackId: string;
-  artists: LabelArtist[];
   participants: TrackParticipant[];
 };
 
@@ -49,14 +50,12 @@ function totalBg(total: number): string {
   return "bg-slate-50 dark:bg-slate-800";
 }
 
-export default function AddParticipantForm({
-  trackId,
-  artists,
-  participants,
-}: Props) {
+export default function AddParticipantForm({ trackId, participants }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<LabelEntity | null>(null);
+  const [role, setRole] = useState("");
 
   // string state to allow comma/dot while typing
   const [royalty, setRoyalty] = useState("0");
@@ -78,6 +77,15 @@ export default function AddParticipantForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!selectedEntity) {
+      setError("Selecione um participante antes de adicionar.");
+      return;
+    }
+    if (!role) {
+      setError("Selecione o papel do participante.");
+      return;
+    }
     if (hasOverflow) {
       setError("A soma de alguma porcentagem ultrapassa 100%. Corrija antes de salvar.");
       return;
@@ -86,10 +94,10 @@ export default function AddParticipantForm({
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
     const body = {
-      artist_id: formData.get("artist_id") as string,
-      role: formData.get("role") as string,
+      entity_id: selectedEntity.id,
+      artist_id: null,
+      role,
       royalty_percentage: parsePercentageInput(royalty),
       publishing_percentage: parsePercentageInput(publishing),
       master_percentage: parsePercentageInput(master),
@@ -108,7 +116,8 @@ export default function AddParticipantForm({
       }
 
       router.refresh();
-      (e.target as HTMLFormElement).reset();
+      setSelectedEntity(null);
+      setRole("");
       setRoyalty("0");
       setPublishing("0");
       setMaster("0");
@@ -157,46 +166,37 @@ export default function AddParticipantForm({
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* Artista */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="artist_id">
-              Artista <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="artist_id"
-              name="artist_id"
-              required
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
-            >
-              <option value="">Selecione...</option>
-              {artists.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.artist_name ?? a.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Entidade — combobox */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium">
+            Participante <span className="text-red-500">*</span>
+          </label>
+          <EntityCombobox
+            value={selectedEntity}
+            onChange={setSelectedEntity}
+            required={!selectedEntity}
+          />
+        </div>
 
-          {/* Role */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium" htmlFor="role">
-              Papel <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="role"
-              name="role"
-              required
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
-            >
-              <option value="">Selecione...</option>
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Role */}
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="role">
+            Papel <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            required
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
+          >
+            <option value="">Selecione...</option>
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Porcentagens */}
@@ -207,7 +207,6 @@ export default function AddParticipantForm({
             </label>
             <input
               id="royalty_percentage"
-              name="royalty_percentage"
               type="text"
               inputMode="decimal"
               value={royalty}
@@ -221,7 +220,6 @@ export default function AddParticipantForm({
             </label>
             <input
               id="publishing_percentage"
-              name="publishing_percentage"
               type="text"
               inputMode="decimal"
               value={publishing}
@@ -235,7 +233,6 @@ export default function AddParticipantForm({
             </label>
             <input
               id="master_percentage"
-              name="master_percentage"
               type="text"
               inputMode="decimal"
               value={master}

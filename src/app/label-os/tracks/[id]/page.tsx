@@ -5,7 +5,6 @@ import Container from "@/components/container";
 import {
   getLabelTrackById,
   getTrackParticipants,
-  getLabelArtists,
 } from "@/lib/label-os";
 import AddParticipantForm from "@/components/label-os/add-participant-form";
 
@@ -41,10 +40,9 @@ type Props = { params: Promise<{ id: string }> };
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params;
 
-  const [track, participants, artists] = await Promise.all([
+  const [track, participants] = await Promise.all([
     getLabelTrackById(id),
     getTrackParticipants(id),
-    getLabelArtists(),
   ]);
 
   if (!track) notFound();
@@ -299,7 +297,6 @@ export default async function TrackDetailPage({ params }: Props) {
           <div className="lg:sticky lg:top-6 lg:self-start">
             <AddParticipantForm
               trackId={track.id}
-              artists={artists}
               participants={participants}
             />
           </div>

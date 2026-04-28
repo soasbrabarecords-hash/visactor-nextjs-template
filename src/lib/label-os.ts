@@ -47,7 +47,8 @@ export type LabelTrackInput = Omit<LabelTrack, "id" | "created_at">;
 export type TrackParticipant = {
   id: string;
   track_id: string;
-  artist_id: string;
+  artist_id: string | null;
+  entity_id: string | null;
   role: string;
   royalty_percentage: number;
   publishing_percentage: number;
