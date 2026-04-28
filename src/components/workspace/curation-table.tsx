@@ -1,5 +1,7 @@
 "use client";
 
+import { detectGenre, type TrackGenre } from "@/lib/genre-detection";
+
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { ExternalLink, Loader2, Music2, RefreshCw } from "lucide-react";
@@ -39,31 +41,26 @@ type PlaylistSuggestion = {
   hasFit: boolean;
 };
 
-type TrackStyle = "funk" | "rap" | "sertanejo" | "pagode" | "piseiro" | "pop" | "reggae" | "unknown";
+// Genre type imported from genre-detection.ts
+type TrackStyle = TrackGenre;
 
-// Mapeamento de strings de gênero Spotify → TrackStyle interno
-// Spotify retorna strings como "funk carioca", "trap brasileiro", "sertanejo universitario"
-const SPOTIFY_GENRE_MAP: Array<[RegExp, TrackStyle]> = [
-  [/funk\s*(carioca|ostenta|mandelao|150|melody|proibid|bh|brasil)?/i, "funk"],
-  [/baile\s*funk/i, "funk"],
-  [/trap\s*(brasileiro|br|nacional|funk)?/i, "rap"], // trap BR = rap
-  [/rap\s*(nacional|brasileiro|consciente|underground|acustico|acústico)?/i, "rap"],
-  [/hip.?hop\s*(brasileiro|nacional)?/i, "rap"],
-  [/sertanejo\s*(universitario|pop|tradicional|romantico)?/i, "sertanejo"],
-  [/pagode/i, "pagode"],
-  [/samba/i, "pagode"],
-  [/forro|piseiro|pisadinha|xote|bai[oa]o/i, "piseiro"],
-  [/axe/i, "pagode"],
-  [/reggae\s*(brasileiro|nacional|roots|roots)?/i, "reggae"],
-  [/k.?pop/i, "pop"],
-  [/pop\s*(brasileiro|nacional|latino|dance)?/i, "pop"],
-  [/reggaeton/i, "pop"],
-  [/rock\s*(brasileiro|nacional|alternativo|classico)?/i, "rap"], // rock br → rap slot (sem categoria própria)
-];
-
+// Genre detection is now handled by genre-detection.ts (shared with playlist-kworb-suggestions)
 function mapSpotifyGenresToStyle(genres: string[]): TrackStyle {
+  // Map Spotify genre strings using the same canonical detectGenre logic
+  // by checking the first genre string that matches known patterns
+  const genreMap: Array<[RegExp, TrackStyle]> = [
+    [/funk|baile/i, "funk"],
+    [/\btrap\b/i, "trap"],
+    [/\brap\b|hip.?hop|drill/i, "rap"],
+    [/sertanejo/i, "sertanejo"],
+    [/pagode|samba/i, "pagode"],
+    [/forro|piseiro|pisadinha/i, "piseiro"],
+    [/reggae/i, "reggae"],
+    [/\brock\b/i, "rock"],
+    [/\bpop\b|k.?pop/i, "pop"],
+  ];
   for (const genre of genres) {
-    for (const [pattern, style] of SPOTIFY_GENRE_MAP) {
+    for (const [pattern, style] of genreMap) {
       if (pattern.test(genre)) return style;
     }
   }
@@ -102,171 +99,17 @@ function countMatches(text: string, terms: string[]) {
 }
 
 function detectTrackStyle(row: DecisionTrack): TrackStyle {
-  // First artist defines the genre when there are collabs.
-  // e.g. "Grupo Menos é Mais, Simone Mendes" → pagode (first artist wins)
-  const firstArtist = normalizeText(row.artists.split(/[,&]|feat\.|part\./i)[0].trim());
-  const trackName = normalizeText(row.name);
-  // Full text used only as fallback for keyword-in-title detection (genre tags in track name)
-  const fullText = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
-  // Primary text = first artist + track name only (no secondary artists)
-  // This ensures collabs are genre-classified by the lead artist, not the featured one.
-  const text = `${firstArtist} ${trackName}`.trim() || fullText;
-  // fullText is kept for album-name keyword fallback (not used in scoring below)
-  void fullText;
-  const funkScore = countMatches(text, [
-    "mc",
-    "dj",
-    "funk",
-    "baile",
-    "mandelao",
-    "automotivo",
-    "proibidao",
-    "rave",
-    "japa nk",
-    "meno k",
-    "mc ryan sp",
-    "mc ig",
-    "mc luuky",
-    "mc gu",
-    "lele jp",
-    "poze do rodo",
-    "pedro sampaio",
-    "anitta",
-
-  ]);
-  const rapScore2 = countMatches(text, [
-    // trap BR
-    "veigh",
-    "matue",
-    "matuê",
-    "sotam",
-    "mc cabelinho",
-    "kayblack",
-    "supernova ent",
-    "marina sena",
-    // rap/consciente
-    "racionais",
-    "racionais mcs",
-    "charlie brown",
-    "charlie brown jr",
-    "bk",
-    "nanda tsunami",
-    "nandatsunami",
-    "2zdnizz",
-    "hhr",
-    "poesia acustica",
-    "poesia acústica",
-  ]);
-  const sertanejoStrongScore = countMatches(text, [
-    "modao",
-    "agro",
-    "universitario",
-    "ze neto",
-    "cristiano",
-    "murilo huff",
-    "marilia mendonca",
-    "panda",
-    "mj records",
-    "gusttavo lima",
-    "danilo e davi",
-    "danilo & davi",
-    "junior e cezar",
-    "junior & cezar",
-    "diego e vitor hugo",
-    "diego & vitor hugo",
-    "matheus e kauan",
-    "matheus & kauan",
-    "lauana prado",
-    "ze neto",
-    "simone mendes",
-    "luan santana",
-    "felipe e rodrigo",
-    "felipe & rodrigo",
-    "clayton e romario",
-    "clayton & romario",
-    "henrique e juliano",
-    "henrique & juliano",
-    "ze felipe",
-    "zé felipe",
-    "maiara e maraisa",
-    "maiara & maraisa",
-    "joao gustavo e murilo",
-    "guilherme e benuto",
-    "guilherme & benuto",
-    "diego e victor hugo",
-    "diego & victor hugo",
-    "zeze di camargo",
-    "zezé di camargo",
-  ]);
-  const sertanejoScore =
-    sertanejoStrongScore + (text.includes("ao vivo") && sertanejoStrongScore > 0 ? 1 : 0);
-  const pagodeScore = countMatches(text, [
-    "pagode",
-    "samba",
-    "grupo menos e mais",
-    "menos e mais",
-    "ferrugem",
-    "thiaguinho",
-    "sorriso maroto",
-    "turma do pagode",
-    "mumuzinho",
-    "molejo",
-  ]);
-  const reggaeScore = countMatches(text, [
-    "natiruts",
-    "reggae",
-    "o rappa",
-  ]);
-  const piseiroScore = countMatches(text, [
-    "piseiro",
-    "pisadinha",
-    "vitinho imperator",
-    "nattan",
-    "ze vaqueiro",
-    "zé vaqueiro",
-    "mari fernandez",
-    "grelo",
-    "natanzinho lima",
-  ]);
-  const popScore = countMatches(text, ["bts", "pop", "kpop", "michael jackson", "justin bieber"]);
-  const rapScore = countMatches(text, ["trap", "rap", "drill"]);
-
-  if (sertanejoScore > 0) {
-    return "sertanejo";
-  }
-
-  if (pagodeScore > 0) {
-    return "pagode";
-  }
-
-  if (piseiroScore > 0) {
-    return "piseiro";
-  }
-
-  if (popScore > 0) {
-    return "pop";
-  }
-
-  if (funkScore > 0) {
-    return "funk";
-  }
-
-  if (rapScore > 0 || rapScore2 > 0) {
-    return "rap";
-  }
-
-  if (reggaeScore > 0) {
-    return "reggae";
-  }
-
-  return "unknown";
+  // Delegates to shared genre-detection.ts — same logic as playlist-kworb-suggestions
+  return detectGenre(row.artists, row.name);
 }
 
 function playlistScore(playlist: SpotifyAccountPlaylist, style: TrackStyle | "discovery") {
   const name = normalizeText(playlist.name);
   const styleTerms: Record<string, string[]> = {
     funk: ["funk", "baile", "mandela", "mandelao", "automotivo", "rave", "proibidao"],
-    rap: ["trap", "rap", "drill"],
+    trap: ["trap"],
+    rap: ["rap", "drill"],
+    rock: ["rock"],
     sertanejo: ["sertanejo", "modao", "agro", "universitario"],
     pagode: ["pagode", "samba"],
     piseiro: ["piseiro", "pisadinha", "forro", "forró", "nordeste"],
@@ -291,13 +134,15 @@ function buildPlaylistSuggestion(
   const style = spotifyStyle !== "unknown" ? spotifyStyle : detectTrackStyle(row);
   const styleLabel: Record<string, string> = {
     funk: "Funk",
-    rap: "Trap/Rap",
+    trap: "Trap",
+    rap: "Rap",
     sertanejo: "Sertanejo",
-    pagode: "Pagode/Samba",
-    piseiro: "Piseiro/Forro",
+    pagode: "Pagode",
+    piseiro: "Piseiro",
     pop: "Pop",
+    rock: "Rock",
     reggae: "Reggae",
-    unknown: "Sem genero claro",
+    unknown: "—",
   };
 
   if (style === "unknown") {
@@ -633,11 +478,13 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                         <StatusBadge
                           tone={
                             suggestion.style === "funk" ? "slate" :
+                            suggestion.style === "trap" ? "yellow" :
                             suggestion.style === "rap" ? "yellow" :
                             suggestion.style === "sertanejo" ? "blue" :
                             suggestion.style === "pagode" ? "green" :
                             suggestion.style === "piseiro" ? "slate" :
                             suggestion.style === "reggae" ? "green" :
+                            suggestion.style === "rock" ? "slate" :
                             "purple"
                           }
                           className={
@@ -647,16 +494,20 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                               ? "!border-lime-500/30 !bg-lime-500/10 !text-lime-400"
                               : suggestion.style === "reggae"
                               ? "!border-teal-500/30 !bg-teal-500/10 !text-teal-400"
+                              : suggestion.style === "rock"
+                              ? "!border-red-500/30 !bg-red-500/10 !text-red-400"
                               : undefined
                           }
                         >
                           <span className="whitespace-nowrap">
                             {suggestion.style === "funk" ? "Funk" :
-                             suggestion.style === "rap" ? "Rap/Trap" :
+                             suggestion.style === "trap" ? "Trap" :
+                             suggestion.style === "rap" ? "Rap" :
                              suggestion.style === "sertanejo" ? "Sertanejo" :
                              suggestion.style === "pagode" ? "Pagode" :
                              suggestion.style === "piseiro" ? "Piseiro" :
                              suggestion.style === "reggae" ? "Reggae" :
+                             suggestion.style === "rock" ? "Rock" :
                              "Pop"}
                           </span>
                         </StatusBadge>

@@ -2,13 +2,8 @@
 
 /**
  * PlaylistKworbSuggestions
- *
  * Shown at the bottom of the playlist editor page.
- * Fetches Kworb BR Top 200, filters by the playlist genre,
- * excludes tracks already in the playlist, and lets the user
- * add tracks directly to the playlist being edited.
- *
- * Does NOT touch PlaylistEditor, CurationTable, or any other component.
+ * Uses genre-detection.ts (same logic as curation-table) so genre matching is consistent.
  */
 
 import { useEffect, useState } from "react";
@@ -16,133 +11,23 @@ import { Loader2, Plus, Check } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import StatusBadge from "./status-badge";
+import { detectGenre, detectPlaylistGenre, GENRE_LABEL, type TrackGenre } from "@/lib/genre-detection";
 import type { BrDailyEntry, BrDailyResponse } from "@/app/api/kworb/br-daily/route";
 
-// ---------------------------------------------------------------------------
-// Genre detection — mirrors curation-table.tsx logic but simplified to vibe
-// ---------------------------------------------------------------------------
-
-type Vibe =
-  | "funk"
-  | "trap"
-  | "rap"
-  | "sertanejo"
-  | "pagode"
-  | "piseiro"
-  | "pop"
-  | "reggae"
-  | "unknown";
-
-function normalize(s: string) {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
-}
-
-function matches(text: string, terms: string[]) {
-  return terms.some((t) => text.includes(t));
-}
-
-// ---------------------------------------------------------------------------
-// Each playlist keyword maps to exactly ONE vibe — no overlaps.
-// Each artist/track keyword maps to exactly ONE vibe — no overlaps.
-// This prevents "samba" playlists from getting "pagode" suggestions and vice-versa.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// PLAYLIST_VIBE_MAP — detects vibe from playlist name/description
-// Each keyword belongs to exactly one vibe. First match wins.
-// ---------------------------------------------------------------------------
-const PLAYLIST_VIBE_MAP: Array<[string[], Vibe]> = [
-  [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave"], "funk"],
-  [["trap"], "trap"],
-  [["rap", "drill", "hip hop", "hip-hop"], "rap"],
-  [["sertanejo", "modao", "agro", "universitario", "caipira"], "sertanejo"],
-  [["pagode", "samba", "axe"], "pagode"],          // pagode AND samba → same vibe
-  [["piseiro", "pisadinha", "forro", "nordeste", "xote"], "piseiro"],
-  [["pop", "hits", "viral", "top", "internacional"], "pop"],
-  [["reggae", "roots"], "reggae"],
-];
-
-// ---------------------------------------------------------------------------
-// TRACK_VIBE_MAP — detects vibe from first artist + track name
-// Must mirror curation-table.tsx detectTrackStyle exactly.
-// First match wins — no artist appears in more than one entry.
-// ---------------------------------------------------------------------------
-const TRACK_VIBE_MAP: Array<[string[], Vibe]> = [
-  // funk
-  [["funk", "baile", "mandelao", "automotivo", "proibidao", "rave",
-    "poze do rodo", "pedro sampaio", "anitta",
-    "mc ryan sp", "mc ig", "mc luuky", "mc gu", "lele jp",
-  ], "funk"],
-  // trap
-  [["trap",
-    "matue", "matuê", "veigh", "sotam", "kayblack",
-    "supernova ent", "marina sena",
-  ], "trap"],
-  // rap
-  [["drill", "hip hop", "hip-hop",
-    "mc cabelinho", "2zdnizz", "hhr",
-    "racionais", "charlie brown", "bk",
-    "nanda tsunami", "nandatsunami",
-    "poesia acustica",
-  ], "rap"],
-  // sertanejo
-  [["sertanejo", "modao", "agro", "universitario",
-    "ze neto", "cristiano", "murilo huff", "marilia mendonca", "gusttavo lima",
-    "simone mendes", "luan santana", "zeze di camargo",
-    "henrique e juliano", "henrique & juliano",
-    "matheus e kauan", "matheus & kauan",
-    "maiara e maraisa", "maiara & maraisa",
-    "ze felipe", "lauana prado",
-    "guilherme e benuto", "guilherme & benuto",
-  ], "sertanejo"],
-  // pagode — pagode AND samba keywords both → pagode vibe (same bucket as playlist)
-  [["pagode", "samba",
-    "menos e mais", "ferrugem", "thiaguinho", "sorriso maroto",
-    "turma do pagode", "mumuzinho", "molejo",
-  ], "pagode"],
-  // piseiro
-  [["piseiro", "pisadinha", "forro",
-    "vitinho imperator", "nattan", "ze vaqueiro",
-    "mari fernandez", "grelo", "natanzinho lima",
-  ], "piseiro"],
-  // pop
-  [["kpop", "michael jackson", "justin bieber", "bts"], "pop"],
-  // reggae
-  [["natiruts", "reggae", "o rappa"], "reggae"],
-];
-
-/** Infer vibe from playlist name + description — first match wins */
-function inferPlaylistVibe(name: string, description: string): Vibe {
-  const t = normalize(`${name} ${description}`);
-  for (const [terms, vibe] of PLAYLIST_VIBE_MAP) {
-    if (matches(t, terms)) return vibe;
-  }
-  return "unknown";
-}
-
-/** Check if a Kworb track belongs to the target vibe — first match wins.
- *  Uses only the FIRST artist (before comma/&/feat) as the primary genre signal.
- *  Track name is included as secondary (for genre keywords in title like "Pagode").
- */
-function trackMatchesVibe(entry: BrDailyEntry, vibe: Vibe): boolean {
-  if (vibe === "unknown") return false;
-  const firstArtist = normalize(entry.artist.split(/[,&]|feat\.|part\./i)[0].trim());
-  const trackName = normalize(entry.trackName);
-  const t = `${firstArtist} ${trackName}`.trim();
-  for (const [terms, trackVibe] of TRACK_VIBE_MAP) {
-    if (matches(t, terms)) return trackVibe === vibe;
-  }
-  return false; // no match → don't suggest
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 type SuggestionState = "idle" | "adding" | "added" | "error";
+
+const GENRE_TONE: Record<TrackGenre, "blue" | "green" | "yellow" | "slate" | "purple"> = {
+  funk: "slate",
+  trap: "yellow",
+  rap: "yellow",
+  sertanejo: "blue",
+  pagode: "green",
+  piseiro: "slate",
+  pop: "purple",
+  rock: "slate",
+  reggae: "green",
+  unknown: "slate",
+};
 
 export default function PlaylistKworbSuggestions({
   playlistId,
@@ -159,22 +44,23 @@ export default function PlaylistKworbSuggestions({
   const [loading, setLoading] = useState(true);
   const [buttonState, setButtonState] = useState<Record<string, SuggestionState>>({});
 
-  const vibe = inferPlaylistVibe(playlistName, playlistDescription);
+  const vibe = detectPlaylistGenre(playlistName, playlistDescription);
   const currentSet = new Set(currentTrackIds);
 
   useEffect(() => {
     fetch("/api/kworb/br-daily")
       .then((r) => r.json())
-      .then((data: BrDailyResponse) => {
-        setEntries(data.entries ?? []);
-      })
+      .then((data: BrDailyResponse) => setEntries(data.entries ?? []))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const suggestions = entries.filter(
-    (e) => !currentSet.has(e.trackId) && trackMatchesVibe(e, vibe),
-  ).slice(0, 20);
+  // Filter: same genre as playlist + not already in it
+  const suggestions = entries.filter((e) => {
+    if (currentSet.has(e.trackId)) return false;
+    const trackGenre = detectGenre(e.artist, e.trackName);
+    return trackGenre === vibe;
+  }).slice(0, 20);
 
   async function handleAdd(entry: BrDailyEntry) {
     setButtonState((s) => ({ ...s, [entry.trackId]: "adding" }));
@@ -194,18 +80,6 @@ export default function PlaylistKworbSuggestions({
     }
   }
 
-  const vibeLabel: Record<Vibe, string> = {
-    funk: "Funk",
-    trap: "Trap",
-    rap: "Rap",
-    sertanejo: "Sertanejo",
-    pagode: "Pagode",
-    piseiro: "Piseiro/Forró",
-    pop: "Pop",
-    reggae: "Reggae",
-    unknown: "Desconhecido",
-  };
-
   return (
     <Container className="border-b border-border py-6">
       <div className="mb-5">
@@ -215,7 +89,7 @@ export default function PlaylistKworbSuggestions({
         <div className="mt-2 flex items-baseline gap-3">
           <h2 className="text-2xl font-semibold">Top 200 BR — compatíveis com esta playlist</h2>
           {vibe !== "unknown" && (
-            <StatusBadge tone="blue">{vibeLabel[vibe]}</StatusBadge>
+            <StatusBadge tone={GENRE_TONE[vibe]}>{GENRE_LABEL[vibe]}</StatusBadge>
           )}
         </div>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -232,7 +106,7 @@ export default function PlaylistKworbSuggestions({
         <div className="rounded-xl border border-border bg-card/60 px-4 py-8 text-center text-sm text-muted-foreground">
           Não foi possível detectar o gênero desta playlist pelo nome/descrição.
           <br />
-          Renomeie a playlist com um termo de gênero (ex: funk, trap, sertanejo) para ativar as sugestões.
+          Inclua um termo de gênero no nome (ex: funk, trap, sertanejo, pagode) para ativar as sugestões.
         </div>
       ) : suggestions.length === 0 ? (
         <div className="rounded-xl border border-border bg-card/60 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -245,7 +119,7 @@ export default function PlaylistKworbSuggestions({
               <col style={{ width: "52px" }} />
               <col />
               <col style={{ width: "110px" }} />
-              <col style={{ width: "100px" }} />
+              <col style={{ width: "110px" }} />
             </colgroup>
             <thead className="bg-muted/20">
               <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
