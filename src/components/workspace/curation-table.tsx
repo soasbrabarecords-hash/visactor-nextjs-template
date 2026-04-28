@@ -50,8 +50,9 @@ function mapSpotifyGenresToStyle(genres: string[]): TrackStyle {
   // by checking the first genre string that matches known patterns
   const genreMap: Array<[RegExp, TrackStyle]> = [
     [/funk|baile/i, "funk"],
-    [/\btrap\b/i, "trap"],
+    // rap checked before trap — Spotify often tags rap artists with "trap brasileiro"
     [/\brap\b|hip.?hop|drill/i, "rap"],
+    [/\btrap\b/i, "trap"],
     [/sertanejo/i, "sertanejo"],
     [/pagode|samba/i, "pagode"],
     [/forro|piseiro|pisadinha/i, "piseiro"],
