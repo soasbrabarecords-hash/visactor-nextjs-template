@@ -38,6 +38,7 @@ export type LabelTrack = {
   audio_url: string | null;
   contract_url: string | null;
   notes: string | null;
+  lyrics: string | null;
   created_at: string;
 };
 

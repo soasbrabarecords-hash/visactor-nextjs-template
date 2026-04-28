@@ -51,6 +51,7 @@ type TrackData = {
   explicit: boolean;
   release_date: string;
   notes: string;
+  lyrics: string;
   coverFile: File | null;
   audioFile: File | null;
   contractFile: File | null;
@@ -211,6 +212,7 @@ export default function TrackForm({ artists }: Props) {
     explicit: false,
     release_date: "",
     notes: "",
+    lyrics: "",
     coverFile: null,
     audioFile: null,
     contractFile: null,
@@ -305,6 +307,7 @@ export default function TrackForm({ artists }: Props) {
           explicit: trackData.explicit,
           release_date: trackData.release_date || null,
           notes: trackData.notes || null,
+          lyrics: trackData.lyrics || null,
           status: "draft",
           cover_url,
           audio_url,
@@ -502,10 +505,24 @@ export default function TrackForm({ artists }: Props) {
 
       {/* ── STEP 2 — OBRA ── */}
       {step === 2 && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-5">
           <div className="rounded-md border border-border bg-slate-50 px-4 py-3 text-sm text-muted-foreground dark:bg-slate-900">
-            Distribua 100% da <strong>Obra</strong> entre os compositores da faixa.
+            Distribua 100% da <strong>Obra</strong> entre os compositores da faixa e preencha a letra.
           </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-semibold">Letra da música</label>
+            <textarea
+              rows={10}
+              placeholder="Cole ou escreva a letra completa aqui..."
+              value={trackData.lyrics}
+              onChange={(e) => setTrackData((d) => ({ ...d, lyrics: e.target.value }))}
+              className={inputCls()}
+            />
+          </div>
+
+          <div className="border-t border-border" />
+
           <SplitEditor
             rows={obraRows}
             onChange={setObraRows}
