@@ -77,6 +77,8 @@ export function detectGenre(
     "joao gustavo e murilo",
     "guilherme e benuto", "guilherme & benuto",
     "zeze di camargo", "zezé di camargo",
+    "fernando & sorocaba", "fernando e sorocaba",
+    "jorge & mateus", "jorge e mateus",
   ]);
   if (sertanejoScore > 0) return "sertanejo";
 
@@ -87,6 +89,7 @@ export function detectGenre(
     "ferrugem", "thiaguinho", "sorriso maroto",
     "turma do pagode", "mumuzinho", "molejo",
     "leo foguete", "yan",
+    "henrique casttro", "henrique castro",
   ]);
   if (pagodeScore > 0) return "pagode";
 
