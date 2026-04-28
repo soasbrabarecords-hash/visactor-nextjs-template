@@ -3,6 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { LabelArtist, TrackParticipant } from "@/lib/label-os";
+import {
+  parsePercentageInput,
+  formatPercentage,
+  sumPercentages,
+  isPercentageEqual,
+} from "@/lib/percentage";
 
 const ROLES: { value: string; label: string }[] = [
   { value: "main_artist", label: "Artista Principal" },
@@ -21,14 +27,26 @@ type Props = {
   participants: TrackParticipant[];
 };
 
-function sumPercent(
+function sumField(
   participants: TrackParticipant[],
   field: keyof Pick<
     TrackParticipant,
     "royalty_percentage" | "publishing_percentage" | "master_percentage"
   >,
 ): number {
-  return participants.reduce((acc, p) => acc + (Number(p[field]) || 0), 0);
+  return sumPercentages(participants.map((p) => p[field]));
+}
+
+function totalColor(total: number): string {
+  if (isPercentageEqual(total, 100)) return "text-green-700 dark:text-green-400";
+  if (total > 100) return "text-red-700 dark:text-red-400";
+  return "text-slate-600 dark:text-slate-400";
+}
+
+function totalBg(total: number): string {
+  if (isPercentageEqual(total, 100)) return "bg-green-50 dark:bg-green-950";
+  if (total > 100) return "bg-red-50 dark:bg-red-950";
+  return "bg-slate-50 dark:bg-slate-800";
 }
 
 export default function AddParticipantForm({
@@ -40,23 +58,25 @@ export default function AddParticipantForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // live totals including what's already saved
-  const [royalty, setRoyalty] = useState(0);
-  const [publishing, setPublishing] = useState(0);
-  const [master, setMaster] = useState(0);
+  // string state to allow comma/dot while typing
+  const [royalty, setRoyalty] = useState("0");
+  const [publishing, setPublishing] = useState("0");
+  const [master, setMaster] = useState("0");
 
-  const savedRoyalty = sumPercent(participants, "royalty_percentage");
-  const savedPublishing = sumPercent(participants, "publishing_percentage");
-  const savedMaster = sumPercent(participants, "master_percentage");
+  const savedRoyalty = sumField(participants, "royalty_percentage");
+  const savedPublishing = sumField(participants, "publishing_percentage");
+  const savedMaster = sumField(participants, "master_percentage");
 
-  const previewRoyalty = savedRoyalty + royalty;
-  const previewPublishing = savedPublishing + publishing;
-  const previewMaster = savedMaster + master;
+  const previewRoyalty = sumPercentages([savedRoyalty, royalty]);
+  const previewPublishing = sumPercentages([savedPublishing, publishing]);
+  const previewMaster = sumPercentages([savedMaster, master]);
 
   const hasOverflow =
-    previewRoyalty > 100 || previewPublishing > 100 || previewMaster > 100;
+    previewRoyalty > 100 + 0.01 ||
+    previewPublishing > 100 + 0.01 ||
+    previewMaster > 100 + 0.01;
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (hasOverflow) {
       setError("A soma de alguma porcentagem ultrapassa 100%. Corrija antes de salvar.");
@@ -70,9 +90,9 @@ export default function AddParticipantForm({
     const body = {
       artist_id: formData.get("artist_id") as string,
       role: formData.get("role") as string,
-      royalty_percentage: Number(formData.get("royalty_percentage") ?? 0),
-      publishing_percentage: Number(formData.get("publishing_percentage") ?? 0),
-      master_percentage: Number(formData.get("master_percentage") ?? 0),
+      royalty_percentage: parsePercentageInput(royalty),
+      publishing_percentage: parsePercentageInput(publishing),
+      master_percentage: parsePercentageInput(master),
     };
 
     try {
@@ -88,17 +108,16 @@ export default function AddParticipantForm({
       }
 
       router.refresh();
-      // reset form
       (e.target as HTMLFormElement).reset();
-      setRoyalty(0);
-      setPublishing(0);
-      setMaster(0);
+      setRoyalty("0");
+      setPublishing("0");
+      setMaster("0");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-5">
@@ -115,16 +134,12 @@ export default function AddParticipantForm({
         ).map(({ label, current }) => (
           <div
             key={label}
-            className={`rounded-md px-3 py-2 text-center text-sm ${
-              current > 100
-                ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400"
-                : current === 100
-                  ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400"
-                  : "bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-            }`}
+            className={`rounded-md px-3 py-2 text-center text-sm ${totalBg(current)}`}
           >
-            <div className="font-medium">{label}</div>
-            <div className="text-lg font-semibold">{current}%</div>
+            <div className={`font-medium ${totalColor(current)}`}>{label}</div>
+            <div className={`text-lg font-semibold ${totalColor(current)}`}>
+              {formatPercentage(current)}
+            </div>
           </div>
         ))}
       </div>
@@ -193,12 +208,10 @@ export default function AddParticipantForm({
             <input
               id="royalty_percentage"
               name="royalty_percentage"
-              type="number"
-              min={0}
-              max={100}
-              step={0.01}
-              defaultValue={0}
-              onChange={(e) => setRoyalty(Number(e.target.value) || 0)}
+              type="text"
+              inputMode="decimal"
+              value={royalty}
+              onChange={(e) => setRoyalty(e.target.value)}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
             />
           </div>
@@ -209,12 +222,10 @@ export default function AddParticipantForm({
             <input
               id="publishing_percentage"
               name="publishing_percentage"
-              type="number"
-              min={0}
-              max={100}
-              step={0.01}
-              defaultValue={0}
-              onChange={(e) => setPublishing(Number(e.target.value) || 0)}
+              type="text"
+              inputMode="decimal"
+              value={publishing}
+              onChange={(e) => setPublishing(e.target.value)}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
             />
           </div>
@@ -225,12 +236,10 @@ export default function AddParticipantForm({
             <input
               id="master_percentage"
               name="master_percentage"
-              type="number"
-              min={0}
-              max={100}
-              step={0.01}
-              defaultValue={0}
-              onChange={(e) => setMaster(Number(e.target.value) || 0)}
+              type="text"
+              inputMode="decimal"
+              value={master}
+              onChange={(e) => setMaster(e.target.value)}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600"
             />
           </div>
