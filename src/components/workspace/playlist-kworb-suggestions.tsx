@@ -126,10 +126,15 @@ function inferPlaylistVibe(name: string, description: string): Vibe {
   return "unknown";
 }
 
-/** Check if a Kworb track belongs to the target vibe — first match wins */
+/** Check if a Kworb track belongs to the target vibe — first match wins.
+ *  Uses only the FIRST artist (before comma/&/feat) as the primary genre signal.
+ *  Track name is included as secondary (for genre keywords in title like "Pagode").
+ */
 function trackMatchesVibe(entry: BrDailyEntry, vibe: Vibe): boolean {
   if (vibe === "unknown") return false;
-  const t = normalize(`${entry.trackName} ${entry.artist}`);
+  const firstArtist = normalize(entry.artist.split(/[,&]|feat\.|part\./i)[0].trim());
+  const trackName = normalize(entry.trackName);
+  const t = `${firstArtist} ${trackName}`.trim();
   for (const [terms, trackVibe] of TRACK_VIBE_MAP) {
     if (matches(t, terms)) return trackVibe === vibe;
   }

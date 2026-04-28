@@ -102,7 +102,17 @@ function countMatches(text: string, terms: string[]) {
 }
 
 function detectTrackStyle(row: DecisionTrack): TrackStyle {
-  const text = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
+  // First artist defines the genre when there are collabs.
+  // e.g. "Grupo Menos é Mais, Simone Mendes" → pagode (first artist wins)
+  const firstArtist = normalizeText(row.artists.split(/[,&]|feat\.|part\./i)[0].trim());
+  const trackName = normalizeText(row.name);
+  // Full text used only as fallback for keyword-in-title detection (genre tags in track name)
+  const fullText = normalizeText(`${row.name} ${row.artists} ${row.albumName}`);
+  // Primary text = first artist + track name only (no secondary artists)
+  // This ensures collabs are genre-classified by the lead artist, not the featured one.
+  const text = `${firstArtist} ${trackName}`.trim() || fullText;
+  // fullText is kept for album-name keyword fallback (not used in scoring below)
+  void fullText;
   const funkScore = countMatches(text, [
     "mc",
     "dj",
