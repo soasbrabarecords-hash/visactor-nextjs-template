@@ -352,7 +352,7 @@ export default function SpotifyChartsClient({
                         <div className="flex items-center gap-2 min-w-0">
                           <div
                             className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
-                            style={coverStyle(null)}
+                            style={coverStyle(track.image_url ?? null)}
                           />
                           <div className="min-w-0">
                             <div className="truncate font-semibold text-sm leading-tight">
