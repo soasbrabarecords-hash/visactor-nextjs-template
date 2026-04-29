@@ -36,6 +36,10 @@ export default function Navigation() {
       return pathname === "/label-os" || pathname.startsWith("/label-os/");
     }
 
+    if (href === "/spotify-charts") {
+      return pathname === "/spotify-charts" || pathname.startsWith("/spotify-charts/");
+    }
+
     return pathname === href;
   }
 

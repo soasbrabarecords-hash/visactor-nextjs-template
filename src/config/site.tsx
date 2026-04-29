@@ -4,6 +4,7 @@ import {
   ListMusic,
   Radio,
   Library,
+  BarChart2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,6 +40,11 @@ export const navigations: Navigation[] = [
     icon: Compass,
     name: "Curadoria",
     href: "/curadoria",
+  },
+  {
+    icon: BarChart2,
+    name: "Spotify Charts",
+    href: "/spotify-charts",
   },
   {
     icon: Library,

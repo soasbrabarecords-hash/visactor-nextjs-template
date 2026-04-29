@@ -6,7 +6,15 @@ import {
   getLabelTrackById,
   getTrackParticipants,
 } from "@/lib/label-os";
+import {
+  getTrackCompositions,
+  getTrackMasterSplits,
+  getTrackRoyaltySplits,
+} from "@/lib/label-splits";
 import AddParticipantForm from "@/components/label-os/add-participant-form";
+import CompositionForm from "@/components/label-os/composition-form";
+import MasterSplitForm from "@/components/label-os/master-split-form";
+import RoyaltySplitForm from "@/components/label-os/royalty-split-form";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +28,10 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   ready: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  released: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
-  archived: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  released:
+    "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  archived:
+    "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -35,17 +45,66 @@ const ROLE_LABEL: Record<string, string> = {
   other: "Outro",
 };
 
+function pctColor(total: number) {
+  if (Math.abs(total - 100) < 0.01) return "text-green-600 dark:text-green-400";
+  if (total > 100) return "text-red-600 dark:text-red-400";
+  return "text-amber-600 dark:text-amber-400";
+}
+
+function SplitSectionHeader({
+  title,
+  total,
+  count,
+}: {
+  title: string;
+  total: number;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-border px-5 py-3">
+      <h3 className="text-sm font-semibold">
+        {title}
+        <span className="ml-2 text-xs font-normal text-muted-foreground">
+          ({count})
+        </span>
+      </h3>
+      {count > 0 && (
+        <span className={`text-sm font-bold ${pctColor(total)}`}>
+          {total.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%
+        </span>
+      )}
+    </div>
+  );
+}
+
 type Props = { params: Promise<{ id: string }> };
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params;
 
-  const [track, participants] = await Promise.all([
-    getLabelTrackById(id),
-    getTrackParticipants(id),
-  ]);
+  const [track, participants, compositions, masterSplits, royaltySplits] =
+    await Promise.all([
+      getLabelTrackById(id),
+      getTrackParticipants(id),
+      getTrackCompositions(id),
+      getTrackMasterSplits(id),
+      getTrackRoyaltySplits(id),
+    ]);
 
   if (!track) notFound();
+
+  const compositionTotal = compositions.reduce<number>(
+    (acc, c) => acc + c.percentage,
+    0,
+  );
+  const masterTotal = masterSplits.reduce<number>(
+    (acc, s) => acc + s.percentage,
+    0,
+  );
+  const royaltyTotal = royaltySplits.reduce<number>(
+    (acc, s) => acc + s.percentage,
+    0,
+  );
 
   return (
     <div>
@@ -64,10 +123,8 @@ export default async function TrackDetailPage({ params }: Props) {
 
       <Container className="py-8">
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-
           {/* Coluna principal */}
           <div className="flex flex-col gap-6">
-
             {/* Header da track */}
             <div className="flex gap-5">
               {track.cover_url ? (
@@ -113,7 +170,9 @@ export default async function TrackDetailPage({ params }: Props) {
                     {
                       label: "Lançamento",
                       value: track.release_date
-                        ? new Date(track.release_date).toLocaleDateString("pt-BR")
+                        ? new Date(track.release_date).toLocaleDateString(
+                            "pt-BR",
+                          )
                         : null,
                     },
                     { label: "ISRC", value: track.isrc },
@@ -124,10 +183,7 @@ export default async function TrackDetailPage({ params }: Props) {
                     },
                   ] as { label: string; value: string | null | undefined }[]
                 ).map(({ label, value }) => (
-                  <div
-                    key={label}
-                    className="bg-card px-5 py-3"
-                  >
+                  <div key={label} className="bg-card px-5 py-3">
                     <dt className="text-xs uppercase tracking-wider text-muted-foreground">
                       {label}
                     </dt>
@@ -187,7 +243,7 @@ export default async function TrackDetailPage({ params }: Props) {
               </div>
             )}
 
-            {/* Participantes — tabela */}
+            {/* Participantes legados */}
             <div className="rounded-lg border border-border bg-card">
               <div className="border-b border-border px-5 py-3">
                 <h3 className="text-sm font-semibold">
@@ -250,7 +306,6 @@ export default async function TrackDetailPage({ params }: Props) {
                         </tr>
                       ))}
                     </tbody>
-                    {/* Totais */}
                     <tfoot>
                       <tr className="border-t border-border bg-slate-50 dark:bg-slate-900">
                         <td
@@ -273,13 +328,7 @@ export default async function TrackDetailPage({ params }: Props) {
                           return (
                             <td
                               key={field}
-                              className={`px-4 py-2.5 text-right text-xs font-semibold ${
-                                total > 100
-                                  ? "text-red-600 dark:text-red-400"
-                                  : total === 100
-                                    ? "text-green-600 dark:text-green-400"
-                                    : ""
-                              }`}
+                              className={`px-4 py-2.5 text-right text-xs font-semibold ${pctColor(total)}`}
                             >
                               {total}%
                             </td>
@@ -290,6 +339,54 @@ export default async function TrackDetailPage({ params }: Props) {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* ── OBRA (Composições) ─────────────────────────────────────────── */}
+            <div className="rounded-lg border border-border bg-card">
+              <SplitSectionHeader
+                title="Obra — Composições"
+                total={compositionTotal}
+                count={compositions.length}
+              />
+              <div className="px-5 py-4">
+                <CompositionForm
+                  trackId={track.id}
+                  existing={compositions}
+                  onSaved={() => {}}
+                />
+              </div>
+            </div>
+
+            {/* ── FONOGRAMA (Master Splits) ──────────────────────────────────── */}
+            <div className="rounded-lg border border-border bg-card">
+              <SplitSectionHeader
+                title="Fonograma — Master"
+                total={masterTotal}
+                count={masterSplits.length}
+              />
+              <div className="px-5 py-4">
+                <MasterSplitForm
+                  trackId={track.id}
+                  existing={masterSplits}
+                  onSaved={() => {}}
+                />
+              </div>
+            </div>
+
+            {/* ── ROYALTIES SHARE ───────────────────────────────────────────── */}
+            <div className="rounded-lg border border-border bg-card">
+              <SplitSectionHeader
+                title="Royalties Share"
+                total={royaltyTotal}
+                count={royaltySplits.length}
+              />
+              <div className="px-5 py-4">
+                <RoyaltySplitForm
+                  trackId={track.id}
+                  existing={royaltySplits}
+                  onSaved={() => {}}
+                />
+              </div>
             </div>
           </div>
 

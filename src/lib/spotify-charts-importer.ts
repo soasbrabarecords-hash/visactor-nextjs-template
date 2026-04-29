@@ -4,6 +4,11 @@ import {
   type SpotifyChartEntryInput,
   upsertSpotifyChartEntries,
 } from "./spotify-charts-store";
+import {
+  upsertChartSnapshot,
+  upsertChartSnapshotTracks,
+  type ChartSnapshotTrackInput,
+} from "./chart-snapshots";
 
 type SupabaseStreamSnapshotInput = {
   spotify_track_id: string;
@@ -336,6 +341,51 @@ export async function importSpotifyChartRows(
   if (!snapshotsSaved) {
     errors.push("Failed to upsert track_stream_snapshots.");
   }
+
+  // ── Salvar histórico diário estruturado (chart_snapshots) ──────────────────
+  // Agrupa as rows válidas por chart_date + country para criar um snapshot por dia.
+  const byDateCountry = new Map<string, SpotifyChartEntryInput[]>();
+  for (const entry of entryRows) {
+    const key = `${entry.chart_date}::${entry.country}`;
+    const group = byDateCountry.get(key) ?? [];
+    group.push(entry);
+    byDateCountry.set(key, group);
+  }
+
+  for (const [, group] of byDateCountry) {
+    const first = group[0];
+    if (!first) continue;
+
+    const snapshot = await upsertChartSnapshot({
+      chart_date: first.chart_date,
+      country: first.country,
+      total_tracks: group.length,
+    });
+
+    if (!snapshot) {
+      errors.push(`Failed to upsert chart_snapshot for ${first.chart_date}.`);
+      continue;
+    }
+
+    // Ordenar por rank_position para garantir ordem correta
+    const sortedGroup = [...group].sort(
+      (a, b) => a.rank_position - b.rank_position,
+    );
+
+    const trackInputs: ChartSnapshotTrackInput[] = sortedGroup.map((e) => ({
+      chart_date: e.chart_date,
+      position: e.rank_position,
+      previous_position: e.previous_rank ?? null,
+      spotify_track_id: e.spotify_track_id,
+      track_name: e.track_name,
+      artist_name: e.artist_name,
+      streams: e.daily_streams ?? null,
+      genre: e.genre ?? null,
+    }));
+
+    await upsertChartSnapshotTracks(snapshot.id, trackInputs);
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   return {
     insertedCount: entryRows.length,
