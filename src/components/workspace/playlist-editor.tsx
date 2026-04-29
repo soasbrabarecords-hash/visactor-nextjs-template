@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   ExternalLink,
   GripVertical,
   Loader2,
+  Minus,
   Music2,
+  Sparkles,
   Trash2,
   Check,
   X,
@@ -21,6 +25,13 @@ import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 type TrackWithStreams = SpotifyEditablePlaylistTrack & {
   streams: KworbTrackData | null;
   streamsLoading: boolean;
+};
+
+type ChartData = {
+  position: number;
+  positionChange: number | null;
+  movement: "up" | "down" | "stable" | "new";
+  streams: number | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -39,6 +50,34 @@ function formatStreams(n: number | null): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
   return n.toString();
+}
+
+function ChartMovement({ movement, positionChange }: { movement: ChartData["movement"]; positionChange: number | null }) {
+  if (movement === "new") {
+    return (
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+        <Sparkles className="h-2.5 w-2.5" />
+        NEW
+      </span>
+    );
+  }
+  if (movement === "up") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-green-600 dark:text-green-400">
+        <ArrowUp className="h-3 w-3" strokeWidth={2.5} />
+        <span className="text-[10px] font-semibold">{Math.abs(positionChange ?? 0)}</span>
+      </span>
+    );
+  }
+  if (movement === "down") {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400">
+        <ArrowDown className="h-3 w-3" strokeWidth={2.5} />
+        <span className="text-[10px] font-semibold">{Math.abs(positionChange ?? 0)}</span>
+      </span>
+    );
+  }
+  return <Minus className="h-3 w-3 text-muted-foreground" />;
 }
 
 function formatDelta(n: number | null, trend: KworbTrackData["trend"]): string {
@@ -195,6 +234,10 @@ export default function PlaylistEditor({
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragTo, setDragTo] = useState<number | null>(null);
 
+  // Chart snapshot data
+  const [chartMap, setChartMap] = useState<Map<string, ChartData>>(new Map());
+  const [chartLoading, setChartLoading] = useState(true);
+
   // Outros estados
   const [deletingIndices, setDeletingIndices] = useState<Set<number>>(new Set());
   const [pendingReorder, setPendingReorder] = useState(false);
@@ -226,6 +269,49 @@ export default function PlaylistEditor({
     }
     void loadAll();
   }, [initialTracks]);
+
+  // ── Chart snapshot BR ─────────────────────────────────────────────────────
+  useEffect(() => {
+    async function loadChart() {
+      setChartLoading(true);
+      try {
+        const datesRes = await fetch("/api/charts/snapshot-dates?country=BR");
+        if (!datesRes.ok) return;
+        const datesData = (await datesRes.json()) as { dates: string[] };
+        const latestDate = datesData.dates?.[0];
+        if (!latestDate) return;
+
+        const snapRes = await fetch(`/api/charts/snapshot?date=${latestDate}&country=BR`);
+        if (!snapRes.ok) return;
+        const snapData = (await snapRes.json()) as {
+          tracks: Array<{
+            spotify_track_id: string | null;
+            position: number;
+            position_change: number | null;
+            status: "new" | "up" | "down" | "stable";
+            streams: number | null;
+          }>;
+        };
+
+        const map = new Map<string, ChartData>();
+        for (const t of snapData.tracks ?? []) {
+          if (!t.spotify_track_id) continue;
+          map.set(t.spotify_track_id, {
+            position: t.position,
+            positionChange: t.position_change,
+            movement: t.status,
+            streams: t.streams,
+          });
+        }
+        setChartMap(map);
+      } catch {
+        // silently fail — chart data is optional enrichment
+      } finally {
+        setChartLoading(false);
+      }
+    }
+    void loadChart();
+  }, []);
 
   // ── Seleção ───────────────────────────────────────────────────────────────
   function handleRowClick(e: React.MouseEvent, index: number) {
@@ -618,6 +704,12 @@ export default function PlaylistEditor({
                   <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">kworb</span>
                 </span>
               </th>
+              <th className="px-4 py-3">
+                <span className="flex items-center gap-1">
+                  Chart BR
+                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">top 200</span>
+                </span>
+              </th>
               <th className="px-4 py-3">Ações</th>
             </tr>
           </thead>
@@ -727,6 +819,31 @@ export default function PlaylistEditor({
                     }
                   </td>
 
+                  {/* Chart BR */}
+                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
+                    {chartLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/40" />
+                    ) : (() => {
+                      const cd = chartMap.get(track.id) ?? null;
+                      if (!cd) {
+                        return <span className="text-sm text-muted-foreground">—</span>;
+                      }
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold tabular-nums">#{cd.position}</span>
+                            <ChartMovement movement={cd.movement} positionChange={cd.positionChange} />
+                          </div>
+                          {cd.streams !== null && (
+                            <span className="text-[10px] tabular-nums text-muted-foreground">
+                              {formatStreams(cd.streams)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+
                   {/* Ações */}
                   <td className="h-16 overflow-hidden px-4 py-0 align-middle">
                     <div className="flex items-center gap-2">
@@ -748,7 +865,7 @@ export default function PlaylistEditor({
               );
             }) : (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   <Music2 className="mx-auto mb-3 h-5 w-5" />
                   Nenhuma faixa nesta playlist.
                 </td>
