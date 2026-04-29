@@ -114,6 +114,7 @@ export async function upsertChartSnapshotTracks(
     image_url: t.image_url ?? null,
   }));
 
+  // Tenta upsert com onConflict — requer unique constraint (snapshot_id, position)
   const { error } = await supabase
     .from("chart_snapshot_tracks")
     .upsert(rows, { onConflict: "snapshot_id,position" });
@@ -121,7 +122,31 @@ export async function upsertChartSnapshotTracks(
   if (error) {
     const msg = `upsertChartSnapshotTracks error: ${error.message} (code: ${error.code})`;
     process.stderr.write(msg + "\n");
-    return { count: 0, error: msg };
+
+    // Fallback: deleta as faixas existentes do snapshot e insere do zero
+    process.stderr.write(`upsertChartSnapshotTracks fallback: deletando tracks do snapshot ${rows[0]?.snapshot_id} e reinserindo...\n`);
+    const { error: deleteError } = await supabase
+      .from("chart_snapshot_tracks")
+      .delete()
+      .eq("snapshot_id", rows[0]?.snapshot_id ?? "");
+
+    if (deleteError) {
+      const msg2 = `upsertChartSnapshotTracks fallback delete error: ${deleteError.message}`;
+      process.stderr.write(msg2 + "\n");
+      return { count: 0, error: `${msg} | fallback: ${msg2}` };
+    }
+
+    const { error: insertError } = await supabase
+      .from("chart_snapshot_tracks")
+      .insert(rows);
+
+    if (insertError) {
+      const msg3 = `upsertChartSnapshotTracks fallback insert error: ${insertError.message}`;
+      process.stderr.write(msg3 + "\n");
+      return { count: 0, error: `${msg} | fallback: ${msg3}` };
+    }
+
+    return { count: tracks.length, error: null };
   }
 
   return { count: tracks.length, error: null };

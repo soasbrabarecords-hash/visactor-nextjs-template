@@ -339,15 +339,10 @@ export async function importSpotifyChartRows(
     };
   }
 
+  // pipeline antiga — compatibilidade apenas, não bloqueia o salvamento principal
   const entriesSaved = await upsertSpotifyChartEntries(entryRows);
-
   if (!entriesSaved) {
-    return {
-      insertedCount: 0,
-      skippedCount: skippedCount + entryRows.length,
-      errors: [...errors, `[debug] parsedRows=${parsedRows} validRows=${validRows} — falha ao salvar spotify_chart_entries.`],
-      debug: { parsedRows, validRows, entriesSaved: false, snapshotCreated: false, tracksSaved: 0, tracksError: "upsert spotify_chart_entries failed" },
-    };
+    errors.push(`[debug] spotify_chart_entries: falha no upsert (não crítico, continuando).`);
   }
 
   const snapshotsSaved = await upsertTrackStreamSnapshots(snapshotRows);
