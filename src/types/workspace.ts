@@ -263,6 +263,10 @@ export type DecisionTrack = {
   decisionScore: number;
   recommendedAction: DecisionAction;
   scoreBreakdown: ScoreBreakdownItem[];
+  // Enriquecimento de posição — vindos do chart_snapshot_tracks
+  movement_type: "up" | "down" | "stable" | "new";
+  position_change: number | null;
+  previous_position: number | null;
 };
 
 export type CurationPageData = {

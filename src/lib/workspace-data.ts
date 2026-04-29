@@ -991,6 +991,17 @@ function buildCurationRows(
       recommendedAction = "ignore";
     }
 
+    // Mapear movement.type para o enum de 4 valores esperado pela curadoria
+    const mvType = row.movement.type;
+    const movement_type: DecisionTrack["movement_type"] =
+      mvType === "up" || mvType === "reentry"
+        ? "up"
+        : mvType === "down"
+          ? "down"
+          : mvType === "new"
+            ? "new"
+            : "stable";
+
     return {
       trackId: row.trackId,
       name: row.name,
@@ -1016,6 +1027,9 @@ function buildCurationRows(
       decisionScore,
       recommendedAction,
       scoreBreakdown: row.scoreBreakdown,
+      movement_type,
+      position_change: row.rankChange ?? null,
+      previous_position: row.previousRank ?? null,
     };
   });
 }
