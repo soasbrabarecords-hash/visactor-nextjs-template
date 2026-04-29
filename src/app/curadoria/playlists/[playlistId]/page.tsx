@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Music2 } from "lucide-react";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import { Button } from "@/components/ui/button";
 import PageIntro from "@/components/page-intro";
-import StatusBadge from "@/components/workspace/status-badge";
 import PlaylistEditor from "@/components/workspace/playlist-editor";
 import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
 import {
@@ -13,15 +12,6 @@ import {
 } from "@/lib/spotify-user";
 
 export const dynamic = "force-dynamic";
-
-function coverStyle(coverUrl: string | null) {
-  if (!coverUrl) return undefined;
-  return {
-    backgroundImage: `url(${coverUrl})`,
-    backgroundPosition: "center",
-    backgroundSize: "cover",
-  };
-}
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -69,77 +59,105 @@ export default async function SpotifyPlaylistEditorPage({
   return (
     <div>
       <TopNav title="Editar playlist" />
-      <PageIntro
-        eyebrow="Curadoria Spotify"
-        title={playlist.name}
-        description="Selecione uma faixa com o mouse ou teclado. Pressione Delete para remover. Arraste pelo grip para reordenar. Clique no nome ou descrição para editar."
-      />
 
-      <Container className="border-b border-border py-6">
-        <div className="grid gap-5 laptop:grid-cols-[148px_1fr_auto] laptop:items-start">
+      {/* ── Spotify-style header ── */}
+      <div className="relative overflow-hidden" style={{ minHeight: "320px" }}>
+        {/* Background: blurred cover + dark gradient overlay */}
+        {playlist.imageUrl && (
           <div
-            className="h-36 w-36 rounded-3xl border border-border bg-muted shadow-2xl"
-            style={coverStyle(playlist.imageUrl)}
+            className="absolute inset-0 scale-110"
+            style={{
+              backgroundImage: `url(${playlist.imageUrl})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+              filter: "blur(40px) brightness(0.35) saturate(1.4)",
+            }}
           />
+        )}
+        {/* Dark gradient overlay — sempre presente mesmo sem capa */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: playlist.imageUrl
+              ? "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)"
+              : "linear-gradient(to bottom, hsl(var(--background) / 0.7), hsl(var(--background)))",
+          }}
+        />
 
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <StatusBadge tone={playlist.isPublic ? "green" : "slate"}>
-                {playlist.isPublic ? "Publica" : "Privada"}
-              </StatusBadge>
-              {playlist.isCollaborative ? (
-                <StatusBadge tone="purple">Colaborativa</StatusBadge>
-              ) : null}
-              <StatusBadge tone="blue">Criada pela conta</StatusBadge>
-              <StatusBadge tone="green">Fase 2 ativa</StatusBadge>
+        {/* Content */}
+        <div className="relative z-10 flex flex-col justify-end px-8 pb-8 pt-12 laptop:px-12">
+          <div className="flex flex-col gap-6 laptop:flex-row laptop:items-end">
+
+            {/* Cover art */}
+            <div className="shrink-0">
+              {playlist.imageUrl ? (
+                <div
+                  className="h-40 w-40 rounded-xl shadow-2xl"
+                  style={{
+                    backgroundImage: `url(${playlist.imageUrl})`,
+                    backgroundPosition: "center",
+                    backgroundSize: "cover",
+                    boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+                  }}
+                />
+              ) : (
+                <div className="flex h-40 w-40 items-center justify-center rounded-xl bg-muted shadow-2xl">
+                  <Music2 className="h-16 w-16 text-muted-foreground/40" />
+                </div>
+              )}
             </div>
 
-            <div className="grid gap-3 laptop:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-card/70 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Faixas
-                </div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {formatCount(playlist.tracksTotal)}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/70 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Dono
-                </div>
-                <div className="mt-2 truncate text-lg font-semibold">
-                  {playlist.ownerName}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/70 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  Edicao
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-green-500">
-                  Ativa
-                </div>
-              </div>
-            </div>
-          </div>
+            {/* Info */}
+            <div className="min-w-0 flex-1 space-y-2 text-white">
+              {/* Label */}
+              <p className="text-xs font-semibold uppercase tracking-widest opacity-70">
+                {playlist.isPublic ? "Playlist pública" : "Playlist privada"}
+                {playlist.isCollaborative ? " · Colaborativa" : ""}
+              </p>
 
-          <div className="flex flex-wrap gap-3 laptop:justify-end">
-            <Button asChild variant="outline">
-              <Link href="/curadoria">Voltar</Link>
-            </Button>
-            <Button asChild>
-              <a
-                href={playlist.spotifyUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2"
+              {/* Title */}
+              <h1
+                className="overflow-hidden text-ellipsis font-bold leading-none tracking-tight"
+                style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)" }}
               >
-                Abrir Spotify
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
+                {playlist.name}
+              </h1>
+
+              {/* Description */}
+              {playlist.description && (
+                <p className="max-w-2xl text-sm leading-relaxed opacity-70 line-clamp-2">
+                  {playlist.description}
+                </p>
+              )}
+
+              {/* Metadata */}
+              <div className="flex flex-wrap items-center gap-1 pt-1 text-sm opacity-80">
+                <span className="font-semibold">{playlist.ownerName}</span>
+                <span className="opacity-50">·</span>
+                <span>{formatCount(playlist.tracksTotal)} faixas</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                <Link href="/curadoria">Voltar</Link>
+              </Button>
+              <Button asChild size="sm" className="bg-white text-black hover:bg-white/90">
+                <a
+                  href={playlist.spotifyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2"
+                >
+                  Abrir Spotify
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
-      </Container>
+      </div>
 
       <Container className="border-b border-border py-6">
         <div className="mb-6">
