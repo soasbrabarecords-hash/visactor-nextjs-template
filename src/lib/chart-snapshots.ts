@@ -195,10 +195,36 @@ export async function getSnapshotWithComparison(
   const snapshot = await getSnapshotByDate(chartDate, country);
   if (!snapshot) return { snapshot: null, tracks: [], previousDate: null };
 
-  const currentTracks = await getSnapshotTracks(snapshot.id);
+  const rawTracks = await getSnapshotTracks(snapshot.id);
+
+  // 1b. Enrich image_url from spotify_chart_entries (same spotify_track_id)
+  const supabase = await createClient();
+  const trackIds = rawTracks
+    .map((t) => t.spotify_track_id)
+    .filter((id): id is string => !!id);
+
+  const imageUrlMap = new Map<string, string>();
+  if (trackIds.length > 0) {
+    const { data: entryRows } = await supabase
+      .from("spotify_chart_entries")
+      .select("spotify_track_id,image_url")
+      .in("spotify_track_id", trackIds)
+      .not("image_url", "is", null)
+      .limit(trackIds.length * 2);
+
+    for (const row of entryRows ?? []) {
+      if (row.spotify_track_id && row.image_url && !imageUrlMap.has(row.spotify_track_id)) {
+        imageUrlMap.set(row.spotify_track_id, row.image_url);
+      }
+    }
+  }
+
+  const currentTracks: ChartSnapshotTrack[] = rawTracks.map((t) => ({
+    ...t,
+    image_url: t.image_url ?? (t.spotify_track_id ? imageUrlMap.get(t.spotify_track_id) ?? null : null),
+  }));
 
   // 2. Find previous snapshot date
-  const supabase = await createClient();
   const { data: prevData } = await supabase
     .from("chart_snapshots")
     .select("id, chart_date")
