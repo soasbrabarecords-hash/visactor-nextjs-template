@@ -60,35 +60,70 @@ export type ChartSnapshotTrackInput = {
 };
 
 // ── Upsert snapshot header ────────────────────────────────────────────────────
+//
+// Uses select-then-update-or-insert to avoid depending on a unique constraint
+// that may not exist in the production database.
 
 export async function upsertChartSnapshot(
   input: ChartSnapshotInput,
 ): Promise<ChartSnapshot | null> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  const country = input.country ?? "BR";
+  const chartDate = input.chart_date;
+
+  // 1. Check if a snapshot already exists for this date + country
+  const { data: existing } = await supabase
     .from("chart_snapshots")
-    .upsert(
-      {
-        chart_date: input.chart_date,
-        source: input.source ?? "spotify_charts_csv",
-        country: input.country ?? "BR",
-        chart_type: input.chart_type ?? "top_200_daily",
-        original_filename: input.original_filename ?? null,
+    .select("*")
+    .eq("chart_date", chartDate)
+    .eq("country", country)
+    .maybeSingle();
+
+  if (existing) {
+    // 2a. Update total_tracks and imported_at on the existing row
+    const { data: updated, error: updateError } = await supabase
+      .from("chart_snapshots")
+      .update({
         total_tracks: input.total_tracks,
         imported_at: new Date().toISOString(),
-      },
-      { onConflict: "chart_date" },
-    )
+        source: input.source ?? existing.source ?? "spotify_charts_csv",
+        chart_type: input.chart_type ?? existing.chart_type ?? "top_200_daily",
+        original_filename: input.original_filename ?? existing.original_filename ?? null,
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      process.stderr.write(`upsertChartSnapshot update error: ${updateError.message}\n`);
+      return existing as ChartSnapshot; // return existing row even if update fails
+    }
+
+    return updated as ChartSnapshot;
+  }
+
+  // 2b. Insert a new snapshot row
+  const { data: inserted, error: insertError } = await supabase
+    .from("chart_snapshots")
+    .insert({
+      chart_date: chartDate,
+      source: input.source ?? "spotify_charts_csv",
+      country,
+      chart_type: input.chart_type ?? "top_200_daily",
+      original_filename: input.original_filename ?? null,
+      total_tracks: input.total_tracks,
+      imported_at: new Date().toISOString(),
+    })
     .select()
     .single();
 
-  if (error) {
-    process.stderr.write(`upsertChartSnapshot error: ${error.message}\n`);
+  if (insertError) {
+    process.stderr.write(`upsertChartSnapshot insert error: ${insertError.message}\n`);
     return null;
   }
 
-  return data as ChartSnapshot;
+  return inserted as ChartSnapshot;
 }
 
 // ── Upsert snapshot tracks ────────────────────────────────────────────────────
