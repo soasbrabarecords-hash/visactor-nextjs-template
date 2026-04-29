@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       importedCount: result.insertedCount,
       skippedCount: result.skippedCount,
       errors: result.errors,
+      debug: result.debug ?? null,
     });
   } catch (error) {
     return NextResponse.json(

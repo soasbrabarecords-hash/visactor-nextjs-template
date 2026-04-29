@@ -52,6 +52,14 @@ export type SpotifyChartsImportResult = {
   insertedCount: number;
   skippedCount: number;
   errors: string[];
+  debug?: {
+    parsedRows: number;
+    validRows: number;
+    entriesSaved: boolean;
+    snapshotCreated: boolean;
+    tracksSaved: number;
+    tracksError: string | null;
+  };
 };
 
 function getSupabaseEnv() {
@@ -297,6 +305,8 @@ export async function importSpotifyChartRows(
   const seenKeys = new Set<string>();
   let skippedCount = 0;
 
+  const parsedRows = rows.length;
+
   rows.forEach((row, index) => {
     const validated = validateRow(row, index);
 
@@ -318,11 +328,14 @@ export async function importSpotifyChartRows(
     snapshotRows.push(validated.snapshot);
   });
 
+  const validRows = entryRows.length;
+
   if (entryRows.length === 0) {
     return {
       insertedCount: 0,
       skippedCount,
-      errors,
+      errors: [...errors, `[debug] parsedRows=${parsedRows} validRows=0 — todas as rows falharam na validação.`],
+      debug: { parsedRows, validRows: 0, entriesSaved: false, snapshotCreated: false, tracksSaved: 0, tracksError: null },
     };
   }
 
@@ -332,18 +345,17 @@ export async function importSpotifyChartRows(
     return {
       insertedCount: 0,
       skippedCount: skippedCount + entryRows.length,
-      errors: [...errors, "Failed to upsert spotify_chart_entries."],
+      errors: [...errors, `[debug] parsedRows=${parsedRows} validRows=${validRows} — falha ao salvar spotify_chart_entries.`],
+      debug: { parsedRows, validRows, entriesSaved: false, snapshotCreated: false, tracksSaved: 0, tracksError: "upsert spotify_chart_entries failed" },
     };
   }
 
   const snapshotsSaved = await upsertTrackStreamSnapshots(snapshotRows);
-
   if (!snapshotsSaved) {
-    errors.push("Failed to upsert track_stream_snapshots.");
+    errors.push("[debug] track_stream_snapshots: falha no upsert (não crítico).");
   }
 
   // ── Salvar histórico diário estruturado (chart_snapshots) ──────────────────
-  // Agrupa as rows válidas por chart_date + country para criar um snapshot por dia.
   const byDateCountry = new Map<string, SpotifyChartEntryInput[]>();
   for (const entry of entryRows) {
     const key = `${entry.chart_date}::${entry.country}`;
@@ -351,6 +363,10 @@ export async function importSpotifyChartRows(
     group.push(entry);
     byDateCountry.set(key, group);
   }
+
+  let snapshotCreated = false;
+  let tracksSaved = 0;
+  let tracksError: string | null = null;
 
   for (const [, group] of byDateCountry) {
     const first = group[0];
@@ -363,11 +379,13 @@ export async function importSpotifyChartRows(
     });
 
     if (!snapshot) {
-      errors.push(`Failed to upsert chart_snapshot for ${first.chart_date}.`);
+      const msg = `[debug] chart_snapshot upsert falhou para ${first.chart_date} (country=${first.country}).`;
+      errors.push(msg);
       continue;
     }
 
-    // Ordenar por rank_position para garantir ordem correta
+    snapshotCreated = true;
+
     const sortedGroup = [...group].sort(
       (a, b) => a.rank_position - b.rank_position,
     );
@@ -384,7 +402,13 @@ export async function importSpotifyChartRows(
       image_url: e.image_url ?? null,
     }));
 
-    await upsertChartSnapshotTracks(snapshot.id, trackInputs);
+    const tracksResult = await upsertChartSnapshotTracks(snapshot.id, trackInputs);
+    tracksSaved = tracksResult.count;
+    tracksError = tracksResult.error;
+
+    if (tracksResult.error) {
+      errors.push(`[debug] chart_snapshot_tracks (${first.chart_date}): ${tracksResult.error}`);
+    }
   }
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -392,5 +416,6 @@ export async function importSpotifyChartRows(
     insertedCount: entryRows.length,
     skippedCount,
     errors,
+    debug: { parsedRows, validRows, entriesSaved: true, snapshotCreated, tracksSaved, tracksError },
   };
 }

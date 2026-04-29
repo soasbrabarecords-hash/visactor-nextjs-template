@@ -96,8 +96,8 @@ export async function upsertChartSnapshot(
 export async function upsertChartSnapshotTracks(
   snapshotId: string,
   tracks: ChartSnapshotTrackInput[],
-): Promise<number> {
-  if (tracks.length === 0) return 0;
+): Promise<{ count: number; error: string | null }> {
+  if (tracks.length === 0) return { count: 0, error: null };
 
   const supabase = await createClient();
 
@@ -119,11 +119,12 @@ export async function upsertChartSnapshotTracks(
     .upsert(rows, { onConflict: "snapshot_id,position" });
 
   if (error) {
-    process.stderr.write(`upsertChartSnapshotTracks error: ${error.message}\n`);
-    return 0;
+    const msg = `upsertChartSnapshotTracks error: ${error.message} (code: ${error.code})`;
+    process.stderr.write(msg + "\n");
+    return { count: 0, error: msg };
   }
 
-  return tracks.length;
+  return { count: tracks.length, error: null };
 }
 
 // ── List available dates ──────────────────────────────────────────────────────
