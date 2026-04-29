@@ -139,7 +139,16 @@ export async function getSnapshotDates(country = "BR"): Promise<string[]> {
 
   if (error) return [];
 
-  return (data ?? []).map((r: { chart_date: string }) => r.chart_date);
+  // Deduplica e mantém a ordem DESC — chart_date é string ISO, ordem lexicográfica = cronológica
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const r of data ?? []) {
+    if (!seen.has(r.chart_date)) {
+      seen.add(r.chart_date);
+      unique.push(r.chart_date);
+    }
+  }
+  return unique;
 }
 
 // ── Get snapshot header for a date ───────────────────────────────────────────
