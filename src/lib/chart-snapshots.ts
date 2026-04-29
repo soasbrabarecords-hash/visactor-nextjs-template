@@ -27,6 +27,7 @@ export type ChartSnapshotTrack = {
   streams: number | null;
   kworb_streams_24h: number | null;
   genre: string | null;
+  image_url: string | null;
   created_at: string;
 };
 
@@ -55,6 +56,7 @@ export type ChartSnapshotTrackInput = {
   artist_name?: string | null;
   streams?: number | null;
   genre?: string | null;
+  image_url?: string | null;
 };
 
 // ── Upsert snapshot header ────────────────────────────────────────────────────
@@ -109,6 +111,7 @@ export async function upsertChartSnapshotTracks(
     artist_name: t.artist_name ?? null,
     streams: t.streams ?? null,
     genre: t.genre ?? null,
+    image_url: t.image_url ?? null,
   }));
 
   const { error } = await supabase

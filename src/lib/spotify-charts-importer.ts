@@ -381,6 +381,7 @@ export async function importSpotifyChartRows(
       artist_name: e.artist_name,
       streams: e.daily_streams ?? null,
       genre: e.genre ?? null,
+      image_url: e.image_url ?? null,
     }));
 
     await upsertChartSnapshotTracks(snapshot.id, trackInputs);

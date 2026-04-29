@@ -245,6 +245,7 @@ type ChartSnapshotTrackRaw = {
   streams: number | null;
   kworb_streams_24h: number | null;
   genre: string | null;
+  image_url: string | null;
   created_at: string;
 };
 
@@ -258,10 +259,10 @@ function snapshotTrackToEntryRow(
     spotify_track_id: trackId,
     track_name: row.track_name,
     artist_name: row.artist_name,
-    // Campos ausentes na nova tabela — defaults que a UI tolera sem quebrar
+    // Campos parcialmente presentes na nova tabela
     artist_ids: null,
     album_name: null,
-    image_url: null,
+    image_url: row.image_url?.trim() || null,
     spotify_url: trackId
       ? `https://open.spotify.com/track/${trackId}`
       : null,
@@ -315,7 +316,7 @@ export async function fetchLatestFromSnapshotTracks({
   const tracksUrl = new URL(`${env.url}/rest/v1/chart_snapshot_tracks`);
   tracksUrl.searchParams.set(
     "select",
-    "id,snapshot_id,chart_date,position,previous_position,spotify_track_id,track_name,artist_name,streams,kworb_streams_24h,genre,created_at",
+    "id,snapshot_id,chart_date,position,previous_position,spotify_track_id,track_name,artist_name,streams,kworb_streams_24h,genre,image_url,created_at",
   );
   tracksUrl.searchParams.set("chart_date", `eq.${latestDate}`);
   tracksUrl.searchParams.set("order", "position.asc");
