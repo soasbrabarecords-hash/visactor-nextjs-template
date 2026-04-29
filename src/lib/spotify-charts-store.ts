@@ -227,6 +227,117 @@ export async function fetchLatestSpotifyChartEntries({
   });
 }
 
+// ── Adapter: chart_snapshot_tracks → SpotifyChartEntryRow[] ──────────────────
+//
+// Lê de chart_snapshot_tracks (histórico diário persistido) em vez de
+// spotify_chart_entries. Retorna exatamente o mesmo shape que a UI espera,
+// sem alterar nenhuma prop ou componente.
+
+type ChartSnapshotTrackRaw = {
+  id: string;
+  snapshot_id: string;
+  chart_date: string;
+  position: number;
+  previous_position: number | null;
+  spotify_track_id: string | null;
+  track_name: string;
+  artist_name: string | null;
+  streams: number | null;
+  kworb_streams_24h: number | null;
+  genre: string | null;
+  created_at: string;
+};
+
+function snapshotTrackToEntryRow(
+  row: ChartSnapshotTrackRaw,
+  country: string,
+): SpotifyChartEntryRow {
+  const trackId = row.spotify_track_id?.trim() ?? null;
+  return {
+    id: row.id,
+    spotify_track_id: trackId,
+    track_name: row.track_name,
+    artist_name: row.artist_name,
+    // Campos ausentes na nova tabela — defaults que a UI tolera sem quebrar
+    artist_ids: null,
+    album_name: null,
+    image_url: null,
+    spotify_url: trackId
+      ? `https://open.spotify.com/track/${trackId}`
+      : null,
+    country,
+    genre: row.genre,
+    chart_name: "top-songs",
+    source_type: "spotify_charts_csv",
+    chart_date: row.chart_date,
+    rank_position: row.position,
+    previous_rank: row.previous_position,
+    movement_type: null,
+    daily_streams: row.streams,
+    captured_at: row.created_at,
+  };
+}
+
+export async function fetchLatestFromSnapshotTracks({
+  country = "BR",
+  genre,
+  limit = 200,
+}: {
+  country?: string;
+  genre?: string;
+  limit?: number;
+} = {}): Promise<SpotifyChartEntryRow[]> {
+  const env = getSupabaseEnv();
+  if (!env) return [];
+
+  // 1. Pegar a data mais recente disponível em chart_snapshots para o country
+  const snapshotUrl = new URL(`${env.url}/rest/v1/chart_snapshots`);
+  snapshotUrl.searchParams.set("select", "chart_date");
+  snapshotUrl.searchParams.set("country", `eq.${country}`);
+  snapshotUrl.searchParams.set("order", "chart_date.desc");
+  snapshotUrl.searchParams.set("limit", "1");
+
+  const snapshotPayload = await fetchJson<{ chart_date: string }[]>(
+    snapshotUrl.toString(),
+    buildHeaders(env),
+  );
+
+  const latestDate = Array.isArray(snapshotPayload)
+    ? snapshotPayload[0]?.chart_date
+    : null;
+
+  if (!latestDate) {
+    // Sem snapshots — fallback para spotify_chart_entries
+    return fetchLatestSpotifyChartEntries({ country, genre, limit });
+  }
+
+  // 2. Buscar as tracks do snapshot mais recente
+  const tracksUrl = new URL(`${env.url}/rest/v1/chart_snapshot_tracks`);
+  tracksUrl.searchParams.set(
+    "select",
+    "id,snapshot_id,chart_date,position,previous_position,spotify_track_id,track_name,artist_name,streams,kworb_streams_24h,genre,created_at",
+  );
+  tracksUrl.searchParams.set("chart_date", `eq.${latestDate}`);
+  tracksUrl.searchParams.set("order", "position.asc");
+  tracksUrl.searchParams.set("limit", String(limit));
+
+  if (genre && genre !== "all") {
+    tracksUrl.searchParams.set("genre", `eq.${genre}`);
+  }
+
+  const tracksPayload = await fetchJson<ChartSnapshotTrackRaw[]>(
+    tracksUrl.toString(),
+    buildHeaders(env),
+  );
+
+  if (!Array.isArray(tracksPayload) || tracksPayload.length === 0) {
+    // Snapshot existe mas tracks vazias — fallback
+    return fetchLatestSpotifyChartEntries({ country, genre, limit });
+  }
+
+  return tracksPayload.map((row) => snapshotTrackToEntryRow(row, country));
+}
+
 export async function fetchTrackStreamSnapshots({
   trackIds,
   country,

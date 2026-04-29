@@ -28,6 +28,7 @@ import {
 } from "./spotify";
 import {
   fetchLatestSpotifyChartEntries,
+  fetchLatestFromSnapshotTracks,
   fetchTrackStreamSnapshots,
   type SpotifyChartEntryRow,
   type TrackStreamSnapshotRow,
@@ -1517,9 +1518,9 @@ export async function getMusicChartsData({
           genreOption.value === "all",
         )
       : genreData.aggregatedTracks;
-  const latestSpotifyChartEntries = await fetchLatestSpotifyChartEntries({
+  const latestSpotifyChartEntries = await fetchLatestFromSnapshotTracks({
     country: marketOption.value,
-    chartName: "top-songs",
+    genre: genreOption.value !== "all" ? genreOption.value : undefined,
     limit: 200,
   });
   const importedChartTracks = buildTracksFromSpotifyChartEntries({
