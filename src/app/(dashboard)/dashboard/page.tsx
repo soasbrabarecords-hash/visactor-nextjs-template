@@ -29,11 +29,7 @@ export default async function DashboardPage() {
       />
 
       <DashboardTopTracksTable rows={radarMusic.rows.slice(0, 10)} />
-      <SpotifyAccountPlaylistsPanel
-        eyebrow="Minha conta Spotify"
-        title="Minhas playlists"
-        description="Playlists puxadas da conta conectada para apoiar a rotina de curadoria e atualizacao."
-      />
+      <SpotifyAccountPlaylistsPanel />
       <CompetitorPlaylistsTable rows={competitorData.rows} />
     </main>
   );
