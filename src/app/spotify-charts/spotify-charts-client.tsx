@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import React, { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -28,6 +28,15 @@ type Props = {
   initialSnapshot: SnapshotData | null;
   country: string;
 };
+
+function coverStyle(coverUrl: string | null): React.CSSProperties | undefined {
+  if (!coverUrl) return undefined;
+  return {
+    backgroundImage: `url(${coverUrl})`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
+}
 
 function formatDate(dateStr: string) {
   // "2025-04-20" → "20/04/2025"
@@ -313,7 +322,6 @@ export default function SpotifyChartsClient({
                     <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-12">#</th>
                     <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-16">Mov.</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Faixa</th>
-                    <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Artista</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Streams</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground hidden lg:table-cell">Gênero</th>
                   </tr>
@@ -341,25 +349,31 @@ export default function SpotifyChartsClient({
 
                       {/* Faixa */}
                       <td className="px-3 py-2">
-                        <span className="font-medium line-clamp-1">
-                          {track.spotify_track_id ? (
-                            <a
-                              href={`https://open.spotify.com/track/${track.spotify_track_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:underline"
-                            >
-                              {track.track_name}
-                            </a>
-                          ) : (
-                            track.track_name
-                          )}
-                        </span>
-                      </td>
-
-                      {/* Artista */}
-                      <td className="px-3 py-2 text-muted-foreground line-clamp-1">
-                        {track.artist_name ?? "—"}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
+                            style={coverStyle(null)}
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-sm leading-tight">
+                              {track.spotify_track_id ? (
+                                <a
+                                  href={`https://open.spotify.com/track/${track.spotify_track_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline"
+                                >
+                                  {track.track_name}
+                                </a>
+                              ) : (
+                                track.track_name
+                              )}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground mt-0.5">
+                              {track.artist_name ?? "—"}
+                            </div>
+                          </div>
+                        </div>
                       </td>
 
                       {/* Streams */}
