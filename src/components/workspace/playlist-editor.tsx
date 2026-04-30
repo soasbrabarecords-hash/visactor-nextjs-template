@@ -88,7 +88,7 @@ function formatDelta(n: number | null, trend: KworbTrackData["trend"]): string {
 
 // ─── EditableField ────────────────────────────────────────────────────────────
 
-function EditableField({
+export function EditableField({
   value, onSave, multiline = false, placeholder = "",
 }: {
   value: string;
@@ -203,14 +203,10 @@ export default function PlaylistEditor({
   playlistId,
   initialTracks,
   initialSnapshotId,
-  initialName,
-  initialDescription,
 }: {
   playlistId: string;
   initialTracks: SpotifyEditablePlaylistTrack[];
   initialSnapshotId: string;
-  initialName: string;
-  initialDescription: string;
 }) {
   const [tracks, setTracks] = useState<TrackWithStreams[]>(() =>
     initialTracks.map((t) => ({ ...t, streams: null, streamsLoading: true })),
@@ -243,8 +239,6 @@ export default function PlaylistEditor({
   const [pendingReorder, setPendingReorder] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription);
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -563,27 +557,6 @@ export default function PlaylistEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSet, tracks.length]);
 
-  // ── Salvar nome/desc ──────────────────────────────────────────────────────
-  async function handleSaveName(newName: string) {
-    const res = await fetch(`/api/spotify/playlists/${playlistId}/details`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, description }),
-    });
-    const data = (await res.json()) as { success?: boolean; message?: string };
-    if (!data.success) throw new Error(data.message ?? "Erro ao salvar nome.");
-    setName(newName);
-  }
-
-  async function handleSaveDescription(newDesc: string) {
-    const res = await fetch(`/api/spotify/playlists/${playlistId}/details`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description: newDesc }),
-    });
-    const data = (await res.json()) as { success?: boolean; message?: string };
-    if (!data.success) throw new Error(data.message ?? "Erro ao salvar descrição.");
-    setDescription(newDesc);
-  }
-
   // ── Cálculo visual do drag ────────────────────────────────────────────────
   // Durante drag, calcula o translateY de cada linha:
   // - Linhas do bloco arrastado: se movem junto com o ponteiro
@@ -626,21 +599,9 @@ export default function PlaylistEditor({
   return (
     <div className="space-y-6">
 
-      {/* Nome e descrição */}
-      <div className="grid gap-3 laptop:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card/70 p-4">
-          <div className="mb-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">Nome da playlist</div>
-          <EditableField value={name} onSave={handleSaveName} placeholder="Nome da playlist" />
-        </div>
-        <div className="rounded-2xl border border-border bg-card/70 p-4">
-          <div className="mb-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">Descrição</div>
-          <EditableField value={description} onSave={handleSaveDescription} multiline placeholder="Adicionar descrição..." />
-        </div>
-      </div>
-
-      {/* Barra de controles */}
+      {/* Barra de controles — legendas escondem em mobile */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+        <div className="hidden flex-wrap gap-2 text-xs text-muted-foreground tablet:flex">
           <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-1.5">
             <span className="font-mono">Click</span> Selecionar
           </span>
@@ -686,31 +647,34 @@ export default function PlaylistEditor({
         </div>
       )}
 
-      {/* Tabela */}
+      {/*
+        Tabela responsiva estilo Spotify
+        - Coluna "Música" agora inclui capa + título + artistas (estilo Spotify)
+        - Colunas secundárias escondem progressivamente em telas menores
+      */}
       <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-        <table className="min-w-[900px] w-full divide-y divide-border text-left">
+        <table className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="w-8 px-3 py-3" />
-              <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Música</th>
-              <th className="px-4 py-3">Artistas</th>
-              <th className="px-4 py-3">Álbum</th>
-              <th className="px-4 py-3">Pop.</th>
-              <th className="px-4 py-3">Duração</th>
-              <th className="px-4 py-3">
+              <th className="px-3 py-3" />
+              <th className="px-2 py-3 sm:px-4">#</th>
+              <th className="px-3 py-3 sm:px-4">Música</th>
+              <th className="hidden px-4 py-3 tablet:table-cell">Álbum</th>
+              <th className="px-3 py-3 sm:px-4">Pop.</th>
+              <th className="hidden px-4 py-3 tablet:table-cell">Duração</th>
+              <th className="hidden px-4 py-3 laptop:table-cell">
                 <span className="flex items-center gap-1">
-                  Streams ontem
+                  Streams
                   <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">kworb</span>
                 </span>
               </th>
-              <th className="px-4 py-3">
+              <th className="hidden px-4 py-3 laptop:table-cell">
                 <span className="flex items-center gap-1">
                   Chart BR
                   <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">top 200</span>
                 </span>
               </th>
-              <th className="px-4 py-3">Ações</th>
+              <th className="px-3 py-3 sm:px-4">Ações</th>
             </tr>
           </thead>
           <tbody ref={tbodyRef} className="divide-y divide-border">
@@ -757,50 +721,66 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* # */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground">
+                  <td className="h-16 overflow-hidden px-2 py-0 align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
                     {isDeleting
                       ? <Loader2 className="h-4 w-4 animate-spin" />
                       : <span className={isSelected ? "text-primary font-semibold" : ""}>{index + 1}</span>
                     }
                   </td>
 
-                  {/* Música */}
-                  <td className="h-16 min-w-0 overflow-hidden px-4 py-0 align-middle">
+                  {/* Música — capa + título + artistas (estilo Spotify) */}
+                  <td className="h-16 min-w-0 overflow-hidden px-3 py-0 align-middle sm:px-4">
                     <div className="flex min-w-0 items-center gap-3 overflow-hidden">
                       <div
-                        className={["h-11 w-11 shrink-0 rounded-xl border bg-muted",
+                        className={["h-11 w-11 shrink-0 rounded-md border bg-muted sm:rounded-xl",
                           isSelected ? "border-primary/40" : "border-border"].join(" ")}
                         style={coverStyle(track.imageUrl)}
                       />
-                      <div className="min-w-0 overflow-hidden">
-                        <div className={["overflow-hidden text-ellipsis whitespace-nowrap font-semibold", isSelected ? "text-primary" : ""].join(" ")}>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <div
+                          className={[
+                            "overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold leading-tight sm:text-[15px]",
+                            isSelected ? "text-primary" : "",
+                          ].join(" ")}
+                          title={track.name}
+                        >
                           {track.name}
+                        </div>
+                        <div
+                          className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground sm:text-[13px]"
+                          title={track.artists}
+                        >
+                          {track.artists}
                         </div>
                       </div>
                     </div>
                   </td>
 
-                  {/* Artistas */}
-                  <td className="h-16 min-w-0 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground">{track.artists}</td>
-
-                  {/* Álbum */}
-                  <td className="h-16 min-w-0 max-w-[240px] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground">{track.albumName}</td>
+                  {/* Álbum — escondido em mobile */}
+                  <td
+                    className="hidden h-16 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground tablet:table-cell"
+                    title={track.albumName}
+                  >
+                    {track.albumName}
+                  </td>
 
                   {/* Popularidade */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
+                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                      <div className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-muted sm:block sm:w-16">
                         <div className="h-full rounded-full bg-primary" style={{ width: `${track.popularity}%` }} />
                       </div>
                       <span className="text-sm font-medium tabular-nums">{track.popularity}</span>
                     </div>
                   </td>
 
-                  {/* Duração */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground">{track.durationLabel}</td>
+                  {/* Duração — escondida em mobile */}
+                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground tablet:table-cell">
+                    {track.durationLabel}
+                  </td>
 
-                  {/* Streams */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
+                  {/* Streams — escondida em mobile/tablet */}
+                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle laptop:table-cell">
                     {track.streamsLoading
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
                       : (
@@ -819,8 +799,8 @@ export default function PlaylistEditor({
                     }
                   </td>
 
-                  {/* Chart BR */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
+                  {/* Chart BR — escondida em mobile/tablet */}
+                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle laptop:table-cell">
                     {chartLoading ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/40" />
                     ) : (() => {
@@ -845,8 +825,8 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Ações */}
-                  <td className="h-16 overflow-hidden px-4 py-0 align-middle">
-                    <div className="flex items-center gap-2">
+                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
+                    <div className="flex items-center gap-1 sm:gap-2">
                       <button type="button"
                         onClick={(e) => { e.stopPropagation(); void handleDelete(isSelected ? selectedSet : new Set([index])); }}
                         disabled={isDeleting || deletingIndices.size > 0 || pendingReorder}
@@ -856,7 +836,7 @@ export default function PlaylistEditor({
                       </button>
                       <a href={track.spotifyUrl} target="_blank" rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary">
+                        className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary sm:inline-flex">
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </div>
@@ -865,7 +845,7 @@ export default function PlaylistEditor({
               );
             }) : (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   <Music2 className="mx-auto mb-3 h-5 w-5" />
                   Nenhuma faixa nesta playlist.
                 </td>
