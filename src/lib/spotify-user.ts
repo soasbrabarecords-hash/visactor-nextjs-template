@@ -903,6 +903,54 @@ async function uploadPlaylistCoverWithToken(
   }
 }
 
+async function uploadPlaylistCoverStrictWithToken(
+  accessToken: string,
+  playlistId: string,
+  base64Jpeg: string,
+): Promise<void> {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "image/jpeg",
+      },
+      body: base64Jpeg,
+    },
+  );
+
+  if (!response.ok) {
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
+    throw new Error(
+      err?.error?.message ?? "Falha ao atualizar capa da playlist.",
+    );
+  }
+}
+
+export async function uploadPlaylistCover(
+  playlistId: string,
+  base64Jpeg: string,
+): Promise<SpotifyMutationResponse> {
+  try {
+    const { refreshedToken } = await withSpotifyToken((token) =>
+      uploadPlaylistCoverStrictWithToken(token, playlistId, base64Jpeg),
+    );
+    return { result: { success: true }, refreshedToken };
+  } catch (error) {
+    return {
+      result: {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Erro ao atualizar capa.",
+      },
+      refreshedToken: null,
+    };
+  }
+}
+
 export async function createSpotifyPlaylist(
   name: string,
   description: string,
