@@ -17,6 +17,7 @@ import {
   Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ResizableTableOverlay from "@/components/workspace/resizable-table-overlay";
 import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
 import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 
@@ -222,6 +223,7 @@ export default function PlaylistEditor({
 
   // Drag state
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
   const draggingFrom = useRef<number | null>(null);
   const dragStartY = useRef(0);
   const dragStarted = useRef(false);
@@ -652,8 +654,8 @@ export default function PlaylistEditor({
         - Coluna "Música" agora inclui capa + título + artistas (estilo Spotify)
         - Colunas secundárias escondem progressivamente em telas menores
       */}
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-        <table className="w-full divide-y divide-border text-left">
+      <div className="relative overflow-x-auto rounded-2xl border border-border bg-card/60">
+        <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="px-3 py-3" />
@@ -853,6 +855,12 @@ export default function PlaylistEditor({
             )}
           </tbody>
         </table>
+        {/* Handles de redimensionamento entre colunas (overlay) */}
+        <ResizableTableOverlay
+          tableRef={tableRef}
+          storageKey="playlist-editor-cols"
+          fixedColumns={[0, 8]}
+        />
       </div>
     </div>
   );
