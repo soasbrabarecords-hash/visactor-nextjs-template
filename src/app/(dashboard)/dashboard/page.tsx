@@ -14,6 +14,7 @@ import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-ad
 import StatusBadge from "@/components/workspace/status-badge";
 import { getDashboardWorkspaceData } from "@/lib/workspace-data";
 import type {
+  DashboardEditorialSpotlight,
   DecisionTrack,
   RadarMusicRow,
   StatusTone,
@@ -42,6 +43,19 @@ function metricToneClasses(tone: StatusTone) {
     purple: "border-violet-500/20 bg-violet-500/10",
     yellow: "border-amber-500/20 bg-amber-500/10",
     slate: "border-white/10 bg-white/5",
+  };
+
+  return classes[tone];
+}
+
+function panelToneClasses(tone: StatusTone) {
+  const classes: Record<StatusTone, string> = {
+    green: "border-emerald-500/20 bg-[linear-gradient(180deg,rgba(16,185,129,0.14),rgba(7,11,10,0.96))]",
+    red: "border-red-500/20 bg-[linear-gradient(180deg,rgba(248,113,113,0.14),rgba(11,7,8,0.96))]",
+    blue: "border-sky-500/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.14),rgba(7,10,13,0.96))]",
+    purple: "border-violet-500/20 bg-[linear-gradient(180deg,rgba(167,139,250,0.14),rgba(10,8,14,0.96))]",
+    yellow: "border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.14),rgba(13,10,7,0.96))]",
+    slate: "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(11,12,15,0.96))]",
   };
 
   return classes[tone];
@@ -77,7 +91,7 @@ function QueuePanel({
   emptyLabel: string;
 }) {
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#0b1116]/92 p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)]">
+    <section className={`rounded-[24px] border p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)] ${panelToneClasses(tone)}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70">
@@ -101,16 +115,20 @@ function QueuePanel({
             {emptyLabel}
           </div>
         ) : (
-          tracks.slice(0, 4).map((track) => (
+          tracks.slice(0, 3).map((track) => (
             <article
               key={`${title}-${track.trackId}`}
-              className="grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3"
+              className="relative grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20 px-3 py-3"
             >
               <div
-                className="h-10 w-10 rounded-xl border border-white/10 bg-white/5"
+                className="absolute inset-0 opacity-[0.14]"
                 style={coverStyle(track.coverUrl)}
               />
-              <div className="min-w-0">
+              <div
+                className="relative h-10 w-10 rounded-xl border border-white/10 bg-white/5"
+                style={coverStyle(track.coverUrl)}
+              />
+              <div className="relative min-w-0">
                 <div className="truncate text-sm font-medium text-white">
                   {track.name}
                 </div>
@@ -126,7 +144,7 @@ function QueuePanel({
                   ) : null}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="relative flex items-center gap-1.5">
                 <SpotifyPlaylistAddButton
                   spotifyTrackId={track.spotifyTrackId}
                   suggestedPlaylistName={track.suggestedPlaylistName}
@@ -163,6 +181,76 @@ function MetricStrip({ metrics }: { metrics: WorkspaceMetric[] }) {
           </div>
           <div className="mt-2 text-2xl font-semibold tracking-tight">{metric.value}</div>
           <div className="mt-1 truncate text-xs text-white/55">{metric.helper}</div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function EditorialStrip({
+  spotlights,
+}: {
+  spotlights: DashboardEditorialSpotlight[];
+}) {
+  if (spotlights.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-3 xl:grid-cols-3">
+      {spotlights.slice(0, 3).map((spotlight) => (
+        <article
+          key={`${spotlight.title}-${spotlight.trackName}`}
+          className={`group relative overflow-hidden rounded-[24px] border p-4 text-white shadow-[0_20px_54px_rgba(0,0,0,0.18)] ${panelToneClasses(spotlight.tone)}`}
+        >
+          <div
+            className="absolute inset-0 opacity-[0.18] transition duration-300 group-hover:opacity-[0.24]"
+            style={coverStyle(spotlight.coverUrl)}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,9,0.04),rgba(5,7,9,0.92))]" />
+
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
+                {spotlight.title}
+              </div>
+              <h3 className="mt-2 truncate text-base font-semibold">
+                {spotlight.trackName}
+              </h3>
+              <p className="truncate text-xs text-white/55">{spotlight.artists}</p>
+            </div>
+            <div
+              className="h-12 w-12 shrink-0 rounded-2xl border border-white/10 bg-white/5"
+              style={coverStyle(spotlight.coverUrl)}
+            />
+          </div>
+
+          <div className="relative mt-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <StatusBadge tone={spotlight.tone} className="px-2 py-0.5 text-[10px]">
+                {spotlight.badge}
+              </StatusBadge>
+              <div className="mt-2 truncate text-xs text-white/62">
+                {spotlight.stats[0] ?? spotlight.summary}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <SpotifyPlaylistAddButton
+                spotifyTrackId={spotlight.spotifyTrackId}
+                suggestedPlaylistName={spotlight.suggestedPlaylistName}
+                compact
+                className="h-8 w-8 rounded-full border-white/10 bg-white/5 px-0 text-white"
+              />
+              <Link
+                href={spotlight.spotifyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/65 transition hover:bg-white/10 hover:text-white"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
         </article>
       ))}
     </div>
@@ -260,7 +348,7 @@ export default async function DashboardPage() {
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_360px]">
           <section
-            className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08100c] p-5 text-white shadow-[0_24px_64px_rgba(0,0,0,0.24)]"
+            className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08100c] p-4 text-white shadow-[0_24px_64px_rgba(0,0,0,0.24)]"
             style={coverStyle(heroTrack?.coverUrl)}
           >
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,8,0.1),rgba(7,10,8,0.82)_55%,rgba(7,10,8,0.95))]" />
@@ -279,9 +367,9 @@ export default async function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="mt-4 grid gap-4 lg:grid-cols-[88px_minmax(0,1fr)_auto] lg:items-center">
+              <div className="mt-3 grid gap-3 lg:grid-cols-[74px_minmax(0,1fr)_auto] lg:items-center">
                 <div
-                  className="h-[88px] w-[88px] rounded-[22px] border border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
+                  className="h-[74px] w-[74px] rounded-[20px] border border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
                   style={coverStyle(heroTrack?.coverUrl)}
                 />
 
@@ -289,13 +377,13 @@ export default async function DashboardPage() {
                   <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
                     Melhor ação do dia
                   </div>
-                  <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight">
+                  <h1 className="mt-1.5 truncate text-[2rem] font-semibold tracking-tight">
                     {heroTrack?.name ?? "Sem prioridade definida"}
                   </h1>
-                  <p className="mt-1 truncate text-sm text-white/68">
+                  <p className="mt-1 truncate text-xs text-white/68">
                     {heroTrack?.artists ?? "Aguardando novo sinal"}
                   </p>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72 line-clamp-2">
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/72 line-clamp-2">
                     {data.primaryAction.reason}
                   </p>
                 </div>
@@ -305,14 +393,14 @@ export default async function DashboardPage() {
                     spotifyTrackId={heroTrack?.spotifyTrackId ?? null}
                     suggestedPlaylistName={heroTrack?.suggestedPlaylistName}
                     label="Adicionar"
-                    className="h-9 rounded-full px-4 text-xs font-semibold uppercase tracking-[0.14em]"
+                    className="h-8 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
                   />
                   {heroTrack ? (
                     <Link
                       href={heroTrack.spotifyUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 text-xs font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
+                      className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
                     >
                       Abrir
                       <ArrowUpRight className="h-3.5 w-3.5" />
@@ -321,12 +409,12 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="mt-3 grid gap-2.5 md:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
                     Fit editorial
                   </div>
-                  <div className="mt-1 text-sm text-white/78 line-clamp-2">
+                  <div className="mt-1 text-xs leading-5 text-white/78 line-clamp-2">
                     {heroTrack?.accountFitContext ?? "Sem leitura de base no momento"}
                   </div>
                 </div>
@@ -334,7 +422,7 @@ export default async function DashboardPage() {
                   <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
                     Resumo
                   </div>
-                  <div className="mt-1 text-sm text-white/78 line-clamp-2">
+                  <div className="mt-1 text-xs leading-5 text-white/78 line-clamp-2">
                     {data.heroInsight.supportingPoints[0] ?? "Sem resumo quente agora"}
                   </div>
                 </div>
@@ -355,6 +443,7 @@ export default async function DashboardPage() {
         </div>
 
         <MetricStrip metrics={data.metrics} />
+        <EditorialStrip spotlights={data.editorialSpotlights} />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <QueuePanel
