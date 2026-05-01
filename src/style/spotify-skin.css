@@ -880,6 +880,48 @@
   position: relative !important;
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+ * v7 — Sticky cells com hover uniforme + esconder coluna grip
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1) Coluna 0 (grip) ESCONDIDA visualmente, drag continua funcionando ── */
+/* O drag-and-drop é gerenciado por handlers de pointer-down na <tr> inteira
+   (não só no grip), então podemos esconder a coluna sem quebrar a função.
+   Visualmente: thead th:nth-child(1) e tbody td:nth-child(1) com width zero */
+.spotify-skin [data-spotify-table-wrapper] table thead th:nth-child(1),
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(1) {
+  display: none !important;
+}
+
+/* O <col> da coluna grip também precisa sumir do colgroup — width 0 */
+.spotify-skin [data-spotify-table-wrapper] table colgroup col:nth-child(1) {
+  width: 0 !important;
+}
+
+/* ── 2) Sticky cells (# e Ações) — mesma cor de hover das outras ───────── */
+/* Solução: forçar background sólido no hover das sticky para emparelhar
+   com o cinza claro translúcido. Como o resto da linha usa
+   rgba(255,255,255,0.1) sobre fundo transparente, o sticky precisa do
+   mesmo bg semi-opaco MAS sem deixar passar o conteúdo de baixo durante
+   scroll. Aplicamos um bg sólido equivalente visual: #1f1f1f */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover > td[style*="position: sticky"] {
+  /* Calculei: rgba(255,255,255,0.1) sobre #121212 = ~#252525.
+     Pra ficar idêntico ao hover das outras células (visualmente),
+     uso o mesmo cinza calculado */
+  background-color: rgb(40, 40, 40) !important;
+}
+
+/* No estado normal (sem hover), sticky cells continuam transparentes */
+.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"]:not(:hover) {
+  background-color: transparent !important;
+}
+
+/* No header (thead), sticky cells precisam de bg sólido (igual o bg da página)
+   pra não revelar conteúdo do tbody atrás durante scroll vertical */
+.spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
+  background-color: var(--sp-bg) !important;
+}
+
 /* ── 3) Botão "Salvar ordem" em VERDE Spotify (era azul/primary) ──────── */
 /* O botão default tem variant primary. Vamos identificar pela cor inline
    ou pelo conteúdo (texto "Salvar ordem"). Como é um <Button> shadcn,
