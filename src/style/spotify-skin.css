@@ -131,17 +131,14 @@
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Sticky cells: bg do tbody/td precisa pintar mesmo em hover */
-.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"] {
-  background-color: var(--sp-bg) !important;
-}
-/* Hover das sticky cells: cinza equivalente ao rgba(255,255,255,0.08) sobre #121212
-   Cálculo: 18 + (255-18)*0.08 = ~37 → rgb(37,37,37) */
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
-  background-color: rgb(37, 37, 37) !important;
-}
+/* Sticky cells: TRANSPARENTES (igual o resto). Como a tabela tem
+   overflow-x: hidden, sticky horizontal não está realmente fixo num scroll —
+   visualmente é só uma posição normal. Então não precisa de bg sólido,
+   pode herdar o estado da linha (transparente / hover / selecionada) */
+.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"],
 .spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
-  background-color: var(--sp-bg) !important;
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 /* Divisores entre linhas mais sutis */
@@ -152,20 +149,14 @@
   border-top: 0 !important;
 }
 
-/* Linha selecionada: cinza claro Spotify (todas as colunas, incluindo sticky) */
+/* Linha selecionada: cinza claro Spotify aplicado na <tr> inteira.
+   Como sticky cells agora são transparentes, herdam essa mesma cor naturalmente */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
   background-color: rgba(255, 255, 255, 0.16) !important;
-}
-/* Sticky cells dentro de linha selecionada: mesmo cinza (não preto) */
-.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td[style*="position: sticky"] {
-  background-color: rgb(57, 57, 57) !important; /* equivalente sólido a rgba(255,255,255,0.16) sobre #121212 */
 }
 /* Hover sobre linha selecionada: cinza um pouco mais claro */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"]:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
-}
-.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"]:hover td[style*="position: sticky"] {
-  background-color: rgb(65, 65, 65) !important;
 }
 
 /* Cards / botões / inputs no resto da página */
