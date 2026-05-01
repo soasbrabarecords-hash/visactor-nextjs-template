@@ -1,6 +1,14 @@
 import "server-only";
 
 import { subDays } from "date-fns";
+import {
+  getSnapshotByDate,
+  getSnapshotDates,
+  getSnapshotTracks,
+  getSnapshotWithComparison,
+  type ChartSnapshotTrack,
+  type ChartSnapshotTrackWithMovement,
+} from "@/lib/chart-snapshots";
 import { getChartsData } from "@/lib/charts-data";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { getMusicChartsData, getMusicGenreOptions, getMusicMarketOptions } from "@/lib/music-charts-data";
@@ -1041,6 +1049,236 @@ function buildActionItems(rows: DecisionTrack[], fallback: string) {
     : [fallback];
 }
 
+function normalizeTrackKey(name: string, artistName: string | null | undefined) {
+  return `${name.trim().toLowerCase()}::${(artistName ?? "").trim().toLowerCase()}`;
+}
+
+function buildSnapshotTrackKey(track: Pick<ChartSnapshotTrack, "spotify_track_id" | "track_name" | "artist_name">) {
+  return track.spotify_track_id?.trim() || normalizeTrackKey(track.track_name, track.artist_name);
+}
+
+function buildWeeklyComparisonDate(dates: string[]) {
+  const latestDate = dates[0];
+
+  if (!latestDate) {
+    return null;
+  }
+
+  const weeklyTarget = subDays(new Date(`${latestDate}T00:00:00Z`), 7)
+    .toISOString()
+    .slice(0, 10);
+
+  return dates.find((date) => date <= weeklyTarget) ?? dates[6] ?? dates[dates.length - 1] ?? null;
+}
+
+async function buildDashboardSnapshotRadarRows({
+  country = "BR",
+  playlistTracks,
+  dominantArtists,
+}: {
+  country?: string;
+  playlistTracks: TrackInsight[];
+  dominantArtists: string[];
+}) {
+  const dates = await getSnapshotDates(country);
+  const latestDate = dates[0] ?? null;
+
+  if (!latestDate) {
+    return {
+      latestDate: null,
+      previousDate: null,
+      weeklyDate: null,
+      rows: [] as RadarMusicRow[],
+    };
+  }
+
+  const dailySnapshot = await getSnapshotWithComparison(latestDate, country);
+  const weeklyDate = buildWeeklyComparisonDate(dates);
+  const weeklySnapshot =
+    weeklyDate && weeklyDate !== latestDate
+      ? await getSnapshotByDate(weeklyDate, country)
+      : null;
+  const weeklyTracks = weeklySnapshot
+    ? await getSnapshotTracks(weeklySnapshot.id)
+    : [];
+  const recentDates = dates.slice(0, 7);
+  const recentSnapshots = await Promise.all(
+    recentDates.map(async (date) => {
+      const snapshot = await getSnapshotByDate(date, country);
+
+      if (!snapshot) {
+        return [] as ChartSnapshotTrack[];
+      }
+
+      return getSnapshotTracks(snapshot.id);
+    }),
+  );
+
+  const weeklyByTrackKey = new Map<string, ChartSnapshotTrack>();
+
+  for (const track of weeklyTracks) {
+    weeklyByTrackKey.set(buildSnapshotTrackKey(track), track);
+  }
+
+  const recentPresenceCount = new Map<string, number>();
+
+  for (const dayTracks of recentSnapshots) {
+    const seenKeys = new Set<string>();
+
+    for (const track of dayTracks) {
+      const key = buildSnapshotTrackKey(track);
+
+      if (seenKeys.has(key)) {
+        continue;
+      }
+
+      seenKeys.add(key);
+      recentPresenceCount.set(key, (recentPresenceCount.get(key) ?? 0) + 1);
+    }
+  }
+
+  const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
+  const playlistTrackMap = new Map(playlistTracks.map((track) => [track.id, track]));
+
+  const rows = dailySnapshot.tracks.map((track) => {
+    const key = buildSnapshotTrackKey(track);
+    const weeklyTrack = weeklyByTrackKey.get(key) ?? null;
+    const weeklyRankChange =
+      weeklyTrack && weeklyTrack.position > 0
+        ? weeklyTrack.position - track.position
+        : null;
+    const presenceCount = recentPresenceCount.get(key) ?? 1;
+    const spotifyTrackId = track.spotify_track_id?.trim() || null;
+    const trackId = spotifyTrackId || key;
+    const artists = track.artist_name?.trim() || "Artista nao identificado";
+    const alreadyInPlaylists =
+      spotifyTrackId !== null && playlistTrackIds.has(spotifyTrackId);
+    const artistFit = dominantArtists.some((artist) =>
+      artists.toLowerCase().includes(artist.toLowerCase()),
+    );
+    const fitLabel = alreadyInPlaylists
+      ? "Fit alto"
+      : artistFit
+        ? "Fit medio"
+        : track.position <= 50 || (weeklyRankChange ?? 0) >= 8
+          ? "Fit medio"
+          : "Fit baixo";
+    const movementType: MovementType =
+      track.status === "stable" ? "same" : track.status;
+    const lowSaturation = presenceCount <= 2;
+    const recurring = presenceCount >= 4;
+    const mappedPlaylistTrack = track.spotify_track_id
+      ? playlistTrackMap.get(track.spotify_track_id)
+      : undefined;
+    const inferredPopularity = clamp(
+      mappedPlaylistTrack?.popularity ??
+        Math.round(
+          92 -
+            track.position * 0.28 +
+            Math.max(track.position_change ?? 0, 0) * 1.4 +
+            Math.max(weeklyRankChange ?? 0, 0) * 0.8,
+        ),
+      35,
+      96,
+    );
+    const rankScore = clamp(100 - (track.position - 1) * 0.45, 10, 100);
+    const dailyBoost =
+      track.status === "new"
+        ? 14
+        : track.status === "up"
+          ? clamp((track.position_change ?? 0) * 4, 0, 28)
+          : track.status === "down"
+            ? clamp((track.position_change ?? 0) * 3, -18, 0)
+            : 4;
+    const weeklyBoost =
+      weeklyRankChange === null ? 0 : clamp(weeklyRankChange * 2.2, -18, 28);
+    const streamBoost =
+      track.stream_growth_percent === null
+        ? 0
+        : clamp(track.stream_growth_percent / 2, -14, 18);
+    const opportunityScore = clamp(
+      Math.round(
+        rankScore * 0.42 +
+          inferredPopularity * 0.18 +
+          dailyBoost +
+          weeklyBoost +
+          streamBoost +
+          (lowSaturation ? 6 : 0) +
+          (recurring ? 8 : 0),
+      ),
+      0,
+      100,
+    );
+    const intelligenceTags = [
+      track.status === "new" ? "Entrada fresca" : null,
+      track.status === "up" && (track.position_change ?? 0) >= 5
+        ? "Subida diaria forte"
+        : null,
+      weeklyRankChange !== null && weeklyRankChange >= 10
+        ? "Subida semanal forte"
+        : null,
+      recurring ? "Consistencia semanal" : null,
+      lowSaturation ? "Janela aberta" : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return {
+      rank: track.position,
+      movement: buildMovementDescriptor(movementType),
+      trackId,
+      name: track.track_name,
+      artists,
+      genre: track.genre ?? "Sem genero",
+      albumName: mappedPlaylistTrack?.albumName ?? "",
+      popularity: inferredPopularity,
+      dailyStreams: track.streams,
+      streamRank: track.streams ? track.position : null,
+      streamGrowth: track.stream_change,
+      streamVelocityLabel:
+        track.stream_change === null
+          ? "Sem historico"
+          : track.stream_change > 0
+            ? "Acelerando"
+            : track.stream_change < 0
+              ? "Perdendo forca"
+              : "Fluxo estavel",
+      popularityChange: null,
+      previousRank: track.previous_position,
+      rankChange: track.position_change,
+      daysOnRadar: presenceCount,
+      saturationCount: presenceCount,
+      opportunityScore,
+      spotifyUrl: spotifyTrackId
+        ? `https://open.spotify.com/track/${spotifyTrackId}`
+        : "#",
+      coverUrl:
+        track.image_url ??
+        mappedPlaylistTrack?.coverUrl ??
+        null,
+      statusTags: intelligenceTags,
+      intelligenceTags,
+      lowSaturation,
+      recurring,
+      alreadyInPlaylists,
+      fitLabel,
+      scoreBreakdown: buildScoreBreakdown({
+        popularity: inferredPopularity,
+        movementType,
+        rankChange: track.position_change,
+        lowSaturation,
+        recurring,
+        fitLabel,
+      }),
+    } satisfies RadarMusicRow;
+  });
+
+  return {
+    latestDate,
+    previousDate: dailySnapshot.previousDate,
+    weeklyDate,
+    rows,
+  };
+}
+
 function compareDecisionPriority(left: DecisionTrack, right: DecisionTrack) {
   const scoreDifference = right.decisionScore - left.decisionScore;
 
@@ -1662,29 +1900,191 @@ export async function getCurationPageData(): Promise<CurationPageData> {
 }
 
 export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceData> {
-  const [curationData, baseData, radarMusic] = await Promise.all([
-    getCurationPageData(),
+  const [baseData, chartsData] = await Promise.all([
     getBasePlaylistsPageData(),
-    getRadarMusicPageData({
-      country: "BR",
-      genre: "all",
-      period: "7d",
-      status: "all",
-    }),
+    getChartsData(),
   ]);
+  const snapshotRadar = await buildDashboardSnapshotRadarRows({
+    country: "BR",
+    playlistTracks: chartsData.tracks,
+    dominantArtists: chartsData.artistDistribution.map((artist) => artist.type),
+  });
+  const radarRows = snapshotRadar.rows;
+
+  if (radarRows.length === 0) {
+    const [curationData, radarMusic] = await Promise.all([
+      getCurationPageData(),
+      getRadarMusicPageData({
+        country: "BR",
+        genre: "all",
+        period: "7d",
+        status: "all",
+      }),
+    ]);
+    const bestPlaylistFallback = [...baseData.rows].sort(
+      (left, right) => right.playlist.score - left.playlist.score,
+    )[0];
+    const addNowQueueFallback = curationData.rows
+      .filter((row) => row.recommendedAction === "add")
+      .sort(compareDecisionPriority);
+    const observeQueueFallback = curationData.rows
+      .filter((row) => row.recommendedAction === "observe")
+      .sort(compareDecisionPriority);
+    const removeQueueFallback = curationData.rows
+      .filter((row) => row.recommendedAction === "remove")
+      .sort(compareRemovePriority);
+    const biggestRiseFallback = [...radarMusic.rows]
+      .filter((row) => (row.rankChange ?? 0) > 0)
+      .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
+    const addNowFallback = addNowQueueFallback.slice(0, 3);
+    const observeFallback = observeQueueFallback.slice(0, 3);
+    const removeFallback = removeQueueFallback.slice(0, 3);
+    const editorialSpotlightsFallback = buildDashboardEditorialSpotlights({
+      addNowQueue: addNowQueueFallback,
+      observeQueue: observeQueueFallback,
+      removeQueue: removeQueueFallback,
+      radarRows: radarMusic.rows,
+    });
+    const primaryTrackFallback = addNowFallback[0] ?? observeFallback[0] ?? null;
+
+    return {
+      hero: {
+        eyebrow: "Visao do dia",
+        title: "Curadoria do dia",
+        description:
+          "Painel executivo para decidir rapido o que entra, o que continua em observacao e o que ja pede ajuste na base.",
+        primaryCtaLabel: "Ir para Curadoria",
+        primaryCtaHref: "/curadoria",
+        secondaryCtaLabel: "Abrir Radar Music",
+        secondaryCtaHref: "/radar-music",
+      },
+      heroInsight: {
+        headline: primaryTrackFallback
+          ? `${primaryTrackFallback.name} e a melhor oportunidade editorial agora`
+          : "O mercado ainda nao definiu uma prioridade absoluta hoje",
+        summary:
+          "Sem snapshots suficientes no Supabase, o dashboard voltou temporariamente para a leitura geral do radar.",
+        tone: buildDashboardTone(primaryTrackFallback),
+        supportingPoints: [
+          `${addNowQueueFallback.length} faixas prontas para adicionar`,
+          biggestRiseFallback
+            ? `Maior subida: ${biggestRiseFallback.name} ${formatSignedValue(biggestRiseFallback.rankChange ?? 0)}`
+            : "Sem subida forte no recorte",
+          `${removeQueueFallback.length} pedem teste ou limpeza`,
+        ],
+      },
+      primaryAction: {
+        track: primaryTrackFallback,
+        reason: primaryTrackFallback
+          ? buildDecisionSummary(primaryTrackFallback)
+          : "Ainda nao houve combinacao forte o suficiente entre radar e base para uma acao unica.",
+      },
+      metrics: [
+        {
+          title: "Entrar agora",
+          value: formatCount(addNowQueueFallback.length),
+          helper: addNowFallback[0]
+            ? `${addNowFallback[0].name} lidera a fila`
+            : "Sem prioridade maxima",
+          tone: "green",
+        },
+        {
+          title: "Melhor score do dia",
+          value: primaryTrackFallback ? `${primaryTrackFallback.decisionScore}` : "0",
+          helper: primaryTrackFallback ? primaryTrackFallback.name : "Sem faixa lider",
+          tone: buildDashboardTone(primaryTrackFallback),
+        },
+        {
+          title: "Maior subida",
+          value: biggestRiseFallback?.rankChange ? `+${biggestRiseFallback.rankChange}` : "0",
+          helper: biggestRiseFallback ? biggestRiseFallback.name : "Sem aceleracao forte",
+          tone: "green",
+        },
+        {
+          title: "Novas entradas",
+          value: formatCount(
+            radarMusic.rows.filter(
+              (row) =>
+                row.movement.type === "new" || row.movement.type === "reentry",
+            ).length,
+          ),
+          helper: "Sinais frescos para discovery",
+          tone: "purple",
+        },
+        {
+          title: "Quedas na base",
+          value: formatCount(removeQueueFallback.length),
+          helper: "Pedem teste ou limpeza",
+          tone: "red",
+        },
+        {
+          title: "Playlists monitoradas",
+          value: formatCount(baseData.rows.length),
+          helper: bestPlaylistFallback
+            ? `Melhor score ${bestPlaylistFallback.playlist.score}`
+            : "Base ativa",
+          tone: "blue",
+        },
+      ],
+      editorialSpotlights: editorialSpotlightsFallback,
+      recommendedActions: [
+        {
+          title: "Adicionar agora",
+          summary:
+            "Faixas com melhor equilibrio entre subida, baixa saturacao e fit com sua base.",
+          tone: "green",
+          items: buildActionItems(
+            addNowFallback,
+            "Ainda sem faixa pronta para entrada imediata.",
+          ),
+        },
+        {
+          title: "Observar",
+          summary:
+            "Sinais que ainda precisam de mais validacao antes de entrar na base principal.",
+          tone: "yellow",
+          items: buildActionItems(
+            observeFallback,
+            "Nenhum sinal em observacao forte agora.",
+          ),
+        },
+        {
+          title: "Remover/Testar",
+          summary:
+            "Faixas com queda ou desgaste que pedem teste, troca ou limpeza de repertorio.",
+          tone: "red",
+          items: buildActionItems(
+            removeFallback,
+            "Sem urgencia de remocao ou teste neste momento.",
+          ),
+        },
+      ],
+      addNow: addNowFallback,
+      observe: observeFallback,
+      removeOrTest: removeFallback,
+      topRadarRows: radarMusic.rows.slice(0, 10),
+      playlistBaseRows: baseData.rows,
+    };
+  }
+
+  const curationRows = buildCurationRows(
+    radarRows,
+    chartsData.tracks,
+    chartsData.artistDistribution.map((artist) => artist.type),
+  );
   const bestPlaylist = [...baseData.rows].sort(
     (left, right) => right.playlist.score - left.playlist.score,
   )[0];
-  const addNowQueue = curationData.rows
+  const addNowQueue = curationRows
     .filter((row) => row.recommendedAction === "add")
     .sort(compareDecisionPriority);
-  const observeQueue = curationData.rows
+  const observeQueue = curationRows
     .filter((row) => row.recommendedAction === "observe")
     .sort(compareDecisionPriority);
-  const removeQueue = curationData.rows
+  const removeQueue = curationRows
     .filter((row) => row.recommendedAction === "remove")
     .sort(compareRemovePriority);
-  const biggestRise = [...radarMusic.rows]
+  const biggestRise = [...radarRows]
     .filter((row) => (row.rankChange ?? 0) > 0)
     .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
   const addNow = addNowQueue.slice(0, 3);
@@ -1694,7 +2094,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     addNowQueue,
     observeQueue,
     removeQueue,
-    radarRows: radarMusic.rows,
+    radarRows,
   });
   const primaryTrack = addNow[0] ?? observe[0] ?? null;
 
@@ -1714,14 +2114,18 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         ? `${primaryTrack.name} e a melhor oportunidade editorial agora`
         : "O mercado ainda nao definiu uma prioridade absoluta hoje",
       summary:
-        "A leitura combina forca atual no chart, velocidade de subida, recorrencia no radar e fit com a sua base para transformar top 200 em decisao pratica.",
+        snapshotRadar.weeklyDate
+          ? `A leitura cruza o snapshot mais recente do top 200 com comparacao diaria e semanal do Supabase para transformar movimento real em decisao pratica.`
+          : "A leitura cruza o snapshot mais recente do top 200 com a ultima comparacao disponivel no Supabase para transformar movimento real em decisao pratica.",
       tone: buildDashboardTone(primaryTrack),
       supportingPoints: [
         `${addNowQueue.length} faixas prontas para adicionar`,
         biggestRise
           ? `Maior subida: ${biggestRise.name} ${formatSignedValue(biggestRise.rankChange ?? 0)}`
           : "Sem subida forte no recorte",
-        `${removeQueue.length} pedem teste ou limpeza`,
+        snapshotRadar.latestDate
+          ? `Leitura base ${snapshotRadar.latestDate}`
+          : `${removeQueue.length} pedem teste ou limpeza`,
       ],
     },
     primaryAction: {
@@ -1752,7 +2156,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
       {
         title: "Novas entradas",
         value: formatCount(
-          radarMusic.rows.filter(
+          radarRows.filter(
             (row) =>
               row.movement.type === "new" || row.movement.type === "reentry",
           ).length,
@@ -1811,7 +2215,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     addNow,
     observe,
     removeOrTest,
-    topRadarRows: radarMusic.rows.slice(0, 10),
+    topRadarRows: radarRows.slice(0, 10),
     playlistBaseRows: baseData.rows,
   };
 }
