@@ -170,7 +170,7 @@ export default function PlaylistHeader({
               onClick={handleCoverClick}
               disabled={uploadingCover}
               title="Clique para alterar a capa"
-              className="group relative block h-32 w-32 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-40 sm:w-40"
+              className="group relative block h-44 w-44 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-56 sm:w-56 laptop:h-64 laptop:w-64"
               style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }}
             >
               {coverUrl ? (
@@ -184,7 +184,7 @@ export default function PlaylistHeader({
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-muted">
-                  <Music2 className="h-12 w-12 text-muted-foreground/40 sm:h-16 sm:w-16" />
+                  <Music2 className="h-16 w-16 text-muted-foreground/40 sm:h-20 sm:w-20 laptop:h-24 laptop:w-24" />
                 </div>
               )}
               {/* Overlay (visível em hover, ou enquanto faz upload) */}
