@@ -275,6 +275,12 @@ export type DecisionTrack = {
   recurring: boolean;
   alreadyInPlaylists: boolean;
   fitLabel: string;
+  accountPlaylistCount: number;
+  accountPlaylistNames: string[];
+  accountArtistCount: number;
+  accountGenre: string;
+  accountFitContext: string;
+  suggestedPlaylistName: string | null;
   decisionScore: number;
   recommendedAction: DecisionAction;
   scoreBreakdown: ScoreBreakdownItem[];

@@ -11,6 +11,13 @@ import {
 } from "@/lib/chart-snapshots";
 import { getChartsData } from "@/lib/charts-data";
 import { getDashboardData } from "@/lib/dashboard-data";
+import {
+  detectGenre,
+  detectPlaylistGenre,
+  GENRE_LABEL,
+  normalizeGenreText,
+  type TrackGenre,
+} from "@/lib/genre-detection";
 import { getMusicChartsData, getMusicGenreOptions, getMusicMarketOptions } from "@/lib/music-charts-data";
 import {
   fetchPlaylistSnapshots,
@@ -20,6 +27,10 @@ import {
   extractSpotifyPlaylistId,
   fetchSpotifyPlaylistTracks,
 } from "@/lib/spotify";
+import {
+  fetchSpotifyAccountPlaylists,
+  fetchSpotifyEditablePlaylist,
+} from "@/lib/spotify-user";
 import type { PlaylistRecord } from "@/types/dashboard";
 import type { TrackInsight } from "@/types/charts";
 import type {
@@ -93,6 +104,380 @@ const GENRE_CHIP_COPY: Record<string, string> = {
   indie: "Indie em foco",
   "r-n-b": "R&B em foco",
 };
+
+type DashboardAccountPlaylistTarget = {
+  id: string;
+  name: string;
+  genre: TrackGenre;
+  trackIds: Set<string>;
+  artistNames: Set<string>;
+  genreCounts: Map<TrackGenre, number>;
+};
+
+type DashboardAccountProfile = {
+  playlistsCount: number;
+  uniqueTrackCount: number;
+  repeatedTrackCount: number;
+  dominantGenre: TrackGenre | null;
+  dominantGenreLabel: string | null;
+  dominantArtists: string[];
+  trackPlaylistNamesById: Map<string, string[]>;
+  artistPlaylistCountByName: Map<string, number>;
+  genreTrackCountByType: Map<TrackGenre, number>;
+  playlistTargets: DashboardAccountPlaylistTarget[];
+};
+
+type DashboardAccountSignals = {
+  alreadyInPlaylists: boolean;
+  fitLabel: string;
+  accountPlaylistCount: number;
+  accountPlaylistNames: string[];
+  accountArtistCount: number;
+  accountGenre: string;
+  accountGenreStrength: number;
+  accountFitContext: string;
+  suggestedPlaylistName: string | null;
+};
+
+const KNOWN_TRACK_GENRES = new Set<TrackGenre>([
+  "funk",
+  "trap",
+  "rap",
+  "sertanejo",
+  "pagode",
+  "pagodao",
+  "piseiro",
+  "pop",
+  "rock",
+  "reggae",
+  "unknown",
+]);
+
+function normalizeArtistName(value: string) {
+  return normalizeGenreText(value).replace(/\s+/g, " ").trim();
+}
+
+function extractArtistNames(artists: string) {
+  return artists
+    .split(/,| feat\. | feat | ft\. | ft | part\./i)
+    .map((value) => normalizeArtistName(value))
+    .filter(Boolean);
+}
+
+function resolveTrackGenre(
+  genreLabel: string | null | undefined,
+  artists: string,
+  trackName: string,
+): TrackGenre {
+  const normalizedGenre = normalizeGenreText(genreLabel ?? "");
+
+  if (KNOWN_TRACK_GENRES.has(normalizedGenre as TrackGenre)) {
+    return normalizedGenre as TrackGenre;
+  }
+
+  if (normalizedGenre === "forro") {
+    return "piseiro";
+  }
+
+  if (normalizedGenre === "samba") {
+    return "pagode";
+  }
+
+  return detectGenre(artists, trackName);
+}
+
+function pickTopGenre(genreCounts: Map<TrackGenre, number>) {
+  return [...genreCounts.entries()]
+    .filter(([genre]) => genre !== "unknown")
+    .sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
+}
+
+function getGenreDisplayLabel(genre: TrackGenre | null) {
+  if (!genre || genre === "unknown") {
+    return null;
+  }
+
+  return GENRE_LABEL[genre];
+}
+
+function inferTargetPlaylistName({
+  accountProfile,
+  trackId,
+  artistNames,
+  genre,
+}: {
+  accountProfile: DashboardAccountProfile;
+  trackId: string;
+  artistNames: string[];
+  genre: TrackGenre;
+}) {
+  let bestMatch: { name: string; score: number } | null = null;
+
+  for (const playlist of accountProfile.playlistTargets) {
+    if (playlist.trackIds.has(trackId)) {
+      continue;
+    }
+
+    let score = 0;
+
+    if (genre !== "unknown") {
+      if (playlist.genre === genre) {
+        score += 28;
+      } else {
+        score += Math.min((playlist.genreCounts.get(genre) ?? 0) * 4, 20);
+      }
+    }
+
+    const matchingArtists = artistNames.filter((artist) =>
+      playlist.artistNames.has(artist),
+    ).length;
+
+    score += matchingArtists * 12;
+
+    if (score >= 18 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = {
+        name: playlist.name,
+        score,
+      };
+    }
+  }
+
+  return bestMatch?.name ?? null;
+}
+
+function buildAccountSignals({
+  accountProfile,
+  trackId,
+  artists,
+  trackName,
+  genreLabel,
+  fallbackAlreadyInPlaylists,
+  fallbackArtistFit,
+  lowSaturation,
+  recurring,
+  rank,
+  weeklyRankChange,
+}: {
+  accountProfile: DashboardAccountProfile | null;
+  trackId: string;
+  artists: string;
+  trackName: string;
+  genreLabel: string | null | undefined;
+  fallbackAlreadyInPlaylists: boolean;
+  fallbackArtistFit: boolean;
+  lowSaturation: boolean;
+  recurring: boolean;
+  rank: number;
+  weeklyRankChange: number | null;
+}): DashboardAccountSignals {
+  if (!accountProfile) {
+    const fitLabel = fallbackAlreadyInPlaylists
+      ? "Fit alto"
+      : fallbackArtistFit || lowSaturation || recurring || rank <= 50 || (weeklyRankChange ?? 0) >= 8
+        ? "Fit medio"
+        : "Fit baixo";
+
+    return {
+      alreadyInPlaylists: fallbackAlreadyInPlaylists,
+      fitLabel,
+      accountPlaylistCount: fallbackAlreadyInPlaylists ? 1 : 0,
+      accountPlaylistNames: [],
+      accountArtistCount: fallbackArtistFit ? 1 : 0,
+      accountGenre: getGenreDisplayLabel(resolveTrackGenre(genreLabel, artists, trackName)) ?? "Radar aberto",
+      accountGenreStrength: 0,
+      accountFitContext: fallbackAlreadyInPlaylists
+        ? "Ja esta na base monitorada"
+        : fallbackArtistFit
+          ? "Artista ja funciona na base monitorada"
+          : lowSaturation
+            ? "Janela de discovery aberta"
+            : "Ainda fora da base atual",
+      suggestedPlaylistName: null,
+    };
+  }
+
+  const accountPlaylistNames = accountProfile.trackPlaylistNamesById.get(trackId) ?? [];
+  const accountPlaylistCount = accountPlaylistNames.length;
+  const artistNames = extractArtistNames(artists);
+  const accountArtistCount = Math.max(
+    0,
+    ...artistNames.map(
+      (artistName) => accountProfile.artistPlaylistCountByName.get(artistName) ?? 0,
+    ),
+  );
+  const accountGenreType = resolveTrackGenre(genreLabel, artists, trackName);
+  const accountGenreLabel = getGenreDisplayLabel(accountGenreType) ?? "Radar aberto";
+  const accountGenreStrength =
+    accountGenreType === "unknown"
+      ? 0
+      : accountProfile.genreTrackCountByType.get(accountGenreType) ?? 0;
+  const suggestedPlaylistName =
+    accountPlaylistCount > 0
+      ? null
+      : inferTargetPlaylistName({
+          accountProfile,
+          trackId,
+          artistNames,
+          genre: accountGenreType,
+        });
+  const fitSignal =
+    accountPlaylistCount * 18 +
+    accountArtistCount * 5 +
+    Math.min(accountGenreStrength, 12) +
+    (suggestedPlaylistName ? 8 : 0);
+  const fitLabel =
+    accountPlaylistCount >= 2 || fitSignal >= 30
+      ? "Fit alto"
+      : accountPlaylistCount >= 1 ||
+          accountArtistCount >= 1 ||
+          accountGenreStrength >= 4 ||
+          Boolean(suggestedPlaylistName) ||
+          lowSaturation ||
+          recurring
+        ? "Fit medio"
+        : "Fit baixo";
+
+  let accountFitContext = "Ainda sem ancora forte na tua base";
+
+  if (accountPlaylistCount >= 2) {
+    accountFitContext = `Ja aparece em ${accountPlaylistCount} playlists da conta`;
+  } else if (accountPlaylistCount === 1) {
+    accountFitContext = `Ja esta em ${accountPlaylistNames[0]}`;
+  } else if (suggestedPlaylistName) {
+    accountFitContext = `Boa candidata para ${suggestedPlaylistName}`;
+  } else if (accountArtistCount >= 3) {
+    accountFitContext = `Artista recorrente em ${accountArtistCount} playlists da conta`;
+  } else if (accountGenreStrength >= 6 && accountGenreType !== "unknown") {
+    accountFitContext = `${accountGenreLabel} com espaco forte na tua base`;
+  } else if (lowSaturation) {
+    accountFitContext = "Janela de discovery fora da base";
+  }
+
+  return {
+    alreadyInPlaylists: accountPlaylistCount > 0,
+    fitLabel,
+    accountPlaylistCount,
+    accountPlaylistNames,
+    accountArtistCount,
+    accountGenre: accountGenreLabel,
+    accountGenreStrength,
+    accountFitContext,
+    suggestedPlaylistName,
+  };
+}
+
+async function buildDashboardAccountProfile(): Promise<DashboardAccountProfile | null> {
+  const { result } = await fetchSpotifyAccountPlaylists();
+
+  if (!result.connected || result.playlists.length === 0) {
+    return null;
+  }
+
+  const playlistResponses = await Promise.allSettled(
+    result.playlists.map(async (playlist) => {
+      const { result: editableResult } = await fetchSpotifyEditablePlaylist(playlist.id);
+
+      if (!editableResult.connected || !editableResult.playlist) {
+        return null;
+      }
+
+      return editableResult.playlist;
+    }),
+  );
+
+  const trackPlaylistNamesById = new Map<string, string[]>();
+  const artistPlaylistCountByName = new Map<string, number>();
+  const genreTrackCountByType = new Map<TrackGenre, number>();
+  const playlistTargets: DashboardAccountPlaylistTarget[] = [];
+
+  for (const response of playlistResponses) {
+    if (response.status !== "fulfilled" || !response.value) {
+      continue;
+    }
+
+    const playlist = response.value;
+    const playlistTrackIds = new Set<string>();
+    const playlistArtistNames = new Set<string>();
+    const playlistGenreCounts = new Map<TrackGenre, number>();
+
+    for (const track of playlist.tracks) {
+      if (!track.id || playlistTrackIds.has(track.id)) {
+        continue;
+      }
+
+      playlistTrackIds.add(track.id);
+      const trackPlaylists = trackPlaylistNamesById.get(track.id) ?? [];
+
+      if (!trackPlaylists.includes(playlist.name)) {
+        trackPlaylists.push(playlist.name);
+      }
+
+      trackPlaylistNamesById.set(track.id, trackPlaylists);
+
+      const detectedGenre = resolveTrackGenre(null, track.artists, track.name);
+
+      if (detectedGenre !== "unknown") {
+        genreTrackCountByType.set(
+          detectedGenre,
+          (genreTrackCountByType.get(detectedGenre) ?? 0) + 1,
+        );
+        playlistGenreCounts.set(
+          detectedGenre,
+          (playlistGenreCounts.get(detectedGenre) ?? 0) + 1,
+        );
+      }
+
+      for (const artistName of extractArtistNames(track.artists)) {
+        playlistArtistNames.add(artistName);
+      }
+    }
+
+    for (const artistName of playlistArtistNames) {
+      artistPlaylistCountByName.set(
+        artistName,
+        (artistPlaylistCountByName.get(artistName) ?? 0) + 1,
+      );
+    }
+
+    const playlistGenre =
+      detectPlaylistGenre(playlist.name, playlist.description) !== "unknown"
+        ? detectPlaylistGenre(playlist.name, playlist.description)
+        : pickTopGenre(playlistGenreCounts) ?? "unknown";
+
+    playlistTargets.push({
+      id: playlist.id,
+      name: playlist.name,
+      genre: playlistGenre,
+      trackIds: playlistTrackIds,
+      artistNames: playlistArtistNames,
+      genreCounts: playlistGenreCounts,
+    });
+  }
+
+  if (playlistTargets.length === 0) {
+    return null;
+  }
+
+  const dominantGenre = pickTopGenre(genreTrackCountByType);
+
+  return {
+    playlistsCount: playlistTargets.length,
+    uniqueTrackCount: trackPlaylistNamesById.size,
+    repeatedTrackCount: [...trackPlaylistNamesById.values()].filter(
+      (playlistNames) => playlistNames.length >= 2,
+    ).length,
+    dominantGenre,
+    dominantGenreLabel: getGenreDisplayLabel(dominantGenre),
+    dominantArtists: [...artistPlaylistCountByName.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 5)
+      .map(([artistName]) => artistName),
+    trackPlaylistNamesById,
+    artistPlaylistCountByName,
+    genreTrackCountByType,
+    playlistTargets,
+  };
+}
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -949,21 +1334,31 @@ function buildCurationRows(
   radarRows: RadarMusicRow[],
   playlistTracks: TrackInsight[],
   dominantArtists: string[],
+  accountProfile?: DashboardAccountProfile | null,
 ): DecisionTrack[] {
   const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
   const trackArtistIds = new Map(playlistTracks.map((track) => [track.id, track.artistIds]));
 
   return radarRows.slice(0, 200).map((row) => {
-    const alreadyInPlaylists = playlistTrackIds.has(row.trackId);
+    const fallbackAlreadyInPlaylists = playlistTrackIds.has(row.trackId);
     const normalizedArtists = row.artists.toLowerCase();
-    const artistFit = dominantArtists.some((artist) =>
+    const fallbackArtistFit = dominantArtists.some((artist) =>
       normalizedArtists.includes(artist.toLowerCase()),
     );
-    const fitLabel = alreadyInPlaylists || artistFit
-      ? "Fit alto"
-      : row.lowSaturation || row.recurring
-        ? "Fit medio"
-        : "Fit baixo";
+    const accountSignals = buildAccountSignals({
+      accountProfile: accountProfile ?? null,
+      trackId: row.trackId,
+      artists: row.artists,
+      trackName: row.name,
+      genreLabel: row.genre,
+      fallbackAlreadyInPlaylists,
+      fallbackArtistFit,
+      lowSaturation: row.lowSaturation,
+      recurring: row.recurring,
+      rank: row.rank,
+      weeklyRankChange: row.rankChange,
+    });
+    const fitLabel = accountSignals.fitLabel;
     const movementWeight =
       row.rankChange === null
         ? row.movement.type === "new" || row.movement.type === "reentry"
@@ -973,7 +1368,15 @@ function buildCurationRows(
     const fitWeight = fitLabel === "Fit alto" ? 18 : fitLabel === "Fit medio" ? 10 : 3;
     const recurringWeight = row.recurring ? 10 : 3;
     const saturationWeight = row.lowSaturation ? 14 : 4;
-    const baseWeight = alreadyInPlaylists ? -6 : 8;
+    const accountPresenceWeight =
+      accountSignals.accountPlaylistCount === 0
+        ? 10
+        : accountSignals.accountPlaylistCount === 1
+          ? 2
+          : -Math.min(12, accountSignals.accountPlaylistCount * 4);
+    const artistWeight = clamp(accountSignals.accountArtistCount * 4, 0, 16);
+    const genreWeight = clamp(accountSignals.accountGenreStrength * 1.4, 0, 16);
+    const suggestionWeight = accountSignals.suggestedPlaylistName ? 8 : 0;
     const decisionScore = clamp(
       Math.round(
         row.popularity * 0.32 +
@@ -982,7 +1385,10 @@ function buildCurationRows(
           fitWeight +
           recurringWeight +
           saturationWeight +
-          baseWeight,
+          accountPresenceWeight +
+          artistWeight +
+          genreWeight +
+          suggestionWeight,
       ),
       0,
       100,
@@ -990,11 +1396,18 @@ function buildCurationRows(
 
     let recommendedAction: DecisionTrack["recommendedAction"];
 
-    if (row.movement.type === "down" && alreadyInPlaylists && decisionScore < 58) {
+    if (
+      row.movement.type === "down" &&
+      accountSignals.accountPlaylistCount >= 2 &&
+      decisionScore < 66
+    ) {
       recommendedAction = "remove";
-    } else if (decisionScore >= 78 && !alreadyInPlaylists) {
+    } else if (decisionScore >= 78 && accountSignals.accountPlaylistCount === 0) {
       recommendedAction = "add";
-    } else if (decisionScore >= 60) {
+    } else if (
+      decisionScore >= 64 ||
+      (accountSignals.accountPlaylistCount > 0 && row.movement.type === "up")
+    ) {
       recommendedAction = "observe";
     } else {
       recommendedAction = "ignore";
@@ -1031,8 +1444,14 @@ function buildCurationRows(
           : `${formatSignedValue(row.rankChange)} no chart`,
       lowSaturation: row.lowSaturation,
       recurring: row.recurring,
-      alreadyInPlaylists,
-      fitLabel,
+      alreadyInPlaylists: accountSignals.alreadyInPlaylists,
+      fitLabel: accountSignals.fitLabel,
+      accountPlaylistCount: accountSignals.accountPlaylistCount,
+      accountPlaylistNames: accountSignals.accountPlaylistNames,
+      accountArtistCount: accountSignals.accountArtistCount,
+      accountGenre: accountSignals.accountGenre,
+      accountFitContext: accountSignals.accountFitContext,
+      suggestedPlaylistName: accountSignals.suggestedPlaylistName,
       decisionScore,
       recommendedAction,
       scoreBreakdown: row.scoreBreakdown,
@@ -1045,7 +1464,17 @@ function buildCurationRows(
 
 function buildActionItems(rows: DecisionTrack[], fallback: string) {
   return rows.length > 0
-    ? rows.map((track) => `${track.name} · ${track.artists}`)
+    ? rows.map((track) => {
+        const targetLabel = track.suggestedPlaylistName
+          ? ` · boa para ${track.suggestedPlaylistName}`
+          : track.accountPlaylistCount > 0
+            ? track.accountPlaylistNames.length > 0
+              ? ` · ja em ${track.accountPlaylistCount} playlist${track.accountPlaylistCount > 1 ? "s" : ""}`
+              : " · ja na base"
+            : "";
+
+        return `${track.name} · ${track.artists}${targetLabel}`;
+      })
     : [fallback];
 }
 
@@ -1075,10 +1504,12 @@ async function buildDashboardSnapshotRadarRows({
   country = "BR",
   playlistTracks,
   dominantArtists,
+  accountProfile,
 }: {
   country?: string;
   playlistTracks: TrackInsight[];
   dominantArtists: string[];
+  accountProfile?: DashboardAccountProfile | null;
 }) {
   const dates = await getSnapshotDates(country);
   const latestDate = dates[0] ?? null;
@@ -1151,22 +1582,28 @@ async function buildDashboardSnapshotRadarRows({
     const spotifyTrackId = track.spotify_track_id?.trim() || null;
     const trackId = spotifyTrackId || key;
     const artists = track.artist_name?.trim() || "Artista nao identificado";
-    const alreadyInPlaylists =
+    const fallbackAlreadyInPlaylists =
       spotifyTrackId !== null && playlistTrackIds.has(spotifyTrackId);
-    const artistFit = dominantArtists.some((artist) =>
+    const fallbackArtistFit = dominantArtists.some((artist) =>
       artists.toLowerCase().includes(artist.toLowerCase()),
     );
-    const fitLabel = alreadyInPlaylists
-      ? "Fit alto"
-      : artistFit
-        ? "Fit medio"
-        : track.position <= 50 || (weeklyRankChange ?? 0) >= 8
-          ? "Fit medio"
-          : "Fit baixo";
     const movementType: MovementType =
       track.status === "stable" ? "same" : track.status;
     const lowSaturation = presenceCount <= 2;
     const recurring = presenceCount >= 4;
+    const accountSignals = buildAccountSignals({
+      accountProfile: accountProfile ?? null,
+      trackId,
+      artists,
+      trackName: track.track_name,
+      genreLabel: track.genre,
+      fallbackAlreadyInPlaylists,
+      fallbackArtistFit,
+      lowSaturation,
+      recurring,
+      rank: track.position,
+      weeklyRankChange,
+    });
     const mappedPlaylistTrack = track.spotify_track_id
       ? playlistTrackMap.get(track.spotify_track_id)
       : undefined;
@@ -1219,6 +1656,10 @@ async function buildDashboardSnapshotRadarRows({
         : null,
       recurring ? "Consistencia semanal" : null,
       lowSaturation ? "Janela aberta" : null,
+      accountSignals.accountPlaylistCount >= 2 ? "Base recorrente" : null,
+      accountSignals.suggestedPlaylistName
+        ? `Pede ${accountSignals.suggestedPlaylistName}`
+        : null,
     ].filter((value): value is string => Boolean(value));
 
     return {
@@ -1258,15 +1699,15 @@ async function buildDashboardSnapshotRadarRows({
       intelligenceTags,
       lowSaturation,
       recurring,
-      alreadyInPlaylists,
-      fitLabel,
+      alreadyInPlaylists: accountSignals.alreadyInPlaylists,
+      fitLabel: accountSignals.fitLabel,
       scoreBreakdown: buildScoreBreakdown({
         popularity: inferredPopularity,
         movementType,
         rankChange: track.position_change,
         lowSaturation,
         recurring,
-        fitLabel,
+        fitLabel: accountSignals.fitLabel,
       }),
     } satisfies RadarMusicRow;
   });
@@ -1319,9 +1760,11 @@ function buildDashboardTone(track: DecisionTrack | null | undefined): StatusTone
 }
 
 function buildDecisionSummary(track: DecisionTrack) {
-  const baseLabel = track.alreadyInPlaylists ? "ja esta na base" : "ainda esta fora da base";
+  const baseLabel = track.alreadyInPlaylists
+    ? "ja conversa com a tua base"
+    : "ainda esta fora da tua base";
 
-  return `${track.name} combina score ${track.decisionScore}, ${track.chartDeltaLabel.toLowerCase()} e ${track.fitLabel.toLowerCase()}; por isso ${baseLabel} virou sinal forte para hoje.`;
+  return `${track.name} combina score ${track.decisionScore}, ${track.chartDeltaLabel.toLowerCase()} e ${track.fitLabel.toLowerCase()}; ${track.accountFitContext.toLowerCase()}, entao ${baseLabel} virou sinal forte para hoje.`;
 }
 
 function buildDashboardEditorialSpotlights({
@@ -1396,7 +1839,7 @@ function buildDashboardEditorialSpotlights({
             `Score ${topDecisionTrack.decisionScore}`,
             topDecisionTrack.chartDeltaLabel,
             topDecisionTrack.fitLabel,
-            topDecisionTrack.alreadyInPlaylists ? "Ja na base" : "Fora da base",
+            topDecisionTrack.accountFitContext,
           ],
           coverUrl: topDecisionTrack.coverUrl,
           spotifyUrl: topDecisionTrack.spotifyUrl,
@@ -1416,9 +1859,11 @@ function buildDashboardEditorialSpotlights({
             weeklyAnchor.recurring ? "Recorrente no radar" : "Historico em formacao",
             `Score ${weeklyAnchor.decisionScore}`,
             weeklyAnchor.fitLabel,
-            weeklyAnchor.position_change === null
-              ? "Sem comparativo"
-              : `${formatSignedValue(weeklyAnchor.position_change)} no chart`,
+            weeklyAnchor.suggestedPlaylistName
+              ? `Boa para ${weeklyAnchor.suggestedPlaylistName}`
+              : weeklyAnchor.position_change === null
+                ? "Sem comparativo"
+                : `${formatSignedValue(weeklyAnchor.position_change)} no chart`,
           ],
           coverUrl: weeklyAnchor.coverUrl,
           spotifyUrl: weeklyAnchor.spotifyUrl,
@@ -1436,9 +1881,10 @@ function buildDashboardEditorialSpotlights({
             `#${biggestRise.rank}`,
             `${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes`,
             decisionByTrackId.get(biggestRise.trackId)?.fitLabel ?? biggestRise.fitLabel,
-            biggestRise.dailyStreams === null
-              ? "Sem streams"
-              : formatStreamsValue(biggestRise.dailyStreams),
+            decisionByTrackId.get(biggestRise.trackId)?.accountFitContext ??
+              (biggestRise.dailyStreams === null
+                ? "Sem streams"
+                : formatStreamsValue(biggestRise.dailyStreams)),
           ],
           coverUrl: biggestRise.coverUrl,
           spotifyUrl: biggestRise.spotifyUrl,
@@ -1459,15 +1905,17 @@ function buildDashboardEditorialSpotlights({
               : "yellow",
           trackName: breakoutTrack.name,
           artists: breakoutTrack.artists,
-          summary: `${breakoutTrack.name} abre uma janela boa de discovery porque ainda esta fora da sua base, tem ${breakoutTrack.fitLabel.toLowerCase()} e chega com espaco editorial para teste antes de saturar.`,
+          summary: `${breakoutTrack.name} abre uma janela boa de discovery porque ainda esta fora da tua base, tem ${breakoutTrack.fitLabel.toLowerCase()} e ${decisionByTrackId.get(breakoutTrack.trackId)?.accountFitContext.toLowerCase() ?? "chega com espaco editorial para teste"}.`,
           stats: [
             decisionByTrackId.get(breakoutTrack.trackId)
               ? `Score ${decisionByTrackId.get(breakoutTrack.trackId)?.decisionScore}`
               : `Radar ${breakoutTrack.opportunityScore}`,
             breakoutTrack.lowSaturation ? "Baixa saturacao" : breakoutTrack.movement.label,
-            breakoutTrack.rankChange === null
-              ? "Sem comparativo"
-              : `${formatSignedValue(breakoutTrack.rankChange)} no chart`,
+            decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName
+              ? `Boa para ${decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName}`
+              : breakoutTrack.rankChange === null
+                ? "Sem comparativo"
+                : `${formatSignedValue(breakoutTrack.rankChange)} no chart`,
             `#${breakoutTrack.rank}`,
           ],
           coverUrl: breakoutTrack.coverUrl,
@@ -1486,7 +1934,7 @@ function buildDashboardEditorialSpotlights({
             `Score ${dropAlertDecision.decisionScore}`,
             dropAlertDecision.chartDeltaLabel,
             dropAlertDecision.fitLabel,
-            dropAlertDecision.alreadyInPlaylists ? "Ja na base" : "Fora da base",
+            dropAlertDecision.accountFitContext,
           ],
           coverUrl: dropAlertDecision.coverUrl,
           spotifyUrl: dropAlertDecision.spotifyUrl,
@@ -1900,14 +2348,16 @@ export async function getCurationPageData(): Promise<CurationPageData> {
 }
 
 export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceData> {
-  const [baseData, chartsData] = await Promise.all([
+  const [baseData, chartsData, accountProfile] = await Promise.all([
     getBasePlaylistsPageData(),
     getChartsData(),
+    buildDashboardAccountProfile(),
   ]);
   const snapshotRadar = await buildDashboardSnapshotRadarRows({
     country: "BR",
     playlistTracks: chartsData.tracks,
     dominantArtists: chartsData.artistDistribution.map((artist) => artist.type),
+    accountProfile,
   });
   const radarRows = snapshotRadar.rows;
 
@@ -1963,14 +2413,18 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
           ? `${primaryTrackFallback.name} e a melhor oportunidade editorial agora`
           : "O mercado ainda nao definiu uma prioridade absoluta hoje",
         summary:
-          "Sem snapshots suficientes no Supabase, o dashboard voltou temporariamente para a leitura geral do radar.",
+          accountProfile
+            ? "Sem snapshots suficientes no Supabase, entao o dashboard voltou temporariamente para a leitura geral do radar, mas manteve o DNA da tua conta conectado na base editorial."
+            : "Sem snapshots suficientes no Supabase, o dashboard voltou temporariamente para a leitura geral do radar.",
         tone: buildDashboardTone(primaryTrackFallback),
         supportingPoints: [
           `${addNowQueueFallback.length} faixas prontas para adicionar`,
           biggestRiseFallback
             ? `Maior subida: ${biggestRiseFallback.name} ${formatSignedValue(biggestRiseFallback.rankChange ?? 0)}`
             : "Sem subida forte no recorte",
-          `${removeQueueFallback.length} pedem teste ou limpeza`,
+          accountProfile
+            ? `${accountProfile.playlistsCount} playlists da conta cruzadas`
+            : `${removeQueueFallback.length} pedem teste ou limpeza`,
         ],
       },
       primaryAction: {
@@ -2002,13 +2456,17 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         },
         {
           title: "Novas entradas",
-          value: formatCount(
-            radarMusic.rows.filter(
-              (row) =>
-                row.movement.type === "new" || row.movement.type === "reentry",
-            ).length,
-          ),
-          helper: "Sinais frescos para discovery",
+          value: accountProfile
+            ? formatCount(accountProfile.uniqueTrackCount)
+            : formatCount(
+                radarMusic.rows.filter(
+                  (row) =>
+                    row.movement.type === "new" || row.movement.type === "reentry",
+                ).length,
+              ),
+          helper: accountProfile
+            ? `${accountProfile.repeatedTrackCount} faixas se repetem na tua base`
+            : "Sinais frescos para discovery",
           tone: "purple",
         },
         {
@@ -2018,11 +2476,15 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
           tone: "red",
         },
         {
-          title: "Playlists monitoradas",
-          value: formatCount(baseData.rows.length),
-          helper: bestPlaylistFallback
-            ? `Melhor score ${bestPlaylistFallback.playlist.score}`
-            : "Base ativa",
+          title: accountProfile ? "Playlists da conta" : "Playlists monitoradas",
+          value: formatCount(accountProfile?.playlistsCount ?? baseData.rows.length),
+          helper: accountProfile
+            ? accountProfile.dominantGenreLabel
+              ? `${accountProfile.dominantGenreLabel} domina a base`
+              : `${accountProfile.repeatedTrackCount} faixas repetem na conta`
+            : bestPlaylistFallback
+              ? `Melhor score ${bestPlaylistFallback.playlist.score}`
+              : "Base ativa",
           tone: "blue",
         },
       ],
@@ -2071,6 +2533,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     radarRows,
     chartsData.tracks,
     chartsData.artistDistribution.map((artist) => artist.type),
+    accountProfile,
   );
   const bestPlaylist = [...baseData.rows].sort(
     (left, right) => right.playlist.score - left.playlist.score,
@@ -2090,6 +2553,9 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
   const addNow = addNowQueue.slice(0, 3);
   const observe = observeQueue.slice(0, 3);
   const removeOrTest = removeQueue.slice(0, 3);
+  const accountBaseMatches = curationRows.filter(
+    (row) => row.accountPlaylistCount > 0,
+  ).length;
   const editorialSpotlights = buildDashboardEditorialSpotlights({
     addNowQueue,
     observeQueue,
@@ -2115,17 +2581,23 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         : "O mercado ainda nao definiu uma prioridade absoluta hoje",
       summary:
         snapshotRadar.weeklyDate
-          ? `A leitura cruza o snapshot mais recente do top 200 com comparacao diaria e semanal do Supabase para transformar movimento real em decisao pratica.`
-          : "A leitura cruza o snapshot mais recente do top 200 com a ultima comparacao disponivel no Supabase para transformar movimento real em decisao pratica.",
+          ? accountProfile
+            ? "A leitura cruza o snapshot mais recente do top 200 com comparacao diaria e semanal do Supabase e com o DNA real das tuas playlists para transformar movimento em decisao pratica."
+            : "A leitura cruza o snapshot mais recente do top 200 com comparacao diaria e semanal do Supabase para transformar movimento real em decisao pratica."
+          : accountProfile
+            ? "A leitura cruza o snapshot mais recente do top 200 com a ultima comparacao disponivel no Supabase e com o DNA real das tuas playlists para transformar movimento em decisao pratica."
+            : "A leitura cruza o snapshot mais recente do top 200 com a ultima comparacao disponivel no Supabase para transformar movimento real em decisao pratica.",
       tone: buildDashboardTone(primaryTrack),
       supportingPoints: [
         `${addNowQueue.length} faixas prontas para adicionar`,
         biggestRise
           ? `Maior subida: ${biggestRise.name} ${formatSignedValue(biggestRise.rankChange ?? 0)}`
           : "Sem subida forte no recorte",
-        snapshotRadar.latestDate
-          ? `Leitura base ${snapshotRadar.latestDate}`
-          : `${removeQueue.length} pedem teste ou limpeza`,
+        accountProfile
+          ? `${accountProfile.playlistsCount} playlists da conta cruzadas`
+          : snapshotRadar.latestDate
+            ? `Leitura base ${snapshotRadar.latestDate}`
+            : `${removeQueue.length} pedem teste ou limpeza`,
       ],
     },
     primaryAction: {
@@ -2154,14 +2626,18 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         tone: "green",
       },
       {
-        title: "Novas entradas",
-        value: formatCount(
-          radarRows.filter(
-            (row) =>
-              row.movement.type === "new" || row.movement.type === "reentry",
-          ).length,
-        ),
-        helper: "Sinais frescos para discovery",
+        title: accountProfile ? "Ja na tua base" : "Novas entradas",
+        value: accountProfile
+          ? formatCount(accountBaseMatches)
+          : formatCount(
+              radarRows.filter(
+                (row) =>
+                  row.movement.type === "new" || row.movement.type === "reentry",
+              ).length,
+            ),
+        helper: accountProfile
+          ? `${accountProfile.uniqueTrackCount} faixas da tua conta mapeadas`
+          : "Sinais frescos para discovery",
         tone: "purple",
       },
       {
@@ -2173,9 +2649,15 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         tone: "red",
       },
       {
-        title: "Playlists monitoradas",
-        value: formatCount(baseData.rows.length),
-        helper: bestPlaylist ? `Melhor score ${bestPlaylist.playlist.score}` : "Base ativa",
+        title: accountProfile ? "Playlists da conta" : "Playlists monitoradas",
+        value: formatCount(accountProfile?.playlistsCount ?? baseData.rows.length),
+        helper: accountProfile
+          ? accountProfile.dominantGenreLabel
+            ? `${accountProfile.dominantGenreLabel} domina a conta`
+            : `${accountProfile.repeatedTrackCount} faixas repetem na conta`
+          : bestPlaylist
+            ? `Melhor score ${bestPlaylist.playlist.score}`
+            : "Base ativa",
         tone: "blue",
       },
     ],
