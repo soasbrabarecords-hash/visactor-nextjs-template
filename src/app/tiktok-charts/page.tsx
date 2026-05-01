@@ -11,8 +11,8 @@ export default async function TikTokChartsPage() {
     <div>
       <PageIntro
         eyebrow="Curadoria / Radar Music"
-        title="TikTok Charts — Viral publico"
-        description="Leitura externa do chart viral publico do TikTok para testar sinais de descoberta antes de levar esse calor para o Radar Music."
+        title="TikTok Charts — Brasil"
+        description="Leitura externa do chart publico de TikTok Brasil para testar sinais de descoberta antes de levar esse calor para o Radar Music."
       />
 
       {chart ? (

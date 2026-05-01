@@ -4,10 +4,11 @@ export type TikTokPublicChartTrack = {
   rank: number;
   trackName: string;
   artistName: string;
+  movementLabel: string;
 };
 
 export type TikTokPublicChart = {
-  source: "tikcharts";
+  source: "kworb-br";
   snapshotDate: string | null;
   tracks: TikTokPublicChartTrack[];
 };
@@ -47,64 +48,72 @@ function htmlToLines(html: string) {
     .filter(Boolean);
 }
 
-function parseTikChartsHtml(html: string): TikTokPublicChart {
-  const lines = htmlToLines(html);
-  const markerIndex = lines.findIndex((line) =>
-    /Viral Charts Top 100/i.test(line),
+function splitArtistAndTitle(value: string) {
+  const separatorIndex = value.indexOf(" - ");
+
+  if (separatorIndex === -1) {
+    return {
+      artistName: value.trim(),
+      trackName: value.trim(),
+    };
+  }
+
+  return {
+    artistName: value.slice(0, separatorIndex).trim(),
+    trackName: value.slice(separatorIndex + 3).trim(),
+  };
+}
+
+function parseKworbHtml(html: string): TikTokPublicChart {
+  const titleMatch = html.match(
+    /<title>\s*TikTok Trending Songs - Brazil\s*<\/title>/i,
   );
-  const relevantLines = markerIndex >= 0 ? lines.slice(markerIndex) : lines;
-  const combinedText = relevantLines.join(" ");
-  const snapshotDate =
-    combinedText.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1] ?? null;
   const tracks: TikTokPublicChartTrack[] = [];
 
-  for (let index = 0; index < relevantLines.length; index += 1) {
-    const currentLine = relevantLines[index];
+  if (!titleMatch) {
+    throw new Error("Kworb BR chart structure not recognized");
+  }
 
-    if (!/^\d{1,3}$/.test(currentLine)) {
-      continue;
-    }
+  const rowPattern =
+    /<tr><td>(\d+)<\/td><td>([^<]+)<\/td><td class="mp text"><div>([\s\S]*?)<\/div><\/td><\/tr>/gi;
+  let rowMatch = rowPattern.exec(html);
 
-    const rank = Number(currentLine);
-
-    if (!Number.isFinite(rank) || rank < 1 || rank > 100) {
-      continue;
-    }
-
-    let cursor = index + 1;
-
-    while (
-      cursor < relevantLines.length &&
-      /^(Image|Top 100|TikTok|Weekly Rankings|latest|Select)$/i.test(
-        relevantLines[cursor],
-      )
-    ) {
-      cursor += 1;
-    }
-
-    const trackName = relevantLines[cursor];
-    const artistName = relevantLines[cursor + 1];
+  while (rowMatch) {
+    const rank = Number(rowMatch[1]);
+    const movementLabel = decodeHtmlEntities(rowMatch[2]).trim();
+    const entryLabel = decodeHtmlEntities(rowMatch[3])
+      .replace(/<[^>]+>/g, "")
+      .trim();
+    const { artistName, trackName } = splitArtistAndTitle(entryLabel);
 
     if (
-      !trackName ||
-      !artistName ||
-      /^\d{1,3}$/.test(trackName) ||
-      /^\d{1,3}$/.test(artistName)
+      Number.isFinite(rank) &&
+      rank >= 1 &&
+      rank <= 200 &&
+      trackName &&
+      artistName
     ) {
-      continue;
-    }
-
-    if (!tracks.some((track) => track.rank === rank)) {
       tracks.push({
         rank,
+        movementLabel,
         trackName,
         artistName,
       });
     }
+
+    rowMatch = rowPattern.exec(html);
+  }
+
+  const lines = htmlToLines(html);
+  const snapshotDate =
+    lines.find((line) => /\b20\d{2}-\d{2}-\d{2}\b/.test(line)) ?? null;
+
+  if (tracks.length === 0) {
+    throw new Error("Kworb BR chart returned no tracks");
   }
 
   return {
-    source: "tikcharts",
+    source: "kworb-br",
     snapshotDate,
     tracks,
   };
@@ -120,7 +129,7 @@ export async function fetchTikTokPublicChart(): Promise<TikTokPublicChart> {
   }
 
   const request = (async () => {
-    const response = await fetch("https://tikcharts.com/", {
+    const response = await fetch("https://kworb.net/charts/tiktok/br.html", {
       cache: "no-store",
       headers: {
         "User-Agent":
@@ -129,11 +138,11 @@ export async function fetchTikTokPublicChart(): Promise<TikTokPublicChart> {
     });
 
     if (!response.ok) {
-      throw new Error(`TikCharts error ${response.status}`);
+      throw new Error(`Kworb BR TikTok error ${response.status}`);
     }
 
     const html = await response.text();
-    const chart = parseTikChartsHtml(html);
+    const chart = parseKworbHtml(html);
 
     cachedChart = {
       value: chart,

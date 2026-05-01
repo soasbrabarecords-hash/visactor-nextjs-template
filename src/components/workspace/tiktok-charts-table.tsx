@@ -68,10 +68,10 @@ export default function TikTokChartsTable({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="blue">
               <Flame className="mr-1 h-3.5 w-3.5" />
-              TikTok viral
+              TikTok Brasil
             </StatusBadge>
             <StatusBadge tone="slate">{formatSnapshotDate(chart.snapshotDate)}</StatusBadge>
-            <StatusBadge tone="purple">Fonte publica</StatusBadge>
+            <StatusBadge tone="purple">Kworb BR</StatusBadge>
           </div>
 
           <div className="mt-5 grid gap-4 laptop:grid-cols-[minmax(0,1fr)_260px]">
@@ -80,11 +80,12 @@ export default function TikTokChartsTable({
                 Radar instantaneo
               </div>
               <h2 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight text-white">
-                O calor do TikTok em uma leitura simples e pronta para cruzar com Spotify.
+                O calor do TikTok Brasil em uma leitura simples e pronta para cruzar com Spotify.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68">
-                Esse painel puxa o chart viral publico do TikTok sem banco proprio,
-                para testar rapidamente o que esta mais quente e jogar isso no Radar Music.
+                Esse painel puxa um chart publico de Brasil sem banco proprio, para
+                testar rapidamente o que esta sendo usado no TikTok BR e jogar isso no
+                Radar Music.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -96,7 +97,7 @@ export default function TikTokChartsTable({
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href="https://tikcharts.com/"
+                  href="https://kworb.net/charts/tiktok/br.html"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/72 transition hover:bg-white/10 hover:text-white"
@@ -185,6 +186,7 @@ export default function TikTokChartsTable({
             <thead className="bg-muted/20">
               <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 <th className="px-5 py-3">Pos.</th>
+                <th className="px-5 py-3">Mov.</th>
                 <th className="px-5 py-3">Faixa</th>
                 <th className="px-5 py-3">Artista</th>
                 <th className="px-5 py-3">Sinal</th>
@@ -195,6 +197,9 @@ export default function TikTokChartsTable({
                 <tr key={`${track.rank}-${track.trackName}-${track.artistName}`} className="hover:bg-muted/10">
                   <td className="px-5 py-3 align-top">
                     <div className="text-lg font-semibold">#{track.rank}</div>
+                  </td>
+                  <td className="px-5 py-3 align-top text-sm text-muted-foreground">
+                    {track.movementLabel}
                   </td>
                   <td className="px-5 py-3 align-top">
                     <div className="font-medium">{track.trackName}</div>
