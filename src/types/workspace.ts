@@ -164,6 +164,9 @@ export type RadarMusicRow = {
   coverUrl: string | null;
   statusTags: string[];
   intelligenceTags: string[];
+  tiktokViral: boolean;
+  tiktokRank: number | null;
+  tiktokSnapshotDate: string | null;
   lowSaturation: boolean;
   recurring: boolean;
   alreadyInPlaylists: boolean;
@@ -199,6 +202,10 @@ export type RadarMusicPageData = {
   };
   summaryCards: RadarMusicSummaryCard[];
   rows: RadarMusicRow[];
+  tiktokMatches: {
+    snapshotDate: string | null;
+    tracks: RadarMusicRow[];
+  };
   support: RadarMusicSupport;
 };
 

@@ -157,6 +157,9 @@ export default function RadarMusicTable({
                           <div className="truncate font-semibold">{row.name}</div>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          {row.tiktokViral && row.tiktokRank !== null ? (
+                            <StatusBadge tone="blue">TikTok #{row.tiktokRank}</StatusBadge>
+                          ) : null}
                           {row.previousRank === null ? (
                             <StatusBadge tone="purple">NEW</StatusBadge>
                           ) : null}
@@ -207,6 +210,14 @@ export default function RadarMusicTable({
                           {tag}
                         </StatusBadge>
                       ))}
+                      {row.tiktokViral ? (
+                        <StatusBadge
+                          tone="blue"
+                          className="normal-case tracking-[0.04em]"
+                        >
+                          Viral no TikTok
+                        </StatusBadge>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-4 py-3 align-top">

@@ -7,6 +7,7 @@ import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
 import RadarMusicRefreshButton from "@/components/workspace/radar-music-refresh-button";
 import RadarMusicTable from "@/components/workspace/radar-music-table";
+import RadarMusicTikTokStrip from "@/components/workspace/radar-music-tiktok-strip";
 import StatusBadge from "@/components/workspace/status-badge";
 import { getRadarMusicPageData } from "@/lib/workspace-data";
 
@@ -66,6 +67,11 @@ export default async function RadarMusicPage({
       <RadarMusicEditorialHero
         hero={data.editorialHero}
         leadRow={data.rows[0] ?? null}
+      />
+
+      <RadarMusicTikTokStrip
+        snapshotDate={data.tiktokMatches.snapshotDate}
+        tracks={data.tiktokMatches.tracks}
       />
 
       <RadarMusicTable rows={data.rows} />

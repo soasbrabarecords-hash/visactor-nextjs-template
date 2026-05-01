@@ -31,6 +31,7 @@ import {
   fetchSpotifyAccountPlaylists,
   fetchSpotifyEditablePlaylist,
 } from "@/lib/spotify-user";
+import { fetchTikTokPublicChart, type TikTokPublicChartTrack } from "@/lib/tiktok-public-charts";
 import type { PlaylistRecord } from "@/types/dashboard";
 import type { TrackInsight } from "@/types/charts";
 import type {
@@ -816,6 +817,9 @@ function buildRadarRows(
       coverUrl: track.coverUrl,
       statusTags: track.tags,
       intelligenceTags: track.intelligenceTags,
+      tiktokViral: false,
+      tiktokRank: null,
+      tiktokSnapshotDate: null,
       lowSaturation: track.lowSaturation,
       recurring: track.daysOnChart >= 3 || track.isRecurring,
       alreadyInPlaylists,
@@ -830,6 +834,106 @@ function buildRadarRows(
       }),
     };
   });
+}
+
+function normalizeRadarMatchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\((feat|ft|with)[^)]+\)/gi, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function buildRadarMatchVariants(value: string) {
+  const normalized = normalizeRadarMatchText(value);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const compact = normalized
+    .replace(/\b(feat|ft|with)\b.*$/i, "")
+    .replace(/\b(slowed|sped up|speed up|instrumental|acoustic|remix|live)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return Array.from(new Set([normalized, compact].filter(Boolean)));
+}
+
+function artistNamesOverlap(left: string, right: string) {
+  const leftTokens = buildRadarMatchVariants(left)
+    .flatMap((value) => value.split(/\s*&\s*|\s*,\s*|\s+x\s+/))
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 3);
+  const rightTokens = new Set(
+    buildRadarMatchVariants(right)
+      .flatMap((value) => value.split(/\s*&\s*|\s*,\s*|\s+x\s+/))
+      .map((value) => value.trim())
+      .filter((value) => value.length >= 3),
+  );
+
+  return leftTokens.some((token) => rightTokens.has(token));
+}
+
+function trackNamesMatch(left: string, right: string) {
+  const leftVariants = buildRadarMatchVariants(left);
+  const rightVariants = buildRadarMatchVariants(right);
+
+  return leftVariants.some((leftVariant) =>
+    rightVariants.some(
+      (rightVariant) =>
+        leftVariant === rightVariant ||
+        leftVariant.includes(rightVariant) ||
+        rightVariant.includes(leftVariant),
+    ),
+  );
+}
+
+function enrichRadarRowsWithTikTokSignals(
+  rows: RadarMusicRow[],
+  tiktokTracks: TikTokPublicChartTrack[],
+  snapshotDate: string | null,
+) {
+  const matchedTrackIds = new Set<string>();
+
+  const enrichedRows = rows.map((row) => {
+    const matchedTikTokTrack = tiktokTracks.find(
+      (track) =>
+        trackNamesMatch(row.name, track.trackName) &&
+        artistNamesOverlap(row.artists, track.artistName),
+    );
+
+    if (!matchedTikTokTrack) {
+      return row;
+    }
+
+    matchedTrackIds.add(row.trackId);
+
+    return {
+      ...row,
+      tiktokViral: true,
+      tiktokRank: matchedTikTokTrack.rank,
+      tiktokSnapshotDate: snapshotDate,
+      opportunityScore: clamp(row.opportunityScore + 10, 0, 100),
+      intelligenceTags: Array.from(
+        new Set([`TikTok #${matchedTikTokTrack.rank}`, ...row.intelligenceTags]),
+      ),
+    };
+  });
+
+  return {
+    rows: enrichedRows.sort((left, right) => {
+      if (left.tiktokViral !== right.tiktokViral) {
+        return left.tiktokViral ? -1 : 1;
+      }
+
+      return left.rank - right.rank;
+    }),
+    matches: enrichedRows.filter((row) => matchedTrackIds.has(row.trackId)),
+  };
 }
 
 function filterRadarRows(
@@ -1790,6 +1894,9 @@ async function buildDashboardSnapshotRadarRows({
         null,
       statusTags: intelligenceTags,
       intelligenceTags,
+      tiktokViral: false,
+      tiktokRank: null,
+      tiktokSnapshotDate: null,
       lowSaturation,
       recurring,
       alreadyInPlaylists: accountSignals.alreadyInPlaylists,
@@ -2100,16 +2207,26 @@ export async function getRadarMusicPageData({
   const selectedPeriod = normalizePeriod(period);
   const selectedStatus = normalizeStatus(status);
   const periodLabel = getPeriodLabel(selectedPeriod);
-  const [musicData, chartsData] = await Promise.all([
+  const [musicData, chartsData, tiktokChart] = await Promise.all([
     getMusicChartsData({ country, genre }),
     getChartsData(),
+    fetchTikTokPublicChart().catch(() => ({
+      source: "tikcharts" as const,
+      snapshotDate: null,
+      tracks: [],
+    })),
   ]);
   const rows = buildRadarRows(
     musicData.workbenchTracks,
     chartsData.tracks,
     musicData.dominantArtists.map((artist) => artist.artistName),
   );
-  const filteredRows = filterRadarRows(rows, selectedStatus);
+  const radarWithTikTok = enrichRadarRowsWithTikTokSignals(
+    rows,
+    tiktokChart.tracks,
+    tiktokChart.snapshotDate,
+  );
+  const filteredRows = filterRadarRows(radarWithTikTok.rows, selectedStatus);
 
   return {
     hero: {
@@ -2123,13 +2240,13 @@ export async function getRadarMusicPageData({
       secondaryCtaHref: "/playlists-concorrentes",
     },
     heroInsight: buildRadarMusicHeroInsight({
-      rows,
+      rows: radarWithTikTok.rows,
       movementContext: musicData.movementContext,
       hottestGenres: musicData.hottestGenres,
       dominantArtists: musicData.dominantArtists,
     }),
     editorialHero: buildRadarMusicEditorialHero({
-      rows,
+      rows: radarWithTikTok.rows,
       countryLabel: musicData.countryLabel,
       genreLabel: musicData.genreLabel,
       periodLabel,
@@ -2138,7 +2255,7 @@ export async function getRadarMusicPageData({
       dominantArtists: musicData.dominantArtists,
     }),
     genreSpotlights: buildRadarMusicGenreSpotlights({
-      rows,
+      rows: radarWithTikTok.rows,
       countryValue: musicData.countryValue,
       countryLabel: musicData.countryLabel,
       selectedGenre: musicData.genreValue,
@@ -2159,17 +2276,24 @@ export async function getRadarMusicPageData({
       selectedStatus,
     },
     summaryCards: buildRadarMusicSummary(
-      rows,
+      radarWithTikTok.rows,
       musicData.movementContext.hasSufficientHistory,
     ),
     rows: filteredRows,
+    tiktokMatches: {
+      snapshotDate: tiktokChart.snapshotDate,
+      tracks: radarWithTikTok.matches.slice(0, 8),
+    },
     support: {
       sourceModeLabel: musicData.dataTrust.sourceModeLabel,
       sourceModeDescription: musicData.dataTrust.sourceModeDescription,
       updatedAtLabel: musicData.dataTrust.updatedAtLabel,
       sampleSize: musicData.dataTrust.sampleSize,
       historyDaysTracked: musicData.dataTrust.historyDaysTracked,
-      marketHighlight: musicData.dataTrust.marketHighlight,
+      marketHighlight:
+        radarWithTikTok.matches.length > 0
+          ? `${musicData.dataTrust.marketHighlight} ${radarWithTikTok.matches.length} faixas do radar tambem aparecem no viral do TikTok.`
+          : musicData.dataTrust.marketHighlight,
     },
   };
 }
