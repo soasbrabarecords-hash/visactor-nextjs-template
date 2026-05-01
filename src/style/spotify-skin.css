@@ -786,3 +786,126 @@
     height: auto !important;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * v6 — Ajustes de margem header/tabela + Salvar ordem em verde + alinhamento
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1) Tabela NÃO invade o header — voltar margin-top a zero (sem negativo)
+       Action bar vira parte do mesmo gradient, mas a tabela respira ───── */
+.spotify-skin .py-6 {
+  margin-top: 0 !important;          /* ANTES era -56px (causava sobreposição) */
+  padding-top: 0 !important;
+}
+
+/* O header agora reserva espaço pro rodapé interno (action bar ocupa lá) */
+.spotify-skin [data-spotify-header] {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  /* O bottom: 16px do action bar fica DENTRO do header próprio,
+     a tabela começa logo após o header sem sobrepor */
+}
+
+/* ── 2) Action bar com Save/Cancel: alinhados à DIREITA, na mesma linha ── */
+/* Container que envolve action bar (Container .py-2): vira flex que segura
+   o Play à esquerda e os controles à direita */
+.spotify-skin .py-2:has([data-spotify-actionbar]) {
+  height: auto !important;
+  padding: 8px 24px !important;
+  margin: 0 !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 72px !important;
+}
+
+/* Play volta a ser estático (ocupa sua coluna no flex acima) */
+.spotify-skin [data-spotify-actionbar] {
+  position: static !important;
+  bottom: auto !important;
+  left: auto !important;
+}
+
+/* Barra de controles (Salvar/Cancelar) — extraída visualmente do PlaylistEditor
+   e posicionada à direita do Play via fixed/absolute. Como está dentro do
+   PlaylistEditor (filho do Container.py-6 abaixo), uso position: fixed
+   ancorada no top do Container.py-2 */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+  position: absolute !important;
+  top: -72px !important;             /* sobre o Container.py-2 acima */
+  right: 24px !important;
+  left: auto !important;
+  bottom: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  z-index: 30 !important;
+}
+
+/* Quando não há save/cancel ativo, esconde a barra inteira */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between:not(:has(button)) {
+  display: none !important;
+}
+
+/* Posição relativa no Container que vai segurar a barra absoluta */
+.spotify-skin .py-6 .space-y-6 {
+  position: relative !important;
+}
+
+/* ── 3) Botão "Salvar ordem" em VERDE Spotify (era azul/primary) ──────── */
+/* O botão default tem variant primary. Vamos identificar pela cor inline
+   ou pelo conteúdo (texto "Salvar ordem"). Como é um <Button> shadcn,
+   filtro pelo SVG Save dentro dele */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button:not([class*="outline"]) {
+  background-color: var(--sp-green) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  border: 0 !important;
+}
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button:not([class*="outline"]):hover {
+  background-color: var(--sp-green-hover) !important;
+  transform: scale(1.04);
+}
+
+/* Botão "Cancelar" outline — mantém pill mas estilo Spotify */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"] {
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: var(--sp-text) !important;
+}
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"]:hover {
+  border-color: var(--sp-text) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* "Ordem alterada — não salvo" texto: branco discreto */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between span.text-yellow-500 {
+  color: var(--sp-text-muted) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+/* ── 4) Tabela com margem topo de respiro ─────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] {
+  margin-top: 16px !important;
+}
+
+/* ── 5) Mobile: tudo volta a ser inline ─────────────────────────────────── */
+@media (max-width: 749px) {
+  .spotify-skin .py-2:has([data-spotify-actionbar]) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px 16px !important;
+  }
+  .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    margin-bottom: 8px !important;
+    flex-wrap: wrap !important;
+  }
+}
