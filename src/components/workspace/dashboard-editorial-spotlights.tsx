@@ -6,12 +6,12 @@ import type { DashboardEditorialSpotlight } from "@/types/workspace";
 import StatusBadge from "./status-badge";
 
 const toneRingClasses = {
-  green: "border-emerald-500/25",
-  red: "border-red-500/25",
-  blue: "border-sky-500/25",
-  purple: "border-violet-500/25",
-  yellow: "border-amber-500/25",
-  slate: "border-slate-500/25",
+  green: "border-emerald-500/25 bg-[linear-gradient(180deg,rgba(16,185,129,0.16),rgba(8,12,10,0.94))]",
+  red: "border-red-500/25 bg-[linear-gradient(180deg,rgba(248,113,113,0.16),rgba(12,8,8,0.94))]",
+  blue: "border-sky-500/25 bg-[linear-gradient(180deg,rgba(56,189,248,0.16),rgba(8,11,14,0.94))]",
+  purple: "border-violet-500/25 bg-[linear-gradient(180deg,rgba(167,139,250,0.16),rgba(11,8,14,0.94))]",
+  yellow: "border-amber-500/25 bg-[linear-gradient(180deg,rgba(251,191,36,0.18),rgba(14,11,8,0.94))]",
+  slate: "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(10,10,12,0.94))]",
 } as const;
 
 function coverStyle(coverUrl: string | null) {
@@ -53,51 +53,57 @@ export default function DashboardEditorialSpotlights({
           <article
             key={`${spotlight.title}-${spotlight.trackName}`}
             className={cn(
-              "flex min-h-[320px] flex-col rounded-2xl border bg-card/70 p-5",
+              "group relative flex min-h-[350px] flex-col overflow-hidden rounded-[26px] border p-5 text-white shadow-[0_18px_42px_rgba(0,0,0,0.2)] transition duration-300 hover:-translate-y-1",
               toneRingClasses[spotlight.tone],
             )}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div
+              className="absolute inset-0 opacity-20 transition duration-300 group-hover:opacity-30"
+              style={coverStyle(spotlight.coverUrl)}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,9,0.06),rgba(5,7,9,0.92))]" />
+
+            <div className="relative flex items-start justify-between gap-3">
               <div className="space-y-2">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="text-xs uppercase tracking-[0.18em] text-white/50">
                   {spotlight.title}
                 </div>
                 <StatusBadge tone={spotlight.tone}>{spotlight.badge}</StatusBadge>
               </div>
               <div
-                className="h-14 w-14 shrink-0 rounded-2xl border border-border bg-muted"
+                className="h-16 w-16 shrink-0 rounded-2xl border border-white/10 bg-muted shadow-[0_12px_24px_rgba(0,0,0,0.25)]"
                 style={coverStyle(spotlight.coverUrl)}
               />
             </div>
 
-            <div className="mt-5 min-w-0">
+            <div className="relative mt-6 min-w-0">
               <h3 className="truncate text-xl font-semibold">{spotlight.trackName}</h3>
-              <p className="truncate text-sm text-muted-foreground">
+              <p className="truncate text-sm text-white/70">
                 {spotlight.artists}
               </p>
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            <p className="relative mt-4 text-sm leading-6 text-white/75">
               {spotlight.summary}
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="relative mt-5 flex flex-wrap gap-2">
               {spotlight.stats.map((stat) => (
                 <span
                   key={stat}
-                  className="rounded-full border border-border bg-background/60 px-3 py-1 text-xs text-muted-foreground"
+                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
                 >
                   {stat}
                 </span>
               ))}
             </div>
 
-            <div className="mt-auto pt-5">
+            <div className="relative mt-auto pt-6">
               <Link
                 href={spotlight.spotifyUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-2 text-sm font-medium text-white transition hover:bg-black/40"
               >
                 Abrir no Spotify
                 <ExternalLink className="h-3.5 w-3.5" />
