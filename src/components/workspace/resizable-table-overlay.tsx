@@ -109,7 +109,7 @@ export default function ResizableTableOverlay({
     // ── Auto-fit: distribuir espaço disponível entre colunas visíveis ─────
     // - Customizadas (no objeto sizes) recebem o width fixo
     // - Restantes dividem o espaço sobrando proporcionalmente aos pesos
-    let computedWidths: Record<number, number> = {};
+    const computedWidths: Record<number, number> = {};
     if (autoFit) {
       const tableContainer = table.parentElement;
       const totalWidth = (tableContainer?.clientWidth ?? table.clientWidth) || 0;
