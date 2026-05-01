@@ -22,6 +22,7 @@ import type {
 } from "@/types/music-charts";
 import type {
   CurationPageData,
+  DashboardEditorialSpotlight,
   DashboardWorkspaceData,
   DecisionTrack,
   HeroInsight,
@@ -1040,6 +1041,245 @@ function buildActionItems(rows: DecisionTrack[], fallback: string) {
     : [fallback];
 }
 
+function compareDecisionPriority(left: DecisionTrack, right: DecisionTrack) {
+  const scoreDifference = right.decisionScore - left.decisionScore;
+
+  if (scoreDifference !== 0) {
+    return scoreDifference;
+  }
+
+  const positionDifference = (right.position_change ?? -999) - (left.position_change ?? -999);
+
+  if (positionDifference !== 0) {
+    return positionDifference;
+  }
+
+  return (right.dailyStreams ?? 0) - (left.dailyStreams ?? 0);
+}
+
+function compareRemovePriority(left: DecisionTrack, right: DecisionTrack) {
+  const positionDifference = (left.position_change ?? 999) - (right.position_change ?? 999);
+
+  if (positionDifference !== 0) {
+    return positionDifference;
+  }
+
+  return left.decisionScore - right.decisionScore;
+}
+
+function buildDashboardTone(track: DecisionTrack | null | undefined): StatusTone {
+  switch (track?.recommendedAction) {
+    case "add":
+      return "green";
+    case "observe":
+      return "yellow";
+    case "remove":
+      return "red";
+    default:
+      return track?.movement.tone ?? "slate";
+  }
+}
+
+function buildDecisionSummary(track: DecisionTrack) {
+  const baseLabel = track.alreadyInPlaylists ? "ja esta na base" : "ainda esta fora da base";
+
+  return `${track.name} combina score ${track.decisionScore}, ${track.chartDeltaLabel.toLowerCase()} e ${track.fitLabel.toLowerCase()}; por isso ${baseLabel} virou sinal forte para hoje.`;
+}
+
+function buildDashboardEditorialSpotlights({
+  addNowQueue,
+  observeQueue,
+  removeQueue,
+  radarRows,
+}: {
+  addNowQueue: DecisionTrack[];
+  observeQueue: DecisionTrack[];
+  removeQueue: DecisionTrack[];
+  radarRows: RadarMusicRow[];
+}): DashboardEditorialSpotlight[] {
+  const decisionByTrackId = new Map(
+    [...addNowQueue, ...observeQueue, ...removeQueue].map((track) => [track.trackId, track]),
+  );
+  const topDecisionTrack =
+    addNowQueue[0] ??
+    observeQueue[0] ??
+    [...decisionByTrackId.values()].sort(compareDecisionPriority)[0] ??
+    null;
+  const weeklyAnchor = [...decisionByTrackId.values()]
+    .filter((track) => track.recurring)
+    .sort(compareDecisionPriority)[0] ?? topDecisionTrack;
+  const biggestRise = [...radarRows]
+    .filter((row) => (row.rankChange ?? 0) > 0)
+    .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
+  const breakoutTrack = [...radarRows]
+    .filter(
+      (row) =>
+        !row.alreadyInPlaylists &&
+        (row.movement.type === "new" ||
+          row.movement.type === "reentry" ||
+          row.lowSaturation),
+    )
+    .sort((left, right) => {
+      const leftDecisionScore = decisionByTrackId.get(left.trackId)?.decisionScore ?? 0;
+      const rightDecisionScore = decisionByTrackId.get(right.trackId)?.decisionScore ?? 0;
+
+      if (rightDecisionScore !== leftDecisionScore) {
+        return rightDecisionScore - leftDecisionScore;
+      }
+
+      return right.opportunityScore - left.opportunityScore;
+    })[0];
+  const dropAlertDecision = removeQueue[0] ?? null;
+  const dropAlertRadar = dropAlertDecision
+    ? null
+    : [...radarRows]
+        .filter(
+          (row) =>
+            row.alreadyInPlaylists &&
+            row.movement.type === "down" &&
+            (row.rankChange ?? 0) < 0,
+        )
+        .sort((left, right) => (left.rankChange ?? 0) - (right.rankChange ?? 0))[0] ??
+      null;
+
+  const editorialSpotlights: Array<DashboardEditorialSpotlight | null> = [
+    topDecisionTrack
+      ? {
+          title: "Melhor musica do dia",
+          badge:
+            topDecisionTrack.recommendedAction === "add"
+              ? "Entrar agora"
+              : "Observacao forte",
+          tone: buildDashboardTone(topDecisionTrack),
+          trackName: topDecisionTrack.name,
+          artists: topDecisionTrack.artists,
+          summary: buildDecisionSummary(topDecisionTrack),
+          stats: [
+            `Score ${topDecisionTrack.decisionScore}`,
+            topDecisionTrack.chartDeltaLabel,
+            topDecisionTrack.fitLabel,
+            topDecisionTrack.alreadyInPlaylists ? "Ja na base" : "Fora da base",
+          ],
+          coverUrl: topDecisionTrack.coverUrl,
+          spotifyUrl: topDecisionTrack.spotifyUrl,
+        }
+      : null,
+    weeklyAnchor
+      ? {
+          title: "Melhor da semana",
+          badge: weeklyAnchor.recurring ? "Consistencia" : "Radar ativo",
+          tone: weeklyAnchor.recurring ? "blue" : buildDashboardTone(weeklyAnchor),
+          trackName: weeklyAnchor.name,
+          artists: weeklyAnchor.artists,
+          summary: weeklyAnchor.recurring
+            ? `${weeklyAnchor.name} sustentou leitura forte no radar, manteve score ${weeklyAnchor.decisionScore} e virou referencia para segurar na playlist alem do hype do dia.`
+            : `${weeklyAnchor.name} ainda esta formando historico semanal, mas ja mostra sinais fortes o suficiente para entrar no monitoramento principal.`,
+          stats: [
+            weeklyAnchor.recurring ? "Recorrente no radar" : "Historico em formacao",
+            `Score ${weeklyAnchor.decisionScore}`,
+            weeklyAnchor.fitLabel,
+            weeklyAnchor.position_change === null
+              ? "Sem comparativo"
+              : `${formatSignedValue(weeklyAnchor.position_change)} no chart`,
+          ],
+          coverUrl: weeklyAnchor.coverUrl,
+          spotifyUrl: weeklyAnchor.spotifyUrl,
+        }
+      : null,
+    biggestRise
+      ? {
+          title: "Maior subida",
+          badge: "Acelerando",
+          tone: "green",
+          trackName: biggestRise.name,
+          artists: biggestRise.artists,
+          summary: `${biggestRise.name} foi a faixa que mais ganhou terreno no top 200, com ${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes. ${decisionByTrackId.get(biggestRise.trackId)?.alreadyInPlaylists ? "Vale revisar se ela ja esta bem posicionada na base." : "Boa candidata para teste rapido nas playlists com fit."}`,
+          stats: [
+            `#${biggestRise.rank}`,
+            `${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes`,
+            decisionByTrackId.get(biggestRise.trackId)?.fitLabel ?? biggestRise.fitLabel,
+            biggestRise.dailyStreams === null
+              ? "Sem streams"
+              : formatStreamsValue(biggestRise.dailyStreams),
+          ],
+          coverUrl: biggestRise.coverUrl,
+          spotifyUrl: biggestRise.spotifyUrl,
+        }
+      : null,
+    breakoutTrack
+      ? {
+          title: "Aposta nova",
+          badge:
+            breakoutTrack.movement.type === "new" ||
+            breakoutTrack.movement.type === "reentry"
+              ? breakoutTrack.movement.label
+              : "Baixa saturacao",
+          tone:
+            breakoutTrack.movement.type === "new" ||
+            breakoutTrack.movement.type === "reentry"
+              ? "purple"
+              : "yellow",
+          trackName: breakoutTrack.name,
+          artists: breakoutTrack.artists,
+          summary: `${breakoutTrack.name} abre uma janela boa de discovery porque ainda esta fora da sua base, tem ${breakoutTrack.fitLabel.toLowerCase()} e chega com espaco editorial para teste antes de saturar.`,
+          stats: [
+            decisionByTrackId.get(breakoutTrack.trackId)
+              ? `Score ${decisionByTrackId.get(breakoutTrack.trackId)?.decisionScore}`
+              : `Radar ${breakoutTrack.opportunityScore}`,
+            breakoutTrack.lowSaturation ? "Baixa saturacao" : breakoutTrack.movement.label,
+            breakoutTrack.rankChange === null
+              ? "Sem comparativo"
+              : `${formatSignedValue(breakoutTrack.rankChange)} no chart`,
+            `#${breakoutTrack.rank}`,
+          ],
+          coverUrl: breakoutTrack.coverUrl,
+          spotifyUrl: breakoutTrack.spotifyUrl,
+        }
+      : null,
+    dropAlertDecision
+      ? {
+          title: "Alerta de queda",
+          badge: "Revisar base",
+          tone: "red",
+          trackName: dropAlertDecision.name,
+          artists: dropAlertDecision.artists,
+          summary: `${dropAlertDecision.name} perdeu tracao e ja pede teste de troca ou limpeza, principalmente se estiver ocupando espaco nobre na playlist.`,
+          stats: [
+            `Score ${dropAlertDecision.decisionScore}`,
+            dropAlertDecision.chartDeltaLabel,
+            dropAlertDecision.fitLabel,
+            dropAlertDecision.alreadyInPlaylists ? "Ja na base" : "Fora da base",
+          ],
+          coverUrl: dropAlertDecision.coverUrl,
+          spotifyUrl: dropAlertDecision.spotifyUrl,
+        }
+      : dropAlertRadar
+        ? {
+            title: "Alerta de queda",
+            badge: "Revisar base",
+            tone: "red",
+            trackName: dropAlertRadar.name,
+            artists: dropAlertRadar.artists,
+            summary: `${dropAlertRadar.name} foi a queda mais sensivel entre as faixas que ja estao na base e merece reavaliacao editorial.`,
+            stats: [
+              `#${dropAlertRadar.rank}`,
+              `${formatSignedValue(dropAlertRadar.rankChange ?? 0)} no chart`,
+              dropAlertRadar.fitLabel,
+              dropAlertRadar.dailyStreams === null
+                ? "Sem streams"
+                : formatStreamsValue(dropAlertRadar.dailyStreams),
+            ],
+            coverUrl: dropAlertRadar.coverUrl,
+            spotifyUrl: dropAlertRadar.spotifyUrl,
+          }
+        : null,
+  ];
+
+  return editorialSpotlights.filter(
+    (spotlight): spotlight is DashboardEditorialSpotlight => spotlight !== null,
+  );
+}
+
 export async function getRadarMusicPageData({
   country,
   genre,
@@ -1435,56 +1675,78 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
   const bestPlaylist = [...baseData.rows].sort(
     (left, right) => right.playlist.score - left.playlist.score,
   )[0];
-  const addNowQueue = curationData.rows.filter(
-    (row) => row.recommendedAction === "add",
-  );
-  const observeQueue = curationData.rows.filter(
-    (row) => row.recommendedAction === "observe",
-  );
-  const removeQueue = curationData.rows.filter(
-    (row) => row.recommendedAction === "remove",
-  );
+  const addNowQueue = curationData.rows
+    .filter((row) => row.recommendedAction === "add")
+    .sort(compareDecisionPriority);
+  const observeQueue = curationData.rows
+    .filter((row) => row.recommendedAction === "observe")
+    .sort(compareDecisionPriority);
+  const removeQueue = curationData.rows
+    .filter((row) => row.recommendedAction === "remove")
+    .sort(compareRemovePriority);
+  const biggestRise = [...radarMusic.rows]
+    .filter((row) => (row.rankChange ?? 0) > 0)
+    .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
   const addNow = addNowQueue.slice(0, 3);
   const observe = observeQueue.slice(0, 3);
   const removeOrTest = removeQueue.slice(0, 3);
+  const editorialSpotlights = buildDashboardEditorialSpotlights({
+    addNowQueue,
+    observeQueue,
+    removeQueue,
+    radarRows: radarMusic.rows,
+  });
+  const primaryTrack = addNow[0] ?? observe[0] ?? null;
 
   return {
     hero: {
       eyebrow: "Visao do dia",
-      title: addNow[0]
-        ? `${addNow[0].name} e a melhor janela de hoje`
-        : "Radar operacional da curadoria",
+      title: "Curadoria do dia",
       description:
-        "Visao executiva para saber o que mexer agora: oportunidades, novos sinais, quedas relevantes e a melhor playlist da sua base.",
+        "Painel executivo para decidir rapido o que entra, o que continua em observacao e o que ja pede ajuste na base.",
       primaryCtaLabel: "Ir para Curadoria",
       primaryCtaHref: "/curadoria",
       secondaryCtaLabel: "Abrir Radar Music",
       secondaryCtaHref: "/radar-music",
     },
     heroInsight: {
-      headline: addNow[0]
-        ? `${addNow[0].artists.split(",")[0]} puxa a decisao com ${addNow[0].name}`
+      headline: primaryTrack
+        ? `${primaryTrack.name} e a melhor oportunidade editorial agora`
         : "O mercado ainda nao definiu uma prioridade absoluta hoje",
       summary:
-        "Esse destaque resume a melhor oportunidade do sistema agora com base em movimento, saturacao, recorrencia e aderencia editorial.",
-      tone: addNow[0]?.movement.tone ?? "yellow",
+        "A leitura combina forca atual no chart, velocidade de subida, recorrencia no radar e fit com a sua base para transformar top 200 em decisao pratica.",
+      tone: buildDashboardTone(primaryTrack),
       supportingPoints: [
         `${addNowQueue.length} faixas prontas para adicionar`,
-        `${radarMusic.rows.filter((row) => row.movement.type === "up").length} subindo`,
-        `${baseData.rows.length} playlists monitoradas`,
+        biggestRise
+          ? `Maior subida: ${biggestRise.name} ${formatSignedValue(biggestRise.rankChange ?? 0)}`
+          : "Sem subida forte no recorte",
+        `${removeQueue.length} pedem teste ou limpeza`,
       ],
     },
     primaryAction: {
-      track: addNow[0] ?? null,
-      reason: addNow[0]
-        ? `${addNow[0].name} combina score ${addNow[0].decisionScore}, ${addNow[0].chartDeltaLabel.toLowerCase()} e ${addNow[0].fitLabel.toLowerCase()} com a sua base.`
+      track: primaryTrack,
+      reason: primaryTrack
+        ? buildDecisionSummary(primaryTrack)
         : "Ainda nao houve combinacao forte o suficiente entre radar e base para uma acao unica.",
     },
     metrics: [
       {
-        title: "Oportunidades de hoje",
+        title: "Entrar agora",
         value: formatCount(addNowQueue.length),
-        helper: "Prontas para entrar",
+        helper: addNow[0] ? `${addNow[0].name} lidera a fila` : "Sem prioridade maxima",
+        tone: "green",
+      },
+      {
+        title: "Melhor score do dia",
+        value: primaryTrack ? `${primaryTrack.decisionScore}` : "0",
+        helper: primaryTrack ? primaryTrack.name : "Sem faixa lider",
+        tone: buildDashboardTone(primaryTrack),
+      },
+      {
+        title: "Maior subida",
+        value: biggestRise?.rankChange ? `+${biggestRise.rankChange}` : "0",
+        helper: biggestRise ? biggestRise.name : "Sem aceleracao forte",
         tone: "green",
       },
       {
@@ -1495,38 +1757,25 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
               row.movement.type === "new" || row.movement.type === "reentry",
           ).length,
         ),
-        helper: "Sinais frescos",
+        helper: "Sinais frescos para discovery",
         tone: "purple",
       },
       {
-        title: "Faixas subindo",
+        title: "Quedas na base",
         value: formatCount(
-          radarMusic.rows.filter((row) => row.movement.type === "up").length,
+          removeQueue.length,
         ),
-        helper: "Momento positivo",
-        tone: "green",
-      },
-      {
-        title: "Faixas caindo",
-        value: formatCount(
-          radarMusic.rows.filter((row) => row.movement.type === "down").length,
-        ),
-        helper: "Ajuste necessario",
+        helper: "Pedem teste ou limpeza",
         tone: "red",
       },
       {
         title: "Playlists monitoradas",
         value: formatCount(baseData.rows.length),
-        helper: "Base ativa",
+        helper: bestPlaylist ? `Melhor score ${bestPlaylist.playlist.score}` : "Base ativa",
         tone: "blue",
       },
-      {
-        title: "Melhor playlist por score",
-        value: bestPlaylist?.playlist.name ?? "Sem playlist",
-        helper: bestPlaylist ? `Score ${bestPlaylist.playlist.score}` : "Sem base",
-        tone: "yellow",
-      },
     ],
+    editorialSpotlights,
     recommendedActions: [
       {
         title: "Adicionar agora",
@@ -1562,5 +1811,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     addNow,
     observe,
     removeOrTest,
+    topRadarRows: radarMusic.rows.slice(0, 10),
+    playlistBaseRows: baseData.rows,
   };
 }

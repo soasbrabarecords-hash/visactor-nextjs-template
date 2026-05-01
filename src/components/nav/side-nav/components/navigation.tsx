@@ -44,7 +44,7 @@ export default function Navigation() {
   }
 
   return (
-    <nav className="flex flex-grow flex-col gap-y-1 p-2">
+    <nav className="flex flex-grow flex-col gap-y-1.5 p-3">
       {navigations.map((navigation) => {
         const Icon = navigation.icon;
         return (
@@ -52,17 +52,17 @@ export default function Navigation() {
             key={navigation.name}
             href={navigation.href}
             className={cn(
-              "flex items-center rounded-md px-2 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-800",
+              "flex items-center rounded-lg px-3 py-2.5 hover:bg-slate-200 dark:hover:bg-slate-800",
               isActive(navigation.href)
                 ? "bg-slate-200 dark:bg-slate-800"
                 : "bg-transparent",
             )}
           >
             <Icon
-              size={16}
-              className="mr-2 text-slate-800 dark:text-slate-200"
+              size={19}
+              className="mr-3 shrink-0 text-slate-800 dark:text-slate-200"
             />
-            <span className="text-sm text-slate-700 dark:text-slate-300">
+            <span className="text-[15px] font-medium text-slate-700 dark:text-slate-300">
               {navigation.name}
             </span>
           </Link>

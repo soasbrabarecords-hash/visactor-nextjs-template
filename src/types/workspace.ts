@@ -45,15 +45,30 @@ export type PrimaryAction = {
   reason: string;
 };
 
+export type DashboardEditorialSpotlight = {
+  title: string;
+  badge: string;
+  tone: StatusTone;
+  trackName: string;
+  artists: string;
+  summary: string;
+  stats: string[];
+  coverUrl: string | null;
+  spotifyUrl: string;
+};
+
 export type DashboardWorkspaceData = {
   hero: WorkspaceInsight;
   heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
   primaryAction: PrimaryAction;
+  editorialSpotlights: DashboardEditorialSpotlight[];
   recommendedActions: RecommendedAction[];
   addNow: DecisionTrack[];
   observe: DecisionTrack[];
   removeOrTest: DecisionTrack[];
+  topRadarRows: RadarMusicRow[];
+  playlistBaseRows: PlaylistBaseRow[];
 };
 
 export type MovementType = "up" | "down" | "same" | "new" | "reentry";

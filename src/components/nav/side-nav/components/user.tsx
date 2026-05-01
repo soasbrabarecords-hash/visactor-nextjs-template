@@ -28,23 +28,27 @@ export default function User() {
   }
 
   return (
-    <div className="flex h-16 items-center border-b border-border px-2">
+    <div className="flex h-20 items-center border-b border-border px-3">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-md px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-800">
-          <div className="flex items-center">
+        <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 hover:bg-slate-200 dark:hover:bg-slate-800">
+          <div className="flex min-w-0 flex-1 items-center">
             <Image
               src="/avatar.png"
               alt="SÓ AS BRABA"
-              className="mr-2 rounded-full"
-              width={36}
-              height={36}
+              className="mr-3 rounded-full"
+              width={40}
+              height={40}
             />
-            <div className="flex flex-col text-left">
-              <span className="text-sm font-medium">SÓ AS BRABA</span>
-              <span className="text-xs text-muted-foreground">Equipe interna</span>
+            <div className="min-w-0 flex-1 text-left">
+              <span className="block truncate whitespace-nowrap text-sm font-semibold">
+                SÓ AS BRABA
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                Equipe interna
+              </span>
             </div>
           </div>
-          <ChevronDown size={16} />
+          <ChevronDown size={18} className="ml-3 shrink-0" />
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="start" className="w-48">
