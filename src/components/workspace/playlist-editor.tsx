@@ -658,7 +658,6 @@ export default function PlaylistEditor({
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-3 py-3" />
               <th className="px-2 py-3 sm:px-4">#</th>
               <th className="px-3 py-3 sm:px-4">Música</th>
               <th className="hidden px-4 py-3 tablet:table-cell">Álbum</th>
@@ -677,6 +676,7 @@ export default function PlaylistEditor({
                 </span>
               </th>
               <th className="px-3 py-3 sm:px-4">Ações</th>
+              <th className="px-3 py-3" />
             </tr>
           </thead>
           <tbody ref={tbodyRef} className="divide-y divide-border">
@@ -713,20 +713,11 @@ export default function PlaylistEditor({
                     isDeleting ? "pointer-events-none" : "",
                   ].filter(Boolean).join(" ")}
                 >
-                  {/* Grip */}
-                  <td className="h-16 overflow-hidden px-3 py-0 align-middle">
-                    <div data-grip="true"
-                      className="flex cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100"
-                      title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
-                      <GripVertical className="h-4 w-4 pointer-events-none text-muted-foreground/50" />
-                    </div>
-                  </td>
-
                   {/* # */}
                   <td className="h-16 overflow-hidden px-2 py-0 align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
                     {isDeleting
                       ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <span className={isSelected ? "text-primary font-semibold" : ""}>{index + 1}</span>
+                      : <span className={isSelected ? "text-primary font-semibold" : ""}>{String(index + 1).padStart(3, "0")}</span>
                     }
                   </td>
 
@@ -843,6 +834,15 @@ export default function PlaylistEditor({
                       </a>
                     </div>
                   </td>
+
+                  {/* Grip (movido pro final) */}
+                  <td className="h-16 overflow-hidden px-3 py-0 align-middle">
+                    <div data-grip="true"
+                      className="flex cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100"
+                      title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
+                      <GripVertical className="h-4 w-4 pointer-events-none text-muted-foreground/50" />
+                    </div>
+                  </td>
                 </tr>
               );
             }) : (
@@ -866,13 +866,13 @@ export default function PlaylistEditor({
         */}
         <ResizableTableOverlay
           tableRef={tableRef}
-          storageKey="playlist-editor-cols"
-          fixedColumns={[0, 8]}
+          storageKey="playlist-editor-cols-v2"
+          fixedColumns={[0, 7, 8]}
           autoFit
-          columnWeights={{ 0: 0.3, 1: 0.4, 2: 3, 3: 2, 4: 0.6, 5: 0.6, 6: 1, 7: 1, 8: 0.6 }}
-          minWidths={{ 0: 32, 1: 40, 2: 220, 3: 140, 4: 80, 5: 70, 6: 110, 7: 100, 8: 88 }}
-          stickyLeft={[1]}
-          stickyRight={[8]}
+          columnWeights={{ 0: 0.4, 1: 3, 2: 2, 3: 0.6, 4: 0.6, 5: 1, 6: 1, 7: 0.6, 8: 0.3 }}
+          minWidths={{ 0: 40, 1: 220, 2: 140, 3: 80, 4: 70, 5: 110, 6: 100, 7: 88, 8: 32 }}
+          stickyLeft={[0]}
+          stickyRight={[7, 8]}
         />
       </div>
     </div>

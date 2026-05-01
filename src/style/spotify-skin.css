@@ -135,8 +135,10 @@
 .spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"] {
   background-color: var(--sp-bg) !important;
 }
+/* Hover das sticky cells: cinza equivalente ao rgba(255,255,255,0.08) sobre #121212
+   Cálculo: 18 + (255-18)*0.08 = ~37 → rgb(37,37,37) */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
-  background-color: #1a1a1a !important;
+  background-color: rgb(37, 37, 37) !important;
 }
 .spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
   background-color: var(--sp-bg) !important;
@@ -255,7 +257,7 @@
 
 /* ── Coluna # (número da faixa) ──────────────────────────────────────────── */
 /* Cor cinza claro como o Spotify */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(1) {
   color: var(--sp-text-muted) !important;
   font-size: 16px !important;
   text-align: left !important;
@@ -265,7 +267,7 @@
 
 /* ── Coluna Música (capa + título + artistas) ────────────────────────────── */
 /* Capa 40px, arredondada, com sombra */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:first-child {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:first-child {
   width: 40px !important;
   height: 40px !important;
   border-radius: 4px !important;
@@ -274,7 +276,7 @@
 }
 
 /* Título da música: branco, 16px, peso 500 (NÃO bold tipo Spotify) */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:last-child > div:first-child {
   color: var(--sp-text) !important;
   font-size: 16px !important;
   font-weight: 400 !important;
@@ -282,7 +284,7 @@
 }
 
 /* Artistas: cinza Spotify, 14px */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:last-child {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:last-child > div:last-child {
   color: var(--sp-text-muted) !important;
   font-size: 14px !important;
   font-weight: 400 !important;
@@ -291,50 +293,50 @@
 }
 
 /* Hover: título da música vira verde igual Spotify */
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(3) > div > div:last-child > div:first-child {
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(2) > div > div:last-child > div:first-child {
   color: var(--sp-green) !important;
 }
 
 /* ── Coluna Álbum: clickable look (cinza claro) ──────────────────────────── */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(4) {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) {
   color: var(--sp-text-muted) !important;
   font-size: 14px !important;
 }
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(4) {
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(3) {
   color: var(--sp-text) !important;
   text-decoration: underline;
 }
 
 /* ── Pop, Duração, Streams, Chart BR: cinza ───────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(4),
 .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5),
 .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(6),
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(7),
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(7) {
   color: var(--sp-text-muted) !important;
   font-size: 14px !important;
 }
 
 /* Barra de Pop: verde Spotify ao invés do azul */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5) [class*="bg-primary"] {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(4) [class*="bg-primary"] {
   background-color: var(--sp-text-muted) !important;
 }
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(5) [class*="bg-primary"] {
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(4) [class*="bg-primary"] {
   background-color: var(--sp-green) !important;
 }
 
 /* ── Coluna Ações: ícones cinza claro, hover branco (igual Spotify ⋯ ) ───── */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button,
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) button,
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) a {
   color: var(--sp-text-muted) !important;
   opacity: 0;
   transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
 }
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(9) button,
-.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(9) a {
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(8) button,
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(8) a {
   opacity: 1;
 }
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button:hover,
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a:hover {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) button:hover,
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) a:hover {
   color: var(--sp-text) !important;
   transform: scale(1.04);
 }
@@ -343,12 +345,12 @@
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
   background-color: rgba(255, 255, 255, 0.16) !important;
 }
-.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td:nth-child(2) {
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td:nth-child(1) {
   color: var(--sp-text) !important;
 }
 
 /* ── Grip handle (drag): aparece só em hover ──────────────────────────────── */
-.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(1) [data-grip] {
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) [data-grip] {
   color: var(--sp-text-muted) !important;
 }
 
@@ -377,7 +379,7 @@
 
 /* Tablet (≥750px) — esconde streams/chart se ficar apertado */
 @media (max-width: 999px) {
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:last-child > div:first-child {
     font-size: 15px !important;
   }
 }
@@ -396,19 +398,19 @@
   .spotify-skin [data-spotify-table-wrapper] table tbody tr {
     height: 60px !important;
   }
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:first-child {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:first-child {
     width: 44px !important;
     height: 44px !important;
   }
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:last-child > div:first-child {
     font-size: 14px !important;
   }
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:last-child {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) > div > div:last-child > div:last-child {
     font-size: 12px !important;
   }
   /* Em mobile mostra ações sempre (não hover) */
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button,
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) button,
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) a {
     opacity: 1 !important;
   }
 }
@@ -532,7 +534,7 @@
     height: 48px !important;
   }
   /* No mobile, esconde barra de Pop e mostra só o número */
-  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5) > div > div:first-child {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(4) > div > div:first-child {
     display: none !important;
   }
 }
