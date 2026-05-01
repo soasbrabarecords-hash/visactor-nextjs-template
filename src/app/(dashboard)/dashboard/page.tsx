@@ -7,15 +7,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Container from "@/components/container";
-import CompetitorPlaylistsTable from "@/components/workspace/competitor-playlists-table";
 import DashboardEditorialSpotlights from "@/components/workspace/dashboard-editorial-spotlights";
 import DashboardTopTracksTable from "@/components/workspace/dashboard-top-tracks-table";
 import DecisionTrackList from "@/components/workspace/decision-track-list";
-import HeroInsightPanel from "@/components/workspace/hero-insight";
 import MetricGrid from "@/components/workspace/metric-grid";
-import PrimaryActionCard from "@/components/workspace/primary-action-card";
-import RecommendedActions from "@/components/workspace/recommended-actions";
-import SpotifyAccountPlaylistsPanel from "@/components/workspace/spotify-account-playlists-panel";
 import StatusBadge from "@/components/workspace/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDashboardWorkspaceData } from "@/lib/workspace-data";
@@ -90,14 +85,14 @@ export default async function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="grid gap-3 tablet:grid-cols-3">
-                {data.heroInsight.supportingPoints.slice(0, 3).map((point, index) => (
+              <div className="grid gap-3 tablet:grid-cols-2">
+                {data.heroInsight.supportingPoints.slice(0, 2).map((point, index) => (
                   <article
                     key={point}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"
                   >
                     <div className="text-[11px] uppercase tracking-[0.2em] text-white/45">
-                      {index === 0 ? "Sinal principal" : index === 1 ? "Radar" : "Base"}
+                      {index === 0 ? "Sinal principal" : "Radar"}
                     </div>
                     <p className="mt-3 text-sm font-medium leading-6 text-white/90">
                       {point}
@@ -160,32 +155,27 @@ export default async function DashboardPage() {
         </section>
       </Container>
 
-      <HeroInsightPanel insight={data.heroInsight} />
       <MetricGrid metrics={data.metrics} />
-      <PrimaryActionCard action={data.primaryAction} />
       <DashboardEditorialSpotlights spotlights={data.editorialSpotlights} />
-      <RecommendedActions actions={data.recommendedActions} />
       <DecisionTrackList
         title="Entrar agora"
-        description="Faixas que ja bateram os sinais mais fortes de subida, fit e janela editorial para entrar na base."
+        description="Fila curta com os sinais mais fortes para agir agora."
         tracks={data.addNow}
         tone="green"
       />
       <DecisionTrackList
         title="Observar de perto"
-        description="Musicas com leitura boa, mas que ainda precisam de mais confirmacao antes de ganhar espaco fixo."
+        description="Faixas promissoras que ainda pedem mais confirmacao."
         tracks={data.observe}
         tone="yellow"
       />
       <DecisionTrackList
         title="Testar ou limpar"
-        description="Faixas que perderam tracao e merecem revisao para nao ocupar espaco nobre na playlist."
+        description="O que perdeu tracao e merece revisao rapida."
         tracks={data.removeOrTest}
         tone="red"
       />
       <DashboardTopTracksTable rows={data.topRadarRows} />
-      <SpotifyAccountPlaylistsPanel />
-      <CompetitorPlaylistsTable rows={data.playlistBaseRows} />
     </main>
   );
 }

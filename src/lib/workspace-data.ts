@@ -2468,8 +2468,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
 }
 
 export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceData> {
-  const [baseData, chartsData, accountProfile] = await Promise.all([
-    getBasePlaylistsPageData(),
+  const [chartsData, accountProfile] = await Promise.all([
     getChartsData(),
     buildDashboardAccountProfile(),
   ]);
@@ -2491,9 +2490,6 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         status: "all",
       }),
     ]);
-    const bestPlaylistFallback = [...baseData.rows].sort(
-      (left, right) => right.playlist.score - left.playlist.score,
-    )[0];
     const addNowQueueFallback = curationData.rows
       .filter((row) => row.recommendedAction === "add")
       .sort(compareDecisionPriority);
@@ -2596,15 +2592,13 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
           tone: "red",
         },
         {
-          title: accountProfile ? "Playlists da conta" : "Playlists monitoradas",
-          value: formatCount(accountProfile?.playlistsCount ?? baseData.rows.length),
+          title: accountProfile ? "Playlists da conta" : "Radar ativo",
+          value: accountProfile ? formatCount(accountProfile.playlistsCount) : "Top 200",
           helper: accountProfile
             ? accountProfile.dominantGenreLabel
               ? `${accountProfile.dominantGenreLabel} domina a base`
               : `${accountProfile.repeatedTrackCount} faixas repetem na conta`
-            : bestPlaylistFallback
-              ? `Melhor score ${bestPlaylistFallback.playlist.score}`
-              : "Base ativa",
+            : "Sem base pessoal conectada no dashboard",
           tone: "blue",
         },
       ],
@@ -2645,7 +2639,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
       observe: observeFallback,
       removeOrTest: removeFallback,
       topRadarRows: radarMusic.rows.slice(0, 10),
-      playlistBaseRows: baseData.rows,
+      playlistBaseRows: [],
     };
   }
 
@@ -2655,9 +2649,6 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     chartsData.artistDistribution.map((artist) => artist.type),
     accountProfile,
   );
-  const bestPlaylist = [...baseData.rows].sort(
-    (left, right) => right.playlist.score - left.playlist.score,
-  )[0];
   const addNowQueue = curationRows
     .filter((row) => row.recommendedAction === "add")
     .sort(compareDecisionPriority);
@@ -2769,15 +2760,13 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         tone: "red",
       },
       {
-        title: accountProfile ? "Playlists da conta" : "Playlists monitoradas",
-        value: formatCount(accountProfile?.playlistsCount ?? baseData.rows.length),
+        title: accountProfile ? "Playlists da conta" : "Radar ativo",
+        value: accountProfile ? formatCount(accountProfile.playlistsCount) : "Top 200",
         helper: accountProfile
           ? accountProfile.dominantGenreLabel
             ? `${accountProfile.dominantGenreLabel} domina a conta`
             : `${accountProfile.repeatedTrackCount} faixas repetem na conta`
-          : bestPlaylist
-            ? `Melhor score ${bestPlaylist.playlist.score}`
-            : "Base ativa",
+          : "Sem base pessoal conectada no dashboard",
         tone: "blue",
       },
     ],
@@ -2818,6 +2807,6 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     observe,
     removeOrTest,
     topRadarRows: radarRows.slice(0, 10),
-    playlistBaseRows: baseData.rows,
+    playlistBaseRows: [],
   };
 }
