@@ -412,3 +412,127 @@
     opacity: 1 !important;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * v3 — POLIMENTO FINAL: header + action bar + remover scroll lateral
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1) Action bar: SÓ o botão Play verde, esconder os outros ícones ─────── */
+.spotify-skin [data-spotify-actionbar] .sp-icon-btn {
+  display: none !important;
+}
+.spotify-skin [data-spotify-actionbar] {
+  padding: 16px 0 0 0 !important;
+  gap: 0 !important;
+}
+
+/* ── 2) Header: esconder botão "Abrir Spotify" (Play verde já abre) ──────── */
+.spotify-skin [data-spotify-header] .flex.shrink-0.flex-wrap.justify-center.gap-2 a[href*="open.spotify"],
+.spotify-skin [data-spotify-header] [class*="bg-white"][class*="text-black"] {
+  display: none !important;
+}
+
+/* ── 3) "Voltar" do header: vira botão pill discreto no canto superior ───── */
+.spotify-skin [data-spotify-header] .flex.shrink-0.flex-wrap.justify-center.gap-2 {
+  position: absolute !important;
+  top: 16px !important;
+  left: 16px !important;
+  z-index: 30 !important;
+  margin: 0 !important;
+}
+.spotify-skin [data-spotify-header] .flex.shrink-0.flex-wrap.justify-center.gap-2 a {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  border-color: transparent !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0 !important; /* esconde texto "Voltar" */
+}
+.spotify-skin [data-spotify-header] .flex.shrink-0.flex-wrap.justify-center.gap-2 a::before {
+  content: "‹" !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  font-weight: 300 !important;
+  margin-top: -2px !important;
+}
+
+/* ── 4) Esconder legendas "Click Selecionar / Shift+Click ..." ───────────── */
+.spotify-skin [data-spotify-table-wrapper] {
+  margin-top: 0 !important;
+}
+/* Esconder a row inteira de legendas (a barra de controles que tem essas tags) */
+.spotify-skin .space-y-6 > .flex.flex-wrap.items-center.justify-between > div:first-child {
+  display: none !important;
+}
+
+/* ── 5) Reduzir gap entre header e tabela ─────────────────────────────────── */
+.spotify-skin [data-spotify-header] {
+  min-height: 280px !important;
+  padding-bottom: 0 !important;
+}
+.spotify-skin [data-spotify-header] > div.relative {
+  padding-bottom: 16px !important;
+}
+
+/* Container que envolve action bar + tabela: cola no header */
+.spotify-skin .py-2 {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.spotify-skin .py-6 {
+  padding-top: 8px !important;
+}
+/* Encolher também o space-y-6 do PlaylistEditor (era 24px) */
+.spotify-skin .space-y-6 > * + * {
+  margin-top: 12px !important;
+}
+
+/* ── 6) Tabela sem scroll horizontal — sempre cabe no viewport ───────────── */
+.spotify-skin [data-spotify-table-wrapper] {
+  overflow-x: hidden !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+/* Garantir que células não vazam do container (truncate hard) */
+.spotify-skin [data-spotify-table-wrapper] table tbody td,
+.spotify-skin [data-spotify-table-wrapper] table thead th {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* ── 7) Mesmo background em TODA a página (header + tabela + search) ─────── */
+.spotify-skin {
+  background: var(--sp-bg) !important;
+}
+.spotify-skin > * {
+  background: transparent !important;
+}
+.spotify-skin [class*="border-b"][class*="border-border"] {
+  border-bottom-color: transparent !important;
+}
+
+/* ── 8) Mobile (≤749px) — esconde mais colunas pra caber sem scroll ──────── */
+@media (max-width: 749px) {
+  .spotify-skin [data-spotify-header] {
+    min-height: auto !important;
+  }
+  .spotify-skin [data-spotify-actionbar] {
+    padding: 8px 0 0 0 !important;
+  }
+  .spotify-skin [data-spotify-actionbar] .sp-play {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  /* No mobile, esconde barra de Pop e mostra só o número */
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5) > div > div:first-child {
+    display: none !important;
+  }
+}
