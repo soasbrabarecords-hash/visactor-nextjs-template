@@ -660,3 +660,129 @@
     min-height: auto !important;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * v5 — Action bar 100% dentro do header, tabela colada, hover transparente
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Action bar Play: dentro do header, no rodapé interno (não fora) ────── */
+.spotify-skin [data-spotify-actionbar] {
+  position: absolute !important;
+  bottom: 16px !important;        /* dentro do header */
+  left: 24px !important;
+  z-index: 25 !important;
+  padding: 0 !important;
+}
+
+/* Header: removida margem inferior — tabela cola direto no rodapé */
+.spotify-skin [data-spotify-header] {
+  margin-bottom: 0 !important;
+}
+
+/* Container da action bar (Container .py-2): some, action bar é absoluta */
+.spotify-skin .py-2:has([data-spotify-actionbar]) {
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* Barra de controles (Save/Cancel): também posicionada absoluta dentro do
+   header, na MESMA linha do Play, à direita do Play */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+  position: absolute !important;
+  bottom: 16px !important;
+  left: 96px !important;          /* depois do Play (24 + 56 + 16) */
+  right: 24px !important;
+  z-index: 26 !important;
+  padding-left: 0 !important;
+  margin: 0 !important;
+  min-height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  /* Quando NÃO está em modo "ordem alterada", esconde tudo (não polui) */
+}
+
+/* Se a barra estiver vazia (sem save/cancel), some completamente */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between:not(:has(button)) {
+  display: none !important;
+}
+
+/* Posicionar a div container do PlaylistEditor como referência absoluta */
+.spotify-skin .py-6 .space-y-6 {
+  position: relative !important;
+}
+
+/* Movemos a barra inteira pra dentro do header — fazemos isso elevando o
+   <Container.py-6> para dentro do data-spotify-header via negative margin */
+.spotify-skin .py-6 {
+  position: relative !important;
+  margin-top: -56px !important;   /* puxa o conteúdo pra cima do header */
+  padding-top: 0 !important;
+  z-index: 1 !important;
+}
+
+/* A barra de controles interna — quando o conteúdo é puxado pra cima, ela
+   coincide com o rodapé do header */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+  position: relative !important;  /* override do absolute acima */
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  padding-left: 96px !important;
+  min-height: 56px !important;
+  margin-bottom: 8px !important;
+}
+
+/* ── Tabela cola IMEDIATAMENTE abaixo da action bar ───────────────────── */
+.spotify-skin [data-spotify-table-wrapper] {
+  margin-top: 0 !important;
+}
+.spotify-skin .space-y-6 > * + * {
+  margin-top: 4px !important;
+}
+
+/* ── Sticky cells: TRANSPARENTES em hover (herdam o branco translúcido) ── */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* O hover na linha já adiciona rgba(255,255,255,0.1) em TODAS as <td>;
+   o sticky precisa apenas garantir que o conteúdo abaixo (que rola atrás
+   da sticky cell) fique visualmente coberto. Solução: usa um pseudo-elemento
+   com bg da página atrás do conteúdo — mas só quando a tabela tem scroll
+   horizontal. Como não temos scroll horizontal mais (overflow-x: hidden),
+   sticky cells podem ser totalmente transparentes. */
+
+.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"],
+.spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Hover row: cor branca translúcida em TUDO incluindo sticky cells */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover > td {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ── Mobile: ajustar negative margin (header é menor) ────────────────────── */
+@media (max-width: 749px) {
+  .spotify-skin .py-6 {
+    margin-top: 0 !important;
+  }
+  .spotify-skin [data-spotify-actionbar] {
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    margin: 8px 16px !important;
+  }
+  .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+    padding-left: 0 !important;
+  }
+  .spotify-skin .py-2:has([data-spotify-actionbar]) {
+    height: auto !important;
+  }
+}
