@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import Container from "@/components/container";
 import { cn } from "@/lib/utils";
 import type { DecisionTrack } from "@/types/workspace";
+import SpotifyPlaylistAddButton from "./spotify-playlist-add-button";
 import StatusBadge from "./status-badge";
 
 const toneCardClasses = {
@@ -109,15 +110,23 @@ export default function DecisionTrackList({
 
               <div className="mt-4 flex items-center justify-between text-sm text-white/70">
                 <span>Score {track.decisionScore}</span>
-                <Link
-                  href={track.spotifyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-white transition hover:bg-black/35"
-                >
-                  Abrir
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
+                <div className="flex items-center gap-2">
+                  <SpotifyPlaylistAddButton
+                    spotifyTrackId={track.spotifyTrackId}
+                    suggestedPlaylistName={track.suggestedPlaylistName}
+                    label="Add"
+                    compact
+                  />
+                  <Link
+                    href={track.spotifyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-white transition hover:bg-black/35"
+                  >
+                    Abrir
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </div>
             </article>
           ))

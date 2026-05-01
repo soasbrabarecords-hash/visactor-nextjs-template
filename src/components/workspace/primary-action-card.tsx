@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ExternalLink, Play, Radio, Sparkles } from "lucide-react";
+import { ExternalLink, Radio, Sparkles } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import type { PrimaryAction } from "@/types/workspace";
+import SpotifyPlaylistAddButton from "./spotify-playlist-add-button";
 import StatusBadge from "./status-badge";
 
 function coverStyle(coverUrl: string | null) {
@@ -79,10 +80,11 @@ export default function PrimaryActionCard({
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button className="h-11 rounded-full bg-[#1ed760] px-5 font-semibold text-black hover:bg-[#35e26c]">
-                <Play className="mr-1 h-4 w-4 fill-current" />
-                Adicionar agora
-              </Button>
+              <SpotifyPlaylistAddButton
+                spotifyTrackId={action.track.spotifyTrackId}
+                suggestedPlaylistName={action.track.suggestedPlaylistName}
+                label="Adicionar agora"
+              />
               <Button
                 asChild
                 variant="outline"

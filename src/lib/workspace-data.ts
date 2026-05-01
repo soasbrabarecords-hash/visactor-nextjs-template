@@ -1426,6 +1426,7 @@ function buildCurationRows(
 
     return {
       trackId: row.trackId,
+      spotifyTrackId: extractTrackIdFromSpotifyUrl(row.spotifyUrl),
       name: row.name,
       artists: row.artists,
       artistIds: trackArtistIds.get(row.trackId) ?? [],
@@ -1484,6 +1485,12 @@ function normalizeTrackKey(name: string, artistName: string | null | undefined) 
 
 function buildSnapshotTrackKey(track: Pick<ChartSnapshotTrack, "spotify_track_id" | "track_name" | "artist_name">) {
   return track.spotify_track_id?.trim() || normalizeTrackKey(track.track_name, track.artist_name);
+}
+
+function extractTrackIdFromSpotifyUrl(url: string) {
+  const match = url.match(/track\/([A-Za-z0-9]{22})/);
+
+  return match?.[1] ?? null;
 }
 
 function buildWeeklyComparisonDate(dates: string[]) {
@@ -1832,6 +1839,8 @@ function buildDashboardEditorialSpotlights({
               ? "Entrar agora"
               : "Observacao forte",
           tone: buildDashboardTone(topDecisionTrack),
+          trackId: topDecisionTrack.trackId,
+          spotifyTrackId: topDecisionTrack.spotifyTrackId,
           trackName: topDecisionTrack.name,
           artists: topDecisionTrack.artists,
           summary: buildDecisionSummary(topDecisionTrack),
@@ -1843,6 +1852,7 @@ function buildDashboardEditorialSpotlights({
           ],
           coverUrl: topDecisionTrack.coverUrl,
           spotifyUrl: topDecisionTrack.spotifyUrl,
+          suggestedPlaylistName: topDecisionTrack.suggestedPlaylistName,
         }
       : null,
     weeklyAnchor
@@ -1850,6 +1860,8 @@ function buildDashboardEditorialSpotlights({
           title: "Melhor da semana",
           badge: weeklyAnchor.recurring ? "Consistencia" : "Radar ativo",
           tone: weeklyAnchor.recurring ? "blue" : buildDashboardTone(weeklyAnchor),
+          trackId: weeklyAnchor.trackId,
+          spotifyTrackId: weeklyAnchor.spotifyTrackId,
           trackName: weeklyAnchor.name,
           artists: weeklyAnchor.artists,
           summary: weeklyAnchor.recurring
@@ -1867,6 +1879,7 @@ function buildDashboardEditorialSpotlights({
           ],
           coverUrl: weeklyAnchor.coverUrl,
           spotifyUrl: weeklyAnchor.spotifyUrl,
+          suggestedPlaylistName: weeklyAnchor.suggestedPlaylistName,
         }
       : null,
     biggestRise
@@ -1874,6 +1887,10 @@ function buildDashboardEditorialSpotlights({
           title: "Maior subida",
           badge: "Acelerando",
           tone: "green",
+          trackId: biggestRise.trackId,
+          spotifyTrackId:
+            decisionByTrackId.get(biggestRise.trackId)?.spotifyTrackId ??
+            extractTrackIdFromSpotifyUrl(biggestRise.spotifyUrl),
           trackName: biggestRise.name,
           artists: biggestRise.artists,
           summary: `${biggestRise.name} foi a faixa que mais ganhou terreno no top 200, com ${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes. ${decisionByTrackId.get(biggestRise.trackId)?.alreadyInPlaylists ? "Vale revisar se ela ja esta bem posicionada na base." : "Boa candidata para teste rapido nas playlists com fit."}`,
@@ -1888,6 +1905,8 @@ function buildDashboardEditorialSpotlights({
           ],
           coverUrl: biggestRise.coverUrl,
           spotifyUrl: biggestRise.spotifyUrl,
+          suggestedPlaylistName:
+            decisionByTrackId.get(biggestRise.trackId)?.suggestedPlaylistName ?? null,
         }
       : null,
     breakoutTrack
@@ -1903,6 +1922,10 @@ function buildDashboardEditorialSpotlights({
             breakoutTrack.movement.type === "reentry"
               ? "purple"
               : "yellow",
+          trackId: breakoutTrack.trackId,
+          spotifyTrackId:
+            decisionByTrackId.get(breakoutTrack.trackId)?.spotifyTrackId ??
+            extractTrackIdFromSpotifyUrl(breakoutTrack.spotifyUrl),
           trackName: breakoutTrack.name,
           artists: breakoutTrack.artists,
           summary: `${breakoutTrack.name} abre uma janela boa de discovery porque ainda esta fora da tua base, tem ${breakoutTrack.fitLabel.toLowerCase()} e ${decisionByTrackId.get(breakoutTrack.trackId)?.accountFitContext.toLowerCase() ?? "chega com espaco editorial para teste"}.`,
@@ -1920,6 +1943,8 @@ function buildDashboardEditorialSpotlights({
           ],
           coverUrl: breakoutTrack.coverUrl,
           spotifyUrl: breakoutTrack.spotifyUrl,
+          suggestedPlaylistName:
+            decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName ?? null,
         }
       : null,
     dropAlertDecision
@@ -1927,6 +1952,8 @@ function buildDashboardEditorialSpotlights({
           title: "Alerta de queda",
           badge: "Revisar base",
           tone: "red",
+          trackId: dropAlertDecision.trackId,
+          spotifyTrackId: dropAlertDecision.spotifyTrackId,
           trackName: dropAlertDecision.name,
           artists: dropAlertDecision.artists,
           summary: `${dropAlertDecision.name} perdeu tracao e ja pede teste de troca ou limpeza, principalmente se estiver ocupando espaco nobre na playlist.`,
@@ -1938,12 +1965,17 @@ function buildDashboardEditorialSpotlights({
           ],
           coverUrl: dropAlertDecision.coverUrl,
           spotifyUrl: dropAlertDecision.spotifyUrl,
+          suggestedPlaylistName: dropAlertDecision.suggestedPlaylistName,
         }
       : dropAlertRadar
         ? {
             title: "Alerta de queda",
             badge: "Revisar base",
             tone: "red",
+            trackId: dropAlertRadar.trackId,
+            spotifyTrackId:
+              decisionByTrackId.get(dropAlertRadar.trackId)?.spotifyTrackId ??
+              extractTrackIdFromSpotifyUrl(dropAlertRadar.spotifyUrl),
             trackName: dropAlertRadar.name,
             artists: dropAlertRadar.artists,
             summary: `${dropAlertRadar.name} foi a queda mais sensivel entre as faixas que ja estao na base e merece reavaliacao editorial.`,
@@ -1957,6 +1989,8 @@ function buildDashboardEditorialSpotlights({
             ],
             coverUrl: dropAlertRadar.coverUrl,
             spotifyUrl: dropAlertRadar.spotifyUrl,
+            suggestedPlaylistName:
+              decisionByTrackId.get(dropAlertRadar.trackId)?.suggestedPlaylistName ?? null,
           }
         : null,
   ];

@@ -49,12 +49,15 @@ export type DashboardEditorialSpotlight = {
   title: string;
   badge: string;
   tone: StatusTone;
+  trackId: string;
+  spotifyTrackId: string | null;
   trackName: string;
   artists: string;
   summary: string;
   stats: string[];
   coverUrl: string | null;
   spotifyUrl: string;
+  suggestedPlaylistName: string | null;
 };
 
 export type DashboardWorkspaceData = {
@@ -260,6 +263,7 @@ export type DecisionAction = "add" | "observe" | "ignore" | "remove";
 
 export type DecisionTrack = {
   trackId: string;
+  spotifyTrackId: string | null;
   name: string;
   artists: string;
   artistIds: string[];

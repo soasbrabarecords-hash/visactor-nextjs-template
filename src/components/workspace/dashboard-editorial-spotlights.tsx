@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import Container from "@/components/container";
 import { cn } from "@/lib/utils";
 import type { DashboardEditorialSpotlight } from "@/types/workspace";
+import SpotifyPlaylistAddButton from "./spotify-playlist-add-button";
 import StatusBadge from "./status-badge";
 
 const toneRingClasses = {
@@ -98,7 +99,13 @@ export default function DashboardEditorialSpotlights({
               ))}
             </div>
 
-            <div className="relative mt-auto pt-6">
+            <div className="relative mt-auto flex flex-wrap gap-2 pt-6">
+              <SpotifyPlaylistAddButton
+                spotifyTrackId={spotlight.spotifyTrackId}
+                suggestedPlaylistName={spotlight.suggestedPlaylistName}
+                label="Add playlist"
+                compact
+              />
               <Link
                 href={spotlight.spotifyUrl}
                 target="_blank"
