@@ -210,3 +210,205 @@
   border-color: transparent !important;
   background: var(--sp-elevated) !important;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * REFINOS DA TABELA ESTILO SPOTIFY (v2)
+ * Baseado em comparação lado-a-lado com print do app oficial
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tabela: padding horizontal maior, mais "respiro" ─────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+/* Headers: tipografia 12px, color #b3b3b3, padding maior */
+.spotify-skin [data-spotify-table-wrapper] table thead th {
+  font-size: 12px !important;
+  color: var(--sp-text-muted) !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+/* Rows: padding vertical 8px, bordas arredondadas no hover (estilo Spotify) */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr {
+  height: 56px !important;
+  border-radius: 4px !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody td {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  vertical-align: middle !important;
+}
+
+/* Hover: branco com 8% opacity (não cinza chumbo) */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ── Coluna # (número da faixa) ──────────────────────────────────────────── */
+/* Cor cinza claro como o Spotify */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(2) {
+  color: var(--sp-text-muted) !important;
+  font-size: 16px !important;
+  text-align: left !important;
+  width: 40px !important;
+  font-weight: 400 !important;
+}
+
+/* ── Coluna Música (capa + título + artistas) ────────────────────────────── */
+/* Capa 40px, arredondada, com sombra */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:first-child {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 4px !important;
+  border: 0 !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Título da música: branco, 16px, peso 500 (NÃO bold tipo Spotify) */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+  color: var(--sp-text) !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+/* Artistas: cinza Spotify, 14px */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:last-child {
+  color: var(--sp-text-muted) !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  margin-top: 2px !important;
+}
+
+/* Hover: título da música vira verde igual Spotify */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(3) > div > div:last-child > div:first-child {
+  color: var(--sp-green) !important;
+}
+
+/* ── Coluna Álbum: clickable look (cinza claro) ──────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(4) {
+  color: var(--sp-text-muted) !important;
+  font-size: 14px !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(4) {
+  color: var(--sp-text) !important;
+  text-decoration: underline;
+}
+
+/* ── Pop, Duração, Streams, Chart BR: cinza ───────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5),
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(6),
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(7),
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(8) {
+  color: var(--sp-text-muted) !important;
+  font-size: 14px !important;
+}
+
+/* Barra de Pop: verde Spotify ao invés do azul */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(5) [class*="bg-primary"] {
+  background-color: var(--sp-text-muted) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(5) [class*="bg-primary"] {
+  background-color: var(--sp-green) !important;
+}
+
+/* ── Coluna Ações: ícones cinza claro, hover branco (igual Spotify ⋯ ) ───── */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button,
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a {
+  color: var(--sp-text-muted) !important;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(9) button,
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td:nth-child(9) a {
+  opacity: 1;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button:hover,
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a:hover {
+  color: var(--sp-text) !important;
+  transform: scale(1.04);
+}
+
+/* ── Linha selecionada: cinza translúcido (não verde forte) ──────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td:nth-child(2) {
+  color: var(--sp-text) !important;
+}
+
+/* ── Grip handle (drag): aparece só em hover ──────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(1) [data-grip] {
+  color: var(--sp-text-muted) !important;
+}
+
+/* ── Sticky cells (#1 e ações): pinta junto no hover ──────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
+  background-color: rgba(40, 40, 40, 1) !important;
+}
+
+/* ── Header da tabela: bg sólido pra sticky thead funcionar com scroll ────── */
+.spotify-skin [data-spotify-table-wrapper] table thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  background-color: var(--sp-bg) !important;
+}
+
+/* ── Largura mínima horizontal: deixa a tabela respirar antes de truncar ─── */
+.spotify-skin [data-spotify-table-wrapper] {
+  /* Permite scroll horizontal interno se viewport for muito apertado */
+  overflow-x: auto !important;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * RESPONSIVIDADE FINA
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet (≥750px) — esconde streams/chart se ficar apertado */
+@media (max-width: 999px) {
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+    font-size: 15px !important;
+  }
+}
+
+/* Mobile (≤749px) — compacta tudo */
+@media (max-width: 749px) {
+  .spotify-skin [data-spotify-table-wrapper] table thead th {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    font-size: 11px !important;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table tbody td {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table tbody tr {
+    height: 60px !important;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:first-child {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:first-child {
+    font-size: 14px !important;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(3) > div > div:last-child > div:last-child {
+    font-size: 12px !important;
+  }
+  /* Em mobile mostra ações sempre (não hover) */
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) button,
+  .spotify-skin [data-spotify-table-wrapper] table tbody td:nth-child(9) a {
+    opacity: 1 !important;
+  }
+}
