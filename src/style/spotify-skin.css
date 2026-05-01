@@ -152,9 +152,20 @@
   border-top: 0 !important;
 }
 
-/* Linha selecionada em azul Spotify */
+/* Linha selecionada: cinza claro Spotify (todas as colunas, incluindo sticky) */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
-  background-color: rgba(30, 215, 96, 0.16) !important;
+  background-color: rgba(255, 255, 255, 0.16) !important;
+}
+/* Sticky cells dentro de linha selecionada: mesmo cinza (não preto) */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td[style*="position: sticky"] {
+  background-color: rgb(57, 57, 57) !important; /* equivalente sólido a rgba(255,255,255,0.16) sobre #121212 */
+}
+/* Hover sobre linha selecionada: cinza um pouco mais claro */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"]:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"]:hover td[style*="position: sticky"] {
+  background-color: rgb(65, 65, 65) !important;
 }
 
 /* Cards / botões / inputs no resto da página */

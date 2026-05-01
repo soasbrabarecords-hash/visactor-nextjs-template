@@ -350,8 +350,17 @@ export default function PlaylistEditor({
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    // Se arrastar uma linha que NÃO está selecionada, seleciona só ela
-    if (!selectedSet.has(index)) {
+    // Se Shift segurado: estende range entre âncora e este index AQUI mesmo
+    // (o handleRowClick é cancelado pelo ignoreNextClick depois do drag)
+    if (e.shiftKey && lastClickedIndex.current !== null) {
+      const from = Math.min(lastClickedIndex.current, index);
+      const to = Math.max(lastClickedIndex.current, index);
+      const range = new Set<number>();
+      for (let i = from; i <= to; i++) range.add(i);
+      setSelectedSet(range);
+      // NÃO atualiza lastClickedIndex — âncora permanece
+    } else if (!selectedSet.has(index)) {
+      // Click normal numa linha não selecionada: seleciona só ela
       setSelectedSet(new Set([index]));
       lastClickedIndex.current = index;
     }
