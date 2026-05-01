@@ -27,6 +27,26 @@ function coverStyle(coverUrl: string | null) {
   };
 }
 
+function getDecisionLine(spotlight: DashboardEditorialSpotlight) {
+  if (spotlight.suggestedPlaylistName) {
+    return `Entrar em ${spotlight.suggestedPlaylistName}`;
+  }
+
+  if (spotlight.tone === "red") {
+    return "Revisar agora";
+  }
+
+  if (spotlight.tone === "yellow") {
+    return "Observar de perto";
+  }
+
+  return "Adicionar agora";
+}
+
+function getFocusStat(spotlight: DashboardEditorialSpotlight) {
+  return spotlight.stats[0] ?? spotlight.badge;
+}
+
 export default function DashboardEditorialSpotlights({
   spotlights,
 }: {
@@ -44,8 +64,7 @@ export default function DashboardEditorialSpotlights({
         </div>
         <h2 className="mt-2 text-2xl font-semibold">Leituras que merecem acao</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          O dashboard prioriza entradas, apostas e alertas cruzando subida no chart,
-          consistencia no radar e fit com a sua base.
+          Cards mais diretos para decidir rapido o que entra, o que observa e o que revisa.
         </p>
       </div>
 
@@ -54,7 +73,7 @@ export default function DashboardEditorialSpotlights({
           <article
             key={`${spotlight.title}-${spotlight.trackName}`}
             className={cn(
-              "group relative flex min-h-[350px] flex-col overflow-hidden rounded-[26px] border p-5 text-white shadow-[0_18px_42px_rgba(0,0,0,0.2)] transition duration-300 hover:-translate-y-1",
+              "group relative flex min-h-[300px] flex-col overflow-hidden rounded-[26px] border p-5 text-white shadow-[0_18px_42px_rgba(0,0,0,0.2)] transition duration-300 hover:-translate-y-1",
               toneRingClasses[spotlight.tone],
             )}
           >
@@ -79,24 +98,21 @@ export default function DashboardEditorialSpotlights({
 
             <div className="relative mt-6 min-w-0">
               <h3 className="truncate text-xl font-semibold">{spotlight.trackName}</h3>
-              <p className="truncate text-sm text-white/70">
+              <p className="truncate text-sm text-white/68">
                 {spotlight.artists}
               </p>
             </div>
 
-            <p className="relative mt-4 text-sm leading-6 text-white/75">
-              {spotlight.summary}
-            </p>
-
-            <div className="relative mt-5 flex flex-wrap gap-2">
-              {spotlight.stats.map((stat) => (
-                <span
-                  key={stat}
-                  className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs text-white/70 backdrop-blur"
-                >
-                  {stat}
-                </span>
-              ))}
+            <div className="relative mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+                Decisao
+              </div>
+              <div className="mt-2 text-base font-semibold text-white">
+                {getDecisionLine(spotlight)}
+              </div>
+              <div className="mt-2 text-sm text-white/65">
+                {getFocusStat(spotlight)}
+              </div>
             </div>
 
             <div className="relative mt-auto flex flex-wrap gap-2 pt-6">
