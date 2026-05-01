@@ -654,7 +654,7 @@ export default function PlaylistEditor({
         - Coluna "Música" agora inclui capa + título + artistas (estilo Spotify)
         - Colunas secundárias escondem progressivamente em telas menores
       */}
-      <div className="relative overflow-x-auto rounded-2xl border border-border bg-card/60">
+      <div data-spotify-table-wrapper className="relative overflow-x-auto rounded-2xl border border-border bg-card/60">
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">

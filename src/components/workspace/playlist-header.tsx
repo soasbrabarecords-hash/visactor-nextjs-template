@@ -137,7 +137,7 @@ export default function PlaylistHeader({
   }
 
   return (
-    <div className="relative overflow-hidden" style={{ minHeight: "320px" }}>
+    <div data-spotify-header className="relative overflow-hidden" style={{ minHeight: "320px" }}>
       {/* Background: blurred cover + dark gradient overlay */}
       {coverUrl && (
         <div

@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 @import "./dot-matrix.css";
+@import "./spotify-skin.css";
 
 @layer base {
   :root {

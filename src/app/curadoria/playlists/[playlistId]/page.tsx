@@ -3,6 +3,7 @@ import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import { Button } from "@/components/ui/button";
 import PageIntro from "@/components/page-intro";
+import PlaylistActionBar from "@/components/workspace/playlist-action-bar";
 import PlaylistEditor from "@/components/workspace/playlist-editor";
 import PlaylistHeader from "@/components/workspace/playlist-header";
 import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
@@ -54,7 +55,7 @@ export default async function SpotifyPlaylistEditorPage({
   }));
 
   return (
-    <div>
+    <div className="spotify-skin">
       <TopNav title="Editar playlist" />
 
       {/* Header estilo Spotify com edição inline de capa, nome e descrição */}
@@ -70,7 +71,12 @@ export default async function SpotifyPlaylistEditorPage({
         spotifyUrl={playlist.spotifyUrl}
       />
 
-      <Container className="border-b border-border py-6">
+      <Container className="py-2">
+        {/* Action bar verde estilo Spotify (Play, shuffle, +, download, ⋯) */}
+        <PlaylistActionBar spotifyUrl={playlist.spotifyUrl} />
+      </Container>
+
+      <Container className="py-6">
         <PlaylistEditor
           playlistId={playlistId}
           initialTracks={playlist.tracks}

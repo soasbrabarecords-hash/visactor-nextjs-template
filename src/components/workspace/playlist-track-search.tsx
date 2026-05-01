@@ -193,7 +193,7 @@ export default function PlaylistTrackSearch({ playlistId, existingTrackIds, onAd
   }
 
   return (
-    <div className="space-y-6 pt-2">
+    <div data-spotify-search className="space-y-6 pt-2">
       {/* Search bar */}
       <div className="space-y-3">
         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">

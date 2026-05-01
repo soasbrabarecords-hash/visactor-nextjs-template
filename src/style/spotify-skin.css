@@ -1,0 +1,212 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Spotify Skin — overlay visual estilo Spotify para a página de edição de playlist
+ *
+ * Aplicar a classe `.spotify-skin` no container raiz da página de edição.
+ * Esse skin sobrescreve APENAS estilos — nada de lógica é tocada.
+ *
+ * Cores oficiais do Spotify dark:
+ *   #121212  background base
+ *   #1f1f1f  cards/elevations
+ *   #2a2a2a  hover/elevated
+ *   #1ed760  verde primário
+ *   #1db954  verde secundário (botões)
+ *   #b3b3b3  texto secundário
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+.spotify-skin {
+  /* Cores de página */
+  --sp-bg: #121212;
+  --sp-elevated: #1f1f1f;
+  --sp-hover: #2a2a2a;
+  --sp-green: #1ed760;
+  --sp-green-hover: #1fdf64;
+  --sp-text: #ffffff;
+  --sp-text-muted: #b3b3b3;
+  --sp-text-subdued: #6a6a6a;
+}
+
+/* ── Background da página inteira: degradê do gradient color → #121212 ────── */
+.spotify-skin {
+  background: var(--sp-bg);
+  color: var(--sp-text);
+}
+
+/* ── Header da playlist: gradiente mais quente, igual Spotify ─────────────── */
+.spotify-skin [data-spotify-header] {
+  /* Mistura: cor extraída da capa em cima, fade pra #121212 embaixo */
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.0) 0%,
+      rgba(0, 0, 0, 0.4) 40%,
+      var(--sp-bg) 100%
+    ),
+    linear-gradient(180deg, transparent, transparent);
+  min-height: 360px !important;
+}
+
+.spotify-skin [data-spotify-header] h1,
+.spotify-skin [data-spotify-header] [data-editable-title] button > span {
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1 !important;
+}
+
+/* ── Action bar (play + ações) ────────────────────────────────────────────── */
+.spotify-skin [data-spotify-actionbar] {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 0 8px 0;
+}
+
+.spotify-skin [data-spotify-actionbar] .sp-play {
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: var(--sp-green);
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 80ms ease, background 120ms ease;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.spotify-skin [data-spotify-actionbar] .sp-play:hover {
+  background: var(--sp-green-hover);
+  transform: scale(1.06);
+}
+.spotify-skin [data-spotify-actionbar] .sp-play:active {
+  transform: scale(0.96);
+}
+
+.spotify-skin [data-spotify-actionbar] .sp-icon-btn {
+  color: var(--sp-text-muted);
+  background: transparent;
+  border: 0;
+  padding: 8px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease;
+}
+.spotify-skin [data-spotify-actionbar] .sp-icon-btn:hover {
+  color: var(--sp-text);
+  transform: scale(1.04);
+}
+
+/* ── Tabela: estilo Spotify ───────────────────────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper] {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  margin-top: 8px;
+}
+.spotify-skin [data-spotify-table-wrapper] table thead {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table thead tr {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: var(--sp-text-muted) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table thead th {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  background-color: var(--sp-bg) !important; /* fundo das stickys do header */
+}
+
+.spotify-skin [data-spotify-table-wrapper] table tbody tr {
+  background-color: transparent !important;
+  border-radius: 6px;
+  transition: background-color 80ms ease;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Sticky cells: bg do tbody/td precisa pintar mesmo em hover */
+.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"] {
+  background-color: var(--sp-bg) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
+  background-color: #1a1a1a !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
+  background-color: var(--sp-bg) !important;
+}
+
+/* Divisores entre linhas mais sutis */
+.spotify-skin [data-spotify-table-wrapper] table tbody {
+  --tw-divide-opacity: 0 !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr {
+  border-top: 0 !important;
+}
+
+/* Linha selecionada em azul Spotify */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
+  background-color: rgba(30, 215, 96, 0.16) !important;
+}
+
+/* Cards / botões / inputs no resto da página */
+.spotify-skin [class*="bg-card"] {
+  background-color: var(--sp-elevated) !important;
+}
+.spotify-skin [class*="bg-muted"] {
+  background-color: var(--sp-hover) !important;
+}
+.spotify-skin button[class*="bg-white text-black"] {
+  background: var(--sp-text) !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  border-radius: 9999px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+/* ── Mobile fine-tunes ────────────────────────────────────────────────────── */
+@media (max-width: 749px) {
+  .spotify-skin [data-spotify-header] {
+    min-height: auto !important;
+  }
+  .spotify-skin [data-spotify-actionbar] {
+    flex-wrap: wrap;
+    padding-top: 12px;
+  }
+  .spotify-skin [data-spotify-actionbar] .sp-play {
+    width: 48px;
+    height: 48px;
+  }
+  /* Em mobile: força a tabela ter um min-width que faça scroll horizontal */
+  .spotify-skin [data-spotify-table-wrapper] {
+    margin-left: -16px;
+    margin-right: -16px;
+  }
+  .spotify-skin [data-spotify-table-wrapper] table {
+    min-width: 100%;
+  }
+}
+
+/* ── Search/sugestões: estilo Spotify ─────────────────────────────────────── */
+.spotify-skin [data-spotify-search] input[type="search"] {
+  background: var(--sp-elevated) !important;
+  border-color: transparent !important;
+  border-radius: 9999px !important;
+  color: var(--sp-text) !important;
+}
+.spotify-skin [data-spotify-search] input[type="search"]::placeholder {
+  color: var(--sp-text-muted) !important;
+}
+
+/* ── Search/sugestões: rounded card sem border ─────────────────────────────── */
+.spotify-skin [data-spotify-search] [class*="rounded-2xl"][class*="border"] {
+  border-color: transparent !important;
+  background: var(--sp-elevated) !important;
+}
