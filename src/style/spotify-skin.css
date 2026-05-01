@@ -788,55 +788,79 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
- * v6 — Ajustes de margem header/tabela + Salvar ordem em verde + alinhamento
+ * v6 — Action bar (Play + Save/Cancel) DENTRO do header, à direita
  * ═════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1) Tabela NÃO invade o header — voltar margin-top a zero (sem negativo)
-       Action bar vira parte do mesmo gradient, mas a tabela respira ───── */
-.spotify-skin .py-6 {
-  margin-top: 0 !important;          /* ANTES era -56px (causava sobreposição) */
-  padding-top: 0 !important;
-}
-
-/* O header agora reserva espaço pro rodapé interno (action bar ocupa lá) */
+/* Header precisa ser referência pra o Container externo grudar nele */
 .spotify-skin [data-spotify-header] {
+  position: relative !important;
   margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-  /* O bottom: 16px do action bar fica DENTRO do header próprio,
-     a tabela começa logo após o header sem sobrepor */
 }
 
-/* ── 2) Action bar com Save/Cancel: alinhados à DIREITA, na mesma linha ── */
-/* Container que envolve action bar (Container .py-2): vira flex que segura
-   o Play à esquerda e os controles à direita */
+/* Container.py-2 (que segura o action bar) — vira "rodapé colado" no header */
 .spotify-skin .py-2:has([data-spotify-actionbar]) {
-  height: auto !important;
-  padding: 8px 24px !important;
+  position: absolute !important;
+  bottom: 16px !important;           /* dentro do gradient do header */
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 25 !important;
+  padding: 0 24px !important;
   margin: 0 !important;
-  position: relative !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  min-height: 72px !important;
+  justify-content: flex-start !important;  /* Play encosta à esquerda */
+  pointer-events: none;             /* deixa cliques passarem onde não há botão */
+}
+.spotify-skin .py-2:has([data-spotify-actionbar]) > * {
+  pointer-events: auto;
 }
 
-/* Play volta a ser estático (ocupa sua coluna no flex acima) */
+/* Play estático dentro desse flex */
 .spotify-skin [data-spotify-actionbar] {
   position: static !important;
   bottom: auto !important;
   left: auto !important;
 }
 
-/* Barra de controles (Salvar/Cancelar) — extraída visualmente do PlaylistEditor
-   e posicionada à direita do Play via fixed/absolute. Como está dentro do
-   PlaylistEditor (filho do Container.py-6 abaixo), uso position: fixed
-   ancorada no top do Container.py-2 */
+/* Como Container.py-2 é absolute, precisamos elevá-lo via DOM travel:
+   o trick é que Container.py-2 é IRMÃO do header — usamos `position: absolute`
+   ancorado no parent comum (a div com class spotify-skin é o pai relativo).
+   Mas como queremos o action bar DENTRO do header (visualmente), aproveitamos
+   que o header tem position: relative — e movemos o Container.py-2 pra dentro
+   dele via translate negativo */
+.spotify-skin .py-2:has([data-spotify-actionbar]) {
+  /* Subimos o Container pra dentro do header com translate */
+  transform: translateY(-100%) !important;
+  /* E deixamos ele com altura 0 pra não ocupar espaço no fluxo */
+  height: 0 !important;
+  overflow: visible !important;
+}
+
+/* Container.py-6 (PlaylistEditor + search) cola direto após o header,
+   sem deixar o gap que a action bar deixaria */
+.spotify-skin .py-6 {
+  margin-top: 0 !important;
+  padding-top: 16px !important;
+  position: relative !important;
+}
+
+/* ── Save/Cancel: também DENTRO do header, à DIREITA ──────────────────── */
+/* A barra de controles é filha do PlaylistEditor (dentro de Container.py-6).
+   Vamos posicioná-la absoluta ancorada no header. Como o header tem
+   position: relative, mas a barra vive em outro container, usamos position:
+   fixed não — usamos position: absolute saindo pro topo do Container.py-6
+   e fazendo overshoot pra dentro do header */
 .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
   position: absolute !important;
-  top: -72px !important;             /* sobre o Container.py-2 acima */
+  bottom: calc(100% + 16px - 72px) !important;  /* dentro do header, ao nível do Play */
+  /* Resolução prática: o conteúdo do Container.py-6 começa logo após o
+     header. Pra ficar na mesma linha vertical do Play (que está em
+     bottom: 16px do header), precisamos posicionar a barra a -56px do
+     topo do Container.py-6 */
+  top: -56px !important;
+  bottom: auto !important;
   right: 24px !important;
   left: auto !important;
-  bottom: auto !important;
   padding: 0 !important;
   margin: 0 !important;
   min-height: 56px !important;
@@ -851,7 +875,7 @@
   display: none !important;
 }
 
-/* Posição relativa no Container que vai segurar a barra absoluta */
+/* Posição relativa no Container.py-6 → space-y-6 pra ancorar a barra */
 .spotify-skin .py-6 .space-y-6 {
   position: relative !important;
 }
