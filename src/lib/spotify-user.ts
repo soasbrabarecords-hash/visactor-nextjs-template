@@ -125,6 +125,99 @@ export type SpotifyEditablePlaylistResult =
       message: string;
     };
 
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const CURRENT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
+const ACCOUNT_PLAYLISTS_CACHE_TTL_MS = 90 * 1000;
+const EDITABLE_PLAYLIST_CACHE_TTL_MS = 3 * 60 * 1000;
+
+const spotifyCurrentUserCache = new Map<string, CacheEntry<SpotifyCurrentUserResponse>>();
+const spotifyAccountPlaylistsCache = new Map<string, CacheEntry<SpotifyAccountPlaylist[]>>();
+const spotifyEditablePlaylistCache = new Map<string, CacheEntry<SpotifyEditablePlaylist>>();
+const spotifyPlaylistsInFlight = new Map<string, Promise<SpotifyAccountPlaylist[]>>();
+const spotifyEditablePlaylistsInFlight = new Map<string, Promise<SpotifyEditablePlaylist>>();
+const spotifyRateLimitUntilByScope = new Map<string, number>();
+
+function buildTokenCacheKey(accessToken: string) {
+  return accessToken.trim();
+}
+
+function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string) {
+  const entry = cache.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedValue<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+  ttlMs: number,
+) {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+
+  return value;
+}
+
+function getRemainingRateLimitSeconds(scope: string) {
+  const blockedUntil = spotifyRateLimitUntilByScope.get(scope) ?? 0;
+
+  return Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
+}
+
+function throwIfRateLimited(scope: string, label: string) {
+  const remainingSeconds = getRemainingRateLimitSeconds(scope);
+
+  if (remainingSeconds > 0) {
+    throw new Error(
+      `${label} 429: rate limit atingido. Tente novamente em ${remainingSeconds} segundos.`,
+    );
+  }
+}
+
+function registerRateLimit(scope: string, retryAfterHeader: string | null) {
+  const retryAfterSeconds = Number.parseInt(retryAfterHeader ?? "", 10);
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    spotifyRateLimitUntilByScope.set(
+      scope,
+      Date.now() + retryAfterSeconds * 1000,
+    );
+  }
+}
+
+function clearRateLimit(scope: string) {
+  spotifyRateLimitUntilByScope.delete(scope);
+}
+
+function clearSpotifyReadCachesForToken(accessToken: string) {
+  const cacheKey = buildTokenCacheKey(accessToken);
+
+  spotifyCurrentUserCache.delete(cacheKey);
+  spotifyAccountPlaylistsCache.delete(cacheKey);
+
+  for (const editableKey of spotifyEditablePlaylistCache.keys()) {
+    if (editableKey.startsWith(`${cacheKey}:`)) {
+      spotifyEditablePlaylistCache.delete(editableKey);
+    }
+  }
+}
+
 function getSpotifyOAuthEnv() {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -308,6 +401,13 @@ function formatDuration(milliseconds: number | undefined) {
 }
 
 async function fetchSpotifyCurrentUserWithToken(accessToken: string) {
+  const cacheKey = buildTokenCacheKey(accessToken);
+  const cachedProfile = getCachedValue(spotifyCurrentUserCache, cacheKey);
+
+  if (cachedProfile?.id) {
+    return cachedProfile;
+  }
+
   const response = await fetch("https://api.spotify.com/v1/me", {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -325,7 +425,12 @@ async function fetchSpotifyCurrentUserWithToken(accessToken: string) {
     throw new Error("Spotify user profile unavailable.");
   }
 
-  return profile;
+  return setCachedValue(
+    spotifyCurrentUserCache,
+    cacheKey,
+    profile,
+    CURRENT_USER_CACHE_TTL_MS,
+  );
 }
 
 function mapSpotifyAccountPlaylist(
@@ -379,6 +484,22 @@ function mapSpotifyEditablePlaylistTrack(
 }
 
 async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
+  const cacheKey = buildTokenCacheKey(accessToken);
+  const cachedPlaylists = getCachedValue(spotifyAccountPlaylistsCache, cacheKey);
+
+  if (cachedPlaylists) {
+    return cachedPlaylists;
+  }
+
+  const inFlight = spotifyPlaylistsInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  throwIfRateLimited("spotify:me:playlists", "Spotify playlists error");
+
+  const requestPromise = (async () => {
   const currentUser = await fetchSpotifyCurrentUserWithToken(accessToken);
   const playlists: SpotifyAccountPlaylist[] = [];
   let nextUrl:
@@ -397,10 +518,13 @@ async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
       const errBody = await response.json().catch(() => ({})) as { error?: { message?: string; status?: number } };
       if (response.status === 429) {
         const retryAfter = response.headers.get("Retry-After");
+        registerRateLimit("spotify:me:playlists", retryAfter);
         throw new Error(`Spotify playlists error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
       }
       throw new Error(`Spotify playlists error ${response.status}: ${errBody?.error?.message ?? "unknown"}`);
     }
+
+    clearRateLimit("spotify:me:playlists");
 
     const payload = (await response.json()) as SpotifyUserPlaylistsResponse;
 
@@ -419,13 +543,29 @@ async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
     nextUrl = payload.next ?? null;
   }
 
-  return playlists;
+    return setCachedValue(
+      spotifyAccountPlaylistsCache,
+      cacheKey,
+      playlists,
+      ACCOUNT_PLAYLISTS_CACHE_TTL_MS,
+    );
+  })();
+
+  spotifyPlaylistsInFlight.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    spotifyPlaylistsInFlight.delete(cacheKey);
+  }
 }
 
 async function fetchSpotifyPlaylistTracksWithToken(
   accessToken: string,
   playlistId: string,
 ) {
+  throwIfRateLimited("spotify:playlist:tracks", "Spotify tracks error");
+
   const tracks: SpotifyEditablePlaylistTrack[] = [];
   let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
 
@@ -440,10 +580,13 @@ async function fetchSpotifyPlaylistTracksWithToken(
     if (!response.ok) {
       if (response.status === 429) {
         const retryAfter = response.headers.get("Retry-After");
+        registerRateLimit("spotify:playlist:tracks", retryAfter);
         throw new Error(`Spotify tracks error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
       }
       throw new Error(`Spotify tracks error ${response.status}: Failed to fetch Spotify playlist tracks.`);
     }
+
+    clearRateLimit("spotify:playlist:tracks");
 
     const payload = (await response.json()) as SpotifyPlaylistTracksResponse;
 
@@ -465,6 +608,22 @@ async function fetchSpotifyEditablePlaylistWithToken(
   accessToken: string,
   playlistId: string,
 ) {
+  const cacheKey = `${buildTokenCacheKey(accessToken)}:${playlistId}`;
+  const cachedPlaylist = getCachedValue(spotifyEditablePlaylistCache, cacheKey);
+
+  if (cachedPlaylist) {
+    return cachedPlaylist;
+  }
+
+  const inFlight = spotifyEditablePlaylistsInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  throwIfRateLimited("spotify:playlist:details", "Spotify playlist error");
+
+  const requestPromise = (async () => {
   const currentUser = await fetchSpotifyCurrentUserWithToken(accessToken);
   const response = await fetch(
     `https://api.spotify.com/v1/playlists/${playlistId}`,
@@ -477,8 +636,17 @@ async function fetchSpotifyEditablePlaylistWithToken(
   );
 
   if (!response.ok) {
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After");
+      registerRateLimit("spotify:playlist:details", retryAfter);
+      throw new Error(
+        `Spotify playlist error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`,
+      );
+    }
     throw new Error("Failed to fetch Spotify playlist.");
   }
+
+  clearRateLimit("spotify:playlist:details");
 
   const playlist = (await response.json()) as SpotifyUserPlaylistObject;
 
@@ -492,11 +660,25 @@ async function fetchSpotifyEditablePlaylistWithToken(
     throw new Error("Spotify playlist unavailable.");
   }
 
-  return {
-    ...mappedPlaylist,
-    description: playlist.description?.trim() || "",
-    tracks: await fetchSpotifyPlaylistTracksWithToken(accessToken, playlistId),
-  };
+    return setCachedValue(
+      spotifyEditablePlaylistCache,
+      cacheKey,
+      {
+        ...mappedPlaylist,
+        description: playlist.description?.trim() || "",
+        tracks: await fetchSpotifyPlaylistTracksWithToken(accessToken, playlistId),
+      },
+      EDITABLE_PLAYLIST_CACHE_TTL_MS,
+    );
+  })();
+
+  spotifyEditablePlaylistsInFlight.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    spotifyEditablePlaylistsInFlight.delete(cacheKey);
+  }
 }
 
 export async function fetchSpotifyAccountPlaylists(): Promise<{
@@ -825,9 +1007,10 @@ export async function updatePlaylistDetails(
   description: string,
 ): Promise<SpotifyMutationResponse> {
   try {
-    const { refreshedToken } = await withSpotifyToken((token) =>
-      updatePlaylistDetailsWithToken(token, playlistId, name, description),
-    );
+    const { refreshedToken } = await withSpotifyToken(async (token) => {
+      await updatePlaylistDetailsWithToken(token, playlistId, name, description);
+      clearSpotifyReadCachesForToken(token);
+    });
     return { result: { success: true }, refreshedToken };
   } catch (error) {
     return {
@@ -963,6 +1146,7 @@ export async function createSpotifyPlaylist(
     if (base64CoverJpeg) {
       await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
     }
+    clearSpotifyReadCachesForToken(token);
     return id;
   });
 

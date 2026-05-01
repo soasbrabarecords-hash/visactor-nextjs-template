@@ -7,6 +7,92 @@ export const dynamic = "force-dynamic";
 
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
+const PLAYLIST_TRACK_IDS_TTL_MS = 2 * 60 * 1000;
+
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const playlistTrackIdsCache = new Map<string, CacheEntry<string[]>>();
+const playlistTrackIdsInFlight = new Map<string, Promise<string[]>>();
+const playlistTrackRateLimitUntilByScope = new Map<string, number>();
+
+function buildPlaylistTrackCacheKey(accessToken: string, playlistId: string) {
+  return `${accessToken.trim()}:${playlistId}`;
+}
+
+function getCachedTrackIds(cacheKey: string) {
+  const entry = playlistTrackIdsCache.get(cacheKey);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    playlistTrackIdsCache.delete(cacheKey);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedTrackIds(cacheKey: string, trackIds: string[]) {
+  const uniqueTrackIds = Array.from(new Set(trackIds));
+
+  playlistTrackIdsCache.set(cacheKey, {
+    value: uniqueTrackIds,
+    expiresAt: Date.now() + PLAYLIST_TRACK_IDS_TTL_MS,
+  });
+
+  return uniqueTrackIds;
+}
+
+function updateCachedTrackIds(
+  accessToken: string,
+  playlistId: string,
+  updater: (trackIds: string[]) => string[],
+) {
+  const cacheKey = buildPlaylistTrackCacheKey(accessToken, playlistId);
+  const currentTrackIds = getCachedTrackIds(cacheKey);
+
+  if (!currentTrackIds) {
+    return;
+  }
+
+  setCachedTrackIds(cacheKey, updater(currentTrackIds));
+}
+
+function getRemainingRateLimitSeconds(scope: string) {
+  const blockedUntil = playlistTrackRateLimitUntilByScope.get(scope) ?? 0;
+
+  return Math.max(0, Math.ceil((blockedUntil - Date.now()) / 1000));
+}
+
+function throwIfRateLimited(scope: string) {
+  const remainingSeconds = getRemainingRateLimitSeconds(scope);
+
+  if (remainingSeconds > 0) {
+    throw new Error(
+      `Spotify tracks error 429: rate limit atingido. Tente novamente em ${remainingSeconds} segundos.`,
+    );
+  }
+}
+
+function registerRateLimit(scope: string, retryAfterHeader: string | null) {
+  const retryAfterSeconds = Number.parseInt(retryAfterHeader ?? "", 10);
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    playlistTrackRateLimitUntilByScope.set(
+      scope,
+      Date.now() + retryAfterSeconds * 1000,
+    );
+  }
+}
+
+function clearRateLimit(scope: string) {
+  playlistTrackRateLimitUntilByScope.delete(scope);
+}
 
 async function doRefresh(clientId: string, clientSecret: string, refreshTok: string) {
   const res = await fetch("https://accounts.spotify.com/api/token", {
@@ -47,7 +133,31 @@ async function removeTrack(
   return data.snapshot_id ?? snapshotId;
 }
 
-async function fetchTrackIds(accessToken: string, playlistId: string): Promise<string[]> {
+async function fetchTrackIds(
+  accessToken: string,
+  playlistId: string,
+  { force = false }: { force?: boolean } = {},
+): Promise<string[]> {
+  const cacheKey = buildPlaylistTrackCacheKey(accessToken, playlistId);
+  const scope = `spotify:playlist:tracks:${playlistId}`;
+
+  if (!force) {
+    const cachedTrackIds = getCachedTrackIds(cacheKey);
+
+    if (cachedTrackIds) {
+      return cachedTrackIds;
+    }
+
+    const inFlight = playlistTrackIdsInFlight.get(cacheKey);
+
+    if (inFlight) {
+      return inFlight;
+    }
+  }
+
+  throwIfRateLimited(scope);
+
+  const requestPromise = (async () => {
   const ids: string[] = [];
   let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=items(track(id)),next&limit=50`;
 
@@ -58,9 +168,15 @@ async function fetchTrackIds(accessToken: string, playlistId: string): Promise<s
     });
 
     if (!res.ok) {
+      if (res.status === 429) {
+        registerRateLimit(scope, res.headers.get("Retry-After"));
+      }
+
       const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
       throw new Error(err?.error?.message ?? `Spotify error ${res.status}`);
     }
+
+    clearRateLimit(scope);
 
     const data = await res.json() as {
       items?: Array<{ track?: { id?: string | null } | null }>;
@@ -74,7 +190,16 @@ async function fetchTrackIds(accessToken: string, playlistId: string): Promise<s
     nextUrl = data.next ?? null;
   }
 
-  return ids;
+    return setCachedTrackIds(cacheKey, ids);
+  })();
+
+  playlistTrackIdsInFlight.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    playlistTrackIdsInFlight.delete(cacheKey);
+  }
 }
 
 async function addTrack(accessToken: string, playlistId: string, trackUri: string) {
@@ -99,6 +224,8 @@ async function addTrack(accessToken: string, playlistId: string, trackUri: strin
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
     throw new Error(err?.error?.message ?? `Spotify error ${res.status}`);
   }
+
+  updateCachedTrackIds(accessToken, playlistId, (trackIds) => [...trackIds, trackId]);
 
   return { alreadyExists: false };
 }
@@ -159,9 +286,12 @@ export async function GET(
     if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
     return response;
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao buscar faixas.";
+
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Erro ao buscar faixas." },
-      { status: 500 },
+      { message },
+      { status: message.includes("429") ? 429 : 500 },
     );
   }
 }
@@ -200,9 +330,12 @@ export async function POST(
     if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
     return response;
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao adicionar faixa.";
+
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Erro ao adicionar faixa." },
-      { status: 500 },
+      { success: false, message },
+      { status: message.includes("429") ? 429 : 500 },
     );
   }
 }
@@ -249,13 +382,21 @@ export async function DELETE(
       }
     }
 
+    const trackId = trackUri.replace("spotify:track:", "");
+    updateCachedTrackIds(token!, playlistId, (trackIds) =>
+      trackIds.filter((currentTrackId) => currentTrackId !== trackId),
+    );
+
     const response = NextResponse.json({ success: true, snapshotId: newSnapshotId });
     if (refreshedTokenData) setSpotifyAuthCookies(response, refreshedTokenData);
     return response;
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao remover faixa.";
+
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : "Erro ao remover faixa." },
-      { status: 500 },
+      { success: false, message },
+      { status: message.includes("429") ? 429 : 500 },
     );
   }
 }

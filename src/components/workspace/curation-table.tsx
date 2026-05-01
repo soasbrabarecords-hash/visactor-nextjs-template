@@ -7,31 +7,18 @@ import Link from "next/link";
 import { ExternalLink, Loader2, Music2, RefreshCw } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
+import {
+  getSpotifyAccountPlaylistsClient,
+  type SpotifyAccountPlaylistClient,
+  type SpotifyPlaylistsClientResponse,
+} from "@/lib/spotify-account-playlists-client";
 import type { DecisionTrack } from "@/types/workspace";
 import type { ArtistGenresResponse } from "@/app/api/spotify/artists/genres/route";
 import StatusBadge from "./status-badge";
 
-type SpotifyAccountPlaylist = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  tracksTotal: number;
-};
+type SpotifyAccountPlaylist = SpotifyAccountPlaylistClient;
 
-type SpotifyPlaylistsResponse =
-  | {
-      connected: true;
-      playlists: SpotifyAccountPlaylist[];
-    }
-  | {
-      connected: false;
-      playlists: [];
-      message: string;
-    };
-
-type PlaylistTrackIdsResponse = {
-  trackIds?: string[];
-};
+type SpotifyPlaylistsResponse = SpotifyPlaylistsClientResponse;
 
 type PlaylistSuggestion = {
   playlist: SpotifyAccountPlaylist | null;
@@ -201,7 +188,7 @@ function getDecisionLabel(row: DecisionTrack) {
 export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
   const [artistGenres, setArtistGenres] = useState<ArtistGenresResponse>({});
   const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
-  const [playlistTrackIdsByPlaylist, setPlaylistTrackIdsByPlaylist] = useState<
+  const [addedTrackIdsByPlaylist, setAddedTrackIdsByPlaylist] = useState<
     Record<string, string[]>
   >({});
   const [addingKey, setAddingKey] = useState<string | null>(null);
@@ -210,15 +197,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
   const loadPlaylists = useCallback(() => {
     startTransition(async () => {
       try {
-        const response = await fetch("/api/spotify/me/playlists", {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error("Nao foi possivel carregar playlists do Spotify.");
-        }
-
-        setPlaylistsData((await response.json()) as SpotifyPlaylistsResponse);
+        setPlaylistsData(await getSpotifyAccountPlaylistsClient());
       } catch {
         setPlaylistsData({
           connected: false,
@@ -272,55 +251,6 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
     [rows],
   );
 
-  useEffect(() => {
-    if (playlists.length === 0 || sortedRows.length === 0) {
-      return;
-    }
-
-    const suggestedPlaylistIds = new Set(
-      sortedRows
-        .map((row) => buildPlaylistSuggestion(row, playlists).playlist?.id)
-        .filter((playlistId): playlistId is string => Boolean(playlistId)),
-    );
-    const missingPlaylistIds = [...suggestedPlaylistIds].filter(
-      (playlistId) => !(playlistId in playlistTrackIdsByPlaylist),
-    );
-
-    if (missingPlaylistIds.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadSuggestedPlaylistTracks() {
-      const entries = await Promise.all(
-        missingPlaylistIds.map(async (playlistId) => {
-          const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
-            cache: "no-store",
-          });
-          const payload = (await response.json().catch(() => ({}))) as PlaylistTrackIdsResponse;
-
-          return [playlistId, response.ok ? payload.trackIds ?? [] : []] as const;
-        }),
-      );
-
-      if (cancelled) {
-        return;
-      }
-
-      setPlaylistTrackIdsByPlaylist((current) => ({
-        ...current,
-        ...Object.fromEntries(entries),
-      }));
-    }
-
-    void loadSuggestedPlaylistTracks();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [playlistTrackIdsByPlaylist, playlists, sortedRows]);
-
   async function handleAddToSuggestedPlaylist(
     row: DecisionTrack,
     suggestion: PlaylistSuggestion,
@@ -341,12 +271,17 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
           body: JSON.stringify({ trackUri: `spotify:track:${row.trackId}` }),
         },
       );
+      const payload = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        alreadyExists?: boolean;
+        message?: string;
+      };
 
-      if (!response.ok) {
-        throw new Error("Nao foi possivel adicionar a faixa.");
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message ?? "Nao foi possivel adicionar a faixa.");
       }
 
-      setPlaylistTrackIdsByPlaylist((current) => {
+      setAddedTrackIdsByPlaylist((current) => {
         const currentIds = current[suggestion.playlist!.id] ?? [];
 
         return {
@@ -416,9 +351,10 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
               sortedRows.map((row, index) => {
                 const rowArtistGenres = row.artistIds.flatMap((id) => artistGenres[id] ?? []);
                 const suggestion = buildPlaylistSuggestion(row, playlists, rowArtistGenres);
-                const isAlreadyInSuggestedPlaylist = suggestion.playlist
-                  ? (playlistTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
+                const isAddedToSuggestedPlaylist = suggestion.playlist
+                  ? (addedTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
                   : false;
+                const isAlreadyOnBase = row.alreadyInPlaylists;
                 const addKey = suggestion.playlist
                   ? `${suggestion.playlist.id}:${row.trackId}`
                   : null;
@@ -520,8 +456,10 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        {isAlreadyInSuggestedPlaylist ? (
-                          <StatusBadge tone="green">On playlist</StatusBadge>
+                        {isAddedToSuggestedPlaylist ? (
+                          <StatusBadge tone="green">Adicionada</StatusBadge>
+                        ) : isAlreadyOnBase ? (
+                          <StatusBadge tone="blue">Na base</StatusBadge>
                         ) : !suggestion.hasFit ? (
                           <span className="text-sm text-muted-foreground">—</span>
                         ) : (

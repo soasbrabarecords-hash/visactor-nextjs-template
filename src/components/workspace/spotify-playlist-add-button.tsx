@@ -14,13 +14,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  getSpotifyAccountPlaylistsClient,
+  invalidateSpotifyAccountPlaylistsClientCache,
+  type SpotifyAccountPlaylistClient,
+} from "@/lib/spotify-account-playlists-client";
 
-type UserPlaylist = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  tracksTotal: number;
-};
+type UserPlaylist = SpotifyAccountPlaylistClient;
 
 type AddState =
   | { status: "idle" }
@@ -116,23 +116,18 @@ export default function SpotifyPlaylistAddButton({
     setPlaylistsError(null);
 
     try {
-      const response = await fetch("/api/spotify/me/playlists", {
-        cache: "no-store",
-      });
-      const data = (await response.json()) as {
-        connected: boolean;
-        playlists?: UserPlaylist[];
-        message?: string;
-      };
+      const data = await getSpotifyAccountPlaylistsClient();
 
-      if (!response.ok || !data.connected) {
+      if (!data.connected) {
         setPlaylistsError(data.message ?? "Spotify nao conectado.");
         return;
       }
 
       setPlaylists(data.playlists ?? []);
-    } catch {
-      setPlaylistsError("Erro ao carregar playlists.");
+    } catch (error) {
+      setPlaylistsError(
+        error instanceof Error ? error.message : "Erro ao carregar playlists.",
+      );
     } finally {
       setLoadingPlaylists(false);
     }
@@ -156,6 +151,14 @@ export default function SpotifyPlaylistAddButton({
       return leftSuggested ? -1 : 1;
     });
   }, [playlists, suggestedPlaylistName]);
+
+  function handleWarmup() {
+    if (!spotifyTrackId || playlists.length > 0 || loadingPlaylists) {
+      return;
+    }
+
+    void fetchPlaylists();
+  }
 
   function handleOpen() {
     if (!spotifyTrackId) {
@@ -212,6 +215,7 @@ export default function SpotifyPlaylistAddButton({
           alreadyExists: data.alreadyExists ?? false,
         },
       }));
+      invalidateSpotifyAccountPlaylistsClientCache();
       setTimeout(() => setOpen(false), 1200);
     } catch {
       setAddStates((current) => ({
@@ -248,6 +252,8 @@ export default function SpotifyPlaylistAddButton({
         ref={btnRef}
         type="button"
         onClick={handleOpen}
+        onMouseEnter={handleWarmup}
+        onFocus={handleWarmup}
         className={cn(
           compact
             ? "h-9 rounded-full border border-white/10 bg-white/5 px-3 text-white hover:bg-white/10"

@@ -1,24 +1,21 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import React, { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
   CalendarDays,
-  Check,
-  ChevronRight,
   FileUp,
   Loader2,
   Minus,
-  MoreHorizontal,
   Sparkles,
-  X,
 } from "lucide-react";
 import type {
   ChartSnapshot,
   ChartSnapshotTrackWithMovement,
 } from "@/lib/chart-snapshots";
+import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -34,19 +31,6 @@ type Props = {
   initialSnapshot: SnapshotData | null;
   country: string;
 };
-
-type UserPlaylist = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  tracksTotal: number;
-};
-
-type AddState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; alreadyExists: boolean }
-  | { status: "error"; message: string };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -119,205 +103,6 @@ function StreamsCell({ streams, change, growthPct }: {
         </span>
       )}
     </span>
-  );
-}
-
-// ── PlaylistAddButton ──────────────────────────────────────────────────────────
-
-function PlaylistAddButton({ spotifyTrackId }: { spotifyTrackId: string }) {
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const [open, setOpen] = useState(false);
-  const [playlists, setPlaylists] = useState<UserPlaylist[]>([]);
-  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
-  const [playlistsError, setPlaylistsError] = useState<string | null>(null);
-  const [addStates, setAddStates] = useState<Record<string, AddState>>({});
-  // track which side to open (left or right) based on viewport
-  const [menuSide, setMenuSide] = useState<"left" | "right">("right");
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        btnRef.current && !btnRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  const fetchPlaylists = useCallback(async () => {
-    setLoadingPlaylists(true);
-    setPlaylistsError(null);
-    try {
-      const res = await fetch("/api/spotify/me/playlists");
-      const data = (await res.json()) as {
-        connected: boolean;
-        playlists?: UserPlaylist[];
-        message?: string;
-      };
-      if (!data.connected) {
-        setPlaylistsError(data.message ?? "Spotify não conectado.");
-        return;
-      }
-      setPlaylists(data.playlists ?? []);
-    } catch {
-      setPlaylistsError("Erro ao carregar playlists.");
-    } finally {
-      setLoadingPlaylists(false);
-    }
-  }, []);
-
-  function handleOpen() {
-    // Detect if button is near right edge — open menu to the left
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setMenuSide(rect.right + 260 > window.innerWidth ? "left" : "right");
-    }
-    setOpen((v) => {
-      if (!v && playlists.length === 0) void fetchPlaylists();
-      return !v;
-    });
-  }
-
-  async function handleAdd(playlistId: string, playlistName: string) {
-    setAddStates((s) => ({ ...s, [playlistId]: { status: "loading" } }));
-    try {
-      const res = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackUri: `spotify:track:${spotifyTrackId}` }),
-      });
-      const data = (await res.json()) as { success: boolean; alreadyExists?: boolean; message?: string };
-
-      if (!res.ok || !data.success) {
-        setAddStates((s) => ({ ...s, [playlistId]: { status: "error", message: data.message ?? "Erro ao adicionar." } }));
-        return;
-      }
-
-      setAddStates((s) => ({ ...s, [playlistId]: { status: "success", alreadyExists: data.alreadyExists ?? false } }));
-      // Auto-close after success
-      setTimeout(() => setOpen(false), 1200);
-    } catch {
-      setAddStates((s) => ({ ...s, [playlistId]: { status: "error", message: "Erro de rede." } }));
-    }
-  }
-
-  return (
-    <div className="relative inline-block">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={handleOpen}
-        className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800 transition-colors"
-        title="Adicionar a playlist"
-      >
-        <MoreHorizontal size={14} />
-      </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          className={`absolute z-50 mt-1 w-60 rounded-lg border border-border bg-popover shadow-lg ${
-            menuSide === "left" ? "right-0" : "left-0"
-          }`}
-          style={{ top: "100%" }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Adicionar a playlist
-            </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X size={13} />
-            </button>
-          </div>
-
-          {/* Body */}
-          <div className="max-h-72 overflow-y-auto">
-            {loadingPlaylists && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 size={16} className="animate-spin text-muted-foreground" />
-              </div>
-            )}
-
-            {!loadingPlaylists && playlistsError && (
-              <p className="px-3 py-4 text-center text-xs text-red-500">{playlistsError}</p>
-            )}
-
-            {!loadingPlaylists && !playlistsError && playlists.length === 0 && (
-              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-                Nenhuma playlist encontrada.
-              </p>
-            )}
-
-            {!loadingPlaylists && playlists.map((pl) => {
-              const state = addStates[pl.id] ?? { status: "idle" };
-              const isLoading = state.status === "loading";
-              const isSuccess = state.status === "success";
-              const isError = state.status === "error";
-
-              return (
-                <button
-                  key={pl.id}
-                  type="button"
-                  disabled={isLoading || isSuccess}
-                  onClick={() => void handleAdd(pl.id, pl.name)}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
-                >
-                  {/* Cover */}
-                  <div
-                    className="h-9 w-9 shrink-0 rounded-md border border-border bg-muted"
-                    style={coverStyle(pl.imageUrl)}
-                  />
-
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-medium">{pl.name}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {pl.tracksTotal} faixas
-                    </div>
-                  </div>
-
-                  {/* State icon */}
-                  <div className="shrink-0">
-                    {isLoading && <Loader2 size={13} className="animate-spin text-muted-foreground" />}
-                    {isSuccess && (
-                      <Check
-                        size={13}
-                        className={state.alreadyExists ? "text-muted-foreground" : "text-green-500"}
-                      />
-                    )}
-                    {isError && <X size={13} className="text-red-500" />}
-                    {state.status === "idle" && <ChevronRight size={13} className="text-muted-foreground" />}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Error detail */}
-          {Object.values(addStates).some((s) => s.status === "error") && (
-            <div className="border-t border-border px-3 py-2">
-              {Object.entries(addStates).map(([id, s]) =>
-                s.status === "error" ? (
-                  <p key={id} className="text-[10px] text-red-500">{s.message}</p>
-                ) : null
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -573,7 +358,11 @@ export default function SpotifyChartsClient({
                       {/* Ação */}
                       <td className="px-3 py-2 text-center">
                         {track.spotify_track_id ? (
-                          <PlaylistAddButton spotifyTrackId={track.spotify_track_id} />
+                          <SpotifyPlaylistAddButton
+                            spotifyTrackId={track.spotify_track_id}
+                            compact
+                            className="h-7 w-7 rounded-md border-border bg-card px-0 text-muted-foreground hover:bg-slate-100 hover:text-foreground dark:hover:bg-slate-800"
+                          />
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}

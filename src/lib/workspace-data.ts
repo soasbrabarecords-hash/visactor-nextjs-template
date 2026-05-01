@@ -139,6 +139,15 @@ type DashboardAccountSignals = {
   suggestedPlaylistName: string | null;
 };
 
+type DashboardAccountProfileCacheEntry = {
+  value: DashboardAccountProfile | null;
+  expiresAt: number;
+};
+
+const DASHBOARD_ACCOUNT_PROFILE_TTL_MS = 5 * 60 * 1000;
+const dashboardAccountProfileCache = new Map<string, DashboardAccountProfileCacheEntry>();
+const dashboardAccountProfileInFlight = new Map<string, Promise<DashboardAccountProfile | null>>();
+
 const KNOWN_TRACK_GENRES = new Set<TrackGenre>([
   "funk",
   "trap",
@@ -198,6 +207,56 @@ function getGenreDisplayLabel(genre: TrackGenre | null) {
   }
 
   return GENRE_LABEL[genre];
+}
+
+function getCachedDashboardAccountProfile(cacheKey: string) {
+  const entry = dashboardAccountProfileCache.get(cacheKey);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    dashboardAccountProfileCache.delete(cacheKey);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedDashboardAccountProfile(
+  cacheKey: string,
+  value: DashboardAccountProfile | null,
+) {
+  dashboardAccountProfileCache.set(cacheKey, {
+    value,
+    expiresAt: Date.now() + DASHBOARD_ACCOUNT_PROFILE_TTL_MS,
+  });
+
+  return value;
+}
+
+async function mapWithConcurrency<TItem, TResult>(
+  items: TItem[],
+  concurrency: number,
+  iteratee: (item: TItem, index: number) => Promise<TResult>,
+) {
+  const results = new Array<TResult>(items.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({
+    length: Math.min(concurrency, items.length),
+  }).map(async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await iteratee(items[currentIndex], currentIndex);
+    }
+  });
+
+  await Promise.all(workers);
+
+  return results;
 }
 
 function inferTargetPlaylistName({
@@ -373,110 +432,137 @@ async function buildDashboardAccountProfile(): Promise<DashboardAccountProfile |
     return null;
   }
 
-  const playlistResponses = await Promise.allSettled(
-    result.playlists.map(async (playlist) => {
-      const { result: editableResult } = await fetchSpotifyEditablePlaylist(playlist.id);
+  const cacheKey = [
+    result.playlists[0]?.ownerId ?? "spotify-account",
+    ...result.playlists.map((playlist) => `${playlist.id}:${playlist.tracksTotal}`),
+  ].join("|");
+  const cachedProfile = getCachedDashboardAccountProfile(cacheKey);
 
-      if (!editableResult.connected || !editableResult.playlist) {
-        return null;
-      }
+  if (cachedProfile) {
+    return cachedProfile;
+  }
 
-      return editableResult.playlist;
-    }),
-  );
+  const inFlight = dashboardAccountProfileInFlight.get(cacheKey);
 
-  const trackPlaylistNamesById = new Map<string, string[]>();
-  const artistPlaylistCountByName = new Map<string, number>();
-  const genreTrackCountByType = new Map<TrackGenre, number>();
-  const playlistTargets: DashboardAccountPlaylistTarget[] = [];
+  if (inFlight) {
+    return inFlight;
+  }
 
-  for (const response of playlistResponses) {
-    if (response.status !== "fulfilled" || !response.value) {
-      continue;
-    }
+  const requestPromise = (async () => {
+    const playlistResponses = await mapWithConcurrency(
+      result.playlists,
+      2,
+      async (playlist) => {
+        const { result: editableResult } = await fetchSpotifyEditablePlaylist(playlist.id);
 
-    const playlist = response.value;
-    const playlistTrackIds = new Set<string>();
-    const playlistArtistNames = new Set<string>();
-    const playlistGenreCounts = new Map<TrackGenre, number>();
+        if (!editableResult.connected || !editableResult.playlist) {
+          return null;
+        }
 
-    for (const track of playlist.tracks) {
-      if (!track.id || playlistTrackIds.has(track.id)) {
+        return editableResult.playlist;
+      },
+    );
+
+    const trackPlaylistNamesById = new Map<string, string[]>();
+    const artistPlaylistCountByName = new Map<string, number>();
+    const genreTrackCountByType = new Map<TrackGenre, number>();
+    const playlistTargets: DashboardAccountPlaylistTarget[] = [];
+
+    for (const playlist of playlistResponses) {
+      if (!playlist) {
         continue;
       }
 
-      playlistTrackIds.add(track.id);
-      const trackPlaylists = trackPlaylistNamesById.get(track.id) ?? [];
+      const playlistTrackIds = new Set<string>();
+      const playlistArtistNames = new Set<string>();
+      const playlistGenreCounts = new Map<TrackGenre, number>();
 
-      if (!trackPlaylists.includes(playlist.name)) {
-        trackPlaylists.push(playlist.name);
+      for (const track of playlist.tracks) {
+        if (!track.id || playlistTrackIds.has(track.id)) {
+          continue;
+        }
+
+        playlistTrackIds.add(track.id);
+        const trackPlaylists = trackPlaylistNamesById.get(track.id) ?? [];
+
+        if (!trackPlaylists.includes(playlist.name)) {
+          trackPlaylists.push(playlist.name);
+        }
+
+        trackPlaylistNamesById.set(track.id, trackPlaylists);
+
+        const detectedGenre = resolveTrackGenre(null, track.artists, track.name);
+
+        if (detectedGenre !== "unknown") {
+          genreTrackCountByType.set(
+            detectedGenre,
+            (genreTrackCountByType.get(detectedGenre) ?? 0) + 1,
+          );
+          playlistGenreCounts.set(
+            detectedGenre,
+            (playlistGenreCounts.get(detectedGenre) ?? 0) + 1,
+          );
+        }
+
+        for (const artistName of extractArtistNames(track.artists)) {
+          playlistArtistNames.add(artistName);
+        }
       }
 
-      trackPlaylistNamesById.set(track.id, trackPlaylists);
-
-      const detectedGenre = resolveTrackGenre(null, track.artists, track.name);
-
-      if (detectedGenre !== "unknown") {
-        genreTrackCountByType.set(
-          detectedGenre,
-          (genreTrackCountByType.get(detectedGenre) ?? 0) + 1,
+      for (const artistName of playlistArtistNames) {
+        artistPlaylistCountByName.set(
+          artistName,
+          (artistPlaylistCountByName.get(artistName) ?? 0) + 1,
         );
-        playlistGenreCounts.set(
-          detectedGenre,
-          (playlistGenreCounts.get(detectedGenre) ?? 0) + 1,
-        );
       }
 
-      for (const artistName of extractArtistNames(track.artists)) {
-        playlistArtistNames.add(artistName);
-      }
+      const playlistGenre =
+        detectPlaylistGenre(playlist.name, playlist.description) !== "unknown"
+          ? detectPlaylistGenre(playlist.name, playlist.description)
+          : pickTopGenre(playlistGenreCounts) ?? "unknown";
+
+      playlistTargets.push({
+        id: playlist.id,
+        name: playlist.name,
+        genre: playlistGenre,
+        trackIds: playlistTrackIds,
+        artistNames: playlistArtistNames,
+        genreCounts: playlistGenreCounts,
+      });
     }
 
-    for (const artistName of playlistArtistNames) {
-      artistPlaylistCountByName.set(
-        artistName,
-        (artistPlaylistCountByName.get(artistName) ?? 0) + 1,
-      );
+    if (playlistTargets.length === 0) {
+      return setCachedDashboardAccountProfile(cacheKey, null);
     }
 
-    const playlistGenre =
-      detectPlaylistGenre(playlist.name, playlist.description) !== "unknown"
-        ? detectPlaylistGenre(playlist.name, playlist.description)
-        : pickTopGenre(playlistGenreCounts) ?? "unknown";
+    const dominantGenre = pickTopGenre(genreTrackCountByType);
 
-    playlistTargets.push({
-      id: playlist.id,
-      name: playlist.name,
-      genre: playlistGenre,
-      trackIds: playlistTrackIds,
-      artistNames: playlistArtistNames,
-      genreCounts: playlistGenreCounts,
+    return setCachedDashboardAccountProfile(cacheKey, {
+      playlistsCount: playlistTargets.length,
+      uniqueTrackCount: trackPlaylistNamesById.size,
+      repeatedTrackCount: [...trackPlaylistNamesById.values()].filter(
+        (playlistNames) => playlistNames.length >= 2,
+      ).length,
+      dominantGenre,
+      dominantGenreLabel: getGenreDisplayLabel(dominantGenre),
+      dominantArtists: [...artistPlaylistCountByName.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5)
+        .map(([artistName]) => artistName),
+      trackPlaylistNamesById,
+      artistPlaylistCountByName,
+      genreTrackCountByType,
+      playlistTargets,
     });
+  })();
+
+  dashboardAccountProfileInFlight.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    dashboardAccountProfileInFlight.delete(cacheKey);
   }
-
-  if (playlistTargets.length === 0) {
-    return null;
-  }
-
-  const dominantGenre = pickTopGenre(genreTrackCountByType);
-
-  return {
-    playlistsCount: playlistTargets.length,
-    uniqueTrackCount: trackPlaylistNamesById.size,
-    repeatedTrackCount: [...trackPlaylistNamesById.values()].filter(
-      (playlistNames) => playlistNames.length >= 2,
-    ).length,
-    dominantGenre,
-    dominantGenreLabel: getGenreDisplayLabel(dominantGenre),
-    dominantArtists: [...artistPlaylistCountByName.entries()]
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 5)
-      .map(([artistName]) => artistName),
-    trackPlaylistNamesById,
-    artistPlaylistCountByName,
-    genreTrackCountByType,
-    playlistTargets,
-  };
 }
 
 function formatCount(value: number) {

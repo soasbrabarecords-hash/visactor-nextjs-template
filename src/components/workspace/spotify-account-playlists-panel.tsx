@@ -14,23 +14,23 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  getSpotifyAccountPlaylistsClient,
+  invalidateSpotifyAccountPlaylistsClientCache,
+  type SpotifyAccountPlaylistClient,
+  type SpotifyPlaylistsClientResponse,
+} from "@/lib/spotify-account-playlists-client";
 import StatusBadge from "./status-badge";
 
-type SpotifyAccountPlaylist = {
-  id: string;
-  name: string;
+type SpotifyAccountPlaylist = SpotifyAccountPlaylistClient & {
   ownerId: string;
   ownerName: string;
-  imageUrl: string | null;
-  tracksTotal: number;
   spotifyUrl: string;
   isPublic: boolean;
   isCollaborative: boolean;
 };
 
-type SpotifyPlaylistsResponse =
-  | { connected: true; playlists: SpotifyAccountPlaylist[] }
-  | { connected: false; playlists: []; message: string };
+type SpotifyPlaylistsResponse = SpotifyPlaylistsClientResponse;
 
 function coverStyle(coverUrl: string | null): React.CSSProperties | undefined {
   if (!coverUrl) return undefined;
@@ -187,13 +187,11 @@ export default function SpotifyAccountPlaylistsPanel() {
   const [isPending, startTransition] = useTransition();
   const [showCreate, setShowCreate] = useState(false);
 
-  const loadPlaylists = useCallback(() => {
+  const loadPlaylists = useCallback((force = false) => {
     startTransition(async () => {
       setError(null);
       try {
-        const response = await fetch("/api/spotify/me/playlists", { cache: "no-store" });
-        if (!response.ok) throw new Error("Nao foi possivel carregar as playlists do Spotify.");
-        const payload = (await response.json()) as SpotifyPlaylistsResponse;
+        const payload = await getSpotifyAccountPlaylistsClient({ force });
         setData(payload);
       } catch (requestError) {
         setError(
@@ -220,7 +218,13 @@ export default function SpotifyAccountPlaylistsPanel() {
   return (
     <>
       {showCreate && (
-        <CreatePlaylistModal onClose={() => setShowCreate(false)} onCreated={loadPlaylists} />
+        <CreatePlaylistModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            invalidateSpotifyAccountPlaylistsClientCache();
+            loadPlaylists(true);
+          }}
+        />
       )}
 
       {/* ── HERO: Spotify profile style ── */}
@@ -336,7 +340,10 @@ export default function SpotifyAccountPlaylistsPanel() {
                     Nova playlist
                   </button>
                   <button
-                    onClick={loadPlaylists}
+                    onClick={() => {
+                      invalidateSpotifyAccountPlaylistsClientCache();
+                      loadPlaylists(true);
+                    }}
                     disabled={isPending}
                     style={{
                       background: "rgba(255,255,255,0.1)",
