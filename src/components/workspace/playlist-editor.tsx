@@ -855,11 +855,24 @@ export default function PlaylistEditor({
             )}
           </tbody>
         </table>
-        {/* Handles de redimensionamento entre colunas (overlay) */}
+        {/*
+          Handles de redimensionamento + auto-fit + sticky columns
+          ────────────────────────────────────────────────────────
+          - autoFit: distribui o espaço disponível proporcionalmente (estilo Spotify)
+          - columnWeights: Música ganha 3x mais espaço, Álbum 2x; restantes 1x
+          - stickyLeft: # (idx 1) fica fixa à esquerda quando rola horizontal
+          - stickyRight: Ações (idx 8) fica fixa à direita
+          - Grip (idx 0) tem peso baixo pra ficar pequena
+        */}
         <ResizableTableOverlay
           tableRef={tableRef}
           storageKey="playlist-editor-cols"
           fixedColumns={[0, 8]}
+          autoFit
+          columnWeights={{ 0: 0.3, 1: 0.4, 2: 3, 3: 2, 4: 0.6, 5: 0.6, 6: 1, 7: 1, 8: 0.6 }}
+          minWidths={{ 0: 32, 1: 40, 2: 220, 3: 140, 4: 80, 5: 70, 6: 110, 7: 100, 8: 88 }}
+          stickyLeft={[1]}
+          stickyRight={[8]}
         />
       </div>
     </div>

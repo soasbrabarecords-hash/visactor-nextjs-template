@@ -32,11 +32,44 @@ type Props = {
   storageKey?: string;
   /** Índices de colunas que NÃO podem ser redimensionadas (ex: grip, ações). */
   fixedColumns?: number[];
+  /**
+   * Auto-fit: quando true, calcula widths proporcionalmente ao espaço total
+   * disponível (estilo Spotify). User pode arrastar pra customizar e o auto-fit
+   * respeita os widths customizados.
+   */
+  autoFit?: boolean;
+  /**
+   * Pesos de cada coluna no auto-fit. Ex: { 2: 3, 3: 2 } = coluna idx 2 ganha
+   * 3x mais espaço que default. Default: 1 para todas, exceto coluna "Música"
+   * que recebe peso maior automaticamente se nenhum peso for passado.
+   */
+  columnWeights?: Record<number, number>;
+  /**
+   * Larguras mínimas por coluna. Default: 60px.
+   */
+  minWidths?: Record<number, number>;
+  /**
+   * Índices de colunas para fixar com position: sticky no início (esquerda).
+   */
+  stickyLeft?: number[];
+  /**
+   * Índices de colunas para fixar com position: sticky no final (direita).
+   */
+  stickyRight?: number[];
 };
 
 type Sizes = Record<number, number>;
 
-export default function ResizableTableOverlay({ tableRef, storageKey, fixedColumns = [] }: Props) {
+export default function ResizableTableOverlay({
+  tableRef,
+  storageKey,
+  fixedColumns = [],
+  autoFit = false,
+  columnWeights = {},
+  minWidths = {},
+  stickyLeft = [],
+  stickyRight = [],
+}: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [handles, setHandles] = useState<Array<{ index: number; left: number; height: number }>>([]);
   const [sizes, setSizes] = useState<Sizes>(() => {
@@ -73,7 +106,44 @@ export default function ResizableTableOverlay({ tableRef, storageKey, fixedColum
       colgroup.removeChild(colgroup.lastChild!);
     }
 
-    // Aplicar widths salvos
+    // ── Auto-fit: distribuir espaço disponível entre colunas visíveis ─────
+    // - Customizadas (no objeto sizes) recebem o width fixo
+    // - Restantes dividem o espaço sobrando proporcionalmente aos pesos
+    let computedWidths: Record<number, number> = {};
+    if (autoFit) {
+      const tableContainer = table.parentElement;
+      const totalWidth = (tableContainer?.clientWidth ?? table.clientWidth) || 0;
+      if (totalWidth > 0) {
+        const visibleIdx: number[] = [];
+        Array.from(headRow.cells).forEach((th, i) => {
+          if ((th as HTMLElement).offsetParent !== null) visibleIdx.push(i);
+        });
+
+        // Subtrai larguras já fixas (customizadas pelo user)
+        let fixedTotal = 0;
+        const flexible: number[] = [];
+        for (const i of visibleIdx) {
+          if (sizes[i] && sizes[i]! > 0) {
+            fixedTotal += sizes[i]!;
+            computedWidths[i] = sizes[i]!;
+          } else {
+            flexible.push(i);
+          }
+        }
+
+        const remaining = Math.max(0, totalWidth - fixedTotal);
+        const weightOf = (i: number) => columnWeights[i] ?? 1;
+        const totalWeight = flexible.reduce((a, i) => a + weightOf(i), 0) || 1;
+
+        for (const i of flexible) {
+          const minW = minWidths[i] ?? 60;
+          const proportional = (remaining * weightOf(i)) / totalWeight;
+          computedWidths[i] = Math.max(minW, Math.round(proportional));
+        }
+      }
+    }
+
+    // Aplicar widths
     Array.from(headRow.cells).forEach((th, i) => {
       const col = colgroup!.children[i] as HTMLTableColElement;
       const isVisible = (th as HTMLElement).offsetParent !== null;
@@ -81,7 +151,7 @@ export default function ResizableTableOverlay({ tableRef, storageKey, fixedColum
         col.style.width = "";
         return;
       }
-      const w = sizes[i];
+      const w = autoFit ? computedWidths[i] : sizes[i];
       if (w && w > 0) {
         col.style.width = `${w}px`;
       } else {
@@ -89,11 +159,73 @@ export default function ResizableTableOverlay({ tableRef, storageKey, fixedColum
       }
     });
 
-    // Forçar table-layout: fixed (necessário para widths fixos funcionarem)
-    if (Object.keys(sizes).length > 0) {
+    // table-layout: fixed quando temos widths controlados
+    if (autoFit || Object.keys(sizes).length > 0) {
       table.style.tableLayout = "fixed";
     }
-  }, [sizes, tableRef]);
+
+    // ── Sticky columns: aplica position: sticky em <th> e <td> das colunas ─
+    const stickyLeftSet = new Set(stickyLeft);
+    const stickyRightSet = new Set(stickyRight);
+    if (stickyLeftSet.size > 0 || stickyRightSet.size > 0) {
+      // Calcular offsets cumulativos para colunas à esquerda
+      const leftOffsets: Record<number, number> = {};
+      let acc = 0;
+      const visibleIdx: number[] = [];
+      Array.from(headRow.cells).forEach((th, i) => {
+        if ((th as HTMLElement).offsetParent !== null) visibleIdx.push(i);
+      });
+      for (const i of visibleIdx) {
+        if (stickyLeftSet.has(i)) {
+          leftOffsets[i] = acc;
+          const th = headRow.cells[i] as HTMLElement;
+          acc += th.getBoundingClientRect().width;
+        }
+      }
+      // Para sticky right, calcular do fim para o início
+      const rightOffsets: Record<number, number> = {};
+      acc = 0;
+      for (let k = visibleIdx.length - 1; k >= 0; k--) {
+        const i = visibleIdx[k];
+        if (stickyRightSet.has(i)) {
+          rightOffsets[i] = acc;
+          const th = headRow.cells[i] as HTMLElement;
+          acc += th.getBoundingClientRect().width;
+        }
+      }
+
+      // Aplica em todas as <tr> (thead + tbody)
+      const allRows = [
+        ...Array.from(table.tHead?.rows ?? []),
+        ...Array.from(table.tBodies[0]?.rows ?? []),
+      ];
+      for (const row of allRows) {
+        Array.from(row.cells).forEach((cell, i) => {
+          const el = cell as HTMLElement;
+          if (stickyLeftSet.has(i)) {
+            el.style.position = "sticky";
+            el.style.left = `${leftOffsets[i] ?? 0}px`;
+            el.style.zIndex = row.parentElement?.tagName === "THEAD" ? "30" : "10";
+            // Background para sobrepor conteúdo que rola atrás
+            if (!el.style.background && !el.style.backgroundColor) {
+              el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
+                ? "hsl(var(--card))"
+                : "hsl(var(--card))";
+            }
+          } else if (stickyRightSet.has(i)) {
+            el.style.position = "sticky";
+            el.style.right = `${rightOffsets[i] ?? 0}px`;
+            el.style.zIndex = row.parentElement?.tagName === "THEAD" ? "30" : "10";
+            if (!el.style.background && !el.style.backgroundColor) {
+              el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
+                ? "hsl(var(--card))"
+                : "hsl(var(--card))";
+            }
+          }
+        });
+      }
+    }
+  }, [sizes, tableRef, autoFit, columnWeights, minWidths, stickyLeft, stickyRight]);
 
   // Recalcula posições dos handles
   const recomputeHandles = useCallback(() => {
@@ -148,19 +280,23 @@ export default function ResizableTableOverlay({ tableRef, storageKey, fixedColum
     }
   }, [sizes, storageKey]);
 
-  // Observa mudanças no tamanho da tabela / window
+  // Observa mudanças no tamanho da tabela / container / window
   useEffect(() => {
     const table = tableRef.current;
     if (!table) return;
-    const ro = new ResizeObserver(() => recomputeHandles());
+    const handleResize = () => {
+      applySizes();
+      recomputeHandles();
+    };
+    const ro = new ResizeObserver(handleResize);
     ro.observe(table);
-    const onWin = () => recomputeHandles();
-    window.addEventListener("resize", onWin);
+    if (table.parentElement) ro.observe(table.parentElement);
+    window.addEventListener("resize", handleResize);
     return () => {
       ro.disconnect();
-      window.removeEventListener("resize", onWin);
+      window.removeEventListener("resize", handleResize);
     };
-  }, [tableRef, recomputeHandles]);
+  }, [tableRef, recomputeHandles, applySizes]);
 
   // Drag handlers
   function onPointerDown(e: React.PointerEvent, index: number) {

@@ -6,6 +6,7 @@ import PageIntro from "@/components/page-intro";
 import PlaylistEditor from "@/components/workspace/playlist-editor";
 import PlaylistHeader from "@/components/workspace/playlist-header";
 import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
+import PlaylistTrackSearch from "@/components/workspace/playlist-track-search";
 import {
   fetchSpotifyEditablePlaylist,
   fetchPlaylistSnapshotId,
@@ -74,6 +75,12 @@ export default async function SpotifyPlaylistEditorPage({
           playlistId={playlistId}
           initialTracks={playlist.tracks}
           initialSnapshotId={snapshotId}
+        />
+
+        {/* Search de tracks + sugestões (estilo Spotify, abaixo da tabela) */}
+        <PlaylistTrackSearch
+          playlistId={playlistId}
+          existingTrackIds={playlist.tracks.map((t) => t.id)}
         />
       </Container>
 
