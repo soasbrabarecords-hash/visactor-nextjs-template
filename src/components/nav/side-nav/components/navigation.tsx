@@ -40,6 +40,10 @@ export default function Navigation() {
       return pathname === "/spotify-charts" || pathname.startsWith("/spotify-charts/");
     }
 
+    if (href === "/tiktok-charts") {
+      return pathname === "/tiktok-charts" || pathname.startsWith("/tiktok-charts/");
+    }
+
     return pathname === href;
   }
 

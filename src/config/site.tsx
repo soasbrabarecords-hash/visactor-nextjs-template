@@ -5,6 +5,7 @@ import {
   Radio,
   Library,
   BarChart2,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,11 @@ export const navigations: Navigation[] = [
     icon: BarChart2,
     name: "Spotify Charts",
     href: "/spotify-charts",
+  },
+  {
+    icon: Flame,
+    name: "TikTok Charts",
+    href: "/tiktok-charts",
   },
   {
     icon: Library,
