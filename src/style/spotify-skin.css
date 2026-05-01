@@ -536,3 +536,127 @@
     display: none !important;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+ * v4 — AJUSTES FINAIS:
+ *  - Action bar (Play) + barra de save/cancel na MESMA linha, ancorados no
+ *    rodapé interno do header (igual Spotify)
+ *  - Tabela 100% transparente herdando o fundo da página
+ *  - Sem espaço vazio antes da coluna #
+ *  - Coluna Ações com mesmo bg que o resto
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Action bar: ancorada DENTRO do header, no canto inferior esquerdo ──── */
+.spotify-skin [data-spotify-actionbar] {
+  position: absolute !important;
+  bottom: -28px !important;
+  left: 24px !important;
+  z-index: 25 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* O Container que envolvia a action bar agora não precisa de espaço próprio */
+.spotify-skin .py-2:has([data-spotify-actionbar]) {
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  position: relative !important;
+}
+
+/* ── Barra de controles do PlaylistEditor (selecionadas / save / cancel) ── */
+/* Move pra junto do Play (absolute também), na mesma linha à direita ───── */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+  position: relative !important;
+  margin-top: 0 !important;
+  padding-left: 96px !important;  /* deixa espaço pro Play que está absoluto */
+  min-height: 56px !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+}
+
+/* O contador "98 faixas" some — visual mais Spotify */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between > div:last-child > span.text-xs.text-muted-foreground {
+  display: none !important;
+}
+
+/* Botões Save/Cancel: estilo Spotify pill */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button {
+  border-radius: 9999px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  height: auto !important;
+}
+
+/* "Ordem alterada — não salvo" texto amarelo discreto */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between span.text-yellow-500 {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* "X selecionadas" texto */
+.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between span.text-primary {
+  color: var(--sp-text-muted) !important;
+  font-size: 13px !important;
+}
+
+/* ── Tabela: 100% transparente ──────────────────────────────────────────── */
+.spotify-skin [data-spotify-table-wrapper],
+.spotify-skin [data-spotify-table-wrapper] table,
+.spotify-skin [data-spotify-table-wrapper] table thead,
+.spotify-skin [data-spotify-table-wrapper] table thead th,
+.spotify-skin [data-spotify-table-wrapper] table tbody,
+.spotify-skin [data-spotify-table-wrapper] table tbody td {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Sticky cells: também transparentes (herdam o fundo da página) */
+.spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"],
+.spotify-skin [data-spotify-table-wrapper] table tbody td[style*="position: sticky"] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* No hover da linha, o sticky precisa pintar pra não vazar conteúdo de baixo
+   quando rola — usa hover branco translúcido (mesma cor do hover normal) */
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
+  background-color: #1a1a1a !important;  /* sticky cells precisam de bg sólido em hover */
+}
+
+/* Header sticky: mesmo bg da página pra não revelar conteúdo do tbody atrás */
+.spotify-skin [data-spotify-table-wrapper] table thead {
+  background: var(--sp-bg) !important;
+}
+.spotify-skin [data-spotify-table-wrapper] table thead th[style*="position: sticky"] {
+  background: var(--sp-bg) !important;
+}
+
+/* ── Reduzir gap header → action bar → tabela ──────────────────────────── */
+.spotify-skin [data-spotify-header] {
+  margin-bottom: 32px !important;  /* deixa room pra action bar absoluta */
+}
+
+.spotify-skin .py-6 {
+  padding-top: 16px !important;
+}
+
+/* ── Mobile: action bar volta a ser inline (não absoluta) ───────────────── */
+@media (max-width: 749px) {
+  .spotify-skin [data-spotify-actionbar] {
+    position: static !important;
+    margin-left: 16px !important;
+    margin-bottom: 8px !important;
+  }
+  .spotify-skin [data-spotify-header] {
+    margin-bottom: 8px !important;
+  }
+  .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+    padding-left: 0 !important;
+    min-height: auto !important;
+  }
+}
