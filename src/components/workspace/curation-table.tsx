@@ -31,12 +31,18 @@ type SpotifyAccountPlaylist = SpotifyAccountPlaylistClient;
 
 type SpotifyPlaylistsResponse = SpotifyPlaylistsClientResponse;
 
+type PlaylistOption = {
+  playlist: SpotifyAccountPlaylist;
+  score: number;
+};
+
 type PlaylistSuggestion = {
   playlist: SpotifyAccountPlaylist | null;
   label: string;
   reason: string;
   style: string;
   hasFit: boolean;
+  options: PlaylistOption[];
 };
 
 // Genre type imported from genre-detection.ts
@@ -83,15 +89,6 @@ function formatCount(value: number | null) {
   }
 
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
-}
-
-function formatDateLabel(value: string | null) {
-  if (!value) {
-    return "—";
-  }
-
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
 }
 
 function normalizeText(value: string) {
@@ -162,13 +159,25 @@ function buildPlaylistSuggestion(
       style,
       hasFit: false,
       reason: "Genero nao identificado.",
+      options: [...playlists]
+        .map((playlist) => ({ playlist, score: 0 }))
+        .sort((left, right) => right.playlist.tracksTotal - left.playlist.tracksTotal),
     };
   }
 
-  const sortedPlaylists = [...playlists].sort(
-    (left, right) => playlistScore(right, style) - playlistScore(left, style),
-  );
-  const match = sortedPlaylists.find((playlist) => playlistScore(playlist, style) > 0) ?? null;
+  const options = playlists
+    .map((playlist) => ({
+      playlist,
+      score: playlistScore(playlist, style),
+    }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return right.playlist.tracksTotal - left.playlist.tracksTotal;
+    });
+  const match = options.find((option) => option.score > 0)?.playlist ?? null;
 
   if (match) {
     return {
@@ -177,6 +186,7 @@ function buildPlaylistSuggestion(
       style,
       hasFit: true,
       reason: `${styleLabel[style]} detectado e match com playlist da conta.`,
+      options,
     };
   }
 
@@ -186,6 +196,7 @@ function buildPlaylistSuggestion(
     style,
     hasFit: false,
     reason: `${styleLabel[style]} detectado, mas sem playlist propria do mesmo genero.`,
+    options,
   };
 }
 
@@ -245,17 +256,18 @@ function MovementBadge({ row }: { row: DecisionTrack }) {
 
 export default function CurationTable({
   rows,
-  snapshotDate,
   previousDate,
 }: {
   rows: DecisionTrack[];
-  snapshotDate: string | null;
   previousDate: string | null;
 }) {
   const [artistGenres, setArtistGenres] = useState<ArtistGenresResponse>({});
   const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
   const [addedTrackIdsByPlaylist, setAddedTrackIdsByPlaylist] = useState<
     Record<string, string[]>
+  >({});
+  const [selectedPlaylistByTrackId, setSelectedPlaylistByTrackId] = useState<
+    Record<string, string>
   >({});
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -363,18 +375,18 @@ export default function CurationTable({
 
   async function handleAddToSuggestedPlaylist(
     row: DecisionTrack,
-    suggestion: PlaylistSuggestion,
+    playlist: SpotifyAccountPlaylist | null,
   ) {
-    if (!suggestion.playlist || addingKey) {
+    if (!playlist || addingKey) {
       return;
     }
 
-    const key = `${suggestion.playlist.id}:${row.trackId}`;
+    const key = `${playlist.id}:${row.trackId}`;
     setAddingKey(key);
 
     try {
       const response = await fetch(
-        `/api/spotify/playlists/${suggestion.playlist.id}/tracks`,
+        `/api/spotify/playlists/${playlist.id}/tracks`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -392,11 +404,11 @@ export default function CurationTable({
       }
 
       setAddedTrackIdsByPlaylist((current) => {
-        const currentIds = current[suggestion.playlist!.id] ?? [];
+        const currentIds = current[playlist.id] ?? [];
 
         return {
           ...current,
-          [suggestion.playlist!.id]: Array.from(new Set([...currentIds, row.trackId])),
+          [playlist.id]: Array.from(new Set([...currentIds, row.trackId])),
         };
       });
     } finally {
@@ -542,7 +554,7 @@ export default function CurationTable({
                 Spotify Charts BR
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                {snapshotDate ? formatDateLabel(snapshotDate) : "Sem data"}
+                Snapshot diario
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                 Add direto na playlist
@@ -586,13 +598,21 @@ export default function CurationTable({
               sortedRows.map((row, index) => {
                 const rowArtistGenres = row.artistIds.flatMap((id) => artistGenres[id] ?? []);
                 const suggestion = buildPlaylistSuggestion(row, playlists, rowArtistGenres);
-                const movementBadge = getMovementBadge(row);
-                const isAddedToSuggestedPlaylist = suggestion.playlist
-                  ? (addedTrackIdsByPlaylist[suggestion.playlist.id] ?? []).includes(row.trackId)
+                const selectedPlaylistId =
+                  selectedPlaylistByTrackId[row.trackId] ?? suggestion.playlist?.id ?? "";
+                const selectedPlaylist =
+                  suggestion.options.find((option) => option.playlist.id === selectedPlaylistId)
+                    ?.playlist ??
+                  suggestion.playlist;
+                const selectedOption =
+                  suggestion.options.find((option) => option.playlist.id === selectedPlaylist?.id) ??
+                  null;
+                const isAddedToSelectedPlaylist = selectedPlaylist
+                  ? (addedTrackIdsByPlaylist[selectedPlaylist.id] ?? []).includes(row.trackId)
                   : false;
                 const isAlreadyOnBase = row.alreadyInPlaylists;
-                const addKey = suggestion.playlist
-                  ? `${suggestion.playlist.id}:${row.trackId}`
+                const addKey = selectedPlaylist
+                  ? `${selectedPlaylist.id}:${row.trackId}`
                   : null;
 
                 return (
@@ -620,9 +640,6 @@ export default function CurationTable({
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle whitespace-nowrap">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-white/40">
-                        {snapshotDate ? formatDateLabel(snapshotDate) : "Hoje"}
-                      </div>
                       <div className="text-sm font-semibold tabular-nums">
                         {formatCount(row.dailyStreams)}
                       </div>
@@ -639,31 +656,56 @@ export default function CurationTable({
                         )}
                       >
                         {row.streamGrowthPercent === null
-                          ? previousDate
-                            ? `Sem hist. vs ${formatDateLabel(previousDate)}`
-                            : "Sem historico"
-                          : `${row.streamGrowthPercent >= 0 ? "+" : ""}${row.streamGrowthPercent.toFixed(1)}% vs ${previousDate ? formatDateLabel(previousDate) : "anterior"}`}
+                          ? "Sem historico"
+                          : `${row.streamGrowthPercent >= 0 ? "+" : ""}${row.streamGrowthPercent.toFixed(1)}%`}
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-2 min-w-0">
-                        {suggestion.playlist?.imageUrl ? (
+                        {selectedPlaylist?.imageUrl ? (
                           <div
                             className="h-8 w-8 shrink-0 rounded-md border border-border bg-muted"
-                            style={coverStyle(suggestion.playlist.imageUrl)}
+                            style={coverStyle(selectedPlaylist.imageUrl)}
                           />
                         ) : (
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
                             <Music2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <div className="truncate text-xs font-semibold leading-tight">
-                            {suggestion.label}
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <select
+                            value={selectedPlaylistId}
+                            onChange={(event) =>
+                              setSelectedPlaylistByTrackId((current) => ({
+                                ...current,
+                                [row.trackId]: event.target.value,
+                              }))
+                            }
+                            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-semibold text-white outline-none transition focus:border-white/20"
+                          >
+                            {suggestion.options.map((option, optionIndex) => (
+                              <option
+                                key={option.playlist.id}
+                                value={option.playlist.id}
+                                className="bg-slate-950 text-white"
+                              >
+                                {optionIndex === 0 && option.score > 0 ? "Sugerida · " : ""}
+                                {option.playlist.name}
+                              </option>
+                            ))}
+                            {!suggestion.playlist ? (
+                              <option value="" className="bg-slate-950 text-white">
+                                Observar
+                              </option>
+                            ) : null}
+                          </select>
                           <div className="text-xs text-muted-foreground">
-                            {suggestion.playlist
-                              ? `${formatCount(suggestion.playlist.tracksTotal)} tracks`
+                            {selectedPlaylist
+                              ? `${formatCount(selectedPlaylist.tracksTotal)} tracks${
+                                  selectedOption && selectedOption.score > 0
+                                    ? " · melhor fit"
+                                    : ""
+                                }`
                               : suggestion.reason}
                           </div>
                         </div>
@@ -715,18 +757,18 @@ export default function CurationTable({
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        {isAddedToSuggestedPlaylist ? (
+                        {isAddedToSelectedPlaylist ? (
                           <StatusBadge tone="green">Adicionada</StatusBadge>
                         ) : isAlreadyOnBase ? (
                           <StatusBadge tone="blue">Na base</StatusBadge>
-                        ) : !suggestion.hasFit ? (
+                        ) : !selectedPlaylist ? (
                           <span className="text-sm text-muted-foreground">—</span>
                         ) : (
                           <Button
                             size="sm"
                             className="rounded-full bg-emerald-500 px-3 text-black hover:bg-emerald-400"
-                            disabled={!suggestion.playlist || addingKey === addKey}
-                            onClick={() => void handleAddToSuggestedPlaylist(row, suggestion)}
+                            disabled={!selectedPlaylist || addingKey === addKey}
+                            onClick={() => void handleAddToSuggestedPlaylist(row, selectedPlaylist)}
                           >
                             {addingKey === addKey ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />

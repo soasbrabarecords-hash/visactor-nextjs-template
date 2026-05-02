@@ -16,7 +16,6 @@ export default async function CuradoriaPage() {
 
       <CurationTable
         rows={data.rows}
-        snapshotDate={data.snapshotDate}
         previousDate={data.previousDate}
       />
     </div>
