@@ -66,6 +66,22 @@ function getRankLabel(rank: number) {
   return "Top 100";
 }
 
+function getMovementTone(movementLabel: string) {
+  if (movementLabel === "NEW") {
+    return "blue";
+  }
+
+  if (movementLabel.startsWith("+")) {
+    return "green";
+  }
+
+  if (movementLabel.startsWith("-")) {
+    return "red";
+  }
+
+  return "slate";
+}
+
 export default function TikTokChartsTable({
   chart,
 }: {
@@ -221,8 +237,10 @@ export default function TikTokChartsTable({
                   <td className="px-5 py-3 align-top">
                     <div className="text-lg font-semibold">#{track.rank}</div>
                   </td>
-                  <td className="px-5 py-3 align-top text-sm text-muted-foreground">
-                    {track.movementLabel}
+                  <td className="px-5 py-3 align-top">
+                    <StatusBadge tone={getMovementTone(track.movementLabel)}>
+                      {track.movementLabel}
+                    </StatusBadge>
                   </td>
                   <td className="px-5 py-3 align-top">
                     <div className="flex items-center gap-3">
