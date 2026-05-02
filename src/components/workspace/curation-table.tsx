@@ -208,7 +208,7 @@ function getMovementBadge(row: DecisionTrack) {
     return { label: `${row.position_change}`, className: "text-rose-300" };
   }
 
-  return { label: "—", className: "text-white/45" };
+  return { label: "=", className: "text-white/45" };
 }
 
 export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
@@ -523,6 +523,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
             <table className="w-full divide-y divide-white/10 text-left table-fixed">
           <colgroup>
             <col className="w-[60px]" />
+            <col className="w-[72px]" />
             <col className="w-[34%]" />
             <col className="w-[110px]" />
             <col className="w-[24%]" />
@@ -532,8 +533,9 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
           <thead className="bg-white/[0.03]">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="px-3 py-3">Rank</th>
+              <th className="px-3 py-3">Mov.</th>
               <th className="px-3 py-3">Musica</th>
-              <th className="px-3 py-3">Streams 24h</th>
+              <th className="px-3 py-3">Streams</th>
               <th className="px-3 py-3">Playlist sugerida</th>
               <th className="px-3 py-3">Gênero</th>
               <th className="px-3 py-3">Acao</th>
@@ -543,7 +545,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
             {sortedRows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma recomendacao disponivel agora.
@@ -565,13 +567,24 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                 return (
                   <tr key={row.trackId} className="hover:bg-white/[0.03]">
                     <td className="px-3 py-3 align-middle">
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-white tabular-nums whitespace-nowrap">
-                          #{row.streamRank ?? index + 1}
-                        </div>
-                        <div className={cn("text-xs font-medium tabular-nums", movementBadge.className)}>
-                          {movementBadge.label}
-                        </div>
+                      <div className="text-lg font-bold text-white tabular-nums whitespace-nowrap">
+                        #{row.streamRank ?? index + 1}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 align-middle">
+                      <div
+                        className={cn(
+                          "inline-flex min-w-[44px] items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums",
+                          row.movement_type === "new"
+                            ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                            : row.position_change && row.position_change > 0
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                              : row.position_change && row.position_change < 0
+                                ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                                : "border-white/10 bg-white/5 text-white/45",
+                        )}
+                      >
+                        {movementBadge.label}
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle">
@@ -595,7 +608,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                       <div className="text-sm font-semibold tabular-nums">
                         {formatCount(row.dailyStreams)}
                       </div>
-                      <div className="text-xs text-muted-foreground">Kworb BR</div>
+                      <div className="text-xs text-muted-foreground">Snapshot do dia</div>
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-2 min-w-0">
