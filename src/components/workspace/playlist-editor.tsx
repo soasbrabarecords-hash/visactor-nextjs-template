@@ -667,7 +667,7 @@ export default function PlaylistEditor({
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-2 py-3 sm:px-4">#</th>
+              <th className="w-[72px] px-2 py-3 text-right sm:px-4">#</th>
               <th className="px-3 py-3 sm:px-4">Música</th>
               <th className="hidden px-4 py-3 tablet:table-cell">Álbum</th>
               <th className="px-3 py-3 sm:px-4">Pop.</th>
@@ -723,10 +723,19 @@ export default function PlaylistEditor({
                   ].filter(Boolean).join(" ")}
                 >
                   {/* # */}
-                  <td className="h-16 overflow-hidden px-2 py-0 align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
+                  <td className="h-16 w-[72px] overflow-hidden px-2 py-0 align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
                     {isDeleting
                       ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <span className={isSelected ? "text-primary font-semibold" : ""}>{String(index + 1).padStart(3, "0")}</span>
+                      : (
+                        <span
+                          className={[
+                            "inline-block w-[3ch] text-right",
+                            isSelected ? "font-semibold text-primary" : "",
+                          ].join(" ")}
+                        >
+                          {index + 1}
+                        </span>
+                      )
                     }
                   </td>
 
@@ -734,7 +743,7 @@ export default function PlaylistEditor({
                   <td className="h-16 min-w-0 overflow-hidden px-3 py-0 align-middle sm:px-4">
                     <div className="flex min-w-0 items-center gap-3 overflow-hidden">
                       <div
-                        className={["h-11 w-11 shrink-0 rounded-md border bg-muted sm:rounded-xl",
+                        className={["flex h-11 w-11 shrink-0 items-center justify-center rounded-md border bg-muted sm:rounded-xl",
                           isSelected ? "border-primary/40" : "border-border"].join(" ")}
                         style={coverStyle(track.imageUrl)}
                       />
@@ -878,8 +887,8 @@ export default function PlaylistEditor({
           storageKey="playlist-editor-cols-v2"
           fixedColumns={[0, 7, 8]}
           autoFit
-          columnWeights={{ 0: 0.4, 1: 3, 2: 2, 3: 0.6, 4: 0.6, 5: 1, 6: 1, 7: 0.6, 8: 0.3 }}
-          minWidths={{ 0: 40, 1: 220, 2: 140, 3: 80, 4: 70, 5: 110, 6: 100, 7: 88, 8: 32 }}
+          columnWeights={{ 0: 0.65, 1: 3, 2: 2, 3: 0.6, 4: 0.6, 5: 1, 6: 1, 7: 0.6, 8: 0.3 }}
+          minWidths={{ 0: 64, 1: 220, 2: 140, 3: 80, 4: 70, 5: 110, 6: 100, 7: 88, 8: 32 }}
           stickyLeft={[0]}
           stickyRight={[7, 8]}
         />

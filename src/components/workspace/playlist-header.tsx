@@ -137,7 +137,7 @@ export default function PlaylistHeader({
   }
 
   return (
-    <div data-spotify-header className="relative overflow-hidden" style={{ minHeight: "320px" }}>
+    <div data-spotify-header className="relative overflow-hidden" style={{ minHeight: "292px" }}>
       {/* Background: blurred cover + dark gradient overlay */}
       {coverUrl && (
         <div
@@ -160,8 +160,8 @@ export default function PlaylistHeader({
       />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col justify-end px-4 pb-6 pt-8 sm:px-8 sm:pb-8 sm:pt-12 laptop:px-12">
-        <div className="flex flex-col gap-4 sm:gap-6 laptop:flex-row laptop:items-end">
+      <div className="relative z-10 flex flex-col justify-end px-4 pb-5 pt-7 sm:px-8 sm:pb-7 sm:pt-10 laptop:px-12">
+        <div className="flex flex-col gap-4 sm:gap-5 laptop:flex-row laptop:items-end">
 
           {/* Cover art — clicável para editar */}
           <div className="shrink-0 self-center laptop:self-end">
@@ -170,7 +170,7 @@ export default function PlaylistHeader({
               onClick={handleCoverClick}
               disabled={uploadingCover}
               title="Clique para alterar a capa"
-              className="group relative block h-44 w-44 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-56 sm:w-56 laptop:h-64 laptop:w-64"
+              className="group relative block h-40 w-40 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-52 sm:w-52 laptop:h-56 laptop:w-56"
               style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }}
             >
               {coverUrl ? (
@@ -232,7 +232,7 @@ export default function PlaylistHeader({
             {/* Title — editável inline */}
             <div
               className="font-bold leading-none tracking-tight"
-              style={{ fontSize: "clamp(1.6rem, 5vw, 3.5rem)" }}
+              style={{ fontSize: "clamp(1.5rem, 4.4vw, 3rem)" }}
             >
               <EditableField
                 value={name}
@@ -242,7 +242,7 @@ export default function PlaylistHeader({
             </div>
 
             {/* Description — editável inline */}
-            <div className="max-w-2xl text-sm leading-relaxed opacity-80">
+            <div className="max-w-2xl text-[13px] leading-relaxed opacity-80 sm:text-sm">
               <EditableField
                 value={description}
                 onSave={handleSaveDescription}
@@ -259,7 +259,7 @@ export default function PlaylistHeader({
           </div>
 
           {/* Actions */}
-          <div className="flex shrink-0 flex-wrap justify-center gap-2 laptop:justify-end">
+            <div className="flex shrink-0 flex-wrap justify-center gap-2 self-start laptop:justify-end">
             <Button asChild variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
               <Link href={backHref}>Voltar</Link>
             </Button>
