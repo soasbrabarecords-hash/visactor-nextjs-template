@@ -34,9 +34,9 @@ export default function RadarMusicGenreRail({
   items: RadarMusicGenreSpotlight[];
 }) {
   return (
-    <section className="rounded-3xl border border-border bg-card/50 p-5">
+    <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_18px_48px_-34px_rgba(8,15,28,0.9)]">
       <div className="mb-4">
-        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="text-xs uppercase tracking-[0.18em] text-white/45">
           Generos em destaque
         </div>
       </div>

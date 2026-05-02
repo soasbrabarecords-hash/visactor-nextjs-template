@@ -45,7 +45,7 @@ export default function RadarMusicTikTokStrip({
   }
 
   return (
-    <Container className="border-b border-border py-6">
+    <Container className="border-b border-border/70 py-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -57,18 +57,18 @@ export default function RadarMusicTikTokStrip({
               <StatusBadge tone="slate">{snapshotDate}</StatusBadge>
             ) : null}
           </div>
-          <h2 className="mt-2 text-2xl font-semibold">Cruza com o TikTok agora</h2>
+          <h2 className="mt-2 text-xl font-semibold text-white">TikTok puxando no radar</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Faixas que ja aparecem no teu radar e tambem estao no viral publico do TikTok.
           </p>
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-4">
+      <div className="grid gap-3 laptop:grid-cols-2 xl:grid-cols-4">
         {tracks.slice(0, 4).map((track) => (
           <article
             key={`tiktok-${track.trackId}`}
-            className="relative overflow-hidden rounded-[24px] border border-sky-500/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.12),rgba(10,14,18,0.96))] p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)]"
+            className="relative overflow-hidden rounded-[22px] border border-sky-500/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.12),rgba(10,14,18,0.96))] p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)]"
           >
             <div
               className="absolute inset-0 opacity-[0.14]"

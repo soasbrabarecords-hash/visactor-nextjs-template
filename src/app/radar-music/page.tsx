@@ -1,6 +1,5 @@
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
-import RadarMusicEditorialHero from "@/components/workspace/radar-music-editorial-hero";
 import RadarMusicActionBoard from "@/components/workspace/radar-music-action-board";
 import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
@@ -36,34 +35,19 @@ export default async function RadarMusicPage({
   });
 
   return (
-    <div>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
       <TopNav title="Radar Music" />
 
       <RadarMusicActionBoard queues={data.decisionQueues} />
-
-      <RadarMusicEditorialHero
-        hero={data.editorialHero}
-        leadRow={
-          data.decisionQueues.primaryTrack
-            ? data.rows.find(
-                (row) => row.trackId === data.decisionQueues.primaryTrack?.trackId,
-              ) ?? data.rows[0] ?? null
-            : data.rows[0] ?? null
-        }
-      />
 
       <RadarMusicTikTokStrip
         snapshotDate={data.tiktokMatches.snapshotDate}
         tracks={data.tiktokMatches.tracks}
       />
 
-      <RadarMusicTable rows={data.rows} decisionTracks={data.decisionRows} />
-
-      <RadarMusicHighlightGrid highlights={data.summaryCards} />
-
-      <Container className="border-b border-border py-6">
-        <div className="grid gap-4 laptop:grid-cols-[1fr_0.9fr]">
-          <article className="rounded-3xl border border-border bg-card/50 p-5">
+      <Container className="border-b border-border/70 py-5">
+        <div className="grid gap-4 laptop:grid-cols-[1fr_0.95fr]">
+          <article className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5 shadow-[0_18px_48px_-34px_rgba(8,15,28,0.9)]">
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone="blue">{data.support.sourceModeLabel}</StatusBadge>
               <StatusBadge tone="green">
@@ -76,7 +60,7 @@ export default async function RadarMusicPage({
             <p className="mt-3 text-sm text-muted-foreground">
               {data.support.marketHighlight}
             </p>
-            <div className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="mt-3 text-xs uppercase tracking-[0.16em] text-white/45">
               Atualizado em {data.support.updatedAtLabel}
             </div>
           </article>
@@ -84,6 +68,10 @@ export default async function RadarMusicPage({
           <RadarMusicGenreRail items={data.genreSpotlights} />
         </div>
       </Container>
+
+      <RadarMusicHighlightGrid highlights={data.summaryCards} />
+
+      <RadarMusicTable rows={data.rows} decisionTracks={data.decisionRows} />
     </div>
   );
 }

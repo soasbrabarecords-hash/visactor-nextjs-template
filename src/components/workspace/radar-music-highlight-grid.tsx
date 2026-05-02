@@ -35,14 +35,14 @@ export default function RadarMusicHighlightGrid({
   highlights: RadarMusicSummaryCard[];
 }) {
   return (
-    <Container className="border-b border-border py-6">
+    <Container className="border-b border-border/70 py-5">
       <div className="mb-4">
-        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="text-xs uppercase tracking-[0.18em] text-white/45">
           Destaques do chart
         </div>
       </div>
 
-      <div className="grid gap-3 laptop:grid-cols-5">
+      <div className="grid gap-3 tablet:grid-cols-2 laptop:grid-cols-5">
         {highlights.map((card) => (
           <article
             key={card.title}
