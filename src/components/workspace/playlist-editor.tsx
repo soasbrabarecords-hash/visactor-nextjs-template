@@ -667,12 +667,11 @@ export default function PlaylistEditor({
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="w-[72px] px-2 py-3 text-right sm:px-4">#</th>
+              <th className="w-[72px] px-2 py-3 text-center sm:px-4">#</th>
               <th className="px-3 py-3 sm:px-4">Música</th>
-              <th className="hidden px-4 py-3 tablet:table-cell">Álbum</th>
-              <th className="px-3 py-3 sm:px-4">Pop.</th>
-              <th className="hidden px-4 py-3 tablet:table-cell">Duração</th>
-              <th className="hidden px-4 py-3 laptop:table-cell">
+              <th className="hidden px-3 py-3 sm:px-4 tablet:table-cell">Pop.</th>
+              <th className="hidden px-4 py-3 desktop:table-cell">Duração</th>
+              <th className="px-3 py-3 sm:px-4">
                 <span className="flex items-center gap-1">
                   Streams
                   <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">kworb</span>
@@ -723,13 +722,13 @@ export default function PlaylistEditor({
                   ].filter(Boolean).join(" ")}
                 >
                   {/* # */}
-                  <td className="h-16 w-[72px] overflow-hidden px-2 py-0 align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
+                  <td className="h-16 w-[72px] overflow-hidden px-2 py-0 align-middle text-center text-sm tabular-nums text-muted-foreground sm:px-4">
                     {isDeleting
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      ? <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                       : (
                         <span
                           className={[
-                            "inline-block w-[3ch] text-right",
+                            "inline-block w-[3ch] text-center",
                             isSelected ? "font-semibold text-primary" : "",
                           ].join(" ")}
                         >
@@ -767,18 +766,10 @@ export default function PlaylistEditor({
                     </div>
                   </td>
 
-                  {/* Álbum — escondido em mobile */}
-                  <td
-                    className="hidden h-16 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-4 py-0 align-middle text-sm text-muted-foreground tablet:table-cell"
-                    title={track.albumName}
-                  >
-                    {track.albumName}
-                  </td>
-
                   {/* Popularidade */}
-                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
+                  <td className="hidden h-16 overflow-hidden px-3 py-0 align-middle sm:px-4 tablet:table-cell">
                     <div className="flex items-center gap-2">
-                      <div className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-muted sm:block sm:w-16">
+                      <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-muted laptop:block laptop:w-20">
                         <div className="h-full rounded-full bg-primary" style={{ width: `${track.popularity}%` }} />
                       </div>
                       <span className="text-sm font-medium tabular-nums">{track.popularity}</span>
@@ -786,12 +777,12 @@ export default function PlaylistEditor({
                   </td>
 
                   {/* Duração — escondida em mobile */}
-                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground tablet:table-cell">
+                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground desktop:table-cell">
                     {track.durationLabel}
                   </td>
 
-                  {/* Streams — escondida em mobile/tablet */}
-                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle laptop:table-cell">
+                  {/* Streams — permanece visível */}
+                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
                     {track.streamsLoading
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
                       : (
@@ -865,7 +856,7 @@ export default function PlaylistEditor({
               );
             }) : (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   <Music2 className="mx-auto mb-3 h-5 w-5" />
                   Nenhuma faixa nesta playlist.
                 </td>
@@ -877,20 +868,20 @@ export default function PlaylistEditor({
           Handles de redimensionamento + auto-fit + sticky columns
           ────────────────────────────────────────────────────────
           - autoFit: distribui o espaço disponível proporcionalmente (estilo Spotify)
-          - columnWeights: Música ganha 3x mais espaço, Álbum 2x; restantes 1x
-          - stickyLeft: # (idx 1) fica fixa à esquerda quando rola horizontal
-          - stickyRight: Ações (idx 8) fica fixa à direita
+          - columnWeights: Música ganha mais espaço; Streams continua visível
+          - stickyLeft: # (idx 0) fica fixa à esquerda quando rola horizontal
+          - stickyRight: Ações (idx 6) fica fixa à direita
           - Grip (idx 0) tem peso baixo pra ficar pequena
         */}
         <ResizableTableOverlay
           tableRef={tableRef}
           storageKey="playlist-editor-cols-v2"
-          fixedColumns={[0, 7, 8]}
+          fixedColumns={[0, 6, 7]}
           autoFit
-          columnWeights={{ 0: 0.65, 1: 3, 2: 2, 3: 0.6, 4: 0.6, 5: 1, 6: 1, 7: 0.6, 8: 0.3 }}
-          minWidths={{ 0: 64, 1: 220, 2: 140, 3: 80, 4: 70, 5: 110, 6: 100, 7: 88, 8: 32 }}
+          columnWeights={{ 0: 0.65, 1: 3.4, 2: 0.95, 3: 0.7, 4: 1.2, 5: 1, 6: 0.6, 7: 0.3 }}
+          minWidths={{ 0: 64, 1: 240, 2: 96, 3: 74, 4: 126, 5: 100, 6: 88, 7: 32 }}
           stickyLeft={[0]}
-          stickyRight={[7, 8]}
+          stickyRight={[6, 7]}
         />
       </div>
     </div>

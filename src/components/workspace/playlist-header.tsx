@@ -137,31 +137,67 @@ export default function PlaylistHeader({
   }
 
   return (
-    <div data-spotify-header className="relative overflow-hidden" style={{ minHeight: "292px" }}>
-      {/* Background: blurred cover + dark gradient overlay */}
-      {coverUrl && (
-        <div
-          className="absolute inset-0 scale-110"
-          style={{
-            backgroundImage: `url(${coverUrl})`,
-            backgroundPosition: "center",
-            backgroundSize: "cover",
-            filter: "blur(40px) brightness(0.35) saturate(1.4)",
-          }}
-        />
-      )}
+    <div data-spotify-header className="relative overflow-hidden" style={{ minHeight: "300px" }}>
+      {coverUrl ? (
+        <>
+          <div
+            className="absolute inset-0 scale-110"
+            style={{
+              backgroundImage: `url(${coverUrl})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+              filter: "blur(72px) brightness(0.72) saturate(2.35)",
+              transform: "scale(1.12)",
+              opacity: 0.95,
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url(${coverUrl})`,
+              backgroundPosition: "center top",
+              backgroundSize: "cover",
+              mixBlendMode: "screen",
+              opacity: 0.16,
+              filter: "blur(12px) saturate(1.9)",
+            }}
+          />
+        </>
+      ) : null}
       <div
         className="absolute inset-0"
         style={{
           background: coverUrl
-            ? "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.85) 100%)"
-            : "linear-gradient(to bottom, hsl(var(--background) / 0.7), hsl(var(--background)))",
+            ? "linear-gradient(180deg, rgba(8,10,18,0.18) 0%, rgba(8,10,18,0.42) 30%, rgba(8,10,18,0.72) 62%, rgba(3,7,12,0.96) 100%)"
+            : "linear-gradient(180deg, hsl(var(--background) / 0.75), hsl(var(--background)) 100%)",
         }}
       />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,rgba(3,7,12,0)_0%,rgba(3,7,12,0.82)_70%,rgba(3,7,12,1)_100%)]" />
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col justify-end px-4 pb-5 pt-7 sm:px-8 sm:pb-7 sm:pt-10 laptop:px-12">
-        <div className="flex flex-col gap-4 sm:gap-5 laptop:flex-row laptop:items-end">
+      <div className="relative z-10 px-4 pb-5 pt-5 sm:px-8 sm:pb-7 sm:pt-6 laptop:px-12">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-9 rounded-full border-white/18 bg-white/10 px-4 text-white hover:bg-white/18"
+          >
+            <Link href={backHref}>Voltar</Link>
+          </Button>
+          <Button asChild size="sm" className="h-9 rounded-full bg-white px-4 text-black hover:bg-white/90">
+            <a
+              href={spotifyUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2"
+            >
+              Abrir Spotify
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-4 sm:gap-5 laptop:grid laptop:grid-cols-[auto_minmax(0,1fr)] laptop:items-end laptop:gap-6">
 
           {/* Cover art — clicável para editar */}
           <div className="shrink-0 self-center laptop:self-end">
@@ -170,7 +206,7 @@ export default function PlaylistHeader({
               onClick={handleCoverClick}
               disabled={uploadingCover}
               title="Clique para alterar a capa"
-              className="group relative block h-40 w-40 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-52 sm:w-52 laptop:h-56 laptop:w-56"
+              className="group relative block h-36 w-36 overflow-hidden rounded-xl shadow-2xl transition-transform hover:scale-[1.02] sm:h-44 sm:w-44 laptop:h-48 laptop:w-48"
               style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.6)" }}
             >
               {coverUrl ? (
@@ -223,7 +259,7 @@ export default function PlaylistHeader({
           </div>
 
           {/* Info */}
-          <div className="min-w-0 flex-1 space-y-2 text-center text-white laptop:text-left">
+          <div className="min-w-0 flex-1 self-end space-y-2 text-center text-white laptop:pb-1 laptop:text-left">
             <p className="text-xs font-semibold uppercase tracking-widest opacity-70">
               {isPublic ? "Playlist pública" : "Playlist privada"}
               {isCollaborative ? " · Colaborativa" : ""}
@@ -232,7 +268,7 @@ export default function PlaylistHeader({
             {/* Title — editável inline */}
             <div
               className="font-bold leading-none tracking-tight"
-              style={{ fontSize: "clamp(1.5rem, 4.4vw, 3rem)" }}
+              style={{ fontSize: "clamp(1.55rem, 4.2vw, 2.8rem)" }}
             >
               <EditableField
                 value={name}
@@ -242,7 +278,7 @@ export default function PlaylistHeader({
             </div>
 
             {/* Description — editável inline */}
-            <div className="max-w-2xl text-[13px] leading-relaxed opacity-80 sm:text-sm">
+            <div className="mx-auto max-w-2xl text-[13px] leading-relaxed opacity-80 sm:text-sm laptop:mx-0">
               <EditableField
                 value={description}
                 onSave={handleSaveDescription}
@@ -256,24 +292,6 @@ export default function PlaylistHeader({
               <span className="opacity-50">·</span>
               <span>{formatCount(tracksTotal)} faixas</span>
             </div>
-          </div>
-
-          {/* Actions */}
-            <div className="flex shrink-0 flex-wrap justify-center gap-2 self-start laptop:justify-end">
-            <Button asChild variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
-              <Link href={backHref}>Voltar</Link>
-            </Button>
-            <Button asChild size="sm" className="bg-white text-black hover:bg-white/90">
-              <a
-                href={spotifyUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2"
-              >
-                Abrir Spotify
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </Button>
           </div>
         </div>
       </div>
