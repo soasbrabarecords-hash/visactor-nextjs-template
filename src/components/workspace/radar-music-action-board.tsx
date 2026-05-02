@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ExternalLink, Play, Sparkles, TrendingUp, Waves, Zap } from "lucide-react";
 import Container from "@/components/container";
-import type { DecisionTrack, RadarMusicDecisionQueues } from "@/types/workspace";
+import type { DecisionTrack, RadarMusicDecisionQueues, RadarMusicRow } from "@/types/workspace";
 import { cn } from "@/lib/utils";
 import SpotifyPlaylistAddButton from "./spotify-playlist-add-button";
+import { getRadarTrendSignal } from "./radar-music-trend-helpers";
 import StatusBadge from "./status-badge";
 
 function coverStyle(coverUrl: string | null) {
@@ -33,11 +34,15 @@ function getColumnTone(title: "Adicionar hoje" | "Testar TikTok" | "Observar" | 
 
 function CompactTrackRow({
   track,
+  row,
   tone,
 }: {
   track: DecisionTrack;
+  row: RadarMusicRow | null;
   tone: "green" | "blue" | "yellow" | "red";
 }) {
+  const signal = row ? getRadarTrendSignal(row, track) : null;
+
   return (
     <article className="rounded-2xl border border-white/8 bg-black/20 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="flex items-start gap-3">
@@ -60,6 +65,11 @@ function CompactTrackRow({
             <StatusBadge tone={track.movement.tone} className="px-2 py-0.5 text-[10px]">
               {track.chartDeltaLabel}
             </StatusBadge>
+            {signal ? (
+              <StatusBadge tone={signal.tone} className="px-2 py-0.5 text-[10px]">
+                {signal.label}
+              </StatusBadge>
+            ) : null}
             <StatusBadge tone="slate" className="px-2 py-0.5 text-[10px]">
               {track.fitLabel}
             </StatusBadge>
@@ -74,9 +84,9 @@ function CompactTrackRow({
 
       <div className="mt-3 flex items-center justify-between gap-2 text-xs text-white/60">
         <span className="truncate">
-          {track.alreadyInPlaylists
+          {signal?.helper ?? (track.alreadyInPlaylists
             ? "Ja esta na tua base"
-            : track.accountFitContext}
+            : track.accountFitContext)}
         </span>
         <div className="flex items-center gap-1.5">
           <SpotifyPlaylistAddButton
@@ -104,10 +114,12 @@ function ActionColumn({
   title,
   helper,
   tracks,
+  rowsByTrackId,
 }: {
   title: "Adicionar hoje" | "Testar TikTok" | "Observar" | "Revisar base";
   helper: string;
   tracks: DecisionTrack[];
+  rowsByTrackId: Map<string, RadarMusicRow>;
 }) {
   const tone = getColumnTone(title);
 
@@ -128,7 +140,12 @@ function ActionColumn({
           </div>
         ) : (
           tracks.map((track) => (
-            <CompactTrackRow key={`${title}-${track.trackId}`} track={track} tone={tone} />
+            <CompactTrackRow
+              key={`${title}-${track.trackId}`}
+              track={track}
+              row={rowsByTrackId.get(track.trackId) ?? null}
+              tone={tone}
+            />
           ))
         )}
       </div>
@@ -138,36 +155,74 @@ function ActionColumn({
 
 export default function RadarMusicActionBoard({
   queues,
+  rows,
+  decisionTracks,
 }: {
   queues: RadarMusicDecisionQueues;
+  rows: RadarMusicRow[];
+  decisionTracks: DecisionTrack[];
 }) {
-  const primaryTrack = queues.primaryTrack;
+  const rowsByTrackId = new Map(rows.map((row) => [row.trackId, row]));
+  const predictiveTracks = decisionTracks
+    .map((track) => {
+      const row = rowsByTrackId.get(track.trackId);
+
+      if (!row) {
+        return null;
+      }
+
+      return {
+        track,
+        row,
+        signal: getRadarTrendSignal(row, track),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => right.signal.weight - left.signal.weight);
+
+  const exploding = predictiveTracks
+    .filter((item) => item.signal.key === "exploding")
+    .map((item) => item.track)
+    .slice(0, 4);
+  const early = predictiveTracks
+    .filter((item) => item.signal.key === "early")
+    .map((item) => item.track)
+    .slice(0, 4);
+  const confirming = predictiveTracks
+    .filter((item) => item.signal.key === "confirming")
+    .map((item) => item.track)
+    .slice(0, 4);
+  const risk = predictiveTracks
+    .filter((item) => item.signal.key === "risk")
+    .map((item) => item.track)
+    .slice(0, 4);
+  const primaryTrack = predictiveTracks[0]?.track ?? queues.primaryTrack;
   const summaryCards = [
     {
-      label: "Adicionar hoje",
-      value: queues.addNow.length,
-      helper: "Fit alto e timing forte",
+      label: "Explodindo",
+      value: exploding.length,
+      helper: "TikTok e Spotify confirmando",
       tone: "green" as const,
       icon: Sparkles,
     },
     {
-      label: "TikTok puxando",
-      value: queues.testNow.length,
-      helper: "Discovery acelerado",
+      label: "Sinal precoce",
+      value: early.length,
+      helper: "TikTok antes da base",
       tone: "blue" as const,
       icon: Waves,
     },
     {
-      label: "Observar",
-      value: queues.observe.length,
-      helper: "Pede mais confirmação",
+      label: "Confirmação",
+      value: confirming.length,
+      helper: "Spotify sustentando",
       tone: "yellow" as const,
       icon: TrendingUp,
     },
     {
-      label: "Revisar base",
-      value: queues.review.length,
-      helper: "Saturação ou queda",
+      label: "Risco",
+      value: risk.length,
+      helper: "Pode ter sido pico curto",
       tone: "red" as const,
       icon: Zap,
     },
@@ -177,11 +232,11 @@ export default function RadarMusicActionBoard({
     <Container className="border-b border-border/70 py-6">
       <div className="mb-5">
         <div className="text-xs uppercase tracking-[0.18em] text-white/45">
-          Mesa de decisao
+          Painel de tendencia
         </div>
-        <h2 className="mt-2 text-[2rem] font-semibold tracking-tight text-white">Radar de ação do dia</h2>
+        <h2 className="mt-2 text-[2rem] font-semibold tracking-tight text-white">O que está virando tendência</h2>
         <p className="mt-1 max-w-3xl text-sm text-white/60">
-          Primeiro vem a decisão. Depois a gente desce para o detalhe. Tudo aqui já cruza Spotify, TikTok Brasil e encaixe real com a tua base.
+          Aqui o radar deixa de ser só ranking e passa a ler antecipação: o que o TikTok acendeu, o que o Spotify confirmou e o que já parece pico curto.
         </p>
       </div>
 
@@ -305,23 +360,27 @@ export default function RadarMusicActionBoard({
       <div className="grid gap-4 desktop:grid-cols-4">
         <ActionColumn
           title="Adicionar hoje"
-          helper="Confirmadas nas duas plataformas ou com fit muito forte."
-          tracks={queues.addNow}
+          helper="Tendências com confirmação cruzada."
+          tracks={exploding}
+          rowsByTrackId={rowsByTrackId}
         />
         <ActionColumn
           title="Testar TikTok"
-          helper="TikTok puxando antes da tua base. Boas para teste rapido."
-          tracks={queues.testNow}
+          helper="Sinais precoces antes de virar consenso."
+          tracks={early}
+          rowsByTrackId={rowsByTrackId}
         />
         <ActionColumn
           title="Observar"
-          helper="Sinais fortes, mas ainda pedem mais um pouco de validacao."
-          tracks={queues.observe}
+          helper="Spotify subindo, mas ainda pedindo mais um dia."
+          tracks={confirming}
+          rowsByTrackId={rowsByTrackId}
         />
         <ActionColumn
           title="Revisar base"
-          helper="Faixas caindo ou saturadas que pedem ajuste fino."
-          tracks={queues.review}
+          helper="Queda ou saturação que parecem pico curto."
+          tracks={risk}
+          rowsByTrackId={rowsByTrackId}
         />
       </div>
     </Container>

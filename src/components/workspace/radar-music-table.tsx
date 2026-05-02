@@ -4,6 +4,7 @@ import Container from "@/components/container";
 import type { DecisionTrack, RadarMusicRow } from "@/types/workspace";
 import { cn } from "@/lib/utils";
 import SpotifyPlaylistAddButton from "./spotify-playlist-add-button";
+import { getRadarTrendSignal } from "./radar-music-trend-helpers";
 import StatusBadge from "./status-badge";
 
 function coverStyle(coverUrl: string | null) {
@@ -36,22 +37,6 @@ function getMovementValue(row: RadarMusicRow) {
   }
 
   return "—";
-}
-
-function getMovementTone(row: RadarMusicRow) {
-  if (row.previousRank === null || row.rankChange === null) {
-    return "purple";
-  }
-
-  if (row.rankChange > 0) {
-    return "green";
-  }
-
-  if (row.rankChange < 0) {
-    return "red";
-  }
-
-  return "slate";
 }
 
 function formatDailyStreams(value: number | null) {
@@ -111,8 +96,8 @@ export default function RadarMusicTable({
               <th className="px-4 py-3">Mov.</th>
               <th className="px-4 py-3">Faixa</th>
               <th className="px-4 py-3">Streams</th>
-              <th className="px-4 py-3">Decisão</th>
-              <th className="px-4 py-3">TikTok</th>
+              <th className="px-4 py-3">Tendência</th>
+              <th className="px-4 py-3">Leitura</th>
               <th className="px-4 py-3">Acao</th>
             </tr>
           </thead>
@@ -129,6 +114,7 @@ export default function RadarMusicTable({
             ) : (
               rows.map((row) => {
                 const decisionTrack = decisionByTrackId.get(row.trackId);
+                const signal = getRadarTrendSignal(row, decisionTrack);
 
                 return (
                   <tr key={row.trackId} className="hover:bg-white/[0.03]">
@@ -202,30 +188,36 @@ export default function RadarMusicTable({
                       <div className="text-sm font-medium">
                         {decisionTrack?.decisionScore ?? row.opportunityScore}/100
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div className="mt-2">
+                        <StatusBadge tone={signal.tone} className="normal-case tracking-[0.04em]">
+                          {signal.label}
+                        </StatusBadge>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {signal.helper}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="text-xs text-muted-foreground">
                         {decisionTrack?.fitLabel ?? row.fitLabel}
                       </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {decisionTrack?.accountFitContext ?? "Abrir e avaliar"}
+                      </div>
                       <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                        <div>{decisionTrack?.accountFitContext ?? "Abrir e avaliar"}</div>
+                        {row.tiktokViral ? (
+                          <div className="text-sky-300">
+                            TikTok {row.tiktokRank !== null ? `#${row.tiktokRank}` : "viral"}
+                          </div>
+                        ) : (
+                          <div>Sem TikTok forte agora</div>
+                        )}
+                        <div>{row.tiktokMovementLabel ?? `${row.daysOnRadar} dias no radar`}</div>
                         {decisionTrack?.suggestedPlaylistName ? (
                           <div className="text-violet-300">
                             Boa para {decisionTrack.suggestedPlaylistName}
                           </div>
                         ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="space-y-2">
-                        {row.tiktokViral ? (
-                          <StatusBadge tone="blue">
-                            TikTok {row.tiktokRank !== null ? `#${row.tiktokRank}` : "viral"}
-                          </StatusBadge>
-                        ) : (
-                          <div className="text-xs text-muted-foreground">Sem cruzamento agora</div>
-                        )}
-                        <div className="text-xs text-muted-foreground">
-                          {row.tiktokMovementLabel ?? `${row.daysOnRadar} dias no radar`}
-                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 align-top">

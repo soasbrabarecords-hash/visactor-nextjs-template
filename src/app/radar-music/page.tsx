@@ -38,7 +38,11 @@ export default async function RadarMusicPage({
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
       <TopNav title="Radar Music" />
 
-      <RadarMusicActionBoard queues={data.decisionQueues} />
+      <RadarMusicActionBoard
+        queues={data.decisionQueues}
+        rows={data.rows}
+        decisionTracks={data.decisionRows}
+      />
 
       <RadarMusicTikTokStrip
         snapshotDate={data.tiktokMatches.snapshotDate}

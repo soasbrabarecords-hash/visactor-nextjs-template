@@ -5,14 +5,15 @@ import { detectGenre, type TrackGenre } from "@/lib/genre-detection";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
+  ArrowDown,
   ArrowUpRight,
+  ArrowUp,
   ExternalLink,
-  Flame,
   Loader2,
+  Minus,
   Music2,
   RefreshCw,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
@@ -197,18 +198,40 @@ function getDecisionLabel(row: DecisionTrack) {
 
 function getMovementBadge(row: DecisionTrack) {
   if (row.movement_type === "new") {
-    return { label: "NEW", className: "text-sky-300" };
+    return { label: "NEW", tone: "purple" as const, icon: Sparkles, value: "NEW" };
   }
 
   if (row.position_change && row.position_change > 0) {
-    return { label: `+${row.position_change}`, className: "text-emerald-300" };
+    return {
+      label: `+${row.position_change}`,
+      tone: "green" as const,
+      icon: ArrowUp,
+      value: `${Math.abs(row.position_change)}`,
+    };
   }
 
   if (row.position_change && row.position_change < 0) {
-    return { label: `${row.position_change}`, className: "text-rose-300" };
+    return {
+      label: `${row.position_change}`,
+      tone: "red" as const,
+      icon: ArrowDown,
+      value: `${Math.abs(row.position_change)}`,
+    };
   }
 
-  return { label: "=", className: "text-white/45" };
+  return { label: "=", tone: "slate" as const, icon: Minus, value: "—" };
+}
+
+function MovementBadge({ row }: { row: DecisionTrack }) {
+  const movement = getMovementBadge(row);
+  const Icon = movement.icon;
+
+  return (
+    <StatusBadge tone={movement.tone} className="min-w-[64px] justify-center px-2 py-0.5 text-[10px]">
+      <Icon className="mr-1 h-3 w-3" />
+      {movement.value}
+    </StatusBadge>
+  );
 }
 
 export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
@@ -290,6 +313,15 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
       ).length,
     [sortedRows],
   );
+  const topActionableTracks = useMemo(
+    () =>
+      sortedRows
+        .filter(
+          (row) => row.recommendedAction === "add" && !row.alreadyInPlaylists,
+        )
+        .slice(0, 4),
+    [sortedRows],
+  );
   const discoveryCount = useMemo(
     () =>
       sortedRows.filter(
@@ -361,128 +393,110 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
         <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_50%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_42%)]" />
 
         <div className="relative border-b border-white/10 px-5 py-5 tablet:px-7 tablet:py-6">
-          <div className="grid gap-4 laptop:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-            <div className="space-y-4">
+          <div className="grid gap-4 laptop:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
+            <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone="green">Curadoria ativa</StatusBadge>
                 <StatusBadge tone="slate">Top 200 Brasil</StatusBadge>
-                <StatusBadge tone="blue">{formatCount(sortedRows.length)} faixas no radar</StatusBadge>
+                <StatusBadge tone="blue">{formatCount(addNowCount)} para adicionar</StatusBadge>
               </div>
 
               <div className="space-y-2">
                 <div className="text-xs uppercase tracking-[0.22em] text-white/45">
                   Mesa de acao
                 </div>
-                <h2 className="max-w-3xl text-2xl font-semibold tracking-tight text-white tablet:text-[2rem]">
-                  Curadoria do dia com decisão rápida e destino de playlist já sugerido.
+                <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white tablet:text-[2rem]">
+                  Principais capas do dia para entrar rápido na tua base.
                 </h2>
-                <p className="max-w-2xl text-sm leading-6 text-white/62">
-                  A página cruza o Top 200 com o DNA da tua conta para mostrar o que
-                  entra agora, o que ainda pede teste e o que já está bem coberto na base.
+                <p className="max-w-xl text-sm leading-6 text-white/62">
+                  O foco aqui é simples: mostrar o que subiu, o que estreou e para qual playlist vale mandar agora.
                 </p>
               </div>
 
-              <div className="grid gap-3 tablet:grid-cols-2 desktop:grid-cols-4">
+              <div className="grid gap-3 tablet:grid-cols-3">
                 <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-emerald-300/80">
-                    <Sparkles className="h-3.5 w-3.5" />
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-emerald-300/80">
                     Entrar agora
                   </div>
                   <div className="text-3xl font-semibold text-white">{addNowCount}</div>
-                  <p className="mt-1 text-sm text-white/55">Faixas prontas para adicionar.</p>
+                  <p className="mt-1 text-sm text-white/55">Melhores sinais para hoje.</p>
                 </div>
-
                 <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-sky-300/80">
-                    <TrendingUp className="h-3.5 w-3.5" />
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-sky-300/80">
                     Top 20 quente
                   </div>
                   <div className="text-3xl font-semibold text-white">{top20Count}</div>
                   <p className="mt-1 text-sm text-white/55">Subidas fortes fora da base.</p>
                 </div>
-
                 <div className="rounded-2xl border border-violet-500/20 bg-violet-500/8 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-violet-300/80">
-                    <Flame className="h-3.5 w-3.5" />
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-violet-300/80">
                     Discovery
                   </div>
                   <div className="text-3xl font-semibold text-white">{discoveryCount}</div>
                   <p className="mt-1 text-sm text-white/55">Janela boa antes de saturar.</p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/55">
-                    <Music2 className="h-3.5 w-3.5" />
-                    Ja na base
-                  </div>
-                  <div className="text-3xl font-semibold text-white">{inBaseCount}</div>
-                  <p className="mt-1 text-sm text-white/55">Faixas já presentes na conta.</p>
                 </div>
               </div>
             </div>
 
             <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               {topDecision ? (
-                <div
-                  className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/30 p-4"
-                >
-                  <div
-                    className="absolute inset-0 opacity-40"
-                    style={coverStyle(topDecision.coverUrl)}
-                  />
-                  <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(4,10,20,0.92),rgba(4,10,20,0.72)_55%,rgba(16,185,129,0.18))]" />
-                  <div className="relative space-y-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge tone="green">Melhor decisao</StatusBadge>
-                      <StatusBadge tone="blue">Score {topDecision.decisionScore}</StatusBadge>
-                      <StatusBadge tone="slate">{topDecision.fitLabel}</StatusBadge>
-                    </div>
-
-                    <div className="flex items-center gap-3">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {topActionableTracks.map((track, index) => (
                       <div
-                        className="h-16 w-16 shrink-0 rounded-2xl border border-white/10 bg-white/5"
-                        style={coverStyle(topDecision.coverUrl)}
-                      />
+                        key={track.trackId}
+                        className={cn(
+                          "relative overflow-hidden rounded-[22px] border border-white/10 bg-black/30",
+                          index === 0 ? "col-span-2 aspect-[2.2/1]" : "aspect-square",
+                        )}
+                      >
+                        <div className="absolute inset-0 opacity-80" style={coverStyle(track.coverUrl)} />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,20,0.12),rgba(5,10,20,0.88))]" />
+                        <div className="relative flex h-full flex-col justify-end p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <MovementBadge row={track} />
+                            <StatusBadge tone="green" className="px-2 py-0.5 text-[10px]">
+                              {track.decisionScore}
+                            </StatusBadge>
+                          </div>
+                          <div className="mt-2 truncate text-sm font-semibold text-white">
+                            {track.name}
+                          </div>
+                          <div className="truncate text-xs text-white/65">{track.artists}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="truncate text-lg font-semibold text-white">
+                        <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+                          Principal do dia
+                        </div>
+                        <div className="mt-1 truncate text-base font-semibold text-white">
                           {topDecision.name}
                         </div>
-                        <div className="truncate text-sm text-white/60">{topDecision.artists}</div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 text-sm text-white/62 tablet:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                        <div className="text-[11px] uppercase tracking-[0.16em] text-white/38">
-                          Playlist sugerida
-                        </div>
-                        <div className="mt-1 truncate font-medium text-white">
-                          {topDecision.suggestedPlaylistName ?? "Observar"}
+                        <div className="truncate text-sm text-white/58">
+                          {topDecision.suggestedPlaylistName ?? "Observar"} · {getDecisionLabel(topDecision)}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                        <div className="text-[11px] uppercase tracking-[0.16em] text-white/38">
-                          Sinal
-                        </div>
-                        <div className="mt-1 font-medium text-white">{getDecisionLabel(topDecision)}</div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => window.location.reload()}
+                          className="rounded-full bg-emerald-500 px-4 text-black hover:bg-emerald-400"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Atualizar
+                        </Button>
+                        <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
+                          <Link href={topDecision.spotifyUrl} target="_blank" rel="noreferrer">
+                            <ArrowUpRight className="h-4 w-4" />
+                            Abrir
+                          </Link>
+                        </Button>
                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => window.location.reload()}
-                        className="rounded-full bg-emerald-500 px-4 text-black hover:bg-emerald-400"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        Atualizar
-                      </Button>
-                      <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
-                        <Link href={topDecision.spotifyUrl} target="_blank" rel="noreferrer">
-                          <ArrowUpRight className="h-4 w-4" />
-                          Abrir no Spotify
-                        </Link>
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -572,20 +586,7 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle">
-                      <div
-                        className={cn(
-                          "inline-flex min-w-[44px] items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold tabular-nums",
-                          row.movement_type === "new"
-                            ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
-                            : row.position_change && row.position_change > 0
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                              : row.position_change && row.position_change < 0
-                                ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
-                                : "border-white/10 bg-white/5 text-white/45",
-                        )}
-                      >
-                        {movementBadge.label}
-                      </div>
+                      <MovementBadge row={row} />
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-2 min-w-0">
