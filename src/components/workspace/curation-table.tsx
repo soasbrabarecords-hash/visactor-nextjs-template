@@ -85,6 +85,15 @@ function formatCount(value: number | null) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
 }
 
+function formatDateLabel(value: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
@@ -234,7 +243,15 @@ function MovementBadge({ row }: { row: DecisionTrack }) {
   );
 }
 
-export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
+export default function CurationTable({
+  rows,
+  snapshotDate,
+  previousDate,
+}: {
+  rows: DecisionTrack[];
+  snapshotDate: string | null;
+  previousDate: string | null;
+}) {
   const [artistGenres, setArtistGenres] = useState<ArtistGenresResponse>({});
   const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
   const [addedTrackIdsByPlaylist, setAddedTrackIdsByPlaylist] = useState<
@@ -522,10 +539,10 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-white/45">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Kworb BR
+                Spotify Charts BR
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Sem paginação
+                {snapshotDate ? formatDateLabel(snapshotDate) : "Sem data"}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                 Add direto na playlist
@@ -599,17 +616,34 @@ export default function CurationTable({ rows }: { rows: DecisionTrack[] }) {
                           <div className="truncate text-xs text-muted-foreground mt-0.5">
                             {row.artists}
                           </div>
-                          <div className="mt-1 truncate text-xs text-white/45">
-                            {getDecisionLabel(row)}
-                          </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-3 py-3 align-middle whitespace-nowrap">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+                        {snapshotDate ? formatDateLabel(snapshotDate) : "Hoje"}
+                      </div>
                       <div className="text-sm font-semibold tabular-nums">
                         {formatCount(row.dailyStreams)}
                       </div>
-                      <div className="text-xs text-muted-foreground">Snapshot do dia</div>
+                      <div
+                        className={cn(
+                          "text-xs",
+                          row.streamGrowthPercent === null
+                            ? "text-muted-foreground"
+                            : row.streamGrowthPercent > 0
+                              ? "text-emerald-400"
+                              : row.streamGrowthPercent < 0
+                                ? "text-red-400"
+                                : "text-white/45",
+                        )}
+                      >
+                        {row.streamGrowthPercent === null
+                          ? previousDate
+                            ? `Sem hist. vs ${formatDateLabel(previousDate)}`
+                            : "Sem historico"
+                          : `${row.streamGrowthPercent >= 0 ? "+" : ""}${row.streamGrowthPercent.toFixed(1)}% vs ${previousDate ? formatDateLabel(previousDate) : "anterior"}`}
+                      </div>
                     </td>
                     <td className="px-3 py-3 align-middle">
                       <div className="flex items-center gap-2 min-w-0">

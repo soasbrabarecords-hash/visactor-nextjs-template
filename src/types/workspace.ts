@@ -154,6 +154,7 @@ export type RadarMusicRow = {
   dailyStreams: number | null;
   streamRank: number | null;
   streamGrowth: number | null;
+  streamGrowthPercent: number | null;
   streamVelocityLabel: string;
   popularityChange: number | null;
   previousRank: number | null;
@@ -292,6 +293,8 @@ export type DecisionTrack = {
   popularity: number;
   dailyStreams: number | null;
   streamRank: number | null;
+  streamGrowth: number | null;
+  streamGrowthPercent: number | null;
   movement: MovementDescriptor;
   chartDeltaLabel: string;
   lowSaturation: boolean;
@@ -317,5 +320,7 @@ export type CurationPageData = {
   hero: WorkspaceInsight;
   heroInsight: HeroInsight;
   metrics: WorkspaceMetric[];
+  snapshotDate: string | null;
+  previousDate: string | null;
   rows: DecisionTrack[];
 };

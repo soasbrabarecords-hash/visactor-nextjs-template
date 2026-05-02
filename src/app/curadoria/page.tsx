@@ -14,7 +14,11 @@ export default async function CuradoriaPage() {
 
       <SpotifyAccountPlaylistsPanel />
 
-      <CurationTable rows={data.rows} />
+      <CurationTable
+        rows={data.rows}
+        snapshotDate={data.snapshotDate}
+        previousDate={data.previousDate}
+      />
     </div>
   );
 }

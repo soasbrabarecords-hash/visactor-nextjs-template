@@ -807,6 +807,7 @@ function buildRadarRows(
       dailyStreams: track.dailyStreams,
       streamRank: track.streamRank,
       streamGrowth: track.streamGrowth,
+      streamGrowthPercent: null,
       streamVelocityLabel: track.streamVelocityLabel,
       popularityChange: track.popularityChange,
       previousRank: track.previousRank,
@@ -1717,6 +1718,8 @@ function buildCurationRows(
       popularity: row.popularity,
       dailyStreams: row.dailyStreams,
       streamRank: row.streamRank,
+      streamGrowth: row.streamGrowth,
+      streamGrowthPercent: row.streamGrowthPercent,
       movement: row.movement,
       chartDeltaLabel:
         row.rankChange === null
@@ -1962,6 +1965,7 @@ async function buildDashboardSnapshotRadarRows({
       dailyStreams: track.streams,
       streamRank: track.streams ? track.position : null,
       streamGrowth: track.stream_change,
+      streamGrowthPercent: track.stream_growth_percent,
       streamVelocityLabel:
         track.stream_change === null
           ? "Sem historico"
@@ -2743,20 +2747,14 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 }
 
 export async function getCurationPageData(): Promise<CurationPageData> {
-  const [musicData, chartsData] = await Promise.all([
-    getMusicChartsData({
-      country: "BR",
-      genre: "all",
-    }),
-    getChartsData(),
-  ]);
-  const chartRows = buildRadarRows(
-    musicData.workbenchTracks,
-    chartsData.tracks,
-    musicData.dominantArtists.map((artist) => artist.artistName),
-  );
+  const chartsData = await getChartsData();
   const dominantArtists = chartsData.artistDistribution.map((artist) => artist.type);
-  const rows = buildCurationRows(chartRows, chartsData.tracks, dominantArtists);
+  const snapshotRadar = await buildDashboardSnapshotRadarRows({
+    country: "BR",
+    playlistTracks: chartsData.tracks,
+    dominantArtists,
+  });
+  const rows = buildCurationRows(snapshotRadar.rows, chartsData.tracks, dominantArtists);
 
   return {
     hero: {
@@ -2800,6 +2798,8 @@ export async function getCurationPageData(): Promise<CurationPageData> {
         tone: "blue",
       },
     ],
+    snapshotDate: snapshotRadar.latestDate,
+    previousDate: snapshotRadar.previousDate,
     rows,
   };
 }
