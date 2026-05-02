@@ -4,6 +4,18 @@ import Container from "@/components/container";
 import type { TikTokPublicChart } from "@/lib/tiktok-public-charts";
 import StatusBadge from "./status-badge";
 
+function coverStyle(coverUrl: string | null) {
+  if (!coverUrl) {
+    return undefined;
+  }
+
+  return {
+    backgroundImage: `url(${coverUrl})`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
+}
+
 function formatSnapshotDate(value: string | null) {
   if (!value) {
     return "Data publica";
@@ -70,7 +82,9 @@ export default function TikTokChartsTable({
               <Flame className="mr-1 h-3.5 w-3.5" />
               TikTok Brasil
             </StatusBadge>
-            <StatusBadge tone="slate">{formatSnapshotDate(chart.snapshotDate)}</StatusBadge>
+            <StatusBadge tone="slate">
+              {formatSnapshotDate(chart.snapshotDate)}
+            </StatusBadge>
             <StatusBadge tone="purple">Kworb BR</StatusBadge>
           </div>
 
@@ -144,16 +158,22 @@ export default function TikTokChartsTable({
               className="rounded-[26px] border border-border bg-card/70 p-4 shadow-[0_24px_48px_-32px_rgba(8,15,28,0.8)]"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <StatusBadge tone={getRankTone(track.rank)}>
-                    {getRankLabel(track.rank)}
-                  </StatusBadge>
-                  <h3 className="mt-3 line-clamp-1 text-lg font-semibold">
-                    {track.trackName}
-                  </h3>
-                  <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                    {track.artistName}
-                  </p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className="h-14 w-14 shrink-0 rounded-2xl border border-border bg-muted"
+                    style={coverStyle(track.coverUrl)}
+                  />
+                  <div className="min-w-0">
+                    <StatusBadge tone={getRankTone(track.rank)}>
+                      {getRankLabel(track.rank)}
+                    </StatusBadge>
+                    <h3 className="mt-3 line-clamp-1 text-lg font-semibold">
+                      {track.trackName}
+                    </h3>
+                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+                      {track.artistName}
+                    </p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -194,7 +214,10 @@ export default function TikTokChartsTable({
             </thead>
             <tbody className="divide-y divide-border">
               {chart.tracks.map((track) => (
-                <tr key={`${track.rank}-${track.trackName}-${track.artistName}`} className="hover:bg-muted/10">
+                <tr
+                  key={`${track.rank}-${track.trackName}-${track.artistName}`}
+                  className="hover:bg-muted/10"
+                >
                   <td className="px-5 py-3 align-top">
                     <div className="text-lg font-semibold">#{track.rank}</div>
                   </td>
@@ -202,7 +225,15 @@ export default function TikTokChartsTable({
                     {track.movementLabel}
                   </td>
                   <td className="px-5 py-3 align-top">
-                    <div className="font-medium">{track.trackName}</div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-11 w-11 shrink-0 rounded-xl border border-border bg-muted"
+                        style={coverStyle(track.coverUrl)}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-medium">{track.trackName}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-3 align-top text-sm text-muted-foreground">
                     {track.artistName}

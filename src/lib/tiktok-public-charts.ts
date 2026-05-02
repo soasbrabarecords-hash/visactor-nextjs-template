@@ -1,10 +1,17 @@
 import "server-only";
 
+import {
+  searchSpotifyTracks,
+  type SpotifyTrackRecord,
+} from "@/lib/spotify";
+
 export type TikTokPublicChartTrack = {
   rank: number;
   trackName: string;
   artistName: string;
   movementLabel: string;
+  coverUrl: string | null;
+  spotifyUrl: string | null;
 };
 
 export type TikTokPublicChart = {
@@ -19,9 +26,18 @@ type CacheEntry = {
 };
 
 const TIKTOK_PUBLIC_CHART_TTL_MS = 30 * 60 * 1000;
+const TIKTOK_PUBLIC_ARTWORK_TTL_MS = 6 * 60 * 60 * 1000;
 
 let cachedChart: CacheEntry | null = null;
 let inFlightChart: Promise<TikTokPublicChart> | null = null;
+const artworkCache = new Map<
+  string,
+  {
+    coverUrl: string | null;
+    spotifyUrl: string | null;
+    expiresAt: number;
+  }
+>();
 
 function decodeHtmlEntities(value: string) {
   return value
@@ -64,6 +80,112 @@ function splitArtistAndTitle(value: string) {
   };
 }
 
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scoreSpotifyMatch(
+  sourceTrack: TikTokPublicChartTrack,
+  candidate: SpotifyTrackRecord,
+) {
+  const sourceTitle = normalizeText(sourceTrack.trackName);
+  const sourceArtist = normalizeText(sourceTrack.artistName);
+  const candidateTitle = normalizeText(candidate.name);
+  const candidateArtists = normalizeText(candidate.artists.join(" "));
+
+  let score = 0;
+
+  if (candidateTitle === sourceTitle) {
+    score += 8;
+  } else if (
+    candidateTitle.includes(sourceTitle) ||
+    sourceTitle.includes(candidateTitle)
+  ) {
+    score += 5;
+  }
+
+  if (candidateArtists === sourceArtist) {
+    score += 6;
+  } else if (
+    candidateArtists.includes(sourceArtist) ||
+    sourceArtist.includes(candidateArtists)
+  ) {
+    score += 4;
+  } else {
+    const sourceArtistTokens = sourceArtist.split(" ").filter(Boolean);
+    const artistOverlap = sourceArtistTokens.filter(
+      (token) => token.length > 2 && candidateArtists.includes(token),
+    ).length;
+    score += Math.min(artistOverlap, 3);
+  }
+
+  score += Math.min(Math.round(candidate.popularity / 25), 4);
+
+  return score;
+}
+
+async function enrichTracksWithArtwork(
+  tracks: TikTokPublicChartTrack[],
+): Promise<TikTokPublicChartTrack[]> {
+  const enriched = [...tracks];
+
+  for (let index = 0; index < enriched.length; index += 8) {
+    const chunk = enriched.slice(index, index + 8);
+
+    await Promise.all(
+      chunk.map(async (track) => {
+        const cacheKey = `${normalizeText(track.artistName)}::${normalizeText(track.trackName)}`;
+        const cachedArtwork = artworkCache.get(cacheKey);
+
+        if (cachedArtwork && cachedArtwork.expiresAt > Date.now()) {
+          track.coverUrl = cachedArtwork.coverUrl;
+          track.spotifyUrl = cachedArtwork.spotifyUrl;
+          return;
+        }
+
+        try {
+          const results = await searchSpotifyTracks(
+            `track:${track.trackName} artist:${track.artistName}`,
+            "BR",
+            5,
+          );
+          const bestMatch =
+            results
+              .map((candidate) => ({
+                candidate,
+                score: scoreSpotifyMatch(track, candidate),
+              }))
+              .sort((left, right) => right.score - left.score)[0]?.candidate ??
+            null;
+
+          const coverUrl = bestMatch?.coverUrl ?? null;
+          const spotifyUrl = bestMatch?.spotifyUrl ?? null;
+
+          track.coverUrl = coverUrl;
+          track.spotifyUrl = spotifyUrl;
+
+          artworkCache.set(cacheKey, {
+            coverUrl,
+            spotifyUrl,
+            expiresAt: Date.now() + TIKTOK_PUBLIC_ARTWORK_TTL_MS,
+          });
+        } catch {
+          track.coverUrl = null;
+          track.spotifyUrl = null;
+        }
+      }),
+    );
+  }
+
+  return enriched;
+}
+
 function parseKworbHtml(html: string): TikTokPublicChart {
   const titleMatch = html.match(
     /<title>\s*TikTok Trending Songs - Brazil\s*<\/title>/i,
@@ -98,6 +220,8 @@ function parseKworbHtml(html: string): TikTokPublicChart {
         movementLabel,
         trackName,
         artistName,
+        coverUrl: null,
+        spotifyUrl: null,
       });
     }
 
@@ -142,7 +266,12 @@ export async function fetchTikTokPublicChart(): Promise<TikTokPublicChart> {
     }
 
     const html = await response.text();
-    const chart = parseKworbHtml(html);
+    const parsedChart = parseKworbHtml(html);
+    const tracks = await enrichTracksWithArtwork(parsedChart.tracks);
+    const chart = {
+      ...parsedChart,
+      tracks,
+    };
 
     cachedChart = {
       value: chart,
