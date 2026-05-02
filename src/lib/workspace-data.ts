@@ -2441,7 +2441,7 @@ export async function getRadarMusicPageData({
 
   return {
     hero: {
-      eyebrow: "Mercado externo",
+      eyebrow: "",
       title: "Radar Music Charts",
       description:
         "Mesa operacional que cruza Spotify Charts, TikTok Charts Brasil e o DNA da tua conta para decidir o que entra, o que testa e o que pede revisao.",
