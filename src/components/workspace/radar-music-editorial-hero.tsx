@@ -135,10 +135,15 @@ export default function RadarMusicEditorialHero({
             <div className="flex flex-wrap gap-3">
               <StatusBadge tone="green">{leadRow ? `#${leadRow.rank} no chart` : hero.rankLabel}</StatusBadge>
               <StatusBadge tone="yellow">{getMovementLabel(leadRow)}</StatusBadge>
+              {leadRow?.tiktokViral ? (
+                <StatusBadge tone="blue">
+                  TikTok {leadRow.tiktokRank !== null ? `#${leadRow.tiktokRank}` : "viral"}
+                </StatusBadge>
+              ) : null}
               <StatusBadge tone="slate">{leadRow ? `${leadRow.opportunityScore}/100 oportunidade` : "—"}</StatusBadge>
             </div>
 
-            <div className="grid gap-3 tablet:grid-cols-3">
+            <div className="grid gap-3 tablet:grid-cols-4">
               {[
                 {
                   label: "Streams 24h",
@@ -154,6 +159,14 @@ export default function RadarMusicEditorialHero({
                 {
                   label: "Dias no chart",
                   value: leadRow ? `${leadRow.daysOnRadar} dias` : "—",
+                },
+                {
+                  label: "TikTok",
+                  value: leadRow?.tiktokViral
+                    ? leadRow.tiktokRank !== null
+                      ? `#${leadRow.tiktokRank}`
+                      : "Viral"
+                    : "Sem cruzamento",
                 },
               ].map((item) => (
                 <article

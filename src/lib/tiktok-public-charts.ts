@@ -10,6 +10,7 @@ export type TikTokPublicChartTrack = {
   trackName: string;
   artistName: string;
   movementLabel: string;
+  spotifyTrackId: string | null;
   coverUrl: string | null;
   spotifyUrl: string | null;
 };
@@ -33,6 +34,7 @@ let inFlightChart: Promise<TikTokPublicChart> | null = null;
 const artworkCache = new Map<
   string,
   {
+    spotifyTrackId: string | null;
     coverUrl: string | null;
     spotifyUrl: string | null;
     expiresAt: number;
@@ -144,6 +146,7 @@ async function enrichTracksWithArtwork(
         const cachedArtwork = artworkCache.get(cacheKey);
 
         if (cachedArtwork && cachedArtwork.expiresAt > Date.now()) {
+          track.spotifyTrackId = cachedArtwork.spotifyTrackId;
           track.coverUrl = cachedArtwork.coverUrl;
           track.spotifyUrl = cachedArtwork.spotifyUrl;
           return;
@@ -164,18 +167,22 @@ async function enrichTracksWithArtwork(
               .sort((left, right) => right.score - left.score)[0]?.candidate ??
             null;
 
+          const spotifyTrackId = bestMatch?.id ?? null;
           const coverUrl = bestMatch?.coverUrl ?? null;
           const spotifyUrl = bestMatch?.spotifyUrl ?? null;
 
+          track.spotifyTrackId = spotifyTrackId;
           track.coverUrl = coverUrl;
           track.spotifyUrl = spotifyUrl;
 
           artworkCache.set(cacheKey, {
+            spotifyTrackId,
             coverUrl,
             spotifyUrl,
             expiresAt: Date.now() + TIKTOK_PUBLIC_ARTWORK_TTL_MS,
           });
         } catch {
+          track.spotifyTrackId = null;
           track.coverUrl = null;
           track.spotifyUrl = null;
         }
@@ -220,6 +227,7 @@ function parseKworbHtml(html: string): TikTokPublicChart {
         movementLabel,
         trackName,
         artistName,
+        spotifyTrackId: null,
         coverUrl: null,
         spotifyUrl: null,
       });

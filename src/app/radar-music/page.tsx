@@ -3,6 +3,7 @@ import MusicFilters from "@/components/charts/music-filters";
 import { TopNav } from "@/components/nav";
 import PageIntro from "@/components/page-intro";
 import RadarMusicEditorialHero from "@/components/workspace/radar-music-editorial-hero";
+import RadarMusicActionBoard from "@/components/workspace/radar-music-action-board";
 import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
 import RadarMusicRefreshButton from "@/components/workspace/radar-music-refresh-button";
@@ -64,9 +65,17 @@ export default async function RadarMusicPage({
         }
       />
 
+      <RadarMusicActionBoard queues={data.decisionQueues} />
+
       <RadarMusicEditorialHero
         hero={data.editorialHero}
-        leadRow={data.rows[0] ?? null}
+        leadRow={
+          data.decisionQueues.primaryTrack
+            ? data.rows.find(
+                (row) => row.trackId === data.decisionQueues.primaryTrack?.trackId,
+              ) ?? data.rows[0] ?? null
+            : data.rows[0] ?? null
+        }
       />
 
       <RadarMusicTikTokStrip
@@ -74,7 +83,7 @@ export default async function RadarMusicPage({
         tracks={data.tiktokMatches.tracks}
       />
 
-      <RadarMusicTable rows={data.rows} />
+      <RadarMusicTable rows={data.rows} decisionTracks={data.decisionRows} />
 
       <RadarMusicHighlightGrid highlights={data.summaryCards} />
 

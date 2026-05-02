@@ -145,6 +145,7 @@ export type RadarMusicRow = {
   rank: number;
   movement: MovementDescriptor;
   trackId: string;
+  spotifyTrackId: string | null;
   name: string;
   artists: string;
   genre: string;
@@ -167,11 +168,20 @@ export type RadarMusicRow = {
   tiktokViral: boolean;
   tiktokRank: number | null;
   tiktokSnapshotDate: string | null;
+  tiktokMovementLabel: string | null;
   lowSaturation: boolean;
   recurring: boolean;
   alreadyInPlaylists: boolean;
   fitLabel: string;
   scoreBreakdown: ScoreBreakdownItem[];
+};
+
+export type RadarMusicDecisionQueues = {
+  primaryTrack: DecisionTrack | null;
+  addNow: DecisionTrack[];
+  testNow: DecisionTrack[];
+  observe: DecisionTrack[];
+  review: DecisionTrack[];
 };
 
 export type RadarMusicSupport = {
@@ -202,6 +212,8 @@ export type RadarMusicPageData = {
   };
   summaryCards: RadarMusicSummaryCard[];
   rows: RadarMusicRow[];
+  decisionRows: DecisionTrack[];
+  decisionQueues: RadarMusicDecisionQueues;
   tiktokMatches: {
     snapshotDate: string | null;
     tracks: RadarMusicRow[];
