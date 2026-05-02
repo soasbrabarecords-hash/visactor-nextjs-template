@@ -422,119 +422,120 @@ export default function CurationTable({
         <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_50%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_42%)]" />
 
         <div className="relative border-b border-white/10 px-5 py-5 tablet:px-7 tablet:py-6">
-          <div className="grid gap-4 laptop:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone="green">Curadoria ativa</StatusBadge>
-                <StatusBadge tone="slate">Top 200 Brasil</StatusBadge>
-                <StatusBadge tone="blue">{formatCount(addNowCount)} para adicionar</StatusBadge>
+          <div className="space-y-5">
+            <div className="flex flex-col gap-4 laptop:flex-row laptop:items-end laptop:justify-between">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone="green">Curadoria ativa</StatusBadge>
+                  <StatusBadge tone="slate">Top 200 Brasil</StatusBadge>
+                  <StatusBadge tone="blue">{formatCount(addNowCount)} para adicionar</StatusBadge>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.22em] text-white/45">
+                    Mesa de acao
+                  </div>
+                  <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white tablet:text-[2rem]">
+                    Musicas quentes para entrar hoje.
+                  </h2>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-[0.22em] text-white/45">
-                  Mesa de acao
-                </div>
-                <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white tablet:text-[2rem]">
-                  Principais capas do dia para entrar rápido na tua base.
-                </h2>
-                <p className="max-w-xl text-sm leading-6 text-white/62">
-                  O foco aqui é simples: mostrar o que subiu, o que estreou e para qual playlist vale mandar agora.
-                </p>
-              </div>
-
-              <div className="grid gap-3 tablet:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 p-4">
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-emerald-300/80">
-                    Entrar agora
+              <div className="grid grid-cols-3 gap-2 tablet:max-w-[420px]">
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-300/80">
+                    Entrar
                   </div>
-                  <div className="text-3xl font-semibold text-white">{addNowCount}</div>
-                  <p className="mt-1 text-sm text-white/55">Melhores sinais para hoje.</p>
+                  <div className="mt-1 text-2xl font-semibold text-white">{addNowCount}</div>
                 </div>
-                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4">
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-sky-300/80">
-                    Top 20 quente
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-sky-300/80">
+                    Top 20
                   </div>
-                  <div className="text-3xl font-semibold text-white">{top20Count}</div>
-                  <p className="mt-1 text-sm text-white/55">Subidas fortes fora da base.</p>
+                  <div className="mt-1 text-2xl font-semibold text-white">{top20Count}</div>
                 </div>
-                <div className="rounded-2xl border border-violet-500/20 bg-violet-500/8 p-4">
-                  <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-violet-300/80">
+                <div className="rounded-2xl border border-violet-500/20 bg-violet-500/8 px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-violet-300/80">
                     Discovery
                   </div>
-                  <div className="text-3xl font-semibold text-white">{discoveryCount}</div>
-                  <p className="mt-1 text-sm text-white/55">Janela boa antes de saturar.</p>
+                  <div className="mt-1 text-2xl font-semibold text-white">{discoveryCount}</div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-              {topDecision ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+            {topDecision ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/42">
+                    Destaques para adicionar rapido
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="h-9 rounded-full bg-emerald-500 px-4 text-black hover:bg-emerald-400"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Atualizar
+                    </Button>
+                    <Button asChild variant="outline" className="h-9 rounded-full border-white/15 bg-white/5 px-4 text-white hover:bg-white/10">
+                      <Link href={topDecision.spotifyUrl} target="_blank" rel="noreferrer">
+                        <ArrowUpRight className="h-4 w-4" />
+                        Abrir
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="-mx-1 overflow-x-auto pb-2">
+                  <div className="flex min-w-max gap-3 px-1">
                     {topActionableTracks.map((track, index) => (
                       <div
                         key={track.trackId}
                         className={cn(
-                          "relative overflow-hidden rounded-[22px] border border-white/10 bg-black/30",
-                          index === 0 ? "col-span-2 aspect-[2.2/1]" : "aspect-square",
+                          "relative overflow-hidden rounded-[24px] border border-white/10 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
+                          index === 0 ? "h-[248px] w-[340px]" : "h-[248px] w-[220px]",
                         )}
                       >
-                        <div className="absolute inset-0 opacity-80" style={coverStyle(track.coverUrl)} />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,20,0.12),rgba(5,10,20,0.88))]" />
-                        <div className="relative flex h-full flex-col justify-end p-3">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="absolute inset-0 opacity-85" style={coverStyle(track.coverUrl)} />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,20,0.12),rgba(5,10,20,0.9))]" />
+                        <div className="relative flex h-full flex-col justify-between p-3">
+                          <div className="flex items-start justify-between gap-2">
                             <MovementBadge row={track} />
                             <StatusBadge tone="green" className="px-2 py-0.5 text-[10px]">
                               {track.decisionScore}
                             </StatusBadge>
                           </div>
-                          <div className="mt-2 truncate text-sm font-semibold text-white">
-                            {track.name}
+
+                          <div className="space-y-2">
+                            <div className="space-y-1">
+                              <div className="line-clamp-2 text-lg font-semibold leading-tight text-white">
+                                {track.name}
+                              </div>
+                              <div className="truncate text-sm text-white/72">{track.artists}</div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/78">
+                              {track.suggestedPlaylistName ? (
+                                <span className="rounded-full border border-white/12 bg-black/25 px-2.5 py-1">
+                                  {track.suggestedPlaylistName}
+                                </span>
+                              ) : null}
+                              <span className="rounded-full border border-white/12 bg-black/25 px-2.5 py-1">
+                                {getDecisionLabel(track)}
+                              </span>
+                            </div>
                           </div>
-                          <div className="truncate text-xs text-white/65">{track.artists}</div>
                         </div>
                       </div>
                     ))}
                   </div>
-
-                  <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
-                          Principal do dia
-                        </div>
-                        <div className="mt-1 truncate text-base font-semibold text-white">
-                          {topDecision.name}
-                        </div>
-                        <div className="truncate text-sm text-white/58">
-                          {topDecision.suggestedPlaylistName ?? "Observar"} · {getDecisionLabel(topDecision)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          onClick={() => window.location.reload()}
-                          className="rounded-full bg-emerald-500 px-4 text-black hover:bg-emerald-400"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                          Atualizar
-                        </Button>
-                        <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10">
-                          <Link href={topDecision.spotifyUrl} target="_blank" rel="noreferrer">
-                            <ArrowUpRight className="h-4 w-4" />
-                            Abrir
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
-              ) : (
-                <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-black/20 px-6 text-center text-sm text-white/50">
-                  Nenhuma faixa disponível para destacar agora.
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex min-h-[220px] items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-black/20 px-6 text-center text-sm text-white/50">
+                Nenhuma faixa disponível para destacar agora.
+              </div>
+            )}
           </div>
         </div>
 
