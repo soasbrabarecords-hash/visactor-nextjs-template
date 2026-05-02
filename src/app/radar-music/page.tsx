@@ -1,12 +1,9 @@
 import Container from "@/components/container";
-import MusicFilters from "@/components/charts/music-filters";
 import { TopNav } from "@/components/nav";
-import PageIntro from "@/components/page-intro";
 import RadarMusicEditorialHero from "@/components/workspace/radar-music-editorial-hero";
 import RadarMusicActionBoard from "@/components/workspace/radar-music-action-board";
 import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
-import RadarMusicRefreshButton from "@/components/workspace/radar-music-refresh-button";
 import RadarMusicTable from "@/components/workspace/radar-music-table";
 import RadarMusicTikTokStrip from "@/components/workspace/radar-music-tiktok-strip";
 import StatusBadge from "@/components/workspace/status-badge";
@@ -41,29 +38,6 @@ export default async function RadarMusicPage({
   return (
     <div>
       <TopNav title="Radar Music" />
-      <PageIntro
-        eyebrow={data.hero.eyebrow}
-        title={data.hero.title}
-        description={data.hero.description}
-        action={
-          <>
-            <MusicFilters
-              countryOptions={data.filters.countryOptions}
-              genreOptions={data.filters.genreOptions}
-              periodOptions={data.filters.periodOptions}
-              statusOptions={data.filters.statusOptions}
-              selectedCountry={data.filters.selectedCountry}
-              selectedGenre={data.filters.selectedGenre}
-              selectedPeriod={data.filters.selectedPeriod}
-              selectedStatus={data.filters.selectedStatus}
-            />
-            <RadarMusicRefreshButton
-              country={data.filters.selectedCountry}
-              genre={data.filters.selectedGenre}
-            />
-          </>
-        }
-      />
 
       <RadarMusicActionBoard queues={data.decisionQueues} />
 
