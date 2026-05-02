@@ -27,7 +27,7 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
       <PageIntro
         eyebrow="Curadoria / Radar Music"
         title="Spotify Charts — Histórico"
-        description="Importe CSVs do Spotify Charts Top 200 Brasil. Cada upload salva um snapshot diário persistido, com rastreamento de movimentação de posições."
+        description="Historico visual do Top 200 Brasil com snapshots diarios para leitura de movimento, comparacao e acao rapida."
       />
 
       <Container className="py-8">
