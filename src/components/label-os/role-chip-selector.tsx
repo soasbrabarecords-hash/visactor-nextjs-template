@@ -50,8 +50,8 @@ export default function RoleChipSelector({
               className={cn(
                 "rounded-full border px-3 py-2 text-sm font-medium transition",
                 active
-                  ? "border-emerald-400/35 bg-emerald-400/12 text-emerald-100 shadow-[0_0_0_1px_rgba(52,211,153,0.12)_inset]"
-                  : "border-white/10 bg-white/[0.04] text-white/68 hover:bg-white/[0.08] hover:text-white",
+                  ? "border-sky-300/30 bg-[linear-gradient(180deg,rgba(125,211,252,0.16),rgba(96,165,250,0.08))] text-slate-100 shadow-[0_0_0_1px_rgba(148,163,184,0.08)_inset]"
+                  : "border-white/10 bg-white/[0.035] text-white/68 hover:bg-white/[0.07] hover:text-white",
               )}
             >
               {option.label}

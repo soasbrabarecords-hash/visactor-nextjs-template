@@ -28,9 +28,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_TONE: Record<string, string> = {
   draft: "border-white/10 bg-white/6 text-white/72",
-  ready: "border-sky-400/20 bg-sky-400/10 text-sky-200",
-  released: "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
-  archived: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+  ready: "border-sky-300/18 bg-sky-300/[0.09] text-sky-100",
+  released: "border-indigo-300/18 bg-indigo-300/[0.09] text-indigo-100",
+  archived: "border-slate-300/16 bg-slate-300/[0.08] text-slate-200",
 };
 
 function formatDate(value: string | null) {
@@ -57,9 +57,9 @@ function LabelMetricCard({
 }) {
   const toneMap = {
     slate: "border-white/10 bg-white/[0.035] text-white/75",
-    emerald: "border-emerald-400/16 bg-emerald-400/[0.08] text-emerald-100",
-    sky: "border-sky-400/16 bg-sky-400/[0.08] text-sky-100",
-    violet: "border-violet-400/16 bg-violet-400/[0.08] text-violet-100",
+    emerald: "border-slate-200/10 bg-[linear-gradient(180deg,rgba(148,163,184,0.08),rgba(148,163,184,0.03))] text-slate-100",
+    sky: "border-sky-200/12 bg-[linear-gradient(180deg,rgba(125,211,252,0.09),rgba(96,165,250,0.04))] text-slate-100",
+    violet: "border-indigo-200/12 bg-[linear-gradient(180deg,rgba(165,180,252,0.09),rgba(129,140,248,0.04))] text-slate-100",
   } as const;
 
   return (
@@ -69,8 +69,8 @@ function LabelMetricCard({
           <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">{label}</div>
           <div className="mt-2 text-3xl font-semibold text-white">{value}</div>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20">
-          <Icon className="h-[18px] w-[18px] text-white/75" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-sm">
+          <Icon className="h-[18px] w-[18px] text-white/70" />
         </div>
       </div>
       <div className="mt-4 text-sm text-white/56">{meta}</div>
@@ -98,14 +98,14 @@ function TrackSpotlightCard({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.03] p-3 transition hover:border-white/18 hover:bg-white/[0.05]"
+      className="group flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.035] p-3 backdrop-blur-sm transition hover:border-white/16 hover:bg-white/[0.06]"
     >
       {coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={coverUrl}
           alt={title}
-          className="h-16 w-16 shrink-0 rounded-[18px] border border-white/10 object-cover"
+          className="h-16 w-16 shrink-0 rounded-[18px] border border-white/10 object-cover shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
         />
       ) : (
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.04]">
@@ -154,10 +154,10 @@ function ActionTile({
   return (
     <Link
       href={href}
-      className="group rounded-[22px] border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/18 hover:bg-white/[0.05]"
+      className="group rounded-[22px] border border-white/10 bg-white/[0.035] p-4 backdrop-blur-sm transition hover:border-white/16 hover:bg-white/[0.06]"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
           <Icon className="h-[18px] w-[18px] text-white/78" />
         </div>
         <ArrowRight className="h-4 w-4 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/65" />
@@ -190,16 +190,16 @@ export default async function LabelOsPage() {
   const latestArtists = artists.slice(0, 5);
 
   return (
-    <div className="bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#06101f_0%,#071121_46%,#08101d_100%)]">
+    <div className="bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.09),transparent_30%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.08),transparent_28%),linear-gradient(180deg,#080d16_0%,#0a0f18_42%,#0b0f17_100%)]">
       <Container className="py-7 tablet:py-8">
         <div className="space-y-7">
-          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,14,28,0.94),rgba(7,12,24,0.98))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.34)] tablet:p-7">
-            <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_45%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_42%)]" />
+          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(12,17,28,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.28)] backdrop-blur-xl tablet:p-7">
+            <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_45%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)]" />
 
             <div className="relative grid gap-6 laptop:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-200">
+                  <span className="rounded-full border border-sky-200/16 bg-sky-200/[0.08] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sky-100">
                     Distribuidora ativa
                   </span>
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">
@@ -220,21 +220,21 @@ export default async function LabelOsPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
                     href="/label-os/tracks/new"
-                    className="inline-flex h-11 items-center gap-2 rounded-full bg-emerald-500 px-5 text-sm font-medium text-black transition hover:bg-emerald-400"
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)]"
                   >
                     <Plus className="h-4 w-4" />
                     Nova track
                   </Link>
                   <Link
                     href="/label-os/entities/new"
-                    className="inline-flex h-11 items-center gap-2 rounded-full border border-white/14 bg-white/5 px-5 text-sm font-medium text-white transition hover:bg-white/10"
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-white/14 bg-white/[0.05] px-5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
                   >
                     <Building2 className="h-4 w-4" />
                     Nova entidade
                   </Link>
                   <Link
                     href="/label-os/tracks"
-                    className="inline-flex h-11 items-center gap-2 rounded-full border border-white/14 bg-black/20 px-5 text-sm font-medium text-white/78 transition hover:bg-white/6 hover:text-white"
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-white/14 bg-white/[0.035] px-5 text-sm font-medium text-white/78 transition hover:bg-white/[0.06] hover:text-white"
                   >
                     <Library className="h-4 w-4" />
                     Ver catálogo
@@ -242,7 +242,7 @@ export default async function LabelOsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">
@@ -257,27 +257,27 @@ export default async function LabelOsPage() {
                         : "Sem data cadastrada no pipeline agora."}
                     </div>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/10 bg-white/5">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.05]">
                     <CalendarClock className="h-5 w-5 text-white/78" />
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
                     <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">Draft</div>
                     <div className="mt-2 text-2xl font-semibold text-white">{stats.draftTracks}</div>
                   </div>
-                  <div className="rounded-2xl border border-sky-400/18 bg-sky-400/[0.08] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-sky-100/70">Prontas</div>
+                  <div className="rounded-2xl border border-sky-200/14 bg-sky-200/[0.07] p-4">
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-sky-100/64">Prontas</div>
                     <div className="mt-2 text-2xl font-semibold text-white">{readyTracks.length}</div>
                   </div>
-                  <div className="rounded-2xl border border-emerald-400/18 bg-emerald-400/[0.08] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-emerald-100/70">Lançadas</div>
+                  <div className="rounded-2xl border border-indigo-200/14 bg-indigo-200/[0.07] p-4">
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-indigo-100/64">Lançadas</div>
                     <div className="mt-2 text-2xl font-semibold text-white">{stats.releasedTracks}</div>
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.16em] text-white/38">Ajuste fino</div>
@@ -289,7 +289,7 @@ export default async function LabelOsPage() {
                     </div>
                     <Link
                       href="/label-os/tracks"
-                      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/25 px-3 py-2 text-xs font-medium text-white/78 transition hover:bg-white/8 hover:text-white"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/78 transition hover:bg-white/[0.08] hover:text-white"
                     >
                       Abrir tracks
                       <ArrowRight className="h-3.5 w-3.5" />
@@ -332,7 +332,7 @@ export default async function LabelOsPage() {
           </section>
 
           <section className="grid gap-5 laptop:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
-            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,13,25,0.96),rgba(7,11,22,0.98))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.28)] tablet:p-6">
+            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-white/40">Pipeline</div>
@@ -373,7 +373,7 @@ export default async function LabelOsPage() {
             </div>
 
             <div className="space-y-5">
-              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,13,25,0.96),rgba(7,11,22,0.98))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.28)] tablet:p-6">
+              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
                 <div className="text-xs uppercase tracking-[0.18em] text-white/40">Ações rápidas</div>
                 <h2 className="mt-2 text-xl font-semibold text-white">Operação da distribuidora</h2>
                 <div className="mt-5 grid gap-3">
@@ -398,7 +398,7 @@ export default async function LabelOsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,13,25,0.96),rgba(7,11,22,0.98))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.28)] tablet:p-6">
+              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-white/40">Roster</div>

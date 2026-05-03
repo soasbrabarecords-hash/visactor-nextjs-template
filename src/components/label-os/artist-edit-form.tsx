@@ -38,7 +38,7 @@ function toBrDate(isoDate: string | null): string {
 }
 
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-emerald-400/30 focus:bg-white/[0.06]";
+  "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";
 
 type FieldProps = {
   label: string;
@@ -99,10 +99,10 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(9,15,29,0.92),rgba(6,11,23,0.98))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.24)]">
+    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.62),rgba(11,16,27,0.82))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl">
       <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-emerald-400/10">
-          <Icon className="h-[18px] w-[18px] text-emerald-200" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+          <Icon className="h-[18px] w-[18px] text-sky-100" />
         </div>
         <div>
           <div className="text-base font-semibold text-white">{title}</div>
@@ -173,13 +173,13 @@ export default function ArtistEditForm({ artist }: { artist: LabelArtist }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,14,28,0.96),rgba(6,11,23,0.98))] shadow-[0_24px_120px_rgba(0,0,0,0.34)]">
-        <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_44%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_42%)] px-6 py-6">
+      <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
+        <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
           <div className="flex flex-wrap items-center gap-2">
             {roles.map((role) => (
               <span
                 key={role}
-                className="rounded-full border border-emerald-400/18 bg-emerald-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-100"
+                className="rounded-full border border-sky-200/16 bg-sky-200/[0.08] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100"
               >
                 {ARTIST_ROLE_LABELS[role]}
               </span>
@@ -195,7 +195,7 @@ export default function ArtistEditForm({ artist }: { artist: LabelArtist }) {
 
         <div className="space-y-5 p-6">
           {error ? (
-            <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+            <div className="rounded-2xl border border-rose-300/18 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
               {error}
             </div>
           ) : null}
@@ -296,7 +296,7 @@ export default function ArtistEditForm({ artist }: { artist: LabelArtist }) {
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex h-11 items-center rounded-full bg-emerald-500 px-5 text-sm font-medium text-black transition hover:bg-emerald-400 disabled:opacity-60"
+              className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60"
             >
               {loading ? "Salvando..." : "Salvar alteracoes"}
             </button>
