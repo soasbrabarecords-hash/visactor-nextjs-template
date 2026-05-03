@@ -3,6 +3,7 @@ import { Pencil, Plus } from "lucide-react";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import { getLabelArtists } from "@/lib/label-os";
+import { ARTIST_ROLE_LABELS, type ArtistRole } from "@/lib/label-os-taxonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function ArtistsPage() {
       <PageIntro
         eyebrow="Label OS"
         title="Artistas"
-        description="Catálogo de artistas da gravadora."
+        description="Cadastro de pessoas do catalogo com funcoes como artista, interprete, compositor e produtor musical."
         action={
           <Link
             href="/label-os/artists/new"
@@ -40,6 +41,7 @@ export default async function ArtistsPage() {
               <thead>
                 <tr className="border-b border-border bg-slate-50 dark:bg-slate-900">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Nome artístico</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Funcoes</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Email</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Instagram</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">Spotify</th>
@@ -54,6 +56,18 @@ export default async function ArtistsPage() {
                   >
                     <td className="px-4 py-3 font-medium">
                       {artist.artist_name ?? artist.name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {(artist.roles?.length ? artist.roles : ["artist"]).map((role) => (
+                          <span
+                            key={role}
+                            className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          >
+                            {ARTIST_ROLE_LABELS[role as ArtistRole] ?? role}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {artist.email ?? "—"}

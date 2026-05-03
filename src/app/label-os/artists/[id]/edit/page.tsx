@@ -33,11 +33,11 @@ export default async function EditArtistPage({ params }: Props) {
       <PageIntro
         eyebrow="Label OS / Artistas"
         title={`Editar: ${artist.artist_name ?? artist.name}`}
-        description="Atualize os dados do artista no catálogo da gravadora."
+        description="Atualize perfil, contato e funcoes do artista dentro do catalogo."
       />
 
       <Container className="py-8">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           <ArtistEditForm artist={artist} />
         </div>
       </Container>

@@ -2,23 +2,25 @@ import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
-import { getLabelEntities, ENTITY_TYPES } from "@/lib/label-entities";
+import { getLabelEntities } from "@/lib/label-entities";
+import {
+  ENTITY_FUNCTION_LABELS,
+  ENTITY_TYPE_LABELS,
+  type EntityFunction,
+} from "@/lib/label-os-taxonomy";
 
 export const dynamic = "force-dynamic";
 
-const TYPE_LABEL: Record<string, string> = Object.fromEntries(
-  ENTITY_TYPES.map((t) => [t.value, t.label]),
-);
-
 const TYPE_COLOR: Record<string, string> = {
-  artist: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
   label: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  imprint: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
   publisher: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
-  producer: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
   manager: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
   company: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   other: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  artist: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+  producer: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+  composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
 };
 
 export default async function EntitiesPage() {
@@ -29,7 +31,7 @@ export default async function EntitiesPage() {
       <PageIntro
         eyebrow="Label OS"
         title="Entidades"
-        description="Cadastro unificado de artistas, gravadoras, editoras, produtores e outros envolvidos."
+        description="Cadastro juridico e operacional para gravadoras, selos, editoras, managers e parceiros da operacao."
         action={
           <Link
             href="/label-os/entities/new"
@@ -61,7 +63,10 @@ export default async function EntitiesPage() {
                     Nome
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Tipo
+                    Categoria
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Funcoes
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Email
@@ -71,9 +76,6 @@ export default async function EntitiesPage() {
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Spotify
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                    Nasc.
                   </th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -98,8 +100,24 @@ export default async function EntitiesPage() {
                       <span
                         className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${TYPE_COLOR[entity.type] ?? TYPE_COLOR.other}`}
                       >
-                        {TYPE_LABEL[entity.type] ?? entity.type}
+                        {ENTITY_TYPE_LABELS[entity.type] ?? entity.type}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {entity.roles?.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {entity.roles.map((role) => (
+                            <span
+                              key={role}
+                              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                              {ENTITY_FUNCTION_LABELS[role as EntityFunction] ?? role}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {entity.email ?? "—"}
@@ -131,11 +149,6 @@ export default async function EntitiesPage() {
                       ) : (
                         "—"
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {entity.type === "artist" && entity.birth_date
-                        ? new Date(entity.birth_date + "T12:00:00").toLocaleDateString("pt-BR")
-                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link

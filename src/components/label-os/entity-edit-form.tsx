@@ -1,40 +1,21 @@
 "use client";
 
+import type { ComponentType, ReactNode } from "react";
+import { BadgeCheck, Building2, FileText, Orbit } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import RoleChipSelector from "@/components/label-os/role-chip-selector";
 import { ENTITY_TYPES } from "@/lib/label-entities-types";
-import type { LabelEntity, EntityType } from "@/lib/label-entities-types";
+import type { LabelEntity } from "@/lib/label-entities-types";
+import {
+  ENTITY_FUNCTION_OPTIONS,
+  ENTITY_TYPE_LABELS,
+  type EntityCategory,
+  type EntityFunction,
+} from "@/lib/label-os-taxonomy";
 
 const INPUT_CLASS =
-  "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600 w-full";
-
-// Aplica máscara DD/MM/AAAA enquanto digita
-function maskDate(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-}
-
-// Converte DD/MM/AAAA → YYYY-MM-DD para o banco
-function parseBrDate(value: string): string | null {
-  const clean = value.replace(/\D/g, "");
-  if (clean.length !== 8) return null;
-  const day = clean.slice(0, 2);
-  const month = clean.slice(2, 4);
-  const year = clean.slice(4, 8);
-  const d = new Date(`${year}-${month}-${day}`);
-  if (isNaN(d.getTime())) return null;
-  return `${year}-${month}-${day}`;
-}
-
-// Converte YYYY-MM-DD → DD/MM/AAAA para exibir
-function toBrDate(iso: string | null): string {
-  if (!iso) return "";
-  const [year, month, day] = iso.split("-");
-  if (!year || !month || !day) return "";
-  return `${day}/${month}/${year}`;
-}
+  "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-emerald-400/30 focus:bg-white/[0.06]";
 
 type FieldProps = {
   label: string;
@@ -45,60 +26,93 @@ type FieldProps = {
   defaultValue?: string;
 };
 
-const Field = ({ label, name, type = "text", placeholder, required, defaultValue }: FieldProps) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-sm font-medium text-foreground" htmlFor={name}>
-      {label}
-      {required && <span className="ml-0.5 text-red-500">*</span>}
-    </label>
-    {type === "textarea" ? (
-      <textarea
-        id={name}
-        name={name}
-        placeholder={placeholder}
-        defaultValue={defaultValue ?? ""}
-        rows={3}
-        className={INPUT_CLASS}
-      />
-    ) : (
-      <input
-        id={name}
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        required={required}
-        defaultValue={defaultValue ?? ""}
-        className={INPUT_CLASS}
-      />
-    )}
-  </div>
-);
+function Field({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required,
+  defaultValue,
+}: FieldProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium text-white" htmlFor={name}>
+        {label}
+        {required ? <span className="ml-1 text-emerald-300">*</span> : null}
+      </label>
+      {type === "textarea" ? (
+        <textarea
+          id={name}
+          name={name}
+          placeholder={placeholder}
+          defaultValue={defaultValue ?? ""}
+          rows={4}
+          className={INPUT_CLASS}
+        />
+      ) : (
+        <input
+          id={name}
+          name={name}
+          type={type}
+          placeholder={placeholder}
+          required={required}
+          defaultValue={defaultValue ?? ""}
+          className={INPUT_CLASS}
+        />
+      )}
+    </div>
+  );
+}
+
+function Section({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(9,15,29,0.92),rgba(6,11,23,0.98))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.24)]">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-sky-400/10">
+          <Icon className="h-[18px] w-[18px] text-sky-100" />
+        </div>
+        <div>
+          <div className="text-base font-semibold text-white">{title}</div>
+          <div className="mt-1 text-sm text-white/54">{description}</div>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<EntityType>(entity.type);
-  const [birthDate, setBirthDate] = useState(toBrDate(entity.birth_date));
-
-  const isArtist = type === "artist";
+  const [type, setType] = useState<EntityCategory>(
+    (ENTITY_TYPES.some((option) => option.value === entity.type)
+      ? entity.type
+      : "label") as EntityCategory,
+  );
+  const [roles, setRoles] = useState<EntityFunction[]>(entity.roles ?? []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (isArtist && birthDate && parseBrDate(birthDate) === null) {
-      setError("Data de nascimento inválida. Use DD/MM/AAAA.");
-      setLoading(false);
-      return;
-    }
-
     const formData = new FormData(e.currentTarget);
     const body = {
       name: formData.get("name") as string,
       display_name: (formData.get("display_name") as string) || null,
       type,
+      roles,
       email: (formData.get("email") as string) || null,
       phone: (formData.get("phone") as string) || null,
       instagram: (formData.get("instagram") as string) || null,
@@ -106,7 +120,7 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
       apple_music_url: (formData.get("apple_music_url") as string) || null,
       youtube_url: (formData.get("youtube_url") as string) || null,
       document: (formData.get("document") as string) || null,
-      birth_date: isArtist ? (parseBrDate(birthDate) ?? null) : null,
+      birth_date: null,
       notes: (formData.get("notes") as string) || null,
     };
 
@@ -132,91 +146,156 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      {error && (
-        <div className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-          {error}
-        </div>
-      )}
-
-      {/* Tipo */}
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-foreground" htmlFor="type">
-          Tipo <span className="ml-0.5 text-red-500">*</span>
-        </label>
-        <select
-          id="type"
-          value={type}
-          onChange={(e) => setType(e.target.value as EntityType)}
-          className={INPUT_CLASS}
-        >
-          {ENTITY_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field
-          label="Nome completo / Razão social"
-          name="name"
-          required
-          defaultValue={entity.name}
-          placeholder={isArtist ? "Nome legal" : "Nome da empresa ou pessoa"}
-        />
-        <Field
-          label={isArtist ? "Nome artístico" : "Nome fantasia / Apelido"}
-          name="display_name"
-          defaultValue={entity.display_name ?? ""}
-          placeholder={isArtist ? "Como aparece nos créditos" : "Nome de exibição"}
-        />
-        <Field label="Email" name="email" type="email" defaultValue={entity.email ?? ""} placeholder="contato@exemplo.com" />
-        <Field label="Telefone" name="phone" defaultValue={entity.phone ?? ""} placeholder="+55 11 99999-9999" />
-        <Field label="Documento (CPF/CNPJ)" name="document" defaultValue={entity.document ?? ""} placeholder="000.000.000-00" />
-
-        {isArtist && (
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-foreground" htmlFor="birth_date">
-              Data de nascimento
-            </label>
-            <input
-              id="birth_date"
-              type="text"
-              inputMode="numeric"
-              placeholder="DD/MM/AAAA"
-              value={birthDate}
-              onChange={(e) => setBirthDate(maskDate(e.target.value))}
-              maxLength={10}
-              className={INPUT_CLASS}
-            />
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,14,28,0.96),rgba(6,11,23,0.98))] shadow-[0_24px_120px_rgba(0,0,0,0.34)]">
+        <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.15),transparent_44%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.14),transparent_42%)] px-6 py-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-sky-400/18 bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100">
+              {ENTITY_TYPE_LABELS[type]}
+            </span>
+            {roles.map((role) => (
+              <span
+                key={role}
+                className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/70"
+              >
+                {role.replaceAll("_", " ")}
+              </span>
+            ))}
           </div>
-        )}
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+            Ajustar categoria e funcoes da entidade.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/56">
+            Mantenha o cadastro juridico alinhado com o papel real da empresa dentro da distribuicao e dos creditos.
+          </p>
+        </div>
 
-        <Field label="Instagram" name="instagram" defaultValue={entity.instagram ?? ""} placeholder="@handle" />
-        <Field label="Spotify URL" name="spotify_url" defaultValue={entity.spotify_url ?? ""} placeholder="https://open.spotify.com/artist/..." />
-        <Field label="Apple Music URL" name="apple_music_url" defaultValue={entity.apple_music_url ?? ""} placeholder="https://music.apple.com/..." />
-        <Field label="YouTube URL" name="youtube_url" defaultValue={entity.youtube_url ?? ""} placeholder="https://youtube.com/@handle" />
-      </div>
+        <div className="space-y-5 p-6">
+          {error ? (
+            <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
 
-      <Field label="Observações" name="notes" type="textarea" defaultValue={entity.notes ?? ""} placeholder="Notas internas..." />
+          <Section
+            icon={Building2}
+            title="Categoria da entidade"
+            description="A categoria principal organiza a leitura do cadastro. As funcoes extras cobrem casos como produtor fonografico."
+          >
+            <div className="space-y-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-white" htmlFor="type">
+                  Categoria principal
+                </label>
+                <select
+                  id="type"
+                  name="type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as EntityCategory)}
+                  className={INPUT_CLASS}
+                >
+                  {ENTITY_TYPES.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-slate-800 px-5 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300"
-        >
-          {loading ? "Salvando..." : "Salvar alterações"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-md border border-border px-5 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          Cancelar
-        </button>
+              <RoleChipSelector
+                label="Funcoes adicionais"
+                hint="Selecione papeis complementares sem perder a categoria principal."
+                options={ENTITY_FUNCTION_OPTIONS}
+                value={roles}
+                onChange={(nextValue) => setRoles(nextValue as EntityFunction[])}
+              />
+            </div>
+          </Section>
+
+          <Section
+            icon={BadgeCheck}
+            title="Dados de cadastro"
+            description="Dados essenciais para contratos, repasses, contato e organizacao do ecossistema."
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Razao social / nome legal"
+                name="name"
+                required
+                placeholder="Nome da empresa ou representante"
+                defaultValue={entity.name}
+              />
+              <Field
+                label="Nome fantasia"
+                name="display_name"
+                placeholder="Como aparece no sistema e nos creditos"
+                defaultValue={entity.display_name ?? ""}
+              />
+              <Field label="Email" name="email" type="email" placeholder="contato@empresa.com" defaultValue={entity.email ?? ""} />
+              <Field label="Telefone" name="phone" placeholder="+55 11 99999-9999" defaultValue={entity.phone ?? ""} />
+              <Field label="Documento" name="document" placeholder="CNPJ ou CPF" defaultValue={entity.document ?? ""} />
+              <Field label="Instagram" name="instagram" placeholder="@perfil" defaultValue={entity.instagram ?? ""} />
+            </div>
+          </Section>
+
+          <Section
+            icon={Orbit}
+            title="Links e presenca publica"
+            description="Atalhos para verificar rapidamente perfis, pages ou catálogos públicos."
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Spotify URL"
+                name="spotify_url"
+                placeholder="https://open.spotify.com/..."
+                defaultValue={entity.spotify_url ?? ""}
+              />
+              <Field
+                label="Apple Music URL"
+                name="apple_music_url"
+                placeholder="https://music.apple.com/..."
+                defaultValue={entity.apple_music_url ?? ""}
+              />
+              <Field
+                label="YouTube URL"
+                name="youtube_url"
+                placeholder="https://youtube.com/@perfil"
+                defaultValue={entity.youtube_url ?? ""}
+              />
+            </div>
+          </Section>
+
+          <Section
+            icon={FileText}
+            title="Observacoes internas"
+            description="Contexto contratual, repasses, relacionamento e qualquer detalhe operacional relevante."
+          >
+            <Field
+              label="Notas"
+              name="notes"
+              type="textarea"
+              placeholder="Observacoes de contrato, distribuicao, repasse, relacionamento..."
+              defaultValue={entity.notes ?? ""}
+            />
+          </Section>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex h-11 items-center rounded-full bg-emerald-500 px-5 text-sm font-medium text-black transition hover:bg-emerald-400 disabled:opacity-60"
+            >
+              {loading ? "Salvando..." : "Salvar alteracoes"}
+            </button>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       </div>
     </form>
   );

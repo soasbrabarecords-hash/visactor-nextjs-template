@@ -8,10 +8,10 @@ export default function NewArtistPage() {
       <PageIntro
         eyebrow="Label OS / Artistas"
         title="Novo Artista"
-        description="Cadastre um novo artista no catálogo da gravadora."
+        description="Cadastre o artista e marque todas as funcoes que ele exerce dentro do catalogo."
       />
       <Container className="py-8">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           <ArtistForm />
         </div>
       </Container>

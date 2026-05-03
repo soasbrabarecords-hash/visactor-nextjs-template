@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import type { ArtistRole } from "@/lib/label-os-taxonomy";
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -8,6 +9,7 @@ export type LabelArtist = {
   id: string;
   name: string;
   artist_name: string | null;
+  roles: ArtistRole[];
   email: string | null;
   phone: string | null;
   instagram: string | null;

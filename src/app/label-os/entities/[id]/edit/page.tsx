@@ -19,10 +19,10 @@ export default async function EditEntityPage({ params }: Props) {
       <PageIntro
         eyebrow="Label OS / Entidades"
         title="Editar Entidade"
-        description={`Editando: ${entity.display_name ?? entity.name}`}
+        description={`Ajuste categoria, funcoes e dados de ${entity.display_name ?? entity.name}.`}
       />
       <Container className="py-8">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           <EntityEditForm entity={entity} />
         </div>
       </Container>

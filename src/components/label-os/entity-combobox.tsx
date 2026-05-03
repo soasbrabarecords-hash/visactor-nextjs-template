@@ -2,27 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { LabelEntity } from "@/lib/label-entities-types";
-
-const TYPE_LABEL: Record<string, string> = {
-  artist: "Artista",
-  label: "Gravadora",
-  publisher: "Editora",
-  producer: "Produtor",
-  composer: "Compositor",
-  manager: "Manager",
-  company: "Empresa",
-  other: "Outro",
-};
+import {
+  ENTITY_FUNCTION_LABELS,
+  ENTITY_TYPE_LABELS,
+  type EntityFunction,
+} from "@/lib/label-os-taxonomy";
 
 const TYPE_COLOR: Record<string, string> = {
-  artist: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  label: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  publisher: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  producer: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-  composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  manager: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+  label: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+  imprint: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  publisher: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  manager: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
   company: "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
   other: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400",
+  artist: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+  producer: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
 };
 
 type Props = {
@@ -35,7 +30,7 @@ type Props = {
 export default function EntityCombobox({
   value,
   onChange,
-  placeholder = "Buscar artista, gravadora ou empresa...",
+  placeholder = "Buscar gravadora, selo, editora ou parceiro...",
   required = false,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -45,7 +40,6 @@ export default function EntityCombobox({
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fechar ao clicar fora
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -56,7 +50,6 @@ export default function EntityCombobox({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Busca com debounce
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (query.trim().length < 1) {
@@ -97,18 +90,31 @@ export default function EntityCombobox({
 
   return (
     <div ref={containerRef} className="relative flex flex-col gap-1">
-      {/* Entidade selecionada */}
       {value ? (
         <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 text-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-medium truncate">
-              {value.display_name ?? value.name}
-            </span>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[value.type] ?? TYPE_COLOR.other}`}
-            >
-              {TYPE_LABEL[value.type] ?? value.type}
-            </span>
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium">
+                {value.display_name ?? value.name}
+              </span>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[value.type] ?? TYPE_COLOR.other}`}
+              >
+                {ENTITY_TYPE_LABELS[value.type] ?? value.type}
+              </span>
+            </div>
+            {value.roles?.length ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {value.roles.slice(0, 2).map((role) => (
+                  <span
+                    key={role}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    {ENTITY_FUNCTION_LABELS[role as EntityFunction] ?? role}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -131,19 +137,14 @@ export default function EntityCombobox({
         />
       )}
 
-      {/* Dropdown de resultados */}
       {open && !value && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-background shadow-lg">
-          {loading && (
-            <div className="px-4 py-3 text-sm text-muted-foreground">
-              Buscando...
-            </div>
-          )}
-          {!loading && results.length === 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-background shadow-lg">
+          {loading ? (
+            <div className="px-4 py-3 text-sm text-muted-foreground">Buscando...</div>
+          ) : null}
+          {!loading && results.length === 0 ? (
             <div className="flex flex-col gap-2 px-4 py-3">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma entidade encontrada.
-              </p>
+              <p className="text-sm text-muted-foreground">Nenhuma entidade encontrada.</p>
               <a
                 href="/label-os/entities/new"
                 target="_blank"
@@ -153,23 +154,37 @@ export default function EntityCombobox({
                 + Criar nova entidade
               </a>
             </div>
-          )}
+          ) : null}
           {!loading &&
             results.map((entity) => (
               <button
                 key={entity.id}
                 type="button"
                 onClick={() => handleSelect(entity)}
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
               >
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {entity.display_name ?? entity.name}
-                </span>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[entity.type] ?? TYPE_COLOR.other}`}
-                >
-                  {TYPE_LABEL[entity.type] ?? entity.type}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {entity.display_name ?? entity.name}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[entity.type] ?? TYPE_COLOR.other}`}
+                  >
+                    {ENTITY_TYPE_LABELS[entity.type] ?? entity.type}
+                  </span>
+                </div>
+                {entity.roles?.length ? (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {entity.roles.slice(0, 2).map((role) => (
+                      <span
+                        key={role}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        {ENTITY_FUNCTION_LABELS[role as EntityFunction] ?? role}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </button>
             ))}
         </div>

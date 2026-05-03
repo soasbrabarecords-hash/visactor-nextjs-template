@@ -8,10 +8,10 @@ export default function NewEntityPage() {
       <PageIntro
         eyebrow="Label OS / Entidades"
         title="Nova Entidade"
-        description="Cadastre um artista, gravadora, editora, produtor ou qualquer envolvido."
+        description="Cadastre gravadora, selo, editora, manager e funcoes extras como produtor fonografico."
       />
       <Container className="py-8">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           <EntityForm />
         </div>
       </Container>
