@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     const ext = file.name.split(".").pop() ?? "bin";
     const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-    const supabase = await createClient();
+    const supabase = createAdminClient() ?? (await createClient());
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -41,6 +42,15 @@ export async function POST(request: Request) {
       });
 
     if (error) {
+      if (error.message.includes("row-level security policy")) {
+        return NextResponse.json(
+          {
+            error:
+              "O Storage do Supabase bloqueou o upload deste bucket. Configure policy de insert para usuarios autenticados ou defina SUPABASE_SERVICE_ROLE_KEY no servidor.",
+          },
+          { status: 403 },
+        );
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

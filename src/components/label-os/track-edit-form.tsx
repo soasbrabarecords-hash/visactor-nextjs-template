@@ -4,7 +4,6 @@ import { FileAudio2, FileImage } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { LabelTrack } from "@/lib/label-os-types";
-import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 
 const INPUT_CLASS =
   "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";
@@ -28,34 +27,16 @@ const GENRE_OPTIONS = [
 
 async function uploadFile(file: File | null, bucket: string): Promise<string | null> {
   if (!file || file.size === 0) return null;
-
-  const supabase = createSupabaseClient();
-  const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
-  const path = `label-os/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    contentType: file.type || undefined,
-    upsert: true,
-  });
-
-  if (error) {
-    throw new Error(error.message || `Erro no upload para ${bucket}`);
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("bucket", bucket);
+  const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error ?? `Erro no upload para ${bucket}`);
   }
-
-  if (bucket === "label-covers") {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
-  }
-
-  const signed = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, 60 * 60 * 24 * 30);
-
-  if (signed.error) {
-    throw new Error(signed.error.message || `Erro ao gerar link de ${bucket}`);
-  }
-
-  return signed.data.signedUrl;
+  const json = (await res.json()) as { url: string };
+  return json.url;
 }
 
 export default function TrackEditForm({ track }: Props) {
