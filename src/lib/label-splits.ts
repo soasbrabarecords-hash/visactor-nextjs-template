@@ -9,6 +9,16 @@ import type {
   TrackRoyaltySplitInput,
 } from "./label-splits-types";
 
+function isMissingTableOrRelationError(error: { message?: string; code?: string } | null | undefined) {
+  return Boolean(
+    error?.code === "PGRST205" ||
+      error?.message?.includes("Could not find a relationship") ||
+      error?.message?.includes("does not exist") ||
+      error?.message?.includes("relation") ||
+      error?.message?.includes("schema cache"),
+  );
+}
+
 // ── Obra / Composições ────────────────────────────────────────────────────────
 
 export async function getTrackCompositions(
@@ -24,7 +34,10 @@ export async function getTrackCompositions(
     .eq("track_id", trackId)
     .order("created_at");
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingTableOrRelationError(error)) return [];
+    throw error;
+  }
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const ent = row.label_entities as
@@ -82,7 +95,10 @@ export async function getTrackMasterSplits(
     .eq("track_id", trackId)
     .order("created_at");
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingTableOrRelationError(error)) return [];
+    throw error;
+  }
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const ent = row.label_entities as
@@ -141,7 +157,10 @@ export async function getTrackRoyaltySplits(
     .eq("track_id", trackId)
     .order("created_at");
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingTableOrRelationError(error)) return [];
+    throw error;
+  }
 
   return (data ?? []).map((row: Record<string, unknown>) => {
     const ent = row.label_entities as
