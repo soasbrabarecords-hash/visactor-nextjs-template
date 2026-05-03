@@ -276,7 +276,7 @@ export function buildSpotifyAuthorizeUrl({
     response_type: "code",
     redirect_uri: getSpotifyRedirectUri(origin),
     scope:
-      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email user-top-read user-follow-read",
+      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email user-read-private user-top-read user-follow-read streaming user-read-playback-state user-modify-playback-state",
     show_dialog: "true",
     state,
   });
