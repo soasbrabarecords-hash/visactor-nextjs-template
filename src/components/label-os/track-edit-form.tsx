@@ -39,10 +39,20 @@ async function uploadFile(file: File | null, bucket: string): Promise<string | n
   return json.url;
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await res.json()) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function TrackEditForm({ track }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [form, setForm] = useState({
@@ -69,6 +79,7 @@ export default function TrackEditForm({ track }: Props) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
 
     if (!form.title.trim()) {
       setError("Titulo da musica e obrigatorio.");
@@ -78,8 +89,29 @@ export default function TrackEditForm({ track }: Props) {
     setLoading(true);
 
     try {
-      const coverUrl = coverFile ? await uploadFile(coverFile, "label-covers") : track.cover_url;
-      const audioUrl = audioFile ? await uploadFile(audioFile, "label-audio") : track.audio_url;
+      let coverUrl = track.cover_url;
+      let audioUrl = track.audio_url;
+      const warnings: string[] = [];
+
+      if (coverFile) {
+        try {
+          coverUrl = await uploadFile(coverFile, "label-covers");
+        } catch (err) {
+          warnings.push(
+            err instanceof Error ? `Capa nao atualizada: ${err.message}` : "Capa nao atualizada.",
+          );
+        }
+      }
+
+      if (audioFile) {
+        try {
+          audioUrl = await uploadFile(audioFile, "label-audio");
+        } catch (err) {
+          warnings.push(
+            err instanceof Error ? `Audio nao atualizado: ${err.message}` : "Audio nao atualizado.",
+          );
+        }
+      }
 
       const response = await fetch(`/api/label-os/tracks/${track.id}`, {
         method: "PATCH",
@@ -99,8 +131,15 @@ export default function TrackEditForm({ track }: Props) {
       });
 
       if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? "Erro ao atualizar track.");
+        throw new Error(await readApiError(response, "Erro ao atualizar track."));
+      }
+
+      if (warnings.length > 0) {
+        setNotice(`Track salva, mas alguns arquivos nao subiram. ${warnings.join(" ")}`);
+        setCoverFile(null);
+        setAudioFile(null);
+        router.refresh();
+        return;
       }
 
       router.push(`/label-os/tracks/${track.id}`);
@@ -117,6 +156,11 @@ export default function TrackEditForm({ track }: Props) {
       {error ? (
         <div className="rounded-2xl border border-rose-300/18 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
           {error}
+        </div>
+      ) : null}
+      {notice ? (
+        <div className="rounded-2xl border border-amber-300/18 bg-amber-300/[0.08] px-4 py-3 text-sm text-amber-100">
+          {notice}
         </div>
       ) : null}
 
