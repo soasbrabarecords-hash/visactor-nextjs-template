@@ -33,6 +33,7 @@ export type LabelTrack = {
   release_date: string | null;
   status: string;
   genre: string | null;
+  subgenre: string | null;
   bpm: number | null;
   key: string | null;
   explicit: boolean;
