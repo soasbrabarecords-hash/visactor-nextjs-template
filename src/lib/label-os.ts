@@ -65,6 +65,12 @@ export type TrackParticipant = {
   master_percentage: number;
   created_at: string;
   label_artists?: Pick<LabelArtist, "id" | "name" | "artist_name">;
+  label_entities?: {
+    id: string;
+    name: string;
+    display_name: string | null;
+    type: string;
+  };
 };
 
 export type TrackParticipantInput = Omit<
@@ -247,6 +253,41 @@ export async function createLabelTrack(
   };
 }
 
+export async function updateLabelTrack(
+  id: string,
+  input: Partial<LabelTrackInput>,
+): Promise<LabelTrack> {
+  const supabase = await createClient();
+  let payload: Partial<LabelTrackInput> = { ...input };
+  let data: LabelTrack | null = null;
+  let error: { message?: string } | null = null;
+
+  for (const optionalColumn of ["subgenre", "lyrics"] as const) {
+    const response = await supabase
+      .from("label_tracks")
+      .update(payload)
+      .eq("id", id)
+      .select()
+      .single();
+
+    data = response.data as LabelTrack | null;
+    error = response.error;
+
+    if (!isMissingColumnError(error, optionalColumn)) {
+      break;
+    }
+
+    const { [optionalColumn]: _ignored, ...fallbackPayload } = payload;
+    payload = fallbackPayload;
+  }
+
+  if (error) throw new Error(`updateLabelTrack: ${error.message}`);
+  return {
+    ...(data as LabelTrack),
+    subgenre: (data as LabelTrack).subgenre ?? input.subgenre ?? null,
+  };
+}
+
 // ─── Participants ─────────────────────────────────────────
 
 export async function getTrackParticipants(
@@ -255,7 +296,7 @@ export async function getTrackParticipants(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_track_participants")
-    .select("*, label_artists(id, name, artist_name)")
+    .select("*, label_artists(id, name, artist_name), label_entities(id, name, display_name, type)")
     .eq("track_id", trackId)
     .order("created_at", { ascending: true });
 

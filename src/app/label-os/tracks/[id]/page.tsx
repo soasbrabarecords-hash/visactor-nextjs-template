@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileText, Music } from "lucide-react";
+import { ArrowLeft, FileText, Music, Pencil } from "lucide-react";
 import Container from "@/components/container";
 import {
   getLabelTrackById,
@@ -44,6 +44,19 @@ const ROLE_LABEL: Record<string, string> = {
   manager: "Manager",
   other: "Outro",
 };
+
+function getParticipantDisplayName(participant: {
+  label_artists?: { name: string; artist_name: string | null };
+  label_entities?: { name: string; display_name: string | null };
+}) {
+  return (
+    participant.label_artists?.artist_name ??
+    participant.label_artists?.name ??
+    participant.label_entities?.display_name ??
+    participant.label_entities?.name ??
+    "—"
+  );
+}
 
 function pctColor(total: number) {
   if (Math.abs(total - 100) < 0.01) return "text-green-600 dark:text-green-400";
@@ -153,6 +166,15 @@ export default async function TrackDetailPage({ params }: Props) {
                 >
                   {STATUS_LABEL[track.status] ?? track.status}
                 </span>
+                <div>
+                  <Link
+                    href={`/label-os/tracks/${track.id}/edit`}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/78 transition hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <Pencil size={13} />
+                    Editar track
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -165,6 +187,7 @@ export default async function TrackDetailPage({ params }: Props) {
                 {(
                   [
                     { label: "Gênero", value: track.genre },
+                    { label: "Subgênero", value: track.subgenre },
                     { label: "BPM", value: track.bpm?.toString() },
                     { label: "Tonalidade", value: track.key },
                     {
@@ -199,6 +222,14 @@ export default async function TrackDetailPage({ params }: Props) {
                     Observações
                   </dt>
                   <dd className="text-sm text-foreground">{track.notes}</dd>
+                </div>
+              )}
+              {track.lyrics && (
+                <div className="border-t border-border px-5 py-4">
+                  <dt className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                    Letra
+                  </dt>
+                  <dd className="whitespace-pre-wrap text-sm text-foreground">{track.lyrics}</dd>
                 </div>
               )}
             </div>
@@ -287,9 +318,7 @@ export default async function TrackDetailPage({ params }: Props) {
                           className="border-b border-border last:border-0"
                         >
                           <td className="px-4 py-2.5 font-medium">
-                            {p.label_artists?.artist_name ??
-                              p.label_artists?.name ??
-                              "—"}
+                            {getParticipantDisplayName(p)}
                           </td>
                           <td className="px-4 py-2.5 text-muted-foreground">
                             {ROLE_LABEL[p.role] ?? p.role}
