@@ -92,6 +92,8 @@ type SpotifyTracksBatchResponse = {
 type AccountPlaylistTarget = {
   id: string;
   name: string;
+  imageUrl: string | null;
+  tracksTotal: number;
   genre: TrackGenre;
   trackIds: Set<string>;
   artistNames: Set<string>;
@@ -123,16 +125,13 @@ type ListeningArtist = {
   affinityScore: number;
 };
 
-type ListeningTrack = {
-  id: string;
-  name: string;
-  artists: string;
-  artistIds: string[];
-  popularity: number;
-  albumName: string;
-  coverUrl: string | null;
-  spotifyUrl: string;
-  inPlaylistNames: string[];
+export type SpotifyReleaseRadarPlaylistFit = {
+  playlistId: string;
+  playlistName: string;
+  imageUrl: string | null;
+  tracksTotal: number;
+  scoreLabel: string;
+  reason: string;
 };
 
 type ReleaseCandidate = {
@@ -154,6 +153,7 @@ type ReleaseCandidate = {
   genreLabel: string;
   alreadyInPlaylists: boolean;
   playlistNames: string[];
+  playlistMatches: SpotifyReleaseRadarPlaylistFit[];
   suggestedPlaylistName: string | null;
   fitLabel: string;
   fitTone: StatusTone;
@@ -216,6 +216,7 @@ export type SpotifyReleaseRadarOpportunity = {
   fitTone: StatusTone;
   signals: string[];
   playlistNames: string[];
+  playlistMatches: SpotifyReleaseRadarPlaylistFit[];
   suggestedPlaylistName: string | null;
   reason: string;
 };
@@ -406,7 +407,7 @@ function getReleaseTypeLabel(value: string | undefined) {
   return "Release";
 }
 
-function inferTargetPlaylistName({
+function buildPlaylistMatches({
   accountProfile,
   trackId,
   artistNames,
@@ -416,39 +417,79 @@ function inferTargetPlaylistName({
   trackId: string;
   artistNames: string[];
   genre: TrackGenre;
-}) {
-  let bestMatch: { name: string; score: number } | null = null;
+}): SpotifyReleaseRadarPlaylistFit[] {
+  return accountProfile.playlistTargets
+    .filter((playlist) => !playlist.trackIds.has(trackId))
+    .map((playlist) => {
+      let score = 0;
+      const reasons: string[] = [];
 
-  for (const playlist of accountProfile.playlistTargets) {
-    if (playlist.trackIds.has(trackId)) {
-      continue;
-    }
+      if (genre !== "unknown") {
+        if (playlist.genre === genre) {
+          score += 34;
+          reasons.push("mesmo genero");
+        } else {
+          const genrePresence = playlist.genreCounts.get(genre) ?? 0;
 
-    let score = 0;
-
-    if (genre !== "unknown") {
-      if (playlist.genre === genre) {
-        score += 28;
-      } else {
-        score += Math.min((playlist.genreCounts.get(genre) ?? 0) * 4, 20);
+          if (genrePresence > 0) {
+            score += Math.min(genrePresence * 4, 18);
+            reasons.push(`${genrePresence} faixas proximas`);
+          }
+        }
       }
-    }
 
-    const matchingArtists = artistNames.filter((artist) =>
-      playlist.artistNames.has(artist),
-    ).length;
+      const matchingArtists = artistNames.filter((artist) =>
+        playlist.artistNames.has(artist),
+      ).length;
 
-    score += matchingArtists * 12;
+      if (matchingArtists > 0) {
+        score += matchingArtists * 14;
+        reasons.push(
+          matchingArtists === 1
+            ? "1 artista recorrente"
+            : `${matchingArtists} artistas recorrentes`,
+        );
+      }
 
-    if (score >= 18 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = {
-        name: playlist.name,
+      const trackDensityBoost =
+        playlist.tracksTotal >= 15 && playlist.tracksTotal <= 140
+          ? 8
+          : playlist.tracksTotal > 140
+            ? 4
+            : 2;
+
+      score += trackDensityBoost;
+
+      return {
+        playlistId: playlist.id,
+        playlistName: playlist.name,
+        imageUrl: playlist.imageUrl,
+        tracksTotal: playlist.tracksTotal,
         score,
+        reason:
+          reasons[0] ??
+          (genre !== "unknown"
+            ? "encaixe por contexto de base"
+            : "encaixe por descoberta"),
       };
-    }
-  }
+    })
+    .filter((playlist) => playlist.score >= 12)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
 
-  return bestMatch?.name ?? null;
+      return right.tracksTotal - left.tracksTotal;
+    })
+    .slice(0, 3)
+    .map((playlist) => ({
+      playlistId: playlist.playlistId,
+      playlistName: playlist.playlistName,
+      imageUrl: playlist.imageUrl,
+      tracksTotal: playlist.tracksTotal,
+      scoreLabel: `${playlist.score} pts`,
+      reason: playlist.reason,
+    }));
 }
 
 async function spotifyFetch<T>(
@@ -871,6 +912,8 @@ function mapEditablePlaylistsToProfile(playlists: SpotifyEditablePlaylist[]) {
     playlistTargets.push({
       id: playlist.id,
       name: playlist.name,
+      imageUrl: playlist.imageUrl,
+      tracksTotal: playlist.tracksTotal,
       genre: playlistGenre,
       trackIds: playlistTrackIds,
       artistNames: playlistArtistNames,
@@ -909,6 +952,7 @@ function buildFitSummary({
 }): {
   playlistNames: string[];
   alreadyInPlaylists: boolean;
+  playlistMatches: SpotifyReleaseRadarPlaylistFit[];
   suggestedPlaylistName: string | null;
   accountArtistCount: number;
   fitLabel: string;
@@ -918,6 +962,7 @@ function buildFitSummary({
     return {
       playlistNames: [],
       alreadyInPlaylists: false,
+      playlistMatches: [],
       suggestedPlaylistName: null,
       accountArtistCount: 0,
       fitLabel: "Base em branco",
@@ -938,15 +983,16 @@ function buildFitSummary({
     genre === "unknown"
       ? 0
       : accountProfile.genreTrackCountByType.get(genre) ?? 0;
-  const suggestedPlaylistName =
+  const playlistMatches =
     playlistNames.length > 0
-      ? null
-      : inferTargetPlaylistName({
+      ? []
+      : buildPlaylistMatches({
           accountProfile,
           trackId,
           artistNames,
           genre,
         });
+  const suggestedPlaylistName = playlistMatches[0]?.playlistName ?? null;
   const fitSignal =
     playlistNames.length * 18 +
     accountArtistCount * 5 +
@@ -957,6 +1003,7 @@ function buildFitSummary({
     return {
       playlistNames,
       alreadyInPlaylists: playlistNames.length > 0,
+      playlistMatches,
       suggestedPlaylistName,
       accountArtistCount,
       fitLabel: playlistNames.length > 0 ? "Ja na base" : "Fit alto",
@@ -968,6 +1015,7 @@ function buildFitSummary({
     return {
       playlistNames,
       alreadyInPlaylists: false,
+      playlistMatches,
       suggestedPlaylistName,
       accountArtistCount,
       fitLabel: "Fit medio",
@@ -978,6 +1026,7 @@ function buildFitSummary({
   return {
     playlistNames,
     alreadyInPlaylists: false,
+    playlistMatches,
     suggestedPlaylistName,
     accountArtistCount,
     fitLabel: "Fit baixo",
@@ -1208,6 +1257,7 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
           genreLabel,
           alreadyInPlaylists: fit.alreadyInPlaylists,
           playlistNames: fit.playlistNames,
+          playlistMatches: fit.playlistMatches,
           suggestedPlaylistName: fit.suggestedPlaylistName,
           fitLabel: fit.fitLabel,
           fitTone: fit.fitTone,
@@ -1275,6 +1325,7 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
         fitTone: candidate.fitTone,
         signals: candidate.signals,
         playlistNames: candidate.playlistNames,
+        playlistMatches: candidate.playlistMatches,
         suggestedPlaylistName: candidate.suggestedPlaylistName,
         reason: candidate.reason,
       }));

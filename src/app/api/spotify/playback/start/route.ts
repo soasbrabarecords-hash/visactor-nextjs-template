@@ -9,6 +9,48 @@ type StartPlaybackBody = {
   spotifyTrackId?: string;
 };
 
+type SpotifyDevicesResponse = {
+  devices?: Array<{
+    id?: string;
+    is_active?: boolean;
+    is_restricted?: boolean;
+    name?: string;
+    type?: string;
+  }>;
+};
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+async function waitForDevice(accessToken: string, deviceId: string) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const response = await fetch("https://api.spotify.com/v1/me/player/devices", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const payload = (await response.json()) as SpotifyDevicesResponse;
+      const device = (payload.devices ?? []).find((item) => item.id === deviceId);
+
+      if (device && !device.is_restricted) {
+        return device;
+      }
+    }
+
+    await wait(350);
+  }
+
+  throw new Error(
+    "O Spotify Web Player ainda nao apareceu como dispositivo disponivel. Deixe a pagina aberta, reconecte o Spotify e tente novamente.",
+  );
+}
+
 async function transferPlaybackToDevice(accessToken: string, deviceId: string) {
   const response = await fetch("https://api.spotify.com/v1/me/player", {
     method: "PUT",
@@ -85,7 +127,9 @@ export async function POST(request: Request) {
     }
 
     const { refreshedToken } = await withSpotifyToken(async (accessToken) => {
+      await waitForDevice(accessToken, deviceId);
       await transferPlaybackToDevice(accessToken, deviceId);
+      await wait(250);
       await startTrackPlayback(accessToken, deviceId, spotifyTrackId);
       return true;
     });

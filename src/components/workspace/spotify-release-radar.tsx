@@ -139,11 +139,14 @@ export default function SpotifyReleaseRadar({
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [playerStatus, setPlayerStatus] = useState("Carregando player web...");
   const [playerError, setPlayerError] = useState<string | null>(null);
+  const [playerConnected, setPlayerConnected] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<RadarOpportunity | null>(null);
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(true);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
   const [isTogglingPlayback, setIsTogglingPlayback] = useState(false);
+  const featuredOpportunities = data.opportunities.slice(0, 3);
+  const queueOpportunities = data.opportunities.slice(3);
 
   useEffect(() => {
     if (!data.connected) {
@@ -191,6 +194,7 @@ export default function SpotifyReleaseRadar({
               fitTone: "blue",
               signals: [],
               playlistNames: [],
+              playlistMatches: [],
               suggestedPlaylistName: null,
               reason: "Faixa em reproducao no player web do Spotify.",
             },
@@ -233,6 +237,7 @@ export default function SpotifyReleaseRadar({
         }
 
         setDeviceId(device_id);
+        setPlayerConnected(true);
         setPlayerStatus("Player pronto. Clique em ouvir aqui para tocar no sistema.");
         setPlayerError(null);
       });
@@ -243,6 +248,7 @@ export default function SpotifyReleaseRadar({
         }
 
         setDeviceId(null);
+        setPlayerConnected(false);
         setPlayerStatus("Player offline no navegador. Tente recarregar a pagina.");
       });
 
@@ -289,7 +295,10 @@ export default function SpotifyReleaseRadar({
       const connected = await playerInstance.connect();
 
       if (!connected && !cancelled) {
+        setPlayerConnected(false);
         setPlayerError("O Spotify nao conseguiu conectar o player web neste navegador.");
+      } else if (!cancelled) {
+        setPlayerConnected(true);
       }
 
       if (!cancelled) {
@@ -619,7 +628,10 @@ export default function SpotifyReleaseRadar({
                       Player Web
                     </StatusBadge>
                     <StatusBadge tone={deviceId ? "blue" : "yellow"}>
-                      {deviceId ? "Pronto no navegador" : "Inicializando"}
+                      {deviceId ? "Dispositivo pronto" : "Inicializando"}
+                    </StatusBadge>
+                    <StatusBadge tone={playerConnected ? "green" : "slate"}>
+                      {playerConnected ? "SDK conectado" : "Aguardando conexao"}
                     </StatusBadge>
                   </div>
                   <h3 className="mt-3 text-2xl font-semibold text-white">
@@ -629,6 +641,10 @@ export default function SpotifyReleaseRadar({
                     Esse modo usa o Spotify Web Playback SDK. Para tocar a musica completa
                     dentro do sistema, a conta precisa estar reconectada com as novas permissoes
                     e ser Premium.
+                  </p>
+                  <p className="mt-2 max-w-3xl text-xs leading-6 text-white/45">
+                    Se o player nao abrir, o caso mais comum e conta sem Premium, permissoes
+                    antigas ou o dispositivo do navegador ainda nao ter aparecido no Spotify.
                   </p>
                 </div>
                 <a
@@ -803,9 +819,111 @@ export default function SpotifyReleaseRadar({
                 </p>
               </div>
 
+              {featuredOpportunities.length > 0 ? (
+                <div className="border-b border-white/8 px-5 py-5">
+                  <div className="mb-4 text-xs uppercase tracking-[0.18em] text-white/42">
+                    Melhores encaixes agora
+                  </div>
+                  <div className="grid gap-4 xl:grid-cols-3">
+                    {featuredOpportunities.map((track) => (
+                      <article
+                        key={`featured-${track.id}`}
+                        className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,14,28,0.94),rgba(5,10,22,0.98))] p-4 shadow-[0_18px_52px_rgba(0,0,0,0.24)]"
+                      >
+                        <div
+                          className="absolute inset-0 opacity-18 transition duration-300 group-hover:opacity-28"
+                          style={coverStyle(track.coverUrl)}
+                        />
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,8,18,0.18),rgba(4,8,18,0.94))]" />
+
+                        <div className="relative">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs uppercase tracking-[0.16em] text-white/45">
+                                {track.releaseName}
+                              </div>
+                              <h4 className="mt-2 truncate text-xl font-semibold text-white">
+                                {track.name}
+                              </h4>
+                              <p className="truncate text-sm text-white/65">{track.artists}</p>
+                            </div>
+                            <div
+                              className="h-16 w-16 shrink-0 rounded-2xl border border-white/10 bg-white/5"
+                              style={coverStyle(track.coverUrl)}
+                            />
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <StatusBadge tone={track.fitTone}>{track.fitLabel}</StatusBadge>
+                            <StatusBadge tone="blue">{track.scoreLabel}</StatusBadge>
+                            <StatusBadge tone="green">{track.freshnessLabel}</StatusBadge>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3">
+                            <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
+                              Melhor destino
+                            </div>
+                            <div className="mt-1 text-base font-semibold text-white">
+                              {track.suggestedPlaylistName ?? "Escolha manual"}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {track.playlistMatches.slice(0, 2).map((playlist) => (
+                                <span
+                                  key={`${track.id}-${playlist.playlistId}`}
+                                  className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-white/58"
+                                >
+                                  {playlist.playlistName} · {playlist.scoreLabel}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <p className="mt-4 text-sm leading-6 text-white/72">{track.reason}</p>
+
+                          <div className="mt-5 flex items-center justify-between gap-2">
+                            <SpotifyPlaylistAddButton
+                              spotifyTrackId={track.spotifyTrackId}
+                              suggestedPlaylistName={track.suggestedPlaylistName}
+                              label="Add playlist"
+                              compact
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handlePlayTrack(track)}
+                                disabled={loadingTrackId === track.id}
+                                className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-70"
+                              >
+                                {loadingTrackId === track.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : currentTrackId === track.spotifyTrackId && !isPaused ? (
+                                  <Pause className="h-4 w-4" />
+                                ) : (
+                                  <Play className="h-4 w-4 fill-current" />
+                                )}
+                                Ouvir
+                              </button>
+                              <Link
+                                href={track.spotifyUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-sm font-medium text-white transition hover:bg-white/10"
+                              >
+                                Abrir
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="divide-y divide-white/8">
                 {data.opportunities.length > 0 ? (
-                  data.opportunities.map((track) => (
+                  (queueOpportunities.length > 0 ? queueOpportunities : featuredOpportunities).map((track) => (
                     <article
                       key={track.id}
                       className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.9fr)_auto]"
@@ -862,6 +980,18 @@ export default function SpotifyReleaseRadar({
                           >
                             {track.suggestedPlaylistName ?? "Escolha manual"}
                           </div>
+                          {track.playlistMatches.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {track.playlistMatches.slice(0, 3).map((playlist) => (
+                                <span
+                                  key={`${track.id}-${playlist.playlistId}`}
+                                  className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-white/52"
+                                >
+                                  {playlist.playlistName} · {playlist.scoreLabel}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="rounded-2xl border border-white/8 bg-black/20 p-3">
                           <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
@@ -904,8 +1034,7 @@ export default function SpotifyReleaseRadar({
                         <SpotifyPlaylistAddButton
                           spotifyTrackId={track.spotifyTrackId}
                           suggestedPlaylistName={track.suggestedPlaylistName}
-                          label="Adicionar agora"
-                          className="w-full rounded-full bg-[#1ed760] px-5 font-semibold text-black hover:bg-[#35e26c]"
+                          label="Add playlist"
                         />
 
                         <a
