@@ -10,6 +10,10 @@ function isMissingColumnError(error: { message?: string } | null | undefined, co
   );
 }
 
+function requiresEntityRolesPersistence(roles?: LabelEntityInput["roles"]) {
+  return Array.isArray(roles) && roles.length > 0;
+}
+
 // Re-exportar para conveniência de server components
 export { ENTITY_TYPES } from "@/lib/label-entities-types";
 export type { EntityType, LabelEntity, LabelEntityInput } from "@/lib/label-entities-types";
@@ -70,6 +74,12 @@ export async function createLabelEntity(input: LabelEntityInput): Promise<LabelE
     .single();
 
   if (isMissingColumnError(error, "roles")) {
+    if (requiresEntityRolesPersistence(input.roles)) {
+      throw new Error(
+        "Seu banco ainda nao tem a coluna roles em label_entities. Rode a migration 20260502_add_roles_to_label_os.sql no Supabase para salvar funcoes adicionais da entidade.",
+      );
+    }
+
     const { roles: _roles, ...fallbackInput } = input;
 
     const retry = await supabase

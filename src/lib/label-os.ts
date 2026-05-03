@@ -28,6 +28,11 @@ function isMissingRelationError(error: { message?: string; code?: string } | nul
   );
 }
 
+function requiresArtistRolesPersistence(roles?: ArtistRole[]) {
+  if (!Array.isArray(roles) || roles.length === 0) return false;
+  return !(roles.length === 1 && roles[0] === "artist");
+}
+
 export type {
   LabelArtist,
   LabelArtistInput,
@@ -87,6 +92,12 @@ export async function updateLabelArtist(
     .single();
 
   if (isMissingColumnError(error, "roles")) {
+    if (requiresArtistRolesPersistence(input.roles)) {
+      throw new Error(
+        "Seu banco ainda nao tem a coluna roles em label_artists. Rode a migration 20260502_add_roles_to_label_os.sql no Supabase para salvar compositor, interprete e produtor musical.",
+      );
+    }
+
     const { roles: _roles, ...fallbackInput } = input;
 
     const retry = await supabase
@@ -121,6 +132,12 @@ export async function createLabelArtist(
     .single();
 
   if (isMissingColumnError(error, "roles")) {
+    if (requiresArtistRolesPersistence(input.roles)) {
+      throw new Error(
+        "Seu banco ainda nao tem a coluna roles em label_artists. Rode a migration 20260502_add_roles_to_label_os.sql no Supabase para salvar compositor, interprete e produtor musical.",
+      );
+    }
+
     const { roles: _roles, ...fallbackInput } = input;
 
     const retry = await supabase
