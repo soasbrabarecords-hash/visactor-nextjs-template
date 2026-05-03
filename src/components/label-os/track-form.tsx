@@ -139,6 +139,15 @@ async function uploadFile(file: File | null, bucket: string): Promise<string | n
   return json.url;
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await res.json()) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function Section({
   icon: Icon,
   title,
@@ -533,11 +542,9 @@ export default function TrackForm({ artists }: TrackFormProps) {
     setLoading(true);
 
     try {
-      const [coverUrl, audioUrl, contractUrl] = await Promise.all([
-        uploadFile(trackData.coverFile, "label-covers"),
-        uploadFile(trackData.audioFile, "label-audio"),
-        uploadFile(trackData.contractFile, "label-contracts"),
-      ]);
+      const coverUrl = await uploadFile(trackData.coverFile, "label-covers");
+      const audioUrl = await uploadFile(trackData.audioFile, "label-audio");
+      const contractUrl = await uploadFile(trackData.contractFile, "label-contracts");
 
       const trackRes = await fetch("/api/label-os/tracks", {
         method: "POST",
@@ -563,8 +570,7 @@ export default function TrackForm({ artists }: TrackFormProps) {
       });
 
       if (!trackRes.ok) {
-        const payload = (await trackRes.json()) as { error?: string };
-        throw new Error(payload.error ?? "Erro ao salvar track.");
+        throw new Error(await readApiError(trackRes, "Erro ao salvar track."));
       }
 
       const track = (await trackRes.json()) as { id: string };
@@ -627,15 +633,25 @@ export default function TrackForm({ artists }: TrackFormProps) {
         })),
       ];
 
-      await Promise.all(
-        participants.map((participant) =>
-          fetch(`/api/label-os/tracks/${trackId}/participants`, {
+      const participantResponses = await Promise.all(
+        participants.map(async (participant) => {
+          const response = await fetch(`/api/label-os/tracks/${trackId}/participants`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(participant),
-          }),
-        ),
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              await readApiError(response, "Erro ao salvar participantes da track."),
+            );
+          }
+
+          return response;
+        }),
       );
+
+      void participantResponses;
 
       router.push(`/label-os/tracks/${trackId}`);
       router.refresh();

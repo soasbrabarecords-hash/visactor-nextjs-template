@@ -44,9 +44,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const { data } = supabase.storage.from(bucket as AllowedBucket).getPublicUrl(path);
+    if (bucket === "label-covers") {
+      const { data } = supabase.storage.from(bucket as AllowedBucket).getPublicUrl(path);
+      return NextResponse.json({ url: data.publicUrl }, { status: 200 });
+    }
 
-    return NextResponse.json({ url: data.publicUrl }, { status: 200 });
+    const signed = await supabase.storage
+      .from(bucket as AllowedBucket)
+      .createSignedUrl(path, 60 * 60 * 24 * 30);
+
+    if (signed.error) {
+      return NextResponse.json({ error: signed.error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: signed.data.signedUrl }, { status: 200 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro interno.";
     return NextResponse.json({ error: message }, { status: 500 });

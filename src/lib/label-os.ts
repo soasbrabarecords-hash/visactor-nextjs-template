@@ -218,23 +218,26 @@ export async function createLabelTrack(
   input: LabelTrackInput,
 ): Promise<LabelTrack> {
   const supabase = await createClient();
-  let { data, error } = await supabase
-    .from("label_tracks")
-    .insert(input)
-    .select()
-    .single();
+  let payload: Partial<LabelTrackInput> = { ...input };
+  let data: LabelTrack | null = null;
+  let error: { message?: string } | null = null;
 
-  if (isMissingColumnError(error, "subgenre")) {
-    const { subgenre: _subgenre, ...fallbackInput } = input;
-
-    const retry = await supabase
+  for (const optionalColumn of ["subgenre", "lyrics"] as const) {
+    const response = await supabase
       .from("label_tracks")
-      .insert(fallbackInput)
+      .insert(payload)
       .select()
       .single();
 
-    data = retry.data;
-    error = retry.error;
+    data = response.data as LabelTrack | null;
+    error = response.error;
+
+    if (!isMissingColumnError(error, optionalColumn)) {
+      break;
+    }
+
+    const { [optionalColumn]: _ignored, ...fallbackPayload } = payload;
+    payload = fallbackPayload;
   }
 
   if (error) throw new Error(`createLabelTrack: ${error.message}`);
@@ -269,6 +272,12 @@ export async function addTrackParticipant(
     .insert(input)
     .select()
     .single();
+
+  if (isMissingColumnError(error, "entity_id")) {
+    throw new Error(
+      "addTrackParticipant: Seu banco ainda nao tem a coluna entity_id em label_track_participants. Rode a migration 20260428_add_entity_id_to_participants.sql no Supabase.",
+    );
+  }
 
   if (error) throw new Error(`addTrackParticipant: ${error.message}`);
   return data as TrackParticipant;
