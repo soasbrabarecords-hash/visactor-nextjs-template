@@ -29,7 +29,7 @@ function sumPct(rows: SplitRow[]): number {
 type Props = {
   trackId: string;
   existing: TrackMasterSplit[];
-  onSaved: () => void;
+  onSaved?: () => void;
 };
 
 export default function MasterSplitForm({ trackId, existing, onSaved }: Props) {
@@ -82,7 +82,7 @@ export default function MasterSplitForm({ trackId, existing, onSaved }: Props) {
         }
       }
       setRows([emptyRow()]);
-      onSaved();
+      onSaved?.();
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erro desconhecido.");

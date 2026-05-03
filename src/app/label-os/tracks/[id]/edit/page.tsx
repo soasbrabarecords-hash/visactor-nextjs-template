@@ -93,11 +93,7 @@ export default async function EditTrackPage({ params }: Props) {
             title="Obra"
             description="Edite os compositores e os percentuais de publishing da obra."
           >
-            <CompositionForm
-              trackId={track.id}
-              existing={compositions}
-              onSaved={() => {}}
-            />
+            <CompositionForm trackId={track.id} existing={compositions} />
           </EditSection>
 
           <EditSection
@@ -105,11 +101,7 @@ export default async function EditTrackPage({ params }: Props) {
             title="Fonograma"
             description="Ajuste interpretes, produtores e demais participacoes de master."
           >
-            <MasterSplitForm
-              trackId={track.id}
-              existing={masterSplits}
-              onSaved={() => {}}
-            />
+            <MasterSplitForm trackId={track.id} existing={masterSplits} />
           </EditSection>
 
           <EditSection
@@ -117,11 +109,7 @@ export default async function EditTrackPage({ params }: Props) {
             title="Royalties"
             description="Defina a divisao final de royalties share entre as entidades envolvidas."
           >
-            <RoyaltySplitForm
-              trackId={track.id}
-              existing={royaltySplits}
-              onSaved={() => {}}
-            />
+            <RoyaltySplitForm trackId={track.id} existing={royaltySplits} />
           </EditSection>
         </div>
       </Container>
