@@ -40,8 +40,19 @@ type WebPlaybackState = {
   };
 };
 
+type PlayerReadyPayload = {
+  device_id: string;
+};
+
+type PlayerErrorPayload = {
+  message: string;
+};
+
 type SpotifyPlayerInstance = {
-  addListener: (event: string, listener: (payload: any) => void) => boolean;
+  addListener: <TPayload = unknown>(
+    event: string,
+    listener: (payload: TPayload) => void,
+  ) => boolean;
   connect: () => Promise<boolean>;
   disconnect: () => void;
   togglePlay: () => Promise<void>;
@@ -111,7 +122,7 @@ function getPlayButtonLabel({
     return "Abrindo...";
   }
 
-  if (currentTrackId === track.id) {
+  if (currentTrackId === track.spotifyTrackId) {
     return isPaused ? "Retomar aqui" : "Tocando aqui";
   }
 
@@ -216,7 +227,7 @@ export default function SpotifyReleaseRadar({
         },
       });
 
-      playerInstance.addListener("ready", ({ device_id }) => {
+      playerInstance.addListener<PlayerReadyPayload>("ready", ({ device_id }) => {
         if (cancelled) {
           return;
         }
@@ -243,7 +254,7 @@ export default function SpotifyReleaseRadar({
         applyPlaybackState(state);
       });
 
-      playerInstance.addListener("initialization_error", ({ message }) => {
+      playerInstance.addListener<PlayerErrorPayload>("initialization_error", ({ message }) => {
         if (cancelled) {
           return;
         }
@@ -251,7 +262,7 @@ export default function SpotifyReleaseRadar({
         setPlayerError(message);
       });
 
-      playerInstance.addListener("authentication_error", ({ message }) => {
+      playerInstance.addListener<PlayerErrorPayload>("authentication_error", ({ message }) => {
         if (cancelled) {
           return;
         }
@@ -259,7 +270,7 @@ export default function SpotifyReleaseRadar({
         setPlayerError(`${message} Reconecte o Spotify para renovar as permissoes do player.`);
       });
 
-      playerInstance.addListener("account_error", ({ message }) => {
+      playerInstance.addListener<PlayerErrorPayload>("account_error", ({ message }) => {
         if (cancelled) {
           return;
         }
@@ -267,7 +278,7 @@ export default function SpotifyReleaseRadar({
         setPlayerError(`${message} O player completo no navegador exige Spotify Premium.`);
       });
 
-      playerInstance.addListener("playback_error", ({ message }) => {
+      playerInstance.addListener<PlayerErrorPayload>("playback_error", ({ message }) => {
         if (cancelled) {
           return;
         }
