@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  clearSpotifyNextCookie,
   clearSpotifyStateCookie,
   exchangeSpotifyCode,
+  getSpotifyNextCookie,
   getSpotifyRedirectUri,
   getSpotifyStateCookie,
   setSpotifyAuthCookies,
@@ -15,12 +17,15 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const expectedState = await getSpotifyStateCookie();
-  const redirectUrl = new URL("/curadoria", url.origin);
+  const nextPath = await getSpotifyNextCookie();
+  const safeNextPath = nextPath?.startsWith("/") ? nextPath : "/curadoria";
+  const redirectUrl = new URL(safeNextPath, url.origin);
 
   if (!code || !state || state !== expectedState) {
     redirectUrl.searchParams.set("spotify_error", "Spotify callback invalido.");
     const response = NextResponse.redirect(redirectUrl);
     clearSpotifyStateCookie(response);
+    clearSpotifyNextCookie(response);
 
     return response;
   }
@@ -35,6 +40,7 @@ export async function GET(request: Request) {
 
     setSpotifyAuthCookies(response, token);
     clearSpotifyStateCookie(response);
+    clearSpotifyNextCookie(response);
 
     return response;
   } catch (error) {
@@ -44,6 +50,7 @@ export async function GET(request: Request) {
     );
     const response = NextResponse.redirect(redirectUrl);
     clearSpotifyStateCookie(response);
+    clearSpotifyNextCookie(response);
 
     return response;
   }

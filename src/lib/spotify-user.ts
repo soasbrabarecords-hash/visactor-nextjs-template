@@ -7,6 +7,7 @@ import type { NextResponse } from "next/server";
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
 const SPOTIFY_STATE_COOKIE = "spotify_auth_state";
+const SPOTIFY_NEXT_COOKIE = "spotify_auth_next";
 const SPOTIFY_PRODUCTION_REDIRECT_URI =
   "https://system.soasbraba.com/api/spotify/auth/callback";
 
@@ -275,7 +276,7 @@ export function buildSpotifyAuthorizeUrl({
     response_type: "code",
     redirect_uri: getSpotifyRedirectUri(origin),
     scope:
-      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email",
+      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public ugc-image-upload user-read-email user-top-read user-follow-read",
     show_dialog: "true",
     state,
   });
@@ -291,14 +292,32 @@ export function setSpotifyStateCookie(response: NextResponse, state: string) {
   );
 }
 
+export function setSpotifyNextCookie(response: NextResponse, nextPath: string) {
+  response.cookies.set(
+    SPOTIFY_NEXT_COOKIE,
+    nextPath,
+    getCookieOptions(10 * 60),
+  );
+}
+
 export async function getSpotifyStateCookie() {
   const cookieStore = await cookies();
 
   return cookieStore.get(SPOTIFY_STATE_COOKIE)?.value ?? null;
 }
 
+export async function getSpotifyNextCookie() {
+  const cookieStore = await cookies();
+
+  return cookieStore.get(SPOTIFY_NEXT_COOKIE)?.value ?? null;
+}
+
 export function clearSpotifyStateCookie(response: NextResponse) {
   response.cookies.set(SPOTIFY_STATE_COOKIE, "", getCookieOptions(0));
+}
+
+export function clearSpotifyNextCookie(response: NextResponse) {
+  response.cookies.set(SPOTIFY_NEXT_COOKIE, "", getCookieOptions(0));
 }
 
 export function setSpotifyAuthCookies(
@@ -324,6 +343,7 @@ export function clearSpotifyAuthCookies(response: NextResponse) {
   response.cookies.set(SPOTIFY_ACCESS_TOKEN_COOKIE, "", getCookieOptions(0));
   response.cookies.set(SPOTIFY_REFRESH_TOKEN_COOKIE, "", getCookieOptions(0));
   clearSpotifyStateCookie(response);
+  clearSpotifyNextCookie(response);
 }
 
 export async function exchangeSpotifyCode({

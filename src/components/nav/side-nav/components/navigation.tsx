@@ -32,6 +32,10 @@ export default function Navigation() {
       return pathname === "/curadoria";
     }
 
+    if (href === "/novidades") {
+      return pathname === "/novidades";
+    }
+
     if (href === "/label-os") {
       return pathname === "/label-os" || pathname.startsWith("/label-os/");
     }

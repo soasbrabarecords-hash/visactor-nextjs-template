@@ -6,6 +6,7 @@ import {
   Library,
   BarChart2,
   Flame,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,11 @@ export const navigations: Navigation[] = [
     icon: Compass,
     name: "Curadoria",
     href: "/curadoria",
+  },
+  {
+    icon: Sparkles,
+    name: "Novidades",
+    href: "/novidades",
   },
   {
     icon: BarChart2,

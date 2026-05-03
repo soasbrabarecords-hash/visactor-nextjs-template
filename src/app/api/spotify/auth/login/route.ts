@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   buildSpotifyAuthorizeUrl,
+  setSpotifyNextCookie,
   setSpotifyStateCookie,
 } from "@/lib/spotify-user";
 
@@ -9,15 +10,21 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const origin = new URL(request.url).origin;
+    const requestUrl = new URL(request.url);
+    const origin = requestUrl.origin;
     const state = crypto.randomUUID();
     const redirectUrl = buildSpotifyAuthorizeUrl({
       origin,
       state,
     });
     const response = NextResponse.redirect(redirectUrl);
+    const nextPath = requestUrl.searchParams.get("next");
 
     setSpotifyStateCookie(response, state);
+
+    if (nextPath && nextPath.startsWith("/")) {
+      setSpotifyNextCookie(response, nextPath);
+    }
 
     return response;
   } catch (error) {
