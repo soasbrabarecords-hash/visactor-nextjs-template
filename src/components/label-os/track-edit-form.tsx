@@ -120,66 +120,65 @@ export default function TrackEditForm({ track }: Props) {
         </div>
       ) : null}
 
-      <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="space-y-5">
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                <FileImage className="h-4 w-4 text-sky-100" />
-                Capa da track
-              </div>
-              <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
-                {coverPreviewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={coverPreviewUrl}
-                    alt={track.title}
-                    className="aspect-square w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-square items-center justify-center text-white/36">
-                    Preview da capa
-                  </div>
-                )}
-              </div>
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm text-white/72">Trocar capa</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
-                />
-              </label>
+      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="space-y-5">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
+              <FileImage className="h-4 w-4 text-sky-100" />
+              Capa da track
             </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
-                <FileAudio2 className="h-4 w-4 text-sky-100" />
-                WAV / audio
-              </div>
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.025] p-4">
-                {audioPreviewUrl ? (
-                  // eslint-disable-next-line jsx-a11y/media-has-caption
-                  <audio controls src={audioPreviewUrl} className="w-full" />
-                ) : (
-                  <div className="text-sm text-white/42">Nenhum audio vinculado.</div>
-                )}
-              </div>
-              <label className="mt-4 block">
-                <span className="mb-2 block text-sm text-white/72">Trocar audio</span>
-                <input
-                  type="file"
-                  accept="audio/wav,audio/mpeg,audio/mp3"
-                  onChange={(event) => setAudioFile(event.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+            <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
+              {coverPreviewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverPreviewUrl}
+                  alt={track.title}
+                  className="aspect-square w-full object-cover"
                 />
-              </label>
+              ) : (
+                <div className="flex aspect-square items-center justify-center text-white/36">
+                  Preview da capa
+                </div>
+              )}
             </div>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-sm text-white/72">Trocar capa</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+              />
+            </label>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
+              <FileAudio2 className="h-4 w-4 text-sky-100" />
+              WAV / audio
+            </div>
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.025] p-4">
+              {audioPreviewUrl ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <audio controls src={audioPreviewUrl} className="w-full" />
+              ) : (
+                <div className="text-sm text-white/42">Nenhum audio vinculado.</div>
+              )}
+            </div>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-sm text-white/72">Trocar audio</span>
+              <input
+                type="file"
+                accept="audio/wav,audio/mpeg,audio/mp3"
+                onChange={(event) => setAudioFile(event.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2">
             <label className="mb-2 block text-sm font-medium text-white">
               Titulo da musica
             </label>
@@ -279,9 +278,8 @@ export default function TrackEditForm({ track }: Props) {
               placeholder="Cole a letra da musica aqui"
             />
           </div>
-          </div>
         </div>
-      </section>
+      </div>
 
       <div className="flex items-center gap-3">
         <button
