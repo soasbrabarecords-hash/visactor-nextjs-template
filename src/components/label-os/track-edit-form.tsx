@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { FileAudio2, FileImage } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import type { LabelTrack } from "@/lib/label-os-types";
 
 const INPUT_CLASS =
@@ -24,10 +25,26 @@ const GENRE_OPTIONS = [
   "Rock / Alternativo",
 ];
 
+async function uploadFile(file: File | null, bucket: string): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("bucket", bucket);
+  const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error ?? `Erro no upload para ${bucket}`);
+  }
+  const json = (await res.json()) as { url: string };
+  return json.url;
+}
+
 export default function TrackEditForm({ track }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     title: track.title ?? "",
     version: track.version ?? "",
@@ -38,6 +55,16 @@ export default function TrackEditForm({ track }: Props) {
     lyrics: track.lyrics ?? "",
     status: track.status ?? "draft",
   });
+
+  const coverPreviewUrl = useMemo(
+    () => (coverFile ? URL.createObjectURL(coverFile) : track.cover_url),
+    [coverFile, track.cover_url],
+  );
+
+  const audioPreviewUrl = useMemo(
+    () => (audioFile ? URL.createObjectURL(audioFile) : track.audio_url),
+    [audioFile, track.audio_url],
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,6 +78,9 @@ export default function TrackEditForm({ track }: Props) {
     setLoading(true);
 
     try {
+      const coverUrl = coverFile ? await uploadFile(coverFile, "label-covers") : track.cover_url;
+      const audioUrl = audioFile ? await uploadFile(audioFile, "label-audio") : track.audio_url;
+
       const response = await fetch(`/api/label-os/tracks/${track.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -63,6 +93,8 @@ export default function TrackEditForm({ track }: Props) {
           explicit: form.explicit,
           lyrics: form.lyrics || null,
           status: form.status || "draft",
+          cover_url: coverUrl,
+          audio_url: audioUrl,
         }),
       });
 
@@ -89,8 +121,65 @@ export default function TrackEditForm({ track }: Props) {
       ) : null}
 
       <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="sm:col-span-2">
+        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
+                <FileImage className="h-4 w-4 text-sky-100" />
+                Capa da track
+              </div>
+              <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
+                {coverPreviewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={coverPreviewUrl}
+                    alt={track.title}
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square items-center justify-center text-white/36">
+                    Preview da capa
+                  </div>
+                )}
+              </div>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm text-white/72">Trocar capa</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                />
+              </label>
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
+                <FileAudio2 className="h-4 w-4 text-sky-100" />
+                WAV / audio
+              </div>
+              <div className="rounded-[22px] border border-white/10 bg-white/[0.025] p-4">
+                {audioPreviewUrl ? (
+                  // eslint-disable-next-line jsx-a11y/media-has-caption
+                  <audio controls src={audioPreviewUrl} className="w-full" />
+                ) : (
+                  <div className="text-sm text-white/42">Nenhum audio vinculado.</div>
+                )}
+              </div>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm text-white/72">Trocar audio</span>
+                <input
+                  type="file"
+                  accept="audio/wav,audio/mpeg,audio/mp3"
+                  onChange={(event) => setAudioFile(event.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
             <label className="mb-2 block text-sm font-medium text-white">
               Titulo da musica
             </label>
@@ -189,6 +278,7 @@ export default function TrackEditForm({ track }: Props) {
               className={`${INPUT_CLASS} min-h-[180px] resize-y`}
               placeholder="Cole a letra da musica aqui"
             />
+          </div>
           </div>
         </div>
       </section>
