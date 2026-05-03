@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { TrackParticipant } from "@/lib/label-os";
+import type { TrackParticipant } from "@/lib/label-os-types";
 import type { LabelEntity } from "@/lib/label-entities-types";
 import {
   parsePercentageInput,

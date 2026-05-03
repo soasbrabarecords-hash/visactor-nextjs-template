@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { LabelArtist } from "@/lib/label-os";
+import type { LabelArtist } from "@/lib/label-os-types";
 import type { LabelEntity } from "@/lib/label-entities-types";
 import {
   formatPercentage,

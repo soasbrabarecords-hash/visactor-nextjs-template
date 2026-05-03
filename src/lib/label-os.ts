@@ -2,6 +2,15 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import type { ArtistRole } from "@/lib/label-os-taxonomy";
+import type {
+  LabelArtist,
+  LabelArtistInput,
+  LabelOsStats,
+  LabelTrack,
+  LabelTrackInput,
+  TrackParticipant,
+  TrackParticipantInput,
+} from "@/lib/label-os-types";
 
 function isMissingColumnError(error: { message?: string } | null | undefined, column: string) {
   return Boolean(
@@ -10,79 +19,23 @@ function isMissingColumnError(error: { message?: string } | null | undefined, co
   );
 }
 
-// ─── Types ────────────────────────────────────────────────
+function isMissingRelationError(error: { message?: string; code?: string } | null | undefined) {
+  return Boolean(
+    error?.code === "PGRST200" ||
+      error?.code === "PGRST205" ||
+      error?.message?.includes("Could not find a relationship") ||
+      error?.message?.includes("schema cache"),
+  );
+}
 
-export type LabelArtist = {
-  id: string;
-  name: string;
-  artist_name: string | null;
-  roles: ArtistRole[];
-  email: string | null;
-  phone: string | null;
-  instagram: string | null;
-  spotify_url: string | null;
-  apple_music_url: string | null;
-  youtube_url: string | null;
-  document: string | null;
-  birth_date: string | null;
-  notes: string | null;
-  created_at: string;
-};
-
-export type LabelArtistInput = Omit<LabelArtist, "id" | "created_at">;
-
-export type LabelTrack = {
-  id: string;
-  title: string;
-  version: string | null;
-  isrc: string | null;
-  upc: string | null;
-  release_date: string | null;
-  status: string;
-  genre: string | null;
-  subgenre: string | null;
-  bpm: number | null;
-  key: string | null;
-  explicit: boolean;
-  cover_url: string | null;
-  audio_url: string | null;
-  contract_url: string | null;
-  notes: string | null;
-  lyrics: string | null;
-  created_at: string;
-};
-
-export type LabelTrackInput = Omit<LabelTrack, "id" | "created_at">;
-
-export type TrackParticipant = {
-  id: string;
-  track_id: string;
-  artist_id: string | null;
-  entity_id: string | null;
-  role: string;
-  royalty_percentage: number;
-  publishing_percentage: number;
-  master_percentage: number;
-  created_at: string;
-  label_artists?: Pick<LabelArtist, "id" | "name" | "artist_name">;
-  label_entities?: {
-    id: string;
-    name: string;
-    display_name: string | null;
-    type: string;
-  };
-};
-
-export type TrackParticipantInput = Omit<
+export type {
+  LabelArtist,
+  LabelArtistInput,
+  LabelOsStats,
+  LabelTrack,
+  LabelTrackInput,
   TrackParticipant,
-  "id" | "created_at" | "label_artists"
->;
-
-export type LabelOsStats = {
-  totalTracks: number;
-  totalArtists: number;
-  draftTracks: number;
-  releasedTracks: number;
+  TrackParticipantInput,
 };
 
 // ─── Artists ──────────────────────────────────────────────
@@ -296,12 +249,69 @@ export async function getTrackParticipants(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_track_participants")
-    .select("*, label_artists(id, name, artist_name), label_entities(id, name, display_name, type)")
+    .select("*")
     .eq("track_id", trackId)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(`getTrackParticipants: ${error.message}`);
-  return (data ?? []) as TrackParticipant[];
+
+  const rows = (data ?? []) as TrackParticipant[];
+  const artistIds = Array.from(
+    new Set(rows.map((row) => row.artist_id).filter((value): value is string => Boolean(value))),
+  );
+  const entityIds = Array.from(
+    new Set(rows.map((row) => row.entity_id).filter((value): value is string => Boolean(value))),
+  );
+
+  let artistsById = new Map<string, Pick<LabelArtist, "id" | "name" | "artist_name">>();
+  if (artistIds.length > 0) {
+    const artistsResult = await supabase
+      .from("label_artists")
+      .select("id, name, artist_name")
+      .in("id", artistIds);
+
+    if (artistsResult.error) {
+      throw new Error(`getTrackParticipants artists: ${artistsResult.error.message}`);
+    }
+
+    artistsById = new Map(
+      ((artistsResult.data ?? []) as Pick<LabelArtist, "id" | "name" | "artist_name">[]).map(
+        (artist) => [artist.id, artist],
+      ),
+    );
+  }
+
+  let entitiesById = new Map<
+    string,
+    { id: string; name: string; display_name: string | null; type: string }
+  >();
+  if (entityIds.length > 0) {
+    const entitiesResult = await supabase
+      .from("label_entities")
+      .select("id, name, display_name, type")
+      .in("id", entityIds);
+
+    if (entitiesResult.error && !isMissingRelationError(entitiesResult.error)) {
+      throw new Error(`getTrackParticipants entities: ${entitiesResult.error.message}`);
+    }
+
+    entitiesById = new Map(
+      (
+        (entitiesResult.data ?? []) as {
+          id: string;
+          name: string;
+          display_name: string | null;
+          type: string;
+        }[]
+      ).map((entity) => [entity.id, entity]),
+    );
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    label_artists: row.artist_id ? artistsById.get(row.artist_id) : undefined,
+    label_entities: row.entity_id ? entitiesById.get(row.entity_id) : undefined,
+  }));
 }
 
 export async function addTrackParticipant(

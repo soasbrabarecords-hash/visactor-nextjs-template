@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { LabelTrack } from "@/lib/label-os";
+import type { LabelTrack } from "@/lib/label-os-types";
 
 const INPUT_CLASS =
   "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";

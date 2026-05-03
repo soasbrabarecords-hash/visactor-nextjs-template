@@ -5,7 +5,7 @@ import { Disc3, Mic2, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import RoleChipSelector from "@/components/label-os/role-chip-selector";
-import type { LabelArtist } from "@/lib/label-os";
+import type { LabelArtist } from "@/lib/label-os-types";
 import {
   ARTIST_ROLE_LABELS,
   ARTIST_ROLE_OPTIONS,
