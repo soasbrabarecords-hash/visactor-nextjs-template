@@ -3,6 +3,13 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { ArtistRole } from "@/lib/label-os-taxonomy";
 
+function isMissingColumnError(error: { message?: string } | null | undefined, column: string) {
+  return Boolean(
+    error?.message?.includes(`Could not find the '${column}' column`) ||
+      error?.message?.includes(`column "${column}" does not exist`),
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────
 
 export type LabelArtist = {
@@ -82,7 +89,10 @@ export async function getLabelArtists(): Promise<LabelArtist[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getLabelArtists: ${error.message}`);
-  return (data ?? []) as LabelArtist[];
+  return ((data ?? []) as LabelArtist[]).map((artist) => ({
+    ...artist,
+    roles: Array.isArray(artist.roles) && artist.roles.length > 0 ? artist.roles : ["artist"],
+  }));
 }
 
 export async function getLabelArtistById(
@@ -96,7 +106,13 @@ export async function getLabelArtistById(
     .single();
 
   if (error) return null;
-  return data as LabelArtist;
+  return {
+    ...(data as LabelArtist),
+    roles:
+      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+        ? (data as LabelArtist).roles
+        : ["artist"],
+  };
 }
 
 export async function updateLabelArtist(
@@ -104,29 +120,68 @@ export async function updateLabelArtist(
   input: Partial<LabelArtistInput>,
 ): Promise<LabelArtist> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("label_artists")
     .update(input)
     .eq("id", id)
     .select()
     .single();
 
+  if (isMissingColumnError(error, "roles")) {
+    const { roles: _roles, ...fallbackInput } = input;
+
+    const retry = await supabase
+      .from("label_artists")
+      .update(fallbackInput)
+      .eq("id", id)
+      .select()
+      .single();
+
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw new Error(`updateLabelArtist: ${error.message}`);
-  return data as LabelArtist;
+  return {
+    ...(data as LabelArtist),
+    roles:
+      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+        ? (data as LabelArtist).roles
+        : (input.roles?.length ? input.roles : ["artist"]),
+  };
 }
 
 export async function createLabelArtist(
   input: LabelArtistInput,
 ): Promise<LabelArtist> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("label_artists")
     .insert(input)
     .select()
     .single();
 
+  if (isMissingColumnError(error, "roles")) {
+    const { roles: _roles, ...fallbackInput } = input;
+
+    const retry = await supabase
+      .from("label_artists")
+      .insert(fallbackInput)
+      .select()
+      .single();
+
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw new Error(`createLabelArtist: ${error.message}`);
-  return data as LabelArtist;
+  return {
+    ...(data as LabelArtist),
+    roles:
+      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+        ? (data as LabelArtist).roles
+        : (input.roles?.length ? input.roles : ["artist"]),
+  };
 }
 
 // ─── Tracks ───────────────────────────────────────────────
@@ -139,7 +194,10 @@ export async function getLabelTracks(): Promise<LabelTrack[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getLabelTracks: ${error.message}`);
-  return (data ?? []) as LabelTrack[];
+  return ((data ?? []) as LabelTrack[]).map((track) => ({
+    ...track,
+    subgenre: track.subgenre ?? null,
+  }));
 }
 
 export async function getLabelTrackById(
@@ -153,21 +211,37 @@ export async function getLabelTrackById(
     .single();
 
   if (error) return null;
-  return data as LabelTrack;
+  return { ...(data as LabelTrack), subgenre: (data as LabelTrack).subgenre ?? null };
 }
 
 export async function createLabelTrack(
   input: LabelTrackInput,
 ): Promise<LabelTrack> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("label_tracks")
     .insert(input)
     .select()
     .single();
 
+  if (isMissingColumnError(error, "subgenre")) {
+    const { subgenre: _subgenre, ...fallbackInput } = input;
+
+    const retry = await supabase
+      .from("label_tracks")
+      .insert(fallbackInput)
+      .select()
+      .single();
+
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error) throw new Error(`createLabelTrack: ${error.message}`);
-  return data as LabelTrack;
+  return {
+    ...(data as LabelTrack),
+    subgenre: (data as LabelTrack).subgenre ?? input.subgenre ?? null,
+  };
 }
 
 // ─── Participants ─────────────────────────────────────────
