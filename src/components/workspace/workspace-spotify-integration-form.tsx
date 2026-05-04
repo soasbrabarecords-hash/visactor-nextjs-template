@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, ChevronDown, KeyRound, Loader2, Save, X } from "lucide-react";
+import type { FormEvent } from "react";
+import { Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -10,104 +11,40 @@ type WorkspaceSpotifyIntegrationFormProps = {
   hasAppClientSecret: boolean;
 };
 
-type ActiveItem = "mode" | "credentials" | null;
-
-function IntegrationRow({
-  title,
-  value,
-  active,
-  onOpen,
-  children,
-}: {
-  title: string;
-  value: string;
-  active: boolean;
-  onOpen: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border-t border-white/10 first:border-t-0">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="grid w-full grid-cols-1 gap-2 px-4 py-4 text-left transition hover:bg-white/[0.03] md:grid-cols-[220px_1fr_24px] md:items-center"
-      >
-        <span className="text-sm font-medium text-white">{title}</span>
-        <span className="text-sm text-white/55">{value}</span>
-        <ChevronDown
-          className={`h-4 w-4 text-white/35 transition ${
-            active ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-      {active ? <div className="px-4 pb-4">{children}</div> : null}
-    </div>
-  );
-}
-
-function ActionBar({
-  saving,
-  onSave,
-  onCancel,
-}: {
-  saving: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saving}
-        className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {saving ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Save className="h-4 w-4" />
-        )}
-        Salvar
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        disabled={saving}
-        className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-white/70 transition hover:bg-white/[0.04] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <X className="h-4 w-4" />
-        Cancelar
-      </button>
-    </div>
-  );
-}
-
-function ModeOption({
+function ModeCard({
   active,
   title,
-  detail,
+  hint,
   onClick,
 }: {
   active: boolean;
   title: string;
-  detail: string;
+  hint: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border px-3 py-3 text-left transition ${
+      className={`rounded-[22px] border p-4 text-left transition ${
         active
           ? "border-sky-400/30 bg-sky-500/10 text-white"
-          : "border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
+          : "border-white/10 bg-black/20 text-white/70"
       }`}
     >
-      <span className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold">{title}</span>
-        {active ? <Check className="h-4 w-4 text-sky-200" /> : null}
-      </span>
-      <span className="mt-1 block text-xs text-white/45">{detail}</span>
+        <span
+          className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+            active
+              ? "bg-white text-slate-950"
+              : "bg-white/10 text-white/45"
+          }`}
+        >
+          {active ? "ativo" : "off"}
+        </span>
+      </div>
+      <p className="mt-2 text-xs text-white/45">{hint}</p>
     </button>
   );
 }
@@ -119,38 +56,19 @@ export default function WorkspaceSpotifyIntegrationForm({
 }: WorkspaceSpotifyIntegrationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [activeItem, setActiveItem] = useState<ActiveItem>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedAppMode, setSavedAppMode] = useState(initialAppMode);
-  const [savedClientId, setSavedClientId] = useState(initialAppClientId ?? "");
-  const [savedHasSecret, setSavedHasSecret] = useState(hasAppClientSecret);
-  const [appMode, setAppMode] = useState(initialAppMode);
+  const [appMode, setAppMode] = useState<"global_app" | "workspace_app">(
+    initialAppMode,
+  );
   const [appClientId, setAppClientId] = useState(initialAppClientId ?? "");
   const [appClientSecret, setAppClientSecret] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function resetDraft() {
-    setAppMode(savedAppMode);
-    setAppClientId(savedClientId);
-    setAppClientSecret("");
-    setActiveItem(null);
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setMessage(null);
     setError(null);
-  }
-
-  async function saveIntegration() {
-    setMessage(null);
-    setError(null);
-
-    if (
-      appMode === "workspace_app" &&
-      (!appClientId.trim() || (!appClientSecret.trim() && !savedHasSecret))
-    ) {
-      setError("Preencha Client ID e Client Secret para usar app do workspace.");
-      return;
-    }
-
     setIsSaving(true);
 
     try {
@@ -165,6 +83,7 @@ export default function WorkspaceSpotifyIntegrationForm({
           appClientSecret,
         }),
       });
+
       const data = (await response.json().catch(() => null)) as
         | {
             success?: boolean;
@@ -177,12 +96,8 @@ export default function WorkspaceSpotifyIntegrationForm({
         return;
       }
 
-      setSavedAppMode(appMode);
-      setSavedClientId(appClientId);
-      setSavedHasSecret(savedHasSecret || Boolean(appClientSecret.trim()));
       setAppClientSecret("");
-      setActiveItem(null);
-      setMessage("Integracao salva.");
+      setMessage("Configuracao salva.");
       startTransition(() => {
         router.refresh();
       });
@@ -191,131 +106,82 @@ export default function WorkspaceSpotifyIntegrationForm({
     }
   }
 
-  const busy = isSaving || isPending;
-  const modeLabel =
-    appMode === "workspace_app" ? "App do workspace" : "App global";
-  const credentialsLabel =
-    appMode === "workspace_app"
-      ? savedHasSecret || appClientSecret.trim()
-        ? "Client ID e Secret configurados"
-        : "Credenciais pendentes"
-      : "Usando credenciais globais";
-
   return (
-    <div className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.025]">
-      <IntegrationRow
-        title="Modo da app"
-        value={modeLabel}
-        active={activeItem === "mode"}
-        onOpen={() => setActiveItem(activeItem === "mode" ? null : "mode")}
-      >
-        <div className="grid max-w-3xl gap-2 md:grid-cols-2">
-          <ModeOption
-            active={appMode === "global_app"}
-            title="App global"
-            detail="Usa a app central do sistema."
-            onClick={() => setAppMode("global_app")}
-          />
-          <ModeOption
-            active={appMode === "workspace_app"}
-            title="App do workspace"
-            detail="Usa a app Spotify do cliente."
-            onClick={() => setAppMode("workspace_app")}
-          />
-        </div>
+    <form
+      className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5"
+      onSubmit={handleSubmit}
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <ModeCard
+          active={appMode === "global_app"}
+          title="App global"
+          hint="Usa a configuracao central do sistema."
+          onClick={() => setAppMode("global_app")}
+        />
+        <ModeCard
+          active={appMode === "workspace_app"}
+          title="App do workspace"
+          hint="Cada cliente usa a propria app do Spotify."
+          onClick={() => setAppMode("workspace_app")}
+        />
+      </div>
 
-        {appMode === "workspace_app" ? (
-          <div className="mt-3 grid max-w-3xl gap-3 md:grid-cols-2">
+      {appMode === "workspace_app" ? (
+        <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase text-white/40">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
                 Client ID
-              </span>
+              </div>
               <input
                 value={appClientId}
                 onChange={(event) => setAppClientId(event.target.value)}
-                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-                placeholder="Spotify Client ID"
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+                placeholder="Cole o Client ID"
               />
             </label>
+
             <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase text-white/40">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
                 Client Secret
-              </span>
+              </div>
               <input
                 type="password"
                 value={appClientSecret}
                 onChange={(event) => setAppClientSecret(event.target.value)}
-                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
                 placeholder={
-                  savedHasSecret
-                    ? "Ja salvo. Digite para trocar."
-                    : "Spotify Client Secret"
+                  hasAppClientSecret
+                    ? "Ja salvo. Digite so para trocar."
+                    : "Cole o Client Secret"
                 }
               />
             </label>
           </div>
-        ) : null}
 
-        <ActionBar saving={busy} onSave={saveIntegration} onCancel={resetDraft} />
-      </IntegrationRow>
-
-      <IntegrationRow
-        title="Credenciais"
-        value={credentialsLabel}
-        active={activeItem === "credentials"}
-        onOpen={() =>
-          setActiveItem(activeItem === "credentials" ? null : "credentials")
-        }
-      >
-        {appMode === "workspace_app" ? (
-          <div className="grid max-w-3xl gap-3 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase text-white/40">
-                Client ID
-              </span>
-              <input
-                value={appClientId}
-                onChange={(event) => setAppClientId(event.target.value)}
-                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-                placeholder="Spotify Client ID"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase text-white/40">
-                Client Secret
-              </span>
-              <input
-                type="password"
-                value={appClientSecret}
-                onChange={(event) => setAppClientSecret(event.target.value)}
-                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-                placeholder={
-                  savedHasSecret
-                    ? "Ja salvo. Digite para trocar."
-                    : "Spotify Client Secret"
-                }
-              />
-            </label>
+          <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/85">
+            Adicione o redirect do sistema na app Spotify do cliente antes de conectar.
           </div>
-        ) : (
-          <div className="flex max-w-3xl items-center gap-3 rounded-md border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white/60">
-            <KeyRound className="h-4 w-4 text-white/40" />
-            As credenciais globais continuam no ambiente do servidor.
-          </div>
-        )}
-        <ActionBar saving={busy} onSave={saveIntegration} onCancel={resetDraft} />
-      </IntegrationRow>
-
-      {message ? (
-        <div className="border-t border-white/10 px-4 py-3 text-sm text-emerald-300">
-          {message}
         </div>
       ) : null}
-      {error ? (
-        <div className="border-t border-white/10 px-4 py-3 text-sm text-red-300">
-          {error}
-        </div>
-      ) : null}
-    </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={isSaving || isPending}
+          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSaving || isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Salvar
+        </button>
+
+        {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+        {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      </div>
+    </form>
   );
 }
