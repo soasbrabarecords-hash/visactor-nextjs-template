@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type WorkspaceRow = {
@@ -160,15 +161,19 @@ function buildWorkspaceSlug(name: string, userId: string) {
 async function ensureWorkspaceDefaults(workspaceId: string) {
   const supabase = await createClient();
 
-  const [{ error: settingsError }, { error: integrationError }] =
-    await Promise.all([
-      supabase.from("workspace_settings").upsert(
+  const runUpserts = async (
+    client:
+      | Awaited<ReturnType<typeof createClient>>
+      | NonNullable<ReturnType<typeof createAdminClient>>,
+  ) =>
+    Promise.all([
+      client.from("workspace_settings").upsert(
         {
           workspace_id: workspaceId,
         },
         { onConflict: "workspace_id" },
       ),
-      supabase.from("workspace_integrations").upsert(
+      client.from("workspace_integrations").upsert(
         {
           workspace_id: workspaceId,
           provider: "spotify",
@@ -178,6 +183,16 @@ async function ensureWorkspaceDefaults(workspaceId: string) {
         { onConflict: "workspace_id,provider" },
       ),
     ]);
+
+  let [{ error: settingsError }, { error: integrationError }] =
+    await runUpserts(supabase);
+
+  const admin = createAdminClient();
+
+  if ((settingsError || integrationError) && admin) {
+    [{ error: settingsError }, { error: integrationError }] =
+      await runUpserts(admin);
+  }
 
   if (settingsError) {
     throw new Error(`ensureWorkspaceDefaults(settings): ${settingsError.message}`);
@@ -237,6 +252,96 @@ async function bootstrapWorkspaceForCurrentUser(user: {
   } satisfies WorkspaceRow;
 }
 
+async function recoverWorkspaceContextForUser(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const admin = createAdminClient();
+
+  if (!admin) {
+    return null;
+  }
+
+  const { data: membershipRows, error: membershipError } = await admin
+    .from("workspace_memberships")
+    .select("workspace_id, role")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (membershipError) {
+    throw new Error(
+      `recoverWorkspaceContextForUser(membership): ${membershipError.message}`,
+    );
+  }
+
+  let membership =
+    ((membershipRows ?? [])[0] as WorkspaceMembershipRow | undefined) ?? null;
+  let workspaceId = membership?.workspace_id ?? null;
+  let workspaceName = buildWorkspaceName(user);
+  let workspaceSlug = buildWorkspaceSlug(workspaceName, user.id);
+
+  if (!workspaceId) {
+    workspaceId = crypto.randomUUID();
+
+    const { error: workspaceInsertError } = await admin
+      .from("workspaces")
+      .insert({
+        id: workspaceId,
+        name: workspaceName,
+        slug: workspaceSlug,
+        owner_user_id: user.id,
+      });
+
+    if (workspaceInsertError) {
+      throw new Error(
+        `recoverWorkspaceContextForUser(workspace): ${workspaceInsertError.message}`,
+      );
+    }
+
+    const { error: membershipInsertError } = await admin
+      .from("workspace_memberships")
+      .insert({
+        workspace_id: workspaceId,
+        user_id: user.id,
+        role: "owner",
+      });
+
+    if (membershipInsertError) {
+      throw new Error(
+        `recoverWorkspaceContextForUser(membershipInsert): ${membershipInsertError.message}`,
+      );
+    }
+  } else {
+    const { data: workspaceRow, error: workspaceError } = await admin
+      .from("workspaces")
+      .select("id, name, slug")
+      .eq("id", workspaceId)
+      .maybeSingle();
+
+    if (workspaceError) {
+      throw new Error(
+        `recoverWorkspaceContextForUser(workspaceRead): ${workspaceError.message}`,
+      );
+    }
+
+    if (workspaceRow) {
+      workspaceName = workspaceRow.name;
+      workspaceSlug = workspaceRow.slug;
+    }
+  }
+
+  await ensureWorkspaceDefaults(workspaceId);
+
+  return {
+    id: workspaceId,
+    name: workspaceName,
+    slug: workspaceSlug,
+    owner_user_id: user.id,
+  } satisfies WorkspaceRow;
+}
+
 export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | null> {
   const supabase = await createClient();
   const {
@@ -257,7 +362,8 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
     .limit(1);
 
   if (membershipError) {
-    throw new Error(`getCurrentWorkspaceContext(membership): ${membershipError.message}`);
+    await recoverWorkspaceContextForUser(user);
+    return getCurrentWorkspaceContext();
   }
 
   membership = ((membershipRows ?? [])[0] as WorkspaceMembershipRow | undefined) ?? null;
@@ -278,7 +384,8 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
       .single();
 
     if (workspaceError) {
-      throw new Error(`getCurrentWorkspaceContext(workspace): ${workspaceError.message}`);
+      await recoverWorkspaceContextForUser(user);
+      return getCurrentWorkspaceContext();
     }
 
     workspace = workspaceRow as WorkspaceRow;
@@ -305,13 +412,13 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
     ]);
 
   if (settingsError) {
-    throw new Error(`getCurrentWorkspaceContext(settings): ${settingsError.message}`);
+    await recoverWorkspaceContextForUser(user);
+    return getCurrentWorkspaceContext();
   }
 
   if (integrationsError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(integrations): ${integrationsError.message}`,
-    );
+    await recoverWorkspaceContextForUser(user);
+    return getCurrentWorkspaceContext();
   }
 
   const settings = settingsRow as WorkspaceSettingsRow | null;

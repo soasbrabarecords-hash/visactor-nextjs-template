@@ -116,6 +116,18 @@ export default function SettingsHub({
     workspace?.spotifyIntegration.appMode === "workspace_app"
       ? "App do workspace"
       : "App global";
+  const workspaceName = workspace?.workspace.name ?? "Meu workspace";
+  const defaultMarket = workspace?.settings.defaultMarket ?? "BR";
+  const releaseWindowDays = workspace?.settings.releaseWindowDays ?? 21;
+  const suggestionScoreThreshold =
+    workspace?.settings.suggestionScoreThreshold ?? 70;
+  const prioritizeFollowedArtists =
+    workspace?.settings.prioritizeFollowedArtists ?? true;
+  const prioritizeTopTracks = workspace?.settings.prioritizeTopTracks ?? true;
+  const integrationMode = workspace?.spotifyIntegration.appMode ?? "global_app";
+  const integrationClientId = workspace?.spotifyIntegration.appClientId ?? null;
+  const hasIntegrationSecret =
+    workspace?.spotifyIntegration.hasAppClientSecret ?? false;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_22%),radial-gradient(circle_at_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
@@ -137,13 +149,16 @@ export default function SettingsHub({
                 Configuracoes do workspace
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                {workspace
-                  ? workspace.workspace.name
-                  : "Conexao, regras e setup."}
+                {workspaceName}
               </p>
               <p className="mt-3 text-sm text-white/45">
                 Ajuste regras da curadoria e a integracao logo abaixo.
               </p>
+              {!workspace ? (
+                <p className="mt-3 text-sm text-amber-200/80">
+                  Painel em modo seguro. Se esta for a primeira carga, salve uma vez para sincronizar o workspace.
+                </p>
+              ) : null}
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <a
@@ -235,7 +250,7 @@ export default function SettingsHub({
           <MiniCard
             icon={<SlidersHorizontal className="h-5 w-5" />}
             title="Curadoria"
-            value={workspace?.settings.defaultMarket ?? "BR"}
+            value={defaultMarket}
             hint="Mercado principal."
             tone="blue"
           />
@@ -244,11 +259,11 @@ export default function SettingsHub({
             title="Credenciais"
             value={spotifyModeLabel}
             hint={
-              workspace?.spotifyIntegration.appMode === "workspace_app"
+              integrationMode === "workspace_app"
                 ? "Modo por cliente."
                 : "Fallback seguro ativo."
             }
-            tone={workspace?.spotifyIntegration.appMode === "workspace_app" ? "yellow" : "blue"}
+            tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
           />
           <MiniCard
             icon={<ShieldCheck className="h-5 w-5" />}
@@ -259,46 +274,42 @@ export default function SettingsHub({
           />
         </section>
 
-        {workspace ? (
-          <SectionCard
-            eyebrow="Workspace"
-            title="Regras e preferencias"
-            badge={<StatusBadge tone="blue">Editavel</StatusBadge>}
-          >
-            <WorkspaceSettingsForm
-              initialWorkspaceName={workspace.workspace.name}
-              initialDefaultMarket={workspace.settings.defaultMarket}
-              initialReleaseWindowDays={workspace.settings.releaseWindowDays}
-              initialSuggestionScoreThreshold={workspace.settings.suggestionScoreThreshold}
-              initialPrioritizeFollowedArtists={workspace.settings.prioritizeFollowedArtists}
-              initialPrioritizeTopTracks={workspace.settings.prioritizeTopTracks}
-            />
-          </SectionCard>
-        ) : null}
+        <SectionCard
+          eyebrow="Workspace"
+          title="Regras e preferencias"
+          badge={
+            <StatusBadge tone={workspace ? "blue" : "yellow"}>
+              {workspace ? "Editavel" : "Sync pendente"}
+            </StatusBadge>
+          }
+        >
+          <WorkspaceSettingsForm
+            initialWorkspaceName={workspaceName}
+            initialDefaultMarket={defaultMarket}
+            initialReleaseWindowDays={releaseWindowDays}
+            initialSuggestionScoreThreshold={suggestionScoreThreshold}
+            initialPrioritizeFollowedArtists={prioritizeFollowedArtists}
+            initialPrioritizeTopTracks={prioritizeTopTracks}
+          />
+        </SectionCard>
 
-        {workspace ? (
-          <SectionCard
-            eyebrow="Integracao Spotify"
-            title="Modo da app"
-            badge={
-              <StatusBadge
-                tone={
-                  workspace.spotifyIntegration.appMode === "workspace_app"
-                    ? "yellow"
-                    : "blue"
-                }
-              >
-                {spotifyModeLabel}
-              </StatusBadge>
-            }
-          >
-            <WorkspaceSpotifyIntegrationForm
-              initialAppMode={workspace.spotifyIntegration.appMode}
-              initialAppClientId={workspace.spotifyIntegration.appClientId}
-              hasAppClientSecret={workspace.spotifyIntegration.hasAppClientSecret}
-            />
-          </SectionCard>
-        ) : null}
+        <SectionCard
+          eyebrow="Integracao Spotify"
+          title="Modo da app"
+          badge={
+            <StatusBadge
+              tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
+            >
+              {spotifyModeLabel}
+            </StatusBadge>
+          }
+        >
+          <WorkspaceSpotifyIntegrationForm
+            initialAppMode={integrationMode}
+            initialAppClientId={integrationClientId}
+            hasAppClientSecret={hasIntegrationSecret}
+          />
+        </SectionCard>
 
         <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
           <div className="flex flex-wrap items-center gap-2">
