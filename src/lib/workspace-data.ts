@@ -30,6 +30,7 @@ import {
   fetchSpotifyAccountPlaylists,
   fetchSpotifyEditablePlaylist,
 } from "@/lib/spotify-user";
+import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 import { fetchTikTokPublicChart, type TikTokPublicChartTrack } from "@/lib/tiktok-public-charts";
 import type { PlaylistRecord } from "@/types/dashboard";
 import type { TrackInsight } from "@/types/charts";
@@ -1616,6 +1617,15 @@ function buildCurationRows(
   playlistTracks: TrackInsight[],
   dominantArtists: string[],
   accountProfile?: DashboardAccountProfile | null,
+  {
+    suggestionScoreThreshold = 70,
+    prioritizeFollowedArtists = true,
+    prioritizeTopTracks = true,
+  }: {
+    suggestionScoreThreshold?: number;
+    prioritizeFollowedArtists?: boolean;
+    prioritizeTopTracks?: boolean;
+  } = {},
 ): DecisionTrack[] {
   const playlistTrackIds = new Set(playlistTracks.map((track) => track.id));
   const trackArtistIds = new Map(playlistTracks.map((track) => [track.id, track.artistIds]));
@@ -1646,7 +1656,11 @@ function buildCurationRows(
           ? 14
           : 6
         : clamp(row.rankChange * 5, -20, 20);
-    const fitWeight = fitLabel === "Fit alto" ? 18 : fitLabel === "Fit medio" ? 10 : 3;
+    const fitWeightBase =
+      fitLabel === "Fit alto" ? 18 : fitLabel === "Fit medio" ? 10 : 3;
+    const fitWeight = prioritizeFollowedArtists
+      ? fitWeightBase + 2
+      : fitWeightBase;
     const recurringWeight = row.recurring ? 10 : 3;
     const saturationWeight = row.lowSaturation ? 14 : 4;
     const accountPresenceWeight =
@@ -1655,13 +1669,19 @@ function buildCurationRows(
         : accountSignals.accountPlaylistCount === 1
           ? 2
           : -Math.min(12, accountSignals.accountPlaylistCount * 4);
-    const artistWeight = clamp(accountSignals.accountArtistCount * 4, 0, 16);
+    const artistWeight = clamp(
+      accountSignals.accountArtistCount * (prioritizeFollowedArtists ? 5 : 3),
+      0,
+      18,
+    );
     const genreWeight = clamp(accountSignals.accountGenreStrength * 1.4, 0, 16);
     const suggestionWeight = accountSignals.suggestedPlaylistName ? 8 : 0;
+    const popularityWeight = prioritizeTopTracks ? 0.36 : 0.26;
+    const opportunityWeight = prioritizeTopTracks ? 0.38 : 0.3;
     const decisionScore = clamp(
       Math.round(
-        row.popularity * 0.32 +
-          row.opportunityScore * 0.34 +
+        row.popularity * popularityWeight +
+          row.opportunityScore * opportunityWeight +
           movementWeight +
           fitWeight +
           recurringWeight +
@@ -1680,13 +1700,16 @@ function buildCurationRows(
     if (
       row.movement.type === "down" &&
       accountSignals.accountPlaylistCount >= 2 &&
-      decisionScore < 66
+      decisionScore < Math.max(60, suggestionScoreThreshold - 4)
     ) {
       recommendedAction = "remove";
-    } else if (decisionScore >= 78 && accountSignals.accountPlaylistCount === 0) {
+    } else if (
+      decisionScore >= Math.max(72, suggestionScoreThreshold) &&
+      accountSignals.accountPlaylistCount === 0
+    ) {
       recommendedAction = "add";
     } else if (
-      decisionScore >= 64 ||
+      decisionScore >= Math.max(58, suggestionScoreThreshold - 10) ||
       (accountSignals.accountPlaylistCount > 0 && row.movement.type === "up")
     ) {
       recommendedAction = "observe";
@@ -2746,14 +2769,26 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 }
 
 export async function getCurationPageData(): Promise<CurationPageData> {
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const defaultMarket = workspace?.settings.defaultMarket?.trim() || "BR";
+  const suggestionScoreThreshold = clamp(
+    workspace?.settings.suggestionScoreThreshold ?? 70,
+    0,
+    100,
+  );
   const chartsData = await getChartsData();
   const dominantArtists = chartsData.artistDistribution.map((artist) => artist.type);
   const snapshotRadar = await buildDashboardSnapshotRadarRows({
-    country: "BR",
+    country: defaultMarket,
     playlistTracks: chartsData.tracks,
     dominantArtists,
   });
-  const rows = buildCurationRows(snapshotRadar.rows, chartsData.tracks, dominantArtists);
+  const rows = buildCurationRows(snapshotRadar.rows, chartsData.tracks, dominantArtists, undefined, {
+    suggestionScoreThreshold,
+    prioritizeFollowedArtists:
+      workspace?.settings.prioritizeFollowedArtists ?? true,
+    prioritizeTopTracks: workspace?.settings.prioritizeTopTracks ?? true,
+  });
 
   return {
     hero: {
@@ -2771,7 +2806,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
       {
         title: "Adicionar agora",
         value: formatCount(rows.filter((row) => row.recommendedAction === "add").length),
-        helper: "Prioridade alta",
+        helper: `Score >= ${Math.max(72, suggestionScoreThreshold)}`,
         tone: "green",
       },
       {
@@ -2793,7 +2828,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
       {
         title: "Fit alto",
         value: formatCount(rows.filter((row) => row.fitLabel === "Fit alto").length),
-        helper: "Alta aderencia",
+        helper: `${defaultMarket} como mercado base`,
         tone: "blue",
       },
     ],

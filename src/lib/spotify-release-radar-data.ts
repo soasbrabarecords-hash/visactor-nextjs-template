@@ -14,6 +14,7 @@ import {
   type SpotifyAccountPlaylist,
   type SpotifyEditablePlaylist,
 } from "@/lib/spotify-user";
+import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 import type { StatusTone, WorkspaceMetric } from "@/types/workspace";
 
 type SpotifyArtistObject = {
@@ -243,6 +244,7 @@ const MAX_FOLLOWED_ARTISTS = 80;
 const MAX_PRIORITY_ARTISTS = 12;
 const MAX_RELEASES = 18;
 const FRESH_RELEASE_WINDOW_DAYS = 120;
+const DEFAULT_RELEASE_SCORE_THRESHOLD = 70;
 
 const KNOWN_TRACK_GENRES = new Set<TrackGenre>([
   "funk",
@@ -654,10 +656,14 @@ function buildPriorityArtists({
   topArtists,
   topTracks,
   followedArtists,
+  prioritizeFollowedArtists,
+  prioritizeTopTracks,
 }: {
   topArtists: Awaited<ReturnType<typeof fetchTopArtists>>;
   topTracks: Awaited<ReturnType<typeof fetchTopTracks>>;
   followedArtists: Awaited<ReturnType<typeof fetchFollowedArtists>>;
+  prioritizeFollowedArtists: boolean;
+  prioritizeTopTracks: boolean;
 }) {
   const byId = new Map<string, ListeningArtist>();
 
@@ -705,8 +711,11 @@ function buildPriorityArtists({
       const topArtistBoost = artist.topArtistRank
         ? Math.max(0, 24 - artist.topArtistRank)
         : 0;
-      const followedBoost = artist.isFollowed ? 38 : 0;
-      const topTrackBoost = artist.topTrackAppearances * 9;
+      const followedBoost =
+        prioritizeFollowedArtists && artist.isFollowed ? 38 : 0;
+      const topTrackBoost = prioritizeTopTracks
+        ? artist.topTrackAppearances * 9
+        : 0;
 
       return {
         ...artist,
@@ -720,10 +729,12 @@ function buildPriorityArtists({
 async function fetchArtistLatestReleases(
   accessToken: string,
   artist: ListeningArtist,
+  market: string,
+  releaseWindowDays: number,
 ) {
   const payload = await spotifyFetch<SpotifyArtistAlbumsResponse>(
     accessToken,
-    `https://api.spotify.com/v1/artists/${artist.id}/albums?include_groups=album,single&market=BR&limit=8`,
+    `https://api.spotify.com/v1/artists/${artist.id}/albums?include_groups=album,single&market=${market}&limit=8`,
   );
   const deduped = new Map<string, SpotifyAlbumObject>();
 
@@ -748,7 +759,7 @@ async function fetchArtistLatestReleases(
   const freshReleases = orderedReleases.filter((release) => {
     const days = getDaysSinceRelease(release.release_date ?? null);
 
-    return days !== null && days <= FRESH_RELEASE_WINDOW_DAYS;
+    return days !== null && days <= releaseWindowDays;
   });
   const selected = (freshReleases.length > 0 ? freshReleases : orderedReleases)
     .slice(0, freshReleases.length > 1 ? 2 : 1)
@@ -785,7 +796,11 @@ async function fetchAlbumTrackIds(accessToken: string, albumId: string) {
     .filter(Boolean);
 }
 
-async function fetchTracksByIds(accessToken: string, trackIds: string[]) {
+async function fetchTracksByIds(
+  accessToken: string,
+  trackIds: string[],
+  market: string,
+) {
   const batches = [];
 
   for (let index = 0; index < trackIds.length; index += 50) {
@@ -795,7 +810,7 @@ async function fetchTracksByIds(accessToken: string, trackIds: string[]) {
   const tracks = await mapWithConcurrency(batches, 3, async (batch) => {
     const payload = await spotifyFetch<SpotifyTracksBatchResponse>(
       accessToken,
-      `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}&market=BR`,
+      `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}&market=${market}`,
     );
 
     return (payload.tracks ?? []).filter(
@@ -1060,6 +1075,22 @@ function buildReason({
 }
 
 export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRadarPageData> {
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const defaultMarket = workspace?.settings.defaultMarket?.trim() || "BR";
+  const releaseWindowDays = clamp(
+    workspace?.settings.releaseWindowDays ?? FRESH_RELEASE_WINDOW_DAYS,
+    7,
+    FRESH_RELEASE_WINDOW_DAYS,
+  );
+  const scoreThreshold = clamp(
+    workspace?.settings.suggestionScoreThreshold ??
+      DEFAULT_RELEASE_SCORE_THRESHOLD,
+    0,
+    100,
+  );
+  const prioritizeFollowedArtists =
+    workspace?.settings.prioritizeFollowedArtists ?? true;
+  const prioritizeTopTracks = workspace?.settings.prioritizeTopTracks ?? true;
   const { result } = await fetchSpotifyAccountPlaylists();
 
   if (!result.connected) {
@@ -1101,10 +1132,17 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
         topArtists,
         topTracks,
         followedArtists,
+        prioritizeFollowedArtists,
+        prioritizeTopTracks,
       });
       const releases = (
         await mapWithConcurrency(priorityArtists, 3, async (artist) =>
-          fetchArtistLatestReleases(accessToken, artist),
+          fetchArtistLatestReleases(
+            accessToken,
+            artist,
+            defaultMarket,
+            releaseWindowDays,
+          ),
         )
       )
         .flat()
@@ -1131,7 +1169,11 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
       });
 
       const trackIds = [...new Set([...trackIdsByRelease.values()].flat())];
-      const trackDetails = await fetchTracksByIds(accessToken, trackIds);
+      const trackDetails = await fetchTracksByIds(
+        accessToken,
+        trackIds,
+        defaultMarket,
+      );
 
       return {
         topArtists,
@@ -1306,7 +1348,10 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
       };
     });
     const opportunities: SpotifyReleaseRadarOpportunity[] = candidateRows
-      .filter((candidate) => !candidate.alreadyInPlaylists)
+      .filter(
+        (candidate) =>
+          !candidate.alreadyInPlaylists && candidate.score >= scoreThreshold,
+      )
       .slice(0, 18)
       .map((candidate) => ({
         id: candidate.id,
@@ -1354,7 +1399,7 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
         {
           title: "Fora das playlists",
           value: formatCount(missingOpportunities),
-          helper: "Oportunidades com gap real",
+          helper: `Score minimo ${scoreThreshold}`,
           tone: "green",
         },
         {
@@ -1363,7 +1408,7 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
           helper:
             accountProfile?.dominantGenreLabel
               ? `${accountProfile.dominantGenreLabel} domina a conta`
-              : "Sem genero dominante claro",
+              : `${defaultMarket} como mercado base`,
           tone: "yellow",
         },
       ],

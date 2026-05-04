@@ -72,6 +72,15 @@ export type WorkspaceSpotifyIntegrationInput = {
   appClientSecret?: string | null;
 };
 
+export type WorkspaceSettingsInput = {
+  workspaceName?: string | null;
+  defaultMarket: string;
+  releaseWindowDays: number;
+  suggestionScoreThreshold: number;
+  prioritizeFollowedArtists: boolean;
+  prioritizeTopTracks: boolean;
+};
+
 export type EffectiveSpotifyCredentials = {
   clientId: string;
   clientSecret: string;
@@ -367,6 +376,62 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
 
   if (error) {
     throw new Error(`updateCurrentWorkspaceSpotifyIntegration: ${error.message}`);
+  }
+
+  return getCurrentWorkspaceContext();
+}
+
+export async function updateCurrentWorkspaceSettings(
+  input: WorkspaceSettingsInput,
+) {
+  const workspace = await getCurrentWorkspaceContext();
+
+  if (!workspace) {
+    throw new Error("Workspace indisponivel.");
+  }
+
+  if (!["owner", "admin"].includes(workspace.membership.role)) {
+    throw new Error("Sem permissao para editar o workspace.");
+  }
+
+  const workspaceName = input.workspaceName?.trim() || workspace.workspace.name;
+  const defaultMarket = input.defaultMarket.trim().toUpperCase() || "BR";
+  const releaseWindowDays = Math.max(1, Math.min(90, input.releaseWindowDays));
+  const suggestionScoreThreshold = Math.max(
+    0,
+    Math.min(100, input.suggestionScoreThreshold),
+  );
+
+  const supabase = await createClient();
+
+  const [{ error: workspaceError }, { error: settingsError }] =
+    await Promise.all([
+      supabase
+        .from("workspaces")
+        .update({
+          name: workspaceName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", workspace.workspace.id),
+      supabase
+        .from("workspace_settings")
+        .update({
+          default_market: defaultMarket,
+          release_window_days: releaseWindowDays,
+          suggestion_score_threshold: suggestionScoreThreshold,
+          prioritize_followed_artists: input.prioritizeFollowedArtists,
+          prioritize_top_tracks: input.prioritizeTopTracks,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("workspace_id", workspace.workspace.id),
+    ]);
+
+  if (workspaceError) {
+    throw new Error(`updateCurrentWorkspaceSettings(workspace): ${workspaceError.message}`);
+  }
+
+  if (settingsError) {
+    throw new Error(`updateCurrentWorkspaceSettings(settings): ${settingsError.message}`);
   }
 
   return getCurrentWorkspaceContext();

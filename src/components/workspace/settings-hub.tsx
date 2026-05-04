@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Container from "@/components/container";
 import StatusBadge from "@/components/workspace/status-badge";
+import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-form";
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
 import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
 import type { WorkspaceContext } from "@/lib/workspaces";
@@ -225,6 +226,31 @@ export default function SettingsHub({
             tone="slate"
           />
         </section>
+
+        {workspace ? (
+          <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+                  Workspace
+                </div>
+                <h3 className="mt-1 text-lg font-semibold text-white">
+                  Regras e preferencias
+                </h3>
+              </div>
+              <StatusBadge tone="blue">Editavel</StatusBadge>
+            </div>
+
+            <WorkspaceSettingsForm
+              initialWorkspaceName={workspace.workspace.name}
+              initialDefaultMarket={workspace.settings.defaultMarket}
+              initialReleaseWindowDays={workspace.settings.releaseWindowDays}
+              initialSuggestionScoreThreshold={workspace.settings.suggestionScoreThreshold}
+              initialPrioritizeFollowedArtists={workspace.settings.prioritizeFollowedArtists}
+              initialPrioritizeTopTracks={workspace.settings.prioritizeTopTracks}
+            />
+          </section>
+        ) : null}
 
         {workspace ? (
           <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
