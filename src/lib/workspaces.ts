@@ -198,16 +198,16 @@ async function bootstrapWorkspaceForCurrentUser(user: {
   const supabase = await createClient();
   const name = buildWorkspaceName(user);
   const slug = buildWorkspaceSlug(name, user.id);
+  const workspaceId = crypto.randomUUID();
 
-  const { data: workspace, error: workspaceError } = await supabase
+  const { error: workspaceError } = await supabase
     .from("workspaces")
     .insert({
+      id: workspaceId,
       name,
       slug,
       owner_user_id: user.id,
-    })
-    .select("id, name, slug, owner_user_id")
-    .single();
+    });
 
   if (workspaceError) {
     throw new Error(`bootstrapWorkspace(workspace): ${workspaceError.message}`);
@@ -216,7 +216,7 @@ async function bootstrapWorkspaceForCurrentUser(user: {
   const { error: membershipError } = await supabase
     .from("workspace_memberships")
     .insert({
-      workspace_id: (workspace as WorkspaceRow).id,
+      workspace_id: workspaceId,
       user_id: user.id,
       role: "owner",
     });
@@ -227,9 +227,14 @@ async function bootstrapWorkspaceForCurrentUser(user: {
     );
   }
 
-  await ensureWorkspaceDefaults((workspace as WorkspaceRow).id);
+  await ensureWorkspaceDefaults(workspaceId);
 
-  return workspace as WorkspaceRow;
+  return {
+    id: workspaceId,
+    name,
+    slug,
+    owner_user_id: user.id,
+  } satisfies WorkspaceRow;
 }
 
 export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | null> {
