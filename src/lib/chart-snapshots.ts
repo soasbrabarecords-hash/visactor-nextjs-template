@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -67,7 +68,11 @@ export type ChartSnapshotTrackInput = {
 export async function upsertChartSnapshot(
   input: ChartSnapshotInput,
 ): Promise<ChartSnapshot | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
+  if (!supabase) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required to write chart snapshots.");
+  }
 
   const country = input.country ?? "BR";
   const chartDate = input.chart_date;
@@ -134,7 +139,14 @@ export async function upsertChartSnapshotTracks(
 ): Promise<{ count: number; error: string | null }> {
   if (tracks.length === 0) return { count: 0, error: null };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
+  if (!supabase) {
+    return {
+      count: 0,
+      error: "SUPABASE_SERVICE_ROLE_KEY is required to write chart snapshot tracks.",
+    };
+  }
 
   const rows = tracks.map((t) => ({
     snapshot_id: snapshotId,
