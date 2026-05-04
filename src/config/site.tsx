@@ -64,6 +64,9 @@ export const navigations: Navigation[] = [
     name: "Label OS",
     href: "/label-os",
   },
+];
+
+export const systemNavigations: Navigation[] = [
   {
     icon: Settings2,
     name: "Configuracoes",
