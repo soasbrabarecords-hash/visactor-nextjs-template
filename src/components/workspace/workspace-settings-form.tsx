@@ -1,7 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Check, ChevronDown, Loader2, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -14,40 +13,135 @@ type WorkspaceSettingsFormProps = {
   initialPrioritizeTopTracks: boolean;
 };
 
-function Toggle({
+type ActiveItem = "name" | "market" | "window" | "score" | "priorities" | null;
+
+type SavedState = {
+  workspaceName: string;
+  defaultMarket: string;
+  releaseWindowDays: string;
+  suggestionScoreThreshold: string;
+  prioritizeFollowedArtists: boolean;
+  prioritizeTopTracks: boolean;
+};
+
+const MARKET_OPTIONS = [
+  { value: "BR", label: "Brasil" },
+  { value: "US", label: "Estados Unidos" },
+  { value: "PT", label: "Portugal" },
+  { value: "MX", label: "Mexico" },
+  { value: "AR", label: "Argentina" },
+  { value: "CO", label: "Colombia" },
+  { value: "GB", label: "Reino Unido" },
+];
+
+const WINDOW_OPTIONS = [
+  { value: "7", label: "7 dias" },
+  { value: "14", label: "14 dias" },
+  { value: "21", label: "21 dias" },
+  { value: "30", label: "30 dias" },
+  { value: "60", label: "60 dias" },
+  { value: "90", label: "90 dias" },
+];
+
+function SettingRow({
+  title,
+  value,
+  active,
+  onOpen,
+  children,
+}: {
+  title: string;
+  value: string;
+  active: boolean;
+  onOpen: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-t border-white/10 first:border-t-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="grid w-full grid-cols-1 gap-2 px-4 py-4 text-left transition hover:bg-white/[0.03] md:grid-cols-[220px_1fr_24px] md:items-center"
+      >
+        <span className="text-sm font-medium text-white">{title}</span>
+        <span className="text-sm text-white/55">{value}</span>
+        <ChevronDown
+          className={`h-4 w-4 text-white/35 transition ${
+            active ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {active ? <div className="px-4 pb-4">{children}</div> : null}
+    </div>
+  );
+}
+
+function ActionBar({
+  saving,
+  onSave,
+  onCancel,
+}: {
+  saving: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        Salvar
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm font-semibold text-white/70 transition hover:bg-white/[0.04] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <X className="h-4 w-4" />
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
+function ToggleButton({
   checked,
   onChange,
   label,
-  hint,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
-  hint: string;
 }) {
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className={`flex items-start justify-between gap-4 rounded-[22px] border px-4 py-3 text-left transition ${
+      className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition ${
         checked
-          ? "border-emerald-400/30 bg-emerald-500/10 text-white"
-          : "border-white/10 bg-black/20 text-white/70"
+          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+          : "border-white/10 bg-white/[0.03] text-white/55 hover:text-white"
       }`}
     >
-      <span>
-        <span className="block text-sm font-medium">{label}</span>
-        <span className="mt-1 block text-xs text-white/45">{hint}</span>
-      </span>
       <span
-        className={`mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+        className={`flex h-4 w-4 items-center justify-center rounded border ${
           checked
-            ? "bg-emerald-300 text-emerald-950"
-            : "bg-white/10 text-white/45"
+            ? "border-emerald-300 bg-emerald-300 text-emerald-950"
+            : "border-white/20"
         }`}
       >
-        {checked ? "on" : "off"}
+        {checked ? <Check className="h-3 w-3" /> : null}
       </span>
+      {label}
     </button>
   );
 }
@@ -62,28 +156,48 @@ export default function WorkspaceSettingsForm({
 }: WorkspaceSettingsFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [activeItem, setActiveItem] = useState<ActiveItem>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [workspaceName, setWorkspaceName] = useState(initialWorkspaceName);
-  const [defaultMarket, setDefaultMarket] = useState(initialDefaultMarket);
-  const [releaseWindowDays, setReleaseWindowDays] = useState(
-    String(initialReleaseWindowDays),
-  );
-  const [suggestionScoreThreshold, setSuggestionScoreThreshold] = useState(
-    String(initialSuggestionScoreThreshold),
-  );
-  const [prioritizeFollowedArtists, setPrioritizeFollowedArtists] = useState(
-    initialPrioritizeFollowedArtists,
-  );
-  const [prioritizeTopTracks, setPrioritizeTopTracks] = useState(
-    initialPrioritizeTopTracks,
-  );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedState>({
+    workspaceName: initialWorkspaceName,
+    defaultMarket: initialDefaultMarket,
+    releaseWindowDays: String(initialReleaseWindowDays),
+    suggestionScoreThreshold: String(initialSuggestionScoreThreshold),
+    prioritizeFollowedArtists: initialPrioritizeFollowedArtists,
+    prioritizeTopTracks: initialPrioritizeTopTracks,
+  });
+  const [workspaceName, setWorkspaceName] = useState(saved.workspaceName);
+  const [defaultMarket, setDefaultMarket] = useState(saved.defaultMarket);
+  const [releaseWindowDays, setReleaseWindowDays] = useState(
+    saved.releaseWindowDays,
+  );
+  const [suggestionScoreThreshold, setSuggestionScoreThreshold] = useState(
+    saved.suggestionScoreThreshold,
+  );
+  const [prioritizeFollowedArtists, setPrioritizeFollowedArtists] = useState(
+    saved.prioritizeFollowedArtists,
+  );
+  const [prioritizeTopTracks, setPrioritizeTopTracks] = useState(
+    saved.prioritizeTopTracks,
+  );
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
+  function resetDraft() {
+    setWorkspaceName(saved.workspaceName);
+    setDefaultMarket(saved.defaultMarket);
+    setReleaseWindowDays(saved.releaseWindowDays);
+    setSuggestionScoreThreshold(saved.suggestionScoreThreshold);
+    setPrioritizeFollowedArtists(saved.prioritizeFollowedArtists);
+    setPrioritizeTopTracks(saved.prioritizeTopTracks);
+    setActiveItem(null);
     setError(null);
+    setMessage(null);
+  }
+
+  async function saveSettings() {
+    setError(null);
+    setMessage(null);
     setIsSaving(true);
 
     try {
@@ -101,7 +215,6 @@ export default function WorkspaceSettingsForm({
           prioritizeTopTracks,
         }),
       });
-
       const data = (await response.json().catch(() => null)) as
         | {
             success?: boolean;
@@ -114,7 +227,17 @@ export default function WorkspaceSettingsForm({
         return;
       }
 
-      setMessage("Workspace salvo.");
+      const nextSaved = {
+        workspaceName,
+        defaultMarket,
+        releaseWindowDays,
+        suggestionScoreThreshold,
+        prioritizeFollowedArtists,
+        prioritizeTopTracks,
+      };
+      setSaved(nextSaved);
+      setActiveItem(null);
+      setMessage("Alteracao salva.");
       startTransition(() => {
         router.refresh();
       });
@@ -123,144 +246,130 @@ export default function WorkspaceSettingsForm({
     }
   }
 
+  const busy = isSaving || isPending;
+
   return (
-    <form
-      className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5"
-      onSubmit={handleSubmit}
-    >
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
-            Workspace
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <label className="block md:col-span-1">
-              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-                Nome
-              </div>
-              <input
-                value={workspaceName}
-                onChange={(event) => setWorkspaceName(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-                placeholder="Nome do workspace"
-              />
-            </label>
+    <div className="overflow-hidden rounded-lg border border-white/10 bg-white/[0.025]">
+      <SettingRow
+        title="Nome do workspace"
+        value={workspaceName || "Meu workspace"}
+        active={activeItem === "name"}
+        onOpen={() => setActiveItem(activeItem === "name" ? null : "name")}
+      >
+        <input
+          value={workspaceName}
+          onChange={(event) => setWorkspaceName(event.target.value)}
+          className="w-full max-w-xl rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+          placeholder="Nome do workspace"
+        />
+        <ActionBar saving={busy} onSave={saveSettings} onCancel={resetDraft} />
+      </SettingRow>
 
-            <label className="block">
-              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-                Mercado
-              </div>
-              <input
-                value={defaultMarket}
-                onChange={(event) =>
-                  setDefaultMarket(event.target.value.toUpperCase())
-                }
-                maxLength={2}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-                placeholder="BR"
-              />
-            </label>
-
-            <label className="block">
-              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-                Janela
-              </div>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={releaseWindowDays}
-                onChange={(event) => setReleaseWindowDays(event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-              />
-            </label>
-          </div>
-
-          <div className="mt-6 text-[11px] uppercase tracking-[0.16em] text-white/40">
-            Curadoria
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr_1fr]">
-            <label className="block">
-              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-                Score minimo
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={suggestionScoreThreshold}
-                onChange={(event) =>
-                  setSuggestionScoreThreshold(event.target.value)
-                }
-                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-              />
-            </label>
-
-            <Toggle
-              checked={prioritizeFollowedArtists}
-              onChange={setPrioritizeFollowedArtists}
-              label="Artistas seguidos"
-              hint="Pesa mais quem voce ja acompanha."
-            />
-            <Toggle
-              checked={prioritizeTopTracks}
-              onChange={setPrioritizeTopTracks}
-              label="Top tracks"
-              hint="Da mais peso ao seu historico forte."
-            />
-          </div>
-        </div>
-
-        <aside className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
-            Resumo
-          </div>
-          <div className="mt-3 space-y-3 text-sm text-white/70">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
-                Mercado base
-              </div>
-              <div className="mt-1 text-base font-semibold text-white">
-                {defaultMarket || "BR"}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
-                Lancamentos
-              </div>
-              <div className="mt-1 text-base font-semibold text-white">
-                {releaseWindowDays || "21"} dias
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
-                Corte
-              </div>
-              <div className="mt-1 text-base font-semibold text-white">
-                {suggestionScoreThreshold || "70"}+
-              </div>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={isSaving || isPending}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+      <SettingRow
+        title="Mercado principal"
+        value={defaultMarket}
+        active={activeItem === "market"}
+        onOpen={() => setActiveItem(activeItem === "market" ? null : "market")}
+      >
+        <select
+          value={defaultMarket}
+          onChange={(event) => setDefaultMarket(event.target.value)}
+          className="w-full max-w-sm rounded-md border border-white/10 bg-[#070b18] px-3 py-2 text-sm text-white outline-none transition focus:border-white/25"
         >
-          {isSaving || isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          Salvar
-        </button>
+          {MARKET_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.value} - {option.label}
+            </option>
+          ))}
+        </select>
+        <ActionBar saving={busy} onSave={saveSettings} onCancel={resetDraft} />
+      </SettingRow>
 
-        {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      </div>
-    </form>
+      <SettingRow
+        title="Janela de lancamentos"
+        value={`${releaseWindowDays} dias`}
+        active={activeItem === "window"}
+        onOpen={() => setActiveItem(activeItem === "window" ? null : "window")}
+      >
+        <select
+          value={releaseWindowDays}
+          onChange={(event) => setReleaseWindowDays(event.target.value)}
+          className="w-full max-w-sm rounded-md border border-white/10 bg-[#070b18] px-3 py-2 text-sm text-white outline-none transition focus:border-white/25"
+        >
+          {WINDOW_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ActionBar saving={busy} onSave={saveSettings} onCancel={resetDraft} />
+      </SettingRow>
+
+      <SettingRow
+        title="Score minimo"
+        value={`${suggestionScoreThreshold}+`}
+        active={activeItem === "score"}
+        onOpen={() => setActiveItem(activeItem === "score" ? null : "score")}
+      >
+        <div className="flex max-w-xl flex-wrap items-center gap-3">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={suggestionScoreThreshold}
+            onChange={(event) => setSuggestionScoreThreshold(event.target.value)}
+            className="min-w-64 flex-1 accent-emerald-300"
+          />
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={suggestionScoreThreshold}
+            onChange={(event) => setSuggestionScoreThreshold(event.target.value)}
+            className="w-24 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition focus:border-white/25"
+          />
+        </div>
+        <ActionBar saving={busy} onSave={saveSettings} onCancel={resetDraft} />
+      </SettingRow>
+
+      <SettingRow
+        title="Prioridades"
+        value={[
+          prioritizeFollowedArtists ? "artistas seguidos" : null,
+          prioritizeTopTracks ? "top tracks" : null,
+        ]
+          .filter(Boolean)
+          .join(" + ") || "sem prioridade extra"}
+        active={activeItem === "priorities"}
+        onOpen={() =>
+          setActiveItem(activeItem === "priorities" ? null : "priorities")
+        }
+      >
+        <div className="flex flex-wrap gap-2">
+          <ToggleButton
+            checked={prioritizeFollowedArtists}
+            onChange={setPrioritizeFollowedArtists}
+            label="Artistas seguidos"
+          />
+          <ToggleButton
+            checked={prioritizeTopTracks}
+            onChange={setPrioritizeTopTracks}
+            label="Top tracks"
+          />
+        </div>
+        <ActionBar saving={busy} onSave={saveSettings} onCancel={resetDraft} />
+      </SettingRow>
+
+      {message ? (
+        <div className="border-t border-white/10 px-4 py-3 text-sm text-emerald-300">
+          {message}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="border-t border-white/10 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      ) : null}
+    </div>
   );
 }
