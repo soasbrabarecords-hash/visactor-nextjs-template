@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
   const { result: spotify } = await fetchSpotifyConnectionStatus();
-  const workspace = await getCurrentWorkspaceContext();
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
   const spotifyAppReady = Boolean(
     process.env.SPOTIFY_CLIENT_ID?.trim() &&
       process.env.SPOTIFY_CLIENT_SECRET?.trim(),
