@@ -3,6 +3,12 @@ import "server-only";
 import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import {
+  clearCurrentWorkspaceSpotifyConnection,
+  getEffectiveSpotifyCredentials,
+  getCurrentWorkspaceSpotifyStoredAuth,
+  syncCurrentWorkspaceSpotifyConnection,
+} from "@/lib/workspaces";
 
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
 const SPOTIFY_REFRESH_TOKEN_COOKIE = "spotify_refresh_token";
@@ -151,6 +157,12 @@ export type SpotifyConnectionStatusResult =
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
+};
+
+type ResolvedSpotifySession = {
+  source: "workspace" | "cookie";
+  accessToken: string | null;
+  refreshToken: string | null;
 };
 
 const CURRENT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -307,18 +319,75 @@ function extractSpotifyTrackId(trackUri: string) {
   return trackUri.replace(/^spotify:track:/, "").trim();
 }
 
-function getSpotifyOAuthEnv() {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+async function getSpotifyOAuthEnv() {
+  const credentials = await getEffectiveSpotifyCredentials();
 
-  if (!clientId || !clientSecret) {
+  if (!credentials?.clientId || !credentials.clientSecret) {
     return null;
   }
 
   return {
-    clientId,
-    clientSecret,
+    clientId: credentials.clientId,
+    clientSecret: credentials.clientSecret,
   };
+}
+
+function isUsableWorkspaceAccessToken(tokenExpiresAt: string | null | undefined) {
+  if (!tokenExpiresAt) {
+    return true;
+  }
+
+  const expiresAt = new Date(tokenExpiresAt).getTime();
+
+  if (!Number.isFinite(expiresAt)) {
+    return true;
+  }
+
+  return expiresAt > Date.now() + 60 * 1000;
+}
+
+async function resolveSpotifySession(): Promise<ResolvedSpotifySession | null> {
+  const workspaceAuth = await getCurrentWorkspaceSpotifyStoredAuth().catch(
+    () => null,
+  );
+
+  if (
+    workspaceAuth?.accessToken &&
+    isUsableWorkspaceAccessToken(workspaceAuth.tokenExpiresAt)
+  ) {
+    return {
+      source: "workspace",
+      accessToken: workspaceAuth.accessToken,
+      refreshToken: workspaceAuth.refreshToken,
+    };
+  }
+
+  if (workspaceAuth?.refreshToken) {
+    return {
+      source: "workspace",
+      accessToken: null,
+      refreshToken: workspaceAuth.refreshToken,
+    };
+  }
+
+  if (workspaceAuth && workspaceAuth.connectionStatus !== "connected") {
+    return null;
+  }
+
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value ?? null;
+  const refreshToken =
+    cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value ?? null;
+
+  if (accessToken || refreshToken) {
+    return {
+      source: "cookie",
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  return null;
 }
 
 function getCookieOptions(maxAge: number) {
@@ -346,14 +415,14 @@ export function getSpotifyRedirectUri(origin: string) {
   return redirectUri.replace(/\/+$/, "");
 }
 
-export function buildSpotifyAuthorizeUrl({
+export async function buildSpotifyAuthorizeUrl({
   origin,
   state,
 }: {
   origin: string;
   state: string;
 }) {
-  const env = getSpotifyOAuthEnv();
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -441,7 +510,7 @@ export async function exchangeSpotifyCode({
   code: string;
   redirectUri: string;
 }) {
-  const env = getSpotifyOAuthEnv();
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -470,7 +539,7 @@ export async function exchangeSpotifyCode({
 }
 
 async function refreshSpotifyToken(refreshToken: string) {
-  const env = getSpotifyOAuthEnv();
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -494,6 +563,34 @@ async function refreshSpotifyToken(refreshToken: string) {
   }
 
   return (await response.json()) as SpotifyOAuthTokenResponse;
+}
+
+export async function syncSpotifyWorkspaceConnection(
+  token: SpotifyOAuthTokenResponse,
+) {
+  try {
+    const profile = await fetchSpotifyCurrentUserWithToken(token.access_token);
+
+    await syncCurrentWorkspaceSpotifyConnection({
+      providerAccountId: profile.id?.trim() || null,
+      providerAccountLabel:
+        profile.display_name?.trim() || profile.email?.trim() || null,
+      grantedScopes: token.scope?.trim() || null,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token ?? undefined,
+      expiresInSeconds: token.expires_in,
+    });
+  } catch {
+    // sync da conexao no workspace nao deve quebrar o auth principal
+  }
+}
+
+export async function clearSpotifyWorkspaceConnection() {
+  try {
+    await clearCurrentWorkspaceSpotifyConnection();
+  } catch {
+    // limpeza de metadata do workspace nao deve quebrar logout
+  }
 }
 
 function formatDuration(milliseconds: number | undefined) {
@@ -920,50 +1017,14 @@ export async function fetchSpotifyAccountPlaylists(): Promise<{
   result: SpotifyAccountPlaylistsResult;
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
-  const refreshToken = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
-
-  if (!accessToken && !refreshToken) {
-    return {
-      result: {
-        connected: false,
-        playlists: [],
-        message: "Spotify ainda nao conectado.",
-      },
-      refreshedToken: null,
-    };
-  }
-
   try {
-    if (accessToken) {
-      try {
-        return {
-          result: {
-            connected: true,
-            playlists: await fetchSpotifyAccountPlaylistsWithToken(accessToken),
-          },
-          refreshedToken: null,
-        };
-      } catch (error) {
-        if (!refreshToken) {
-          throw error;
-        }
-      }
-    }
-
-    if (!refreshToken) {
-      throw new Error("Spotify session unavailable.");
-    }
-
-    const refreshedToken = await refreshSpotifyToken(refreshToken);
-
+    const { data: playlists, refreshedToken } = await withSpotifyToken((token) =>
+      fetchSpotifyAccountPlaylistsWithToken(token),
+    );
     return {
       result: {
         connected: true,
-        playlists: await fetchSpotifyAccountPlaylistsWithToken(
-          refreshedToken.access_token,
-        ),
+        playlists,
       },
       refreshedToken,
     };
@@ -986,47 +1047,9 @@ export async function fetchSpotifyConnectionStatus(): Promise<{
   result: SpotifyConnectionStatusResult;
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
-  const refreshToken = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
-
-  if (!accessToken && !refreshToken) {
-    return {
-      result: {
-        connected: false,
-        account: null,
-        message: "Spotify ainda nao conectado.",
-      },
-      refreshedToken: null,
-    };
-  }
-
   try {
-    if (accessToken) {
-      try {
-        const profile = await fetchSpotifyCurrentUserWithToken(accessToken);
-
-        return {
-          result: {
-            connected: true,
-            account: mapSpotifyConnectionAccount(profile),
-          },
-          refreshedToken: null,
-        };
-      } catch (error) {
-        if (!refreshToken) {
-          throw error;
-        }
-      }
-    }
-
-    if (!refreshToken) {
-      throw new Error("Spotify session unavailable.");
-    }
-
-    const refreshedToken = await refreshSpotifyToken(refreshToken);
-    const profile = await fetchSpotifyCurrentUserWithToken(
-      refreshedToken.access_token,
+    const { data: profile, refreshedToken } = await withSpotifyToken((token) =>
+      fetchSpotifyCurrentUserWithToken(token),
     );
 
     return {
@@ -1057,54 +1080,14 @@ export async function fetchSpotifyEditablePlaylist(
   result: SpotifyEditablePlaylistResult;
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
-  const refreshToken = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
-
-  if (!accessToken && !refreshToken) {
-    return {
-      result: {
-        connected: false,
-        playlist: null,
-        message: "Spotify ainda nao conectado.",
-      },
-      refreshedToken: null,
-    };
-  }
-
   try {
-    if (accessToken) {
-      try {
-        return {
-          result: {
-            connected: true,
-            playlist: await fetchSpotifyEditablePlaylistWithToken(
-              accessToken,
-              playlistId,
-            ),
-          },
-          refreshedToken: null,
-        };
-      } catch (error) {
-        if (!refreshToken) {
-          throw error;
-        }
-      }
-    }
-
-    if (!refreshToken) {
-      throw new Error("Spotify session unavailable.");
-    }
-
-    const refreshedToken = await refreshSpotifyToken(refreshToken);
-
+    const { data: playlist, refreshedToken } = await withSpotifyToken((token) =>
+      fetchSpotifyEditablePlaylistWithToken(token, playlistId),
+    );
     return {
       result: {
         connected: true,
-        playlist: await fetchSpotifyEditablePlaylistWithToken(
-          refreshedToken.access_token,
-          playlistId,
-        ),
+        playlist,
       },
       refreshedToken,
     };
@@ -1137,25 +1120,29 @@ export type SpotifyMutationResponse = {
 export async function withSpotifyToken<T>(
   fn: (accessToken: string) => Promise<T>,
 ): Promise<{ data: T; refreshedToken: SpotifyOAuthTokenResponse | null }> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value;
-  const refreshToken = cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value;
+  const session = await resolveSpotifySession();
 
-  if (!accessToken && !refreshToken) {
+  if (!session?.accessToken && !session?.refreshToken) {
     throw new Error("Spotify ainda nao conectado.");
   }
 
-  if (accessToken) {
+  if (session.accessToken) {
     try {
-      return { data: await fn(accessToken), refreshedToken: null };
+      return { data: await fn(session.accessToken), refreshedToken: null };
     } catch (err) {
-      if (!refreshToken) throw err;
+      if (!session.refreshToken) throw err;
     }
   }
 
-  if (!refreshToken) throw new Error("Spotify session unavailable.");
+  if (!session.refreshToken) throw new Error("Spotify session unavailable.");
 
-  const refreshedToken = await refreshSpotifyToken(refreshToken);
+  const refreshedToken = await refreshSpotifyToken(session.refreshToken);
+
+  await syncSpotifyWorkspaceConnection({
+    ...refreshedToken,
+    refresh_token: refreshedToken.refresh_token ?? session.refreshToken,
+  });
+
   return { data: await fn(refreshedToken.access_token), refreshedToken };
 }
 

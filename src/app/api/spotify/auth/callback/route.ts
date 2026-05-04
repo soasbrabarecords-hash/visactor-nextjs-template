@@ -7,6 +7,7 @@ import {
   getSpotifyRedirectUri,
   getSpotifyStateCookie,
   setSpotifyAuthCookies,
+  syncSpotifyWorkspaceConnection,
 } from "@/lib/spotify-user";
 
 export const runtime = "nodejs";
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
       code,
       redirectUri: getSpotifyRedirectUri(url.origin),
     });
+    await syncSpotifyWorkspaceConnection(token);
     redirectUrl.searchParams.set("spotify", "connected");
     const response = NextResponse.redirect(redirectUrl);
 

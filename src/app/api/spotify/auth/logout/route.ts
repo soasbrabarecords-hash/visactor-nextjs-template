@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { clearSpotifyAuthCookies } from "@/lib/spotify-user";
+import {
+  clearSpotifyAuthCookies,
+  clearSpotifyWorkspaceConnection,
+} from "@/lib/spotify-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  await clearSpotifyWorkspaceConnection();
   const requestUrl = new URL(request.url);
   const nextPath = requestUrl.searchParams.get("next");
   const targetPath =

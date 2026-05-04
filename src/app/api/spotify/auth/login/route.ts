@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const requestUrl = new URL(request.url);
     const origin = requestUrl.origin;
     const state = crypto.randomUUID();
-    const redirectUrl = buildSpotifyAuthorizeUrl({
+    const redirectUrl = await buildSpotifyAuthorizeUrl({
       origin,
       state,
     });
