@@ -18,27 +18,36 @@ function Toggle({
   checked,
   onChange,
   label,
+  hint,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
+  hint: string;
 }) {
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+      className={`flex items-start justify-between gap-4 rounded-[22px] border px-4 py-3 text-left transition ${
         checked
           ? "border-emerald-400/30 bg-emerald-500/10 text-white"
           : "border-white/10 bg-black/20 text-white/70"
       }`}
     >
-      <span className="text-sm font-medium">{label}</span>
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="mt-1 block text-xs text-white/45">{hint}</span>
+      </span>
       <span
-        className={`h-2.5 w-2.5 rounded-full ${
-          checked ? "bg-emerald-300" : "bg-white/25"
+        className={`mt-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+          checked
+            ? "bg-emerald-300 text-emerald-950"
+            : "bg-white/10 text-white/45"
         }`}
-      />
+      >
+        {checked ? "on" : "off"}
+      </span>
     </button>
   );
 }
@@ -115,76 +124,127 @@ export default function WorkspaceSettingsForm({
   }
 
   return (
-    <form className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5" onSubmit={handleSubmit}>
-      <div className="grid gap-3 md:grid-cols-3">
-        <label className="block md:col-span-1">
-          <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-            Nome
+    <form
+      className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5"
+      onSubmit={handleSubmit}
+    >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+            Workspace
           </div>
-          <input
-            value={workspaceName}
-            onChange={(event) => setWorkspaceName(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-            placeholder="Nome do workspace"
-          />
-        </label>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <label className="block md:col-span-1">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
+                Nome
+              </div>
+              <input
+                value={workspaceName}
+                onChange={(event) => setWorkspaceName(event.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+                placeholder="Nome do workspace"
+              />
+            </label>
 
-        <label className="block">
-          <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-            Mercado
-          </div>
-          <input
-            value={defaultMarket}
-            onChange={(event) => setDefaultMarket(event.target.value.toUpperCase())}
-            maxLength={2}
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-            placeholder="BR"
-          />
-        </label>
+            <label className="block">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
+                Mercado
+              </div>
+              <input
+                value={defaultMarket}
+                onChange={(event) =>
+                  setDefaultMarket(event.target.value.toUpperCase())
+                }
+                maxLength={2}
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+                placeholder="BR"
+              />
+            </label>
 
-        <label className="block">
-          <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-            Janela (dias)
+            <label className="block">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
+                Janela
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={releaseWindowDays}
+                onChange={(event) => setReleaseWindowDays(event.target.value)}
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+              />
+            </label>
           </div>
-          <input
-            type="number"
-            min={1}
-            max={90}
-            value={releaseWindowDays}
-            onChange={(event) => setReleaseWindowDays(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-          />
-        </label>
+
+          <div className="mt-6 text-[11px] uppercase tracking-[0.16em] text-white/40">
+            Curadoria
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr_1fr]">
+            <label className="block">
+              <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
+                Score minimo
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={suggestionScoreThreshold}
+                onChange={(event) =>
+                  setSuggestionScoreThreshold(event.target.value)
+                }
+                className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
+              />
+            </label>
+
+            <Toggle
+              checked={prioritizeFollowedArtists}
+              onChange={setPrioritizeFollowedArtists}
+              label="Artistas seguidos"
+              hint="Pesa mais quem voce ja acompanha."
+            />
+            <Toggle
+              checked={prioritizeTopTracks}
+              onChange={setPrioritizeTopTracks}
+              label="Top tracks"
+              hint="Da mais peso ao seu historico forte."
+            />
+          </div>
+        </div>
+
+        <aside className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+          <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+            Resumo
+          </div>
+          <div className="mt-3 space-y-3 text-sm text-white/70">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
+                Mercado base
+              </div>
+              <div className="mt-1 text-base font-semibold text-white">
+                {defaultMarket || "BR"}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
+                Lancamentos
+              </div>
+              <div className="mt-1 text-base font-semibold text-white">
+                {releaseWindowDays || "21"} dias
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <div className="text-xs uppercase tracking-[0.14em] text-white/40">
+                Corte
+              </div>
+              <div className="mt-1 text-base font-semibold text-white">
+                {suggestionScoreThreshold || "70"}+
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr_1fr]">
-        <label className="block">
-          <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
-            Score minimo
-          </div>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            value={suggestionScoreThreshold}
-            onChange={(event) => setSuggestionScoreThreshold(event.target.value)}
-            className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/25"
-          />
-        </label>
-
-        <Toggle
-          checked={prioritizeFollowedArtists}
-          onChange={setPrioritizeFollowedArtists}
-          label="Priorizar artistas seguidos"
-        />
-        <Toggle
-          checked={prioritizeTopTracks}
-          onChange={setPrioritizeTopTracks}
-          label="Priorizar top tracks"
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={isSaving || isPending}

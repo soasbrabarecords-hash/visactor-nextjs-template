@@ -100,6 +100,24 @@ export type WorkspaceSpotifyStoredAuth = {
   grantedScopes: string | null;
 };
 
+const DEFAULT_WORKSPACE_SETTINGS = {
+  defaultMarket: "BR",
+  releaseWindowDays: 21,
+  suggestionScoreThreshold: 70,
+  prioritizeFollowedArtists: true,
+  prioritizeTopTracks: true,
+} as const;
+
+const DEFAULT_SPOTIFY_INTEGRATION = {
+  appMode: "global_app",
+  connectionStatus: "not_connected",
+  appClientId: null,
+  hasAppClientSecret: false,
+  providerAccountId: null,
+  providerAccountLabel: null,
+  grantedScopes: null,
+} as const;
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -262,7 +280,7 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
     await ensureWorkspaceDefaults(workspace.id);
   }
 
-  const [{ data: settingsRow, error: settingsError }, { data: integrationRows, error: integrationsError }] =
+  const [{ data: settingsRow, error: settingsError }, { data: spotifyIntegrationRow, error: integrationsError }] =
     await Promise.all([
       supabase
         .from("workspace_settings")
@@ -270,7 +288,7 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
           "workspace_id, default_market, release_window_days, suggestion_score_threshold, prioritize_followed_artists, prioritize_top_tracks",
         )
         .eq("workspace_id", workspace.id)
-        .single(),
+        .maybeSingle(),
       supabase
         .from("workspace_integrations")
         .select(
@@ -278,7 +296,7 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
         )
         .eq("workspace_id", workspace.id)
         .eq("provider", "spotify")
-        .limit(1),
+        .maybeSingle(),
     ]);
 
   if (settingsError) {
@@ -291,14 +309,8 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
     );
   }
 
-  const spotifyIntegration =
-    ((integrationRows ?? [])[0] as WorkspaceIntegrationRow | undefined) ?? null;
-
-  if (!spotifyIntegration) {
-    throw new Error("Spotify integration workspace row unavailable.");
-  }
-
-  const settings = settingsRow as WorkspaceSettingsRow;
+  const settings = settingsRow as WorkspaceSettingsRow | null;
+  const spotifyIntegration = spotifyIntegrationRow as WorkspaceIntegrationRow | null;
 
   return {
     workspace: {
@@ -310,20 +322,42 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
       role: membership.role,
     },
     settings: {
-      defaultMarket: settings.default_market,
-      releaseWindowDays: settings.release_window_days,
-      suggestionScoreThreshold: settings.suggestion_score_threshold,
-      prioritizeFollowedArtists: settings.prioritize_followed_artists,
-      prioritizeTopTracks: settings.prioritize_top_tracks,
+      defaultMarket:
+        settings?.default_market ?? DEFAULT_WORKSPACE_SETTINGS.defaultMarket,
+      releaseWindowDays:
+        settings?.release_window_days ??
+        DEFAULT_WORKSPACE_SETTINGS.releaseWindowDays,
+      suggestionScoreThreshold:
+        settings?.suggestion_score_threshold ??
+        DEFAULT_WORKSPACE_SETTINGS.suggestionScoreThreshold,
+      prioritizeFollowedArtists:
+        settings?.prioritize_followed_artists ??
+        DEFAULT_WORKSPACE_SETTINGS.prioritizeFollowedArtists,
+      prioritizeTopTracks:
+        settings?.prioritize_top_tracks ??
+        DEFAULT_WORKSPACE_SETTINGS.prioritizeTopTracks,
     },
     spotifyIntegration: {
-      appMode: spotifyIntegration.app_mode,
-      connectionStatus: spotifyIntegration.connection_status,
-      appClientId: spotifyIntegration.app_client_id,
-      hasAppClientSecret: Boolean(spotifyIntegration.app_client_secret),
-      providerAccountId: spotifyIntegration.provider_account_id,
-      providerAccountLabel: spotifyIntegration.provider_account_label,
-      grantedScopes: spotifyIntegration.granted_scopes,
+      appMode: spotifyIntegration?.app_mode ?? DEFAULT_SPOTIFY_INTEGRATION.appMode,
+      connectionStatus:
+        spotifyIntegration?.connection_status ??
+        DEFAULT_SPOTIFY_INTEGRATION.connectionStatus,
+      appClientId:
+        spotifyIntegration?.app_client_id ??
+        DEFAULT_SPOTIFY_INTEGRATION.appClientId,
+      hasAppClientSecret:
+        spotifyIntegration?.app_client_secret != null
+          ? Boolean(spotifyIntegration.app_client_secret)
+          : DEFAULT_SPOTIFY_INTEGRATION.hasAppClientSecret,
+      providerAccountId:
+        spotifyIntegration?.provider_account_id ??
+        DEFAULT_SPOTIFY_INTEGRATION.providerAccountId,
+      providerAccountLabel:
+        spotifyIntegration?.provider_account_label ??
+        DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel,
+      grantedScopes:
+        spotifyIntegration?.granted_scopes ??
+        DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
     },
   };
 }

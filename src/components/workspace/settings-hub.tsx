@@ -78,6 +78,33 @@ function MiniCard({
   );
 }
 
+function SectionCard({
+  eyebrow,
+  title,
+  badge,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  badge: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+            {eyebrow}
+          </div>
+          <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function SettingsHub({
   spotify,
   spotifyAppReady,
@@ -110,7 +137,12 @@ export default function SettingsHub({
                 Configuracoes do workspace
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                {workspace ? workspace.workspace.name : "Conexao, regras e setup."}
+                {workspace
+                  ? workspace.workspace.name
+                  : "Conexao, regras e setup."}
+              </p>
+              <p className="mt-3 text-sm text-white/45">
+                Ajuste regras da curadoria e a integracao logo abaixo.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -228,19 +260,11 @@ export default function SettingsHub({
         </section>
 
         {workspace ? (
-          <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
-                  Workspace
-                </div>
-                <h3 className="mt-1 text-lg font-semibold text-white">
-                  Regras e preferencias
-                </h3>
-              </div>
-              <StatusBadge tone="blue">Editavel</StatusBadge>
-            </div>
-
+          <SectionCard
+            eyebrow="Workspace"
+            title="Regras e preferencias"
+            badge={<StatusBadge tone="blue">Editavel</StatusBadge>}
+          >
             <WorkspaceSettingsForm
               initialWorkspaceName={workspace.workspace.name}
               initialDefaultMarket={workspace.settings.defaultMarket}
@@ -249,20 +273,14 @@ export default function SettingsHub({
               initialPrioritizeFollowedArtists={workspace.settings.prioritizeFollowedArtists}
               initialPrioritizeTopTracks={workspace.settings.prioritizeTopTracks}
             />
-          </section>
+          </SectionCard>
         ) : null}
 
         {workspace ? (
-          <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
-                  Integracao Spotify
-                </div>
-                <h3 className="mt-1 text-lg font-semibold text-white">
-                  Modo da app
-                </h3>
-              </div>
+          <SectionCard
+            eyebrow="Integracao Spotify"
+            title="Modo da app"
+            badge={
               <StatusBadge
                 tone={
                   workspace.spotifyIntegration.appMode === "workspace_app"
@@ -272,23 +290,23 @@ export default function SettingsHub({
               >
                 {spotifyModeLabel}
               </StatusBadge>
-            </div>
-
+            }
+          >
             <WorkspaceSpotifyIntegrationForm
               initialAppMode={workspace.spotifyIntegration.appMode}
               initialAppClientId={workspace.spotifyIntegration.appClientId}
               hasAppClientSecret={workspace.spotifyIntegration.hasAppClientSecret}
             />
-          </section>
+          </SectionCard>
         ) : null}
 
         <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
           <div className="flex flex-wrap items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-            <span className="text-sm font-medium text-white">Proximo passo</span>
+            <span className="text-sm font-medium text-white">Workspace ativo</span>
           </div>
           <p className="mt-2 text-sm text-white/55">
-            Ativar edicao de regras e modo de app por workspace.
+            Regras, credenciais e conexao ficam centralizadas nesta tela.
           </p>
         </section>
       </Container>
