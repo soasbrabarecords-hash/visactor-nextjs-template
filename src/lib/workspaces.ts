@@ -276,7 +276,7 @@ async function recoverWorkspaceContextForUser(user: {
     );
   }
 
-  let membership =
+  const membership =
     ((membershipRows ?? [])[0] as WorkspaceMembershipRow | undefined) ?? null;
   let workspaceId = membership?.workspace_id ?? null;
   let workspaceName = buildWorkspaceName(user);
