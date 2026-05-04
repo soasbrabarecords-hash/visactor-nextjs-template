@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   type SpotifyChartEntryInput,
   upsertSpotifyChartEntries,
@@ -61,27 +62,6 @@ export type SpotifyChartsImportResult = {
     tracksError: string | null;
   };
 };
-
-function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return null;
-  }
-
-  return {
-    url,
-    anonKey,
-  };
-}
-
-function buildHeaders(env: { anonKey: string }) {
-  return {
-    apikey: env.anonKey,
-    Authorization: `Bearer ${env.anonKey}`,
-  };
-}
 
 function normalizeString(value: string | null | undefined) {
   const normalized = value?.trim();
@@ -270,30 +250,22 @@ function validateRow(
 async function upsertTrackStreamSnapshots(
   rows: SupabaseStreamSnapshotInput[],
 ): Promise<boolean> {
-  const env = getSupabaseEnv();
-
-  if (!env || rows.length === 0) {
+  if (rows.length === 0) {
     return false;
   }
 
-  const url = new URL(`${env.url}/rest/v1/track_stream_snapshots`);
-  url.searchParams.set(
-    "on_conflict",
-    "spotify_track_id,country,chart_name,chart_date",
-  );
+  const supabase = createAdminClient();
 
-  const response = await fetch(url.toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...buildHeaders(env),
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify(rows),
-    cache: "no-store",
-  }).catch(() => null);
+  if (!supabase) {
+    return false;
+  }
 
-  return Boolean(response?.ok);
+  const { error } = await supabase.from("track_stream_snapshots").upsert(rows, {
+    onConflict: "spotify_track_id,country,chart_name,chart_date",
+    ignoreDuplicates: false,
+  });
+
+  return !error;
 }
 
 export async function importSpotifyChartRows(

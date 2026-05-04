@@ -1,8 +1,7 @@
 import "server-only";
 
-type SupabaseResponse = {
-  message?: string;
-};
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export type SpotifyChartEntryRow = {
   id?: string | null;
@@ -64,64 +63,32 @@ export type TrackStreamSnapshotRow = {
   captured_at: string | null;
 };
 
-function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+type ChartSnapshotTrackRaw = {
+  id: string;
+  snapshot_id: string;
+  chart_date: string;
+  position: number;
+  previous_position: number | null;
+  spotify_track_id: string | null;
+  track_name: string;
+  artist_name: string | null;
+  streams: number | null;
+  kworb_streams_24h: number | null;
+  genre: string | null;
+  image_url: string | null;
+  created_at: string;
+};
 
-  if (!url || !anonKey) {
-    return null;
+function getAdminOrThrow() {
+  const admin = createAdminClient();
+
+  if (!admin) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is required to write chart legacy tables safely.",
+    );
   }
 
-  return {
-    url,
-    anonKey,
-  };
-}
-
-function buildHeaders(env: { anonKey: string }) {
-  return {
-    apikey: env.anonKey,
-    Authorization: `Bearer ${env.anonKey}`,
-  };
-}
-
-async function fetchJson<T>(url: string, headers: Record<string, string>) {
-  const response = await fetch(url, {
-    headers,
-    cache: "no-store",
-  }).catch(() => null);
-
-  if (!response || !response.ok) {
-    return null;
-  }
-
-  return (await response.json().catch(() => null)) as T | SupabaseResponse | null;
-}
-
-async function postJson({
-  env,
-  table,
-  rows,
-  onConflict,
-}: {
-  env: { url: string; anonKey: string };
-  table: string;
-  rows: unknown[];
-  onConflict: string;
-}) {
-  const url = new URL(`${env.url}/rest/v1/${table}`);
-  url.searchParams.set("on_conflict", onConflict);
-
-  return fetch(url.toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...buildHeaders(env),
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify(rows),
-    cache: "no-store",
-  }).catch(() => null);
+  return admin;
 }
 
 export async function fetchSpotifyChartEntries({
@@ -137,62 +104,58 @@ export async function fetchSpotifyChartEntries({
   chartName?: string;
   limit?: number;
 } = {}): Promise<SpotifyChartEntryRow[]> {
-  const env = getSupabaseEnv();
-
-  if (!env) {
-    return [];
-  }
-
-  const url = new URL(`${env.url}/rest/v1/spotify_chart_entries`);
-  url.searchParams.set(
-    "select",
-    "id,spotify_track_id,track_name,artist_name,artist_ids,album_name,image_url,spotify_url,country,genre,chart_name,source_type,chart_date,rank_position,previous_rank,movement_type,daily_streams,captured_at",
-  );
+  const supabase = await createClient();
+  let query = supabase
+    .from("spotify_chart_entries")
+    .select(
+      "id,spotify_track_id,track_name,artist_name,artist_ids,album_name,image_url,spotify_url,country,genre,chart_name,source_type,chart_date,rank_position,previous_rank,movement_type,daily_streams,captured_at",
+    )
+    .order("chart_date", { ascending: false })
+    .order("rank_position", { ascending: true })
+    .order("captured_at", { ascending: false })
+    .limit(limit);
 
   if (country) {
-    url.searchParams.set("country", `eq.${country}`);
+    query = query.eq("country", country);
   }
 
   if (genre) {
-    url.searchParams.set("genre", `eq.${genre}`);
+    query = query.eq("genre", genre);
   }
 
   if (chartDate) {
-    url.searchParams.set("chart_date", `eq.${chartDate}`);
+    query = query.eq("chart_date", chartDate);
   }
 
   if (chartName) {
-    url.searchParams.set("chart_name", `eq.${chartName}`);
+    query = query.eq("chart_name", chartName);
   }
 
-  url.searchParams.set("order", "chart_date.desc,rank_position.asc,captured_at.desc");
-  url.searchParams.set("limit", String(limit));
+  const { data, error } = await query;
 
-  const payload = await fetchJson<SpotifyChartEntryRow[]>(
-    url.toString(),
-    buildHeaders(env),
-  );
+  if (error) {
+    return [];
+  }
 
-  return Array.isArray(payload) ? payload : [];
+  return (data ?? []) as SpotifyChartEntryRow[];
 }
 
 export async function upsertSpotifyChartEntries(
   rows: SpotifyChartEntryInput[],
 ): Promise<boolean> {
-  const env = getSupabaseEnv();
-
-  if (!env || rows.length === 0) {
+  if (rows.length === 0) {
     return false;
   }
 
-  const response = await postJson({
-    env,
-    table: "spotify_chart_entries",
-    rows,
-    onConflict: "country,chart_name,chart_date,spotify_track_id",
-  });
+  const supabase = getAdminOrThrow();
+  const { error } = await supabase
+    .from("spotify_chart_entries")
+    .upsert(rows, {
+      onConflict: "country,chart_name,chart_date,spotify_track_id",
+      ignoreDuplicates: false,
+    });
 
-  return Boolean(response?.ok);
+  return !error;
 }
 
 export async function fetchLatestSpotifyChartEntries({
@@ -227,28 +190,6 @@ export async function fetchLatestSpotifyChartEntries({
   });
 }
 
-// ── Adapter: chart_snapshot_tracks → SpotifyChartEntryRow[] ──────────────────
-//
-// Lê de chart_snapshot_tracks (histórico diário persistido) em vez de
-// spotify_chart_entries. Retorna exatamente o mesmo shape que a UI espera,
-// sem alterar nenhuma prop ou componente.
-
-type ChartSnapshotTrackRaw = {
-  id: string;
-  snapshot_id: string;
-  chart_date: string;
-  position: number;
-  previous_position: number | null;
-  spotify_track_id: string | null;
-  track_name: string;
-  artist_name: string | null;
-  streams: number | null;
-  kworb_streams_24h: number | null;
-  genre: string | null;
-  image_url: string | null;
-  created_at: string;
-};
-
 function snapshotTrackToEntryRow(
   row: ChartSnapshotTrackRaw,
   country: string,
@@ -259,13 +200,10 @@ function snapshotTrackToEntryRow(
     spotify_track_id: trackId,
     track_name: row.track_name,
     artist_name: row.artist_name,
-    // Campos parcialmente presentes na nova tabela
     artist_ids: null,
     album_name: null,
     image_url: row.image_url?.trim() || null,
-    spotify_url: trackId
-      ? `https://open.spotify.com/track/${trackId}`
-      : null,
+    spotify_url: trackId ? `https://open.spotify.com/track/${trackId}` : null,
     country,
     genre: row.genre,
     chart_name: "top-songs",
@@ -288,55 +226,43 @@ export async function fetchLatestFromSnapshotTracks({
   genre?: string;
   limit?: number;
 } = {}): Promise<SpotifyChartEntryRow[]> {
-  const env = getSupabaseEnv();
-  if (!env) return [];
+  const supabase = await createClient();
 
-  // 1. Pegar a data mais recente disponível em chart_snapshots para o country
-  const snapshotUrl = new URL(`${env.url}/rest/v1/chart_snapshots`);
-  snapshotUrl.searchParams.set("select", "chart_date");
-  snapshotUrl.searchParams.set("country", `eq.${country}`);
-  snapshotUrl.searchParams.set("order", "chart_date.desc");
-  snapshotUrl.searchParams.set("limit", "1");
+  const { data: snapshotRows } = await supabase
+    .from("chart_snapshots")
+    .select("chart_date")
+    .eq("country", country)
+    .order("chart_date", { ascending: false })
+    .limit(1);
 
-  const snapshotPayload = await fetchJson<{ chart_date: string }[]>(
-    snapshotUrl.toString(),
-    buildHeaders(env),
-  );
-
-  const latestDate = Array.isArray(snapshotPayload)
-    ? snapshotPayload[0]?.chart_date
-    : null;
+  const latestDate = snapshotRows?.[0]?.chart_date ?? null;
 
   if (!latestDate) {
-    // Sem snapshots — fallback para spotify_chart_entries
     return fetchLatestSpotifyChartEntries({ country, genre, limit });
   }
 
-  // 2. Buscar as tracks do snapshot mais recente
-  const tracksUrl = new URL(`${env.url}/rest/v1/chart_snapshot_tracks`);
-  tracksUrl.searchParams.set(
-    "select",
-    "id,snapshot_id,chart_date,position,previous_position,spotify_track_id,track_name,artist_name,streams,kworb_streams_24h,genre,image_url,created_at",
-  );
-  tracksUrl.searchParams.set("chart_date", `eq.${latestDate}`);
-  tracksUrl.searchParams.set("order", "position.asc");
-  tracksUrl.searchParams.set("limit", String(limit));
+  let tracksQuery = supabase
+    .from("chart_snapshot_tracks")
+    .select(
+      "id,snapshot_id,chart_date,position,previous_position,spotify_track_id,track_name,artist_name,streams,kworb_streams_24h,genre,image_url,created_at",
+    )
+    .eq("chart_date", latestDate)
+    .order("position", { ascending: true })
+    .limit(limit);
 
   if (genre && genre !== "all") {
-    tracksUrl.searchParams.set("genre", `eq.${genre}`);
+    tracksQuery = tracksQuery.eq("genre", genre);
   }
 
-  const tracksPayload = await fetchJson<ChartSnapshotTrackRaw[]>(
-    tracksUrl.toString(),
-    buildHeaders(env),
-  );
+  const { data: tracksPayload } = await tracksQuery;
 
-  if (!Array.isArray(tracksPayload) || tracksPayload.length === 0) {
-    // Snapshot existe mas tracks vazias — fallback
+  if (!tracksPayload || tracksPayload.length === 0) {
     return fetchLatestSpotifyChartEntries({ country, genre, limit });
   }
 
-  return tracksPayload.map((row) => snapshotTrackToEntryRow(row, country));
+  return (tracksPayload as ChartSnapshotTrackRaw[]).map((row) =>
+    snapshotTrackToEntryRow(row, country),
+  );
 }
 
 export async function fetchTrackStreamSnapshots({
@@ -352,42 +278,38 @@ export async function fetchTrackStreamSnapshots({
   sinceDate?: string;
   limit?: number;
 } = {}): Promise<TrackStreamSnapshotRow[]> {
-  const env = getSupabaseEnv();
-
-  if (!env) {
-    return [];
-  }
-
-  const url = new URL(`${env.url}/rest/v1/track_stream_snapshots`);
-  url.searchParams.set(
-    "select",
-    "id,spotify_track_id,track_name,artist_name,artist_ids,album_name,image_url,spotify_url,country,genre,chart_name,chart_date,daily_streams,rank_position,previous_rank,captured_at",
-  );
+  const supabase = await createClient();
+  let query = supabase
+    .from("track_stream_snapshots")
+    .select(
+      "id,spotify_track_id,track_name,artist_name,artist_ids,album_name,image_url,spotify_url,country,genre,chart_name,chart_date,daily_streams,rank_position,previous_rank,captured_at",
+    )
+    .order("chart_date", { ascending: false })
+    .order("rank_position", { ascending: true })
+    .order("captured_at", { ascending: false })
+    .limit(limit);
 
   if (trackIds && trackIds.length > 0) {
-    const encodedIds = trackIds.join(",");
-    url.searchParams.set("spotify_track_id", `in.(${encodedIds})`);
+    query = query.in("spotify_track_id", trackIds);
   }
 
   if (country) {
-    url.searchParams.set("country", `eq.${country}`);
+    query = query.eq("country", country);
   }
 
   if (chartName) {
-    url.searchParams.set("chart_name", `eq.${chartName}`);
+    query = query.eq("chart_name", chartName);
   }
 
   if (sinceDate) {
-    url.searchParams.set("chart_date", `gte.${sinceDate}`);
+    query = query.gte("chart_date", sinceDate);
   }
 
-  url.searchParams.set("order", "chart_date.desc,rank_position.asc,captured_at.desc");
-  url.searchParams.set("limit", String(limit));
+  const { data, error } = await query;
 
-  const payload = await fetchJson<TrackStreamSnapshotRow[]>(
-    url.toString(),
-    buildHeaders(env),
-  );
+  if (error) {
+    return [];
+  }
 
-  return Array.isArray(payload) ? payload : [];
+  return (data ?? []) as TrackStreamSnapshotRow[];
 }

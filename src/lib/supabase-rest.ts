@@ -1,6 +1,6 @@
 import "server-only";
 
-const PLAYLIST_COLUMNS = "id,created_at,url,name,image_url,followers,tracks,score";
+import { createClient } from "@/lib/supabase/server";
 
 export type SupabasePlaylistRow = {
   id: string | number | null;
@@ -11,10 +11,6 @@ export type SupabasePlaylistRow = {
   followers: number | string | null;
   tracks: number | string | null;
   score: number | string | null;
-};
-
-type SupabaseSelectResponse = {
-  message?: string;
 };
 
 type SupabaseInsertPlaylistInput = {
@@ -35,92 +31,44 @@ type SupabaseUpdatePlaylistInput = {
   score?: number | null;
 };
 
-function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return null;
-  }
-
-  return {
-    url,
-    anonKey,
-  };
-}
+const PLAYLIST_COLUMNS =
+  "id,created_at,url,name,image_url,followers,tracks,score";
 
 export async function fetchPlaylistsFromSupabase(): Promise<SupabasePlaylistRow[]> {
-  const env = getSupabaseEnv();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("playlists")
+    .select(PLAYLIST_COLUMNS)
+    .order("followers", { ascending: false, nullsFirst: false });
 
-  if (!env) {
-    return [];
+  if (error) {
+    throw new Error(error.message || "Failed to fetch playlists from Supabase.");
   }
 
-  const response = await fetch(
-    `${env.url}/rest/v1/playlists?select=${encodeURIComponent(PLAYLIST_COLUMNS)}&order=followers.desc.nullslast`,
-    {
-      headers: {
-        apikey: env.anonKey,
-        Authorization: `Bearer ${env.anonKey}`,
-      },
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | SupabaseSelectResponse
-      | null;
-    throw new Error(
-      errorPayload?.message ?? "Failed to fetch playlists from Supabase.",
-    );
-  }
-
-  return (await response.json()) as SupabasePlaylistRow[];
+  return (data ?? []) as SupabasePlaylistRow[];
 }
 
 export async function fetchPlaylistByIdFromSupabase(
   id: string,
 ): Promise<SupabasePlaylistRow | null> {
-  const env = getSupabaseEnv();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("playlists")
+    .select(PLAYLIST_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
 
-  if (!env) {
-    return null;
+  if (error) {
+    throw new Error(error.message || "Failed to fetch playlist from Supabase.");
   }
 
-  const response = await fetch(
-    `${env.url}/rest/v1/playlists?select=${encodeURIComponent(PLAYLIST_COLUMNS)}&id=eq.${encodeURIComponent(id)}&limit=1`,
-    {
-      headers: {
-        apikey: env.anonKey,
-        Authorization: `Bearer ${env.anonKey}`,
-      },
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | SupabaseSelectResponse
-      | null;
-    throw new Error(
-      errorPayload?.message ?? "Failed to fetch playlist from Supabase.",
-    );
-  }
-
-  const rows = (await response.json()) as SupabasePlaylistRow[];
-  return rows[0] ?? null;
+  return (data as SupabasePlaylistRow | null) ?? null;
 }
 
 export async function insertPlaylistIntoSupabase(
   input: SupabaseInsertPlaylistInput,
 ): Promise<SupabasePlaylistRow> {
-  const env = getSupabaseEnv();
-
-  if (!env) {
-    throw new Error("Supabase environment variables are not configured.");
-  }
-
+  const supabase = await createClient();
   const payload = {
     url: input.url,
     name: input.name ?? null,
@@ -130,69 +78,31 @@ export async function insertPlaylistIntoSupabase(
     score: input.score ?? null,
   };
 
-  const response = await fetch(`${env.url}/rest/v1/playlists`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: env.anonKey,
-      Authorization: `Bearer ${env.anonKey}`,
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
+  const { data, error } = await supabase
+    .from("playlists")
+    .insert(payload)
+    .select(PLAYLIST_COLUMNS)
+    .single();
 
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | SupabaseSelectResponse
-      | null;
-
+  if (error) {
     throw new Error(
-      errorPayload?.message ?? "Failed to insert playlist into Supabase.",
+      error.message || "Failed to insert playlist into Supabase.",
     );
   }
 
-  const rows = (await response.json()) as SupabasePlaylistRow[];
-  const insertedRow = rows[0];
-
-  if (!insertedRow) {
-    throw new Error("Supabase did not return the inserted playlist.");
-  }
-
-  return insertedRow;
+  return data as SupabasePlaylistRow;
 }
 
 export async function updatePlaylistInSupabase(
   id: string,
   input: SupabaseUpdatePlaylistInput,
 ): Promise<void> {
-  const env = getSupabaseEnv();
+  const supabase = await createClient();
+  const { error } = await supabase.from("playlists").update(input).eq("id", id);
 
-  if (!env) {
-    throw new Error("Supabase environment variables are not configured.");
-  }
-
-  const response = await fetch(
-    `${env.url}/rest/v1/playlists?id=eq.${encodeURIComponent(id)}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: env.anonKey,
-        Authorization: `Bearer ${env.anonKey}`,
-      },
-      body: JSON.stringify(input),
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as
-      | SupabaseSelectResponse
-      | null;
-
+  if (error) {
     throw new Error(
-      errorPayload?.message ?? "Failed to update playlist in Supabase.",
+      error.message || "Failed to update playlist in Supabase.",
     );
   }
 }
