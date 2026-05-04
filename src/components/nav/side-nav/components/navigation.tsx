@@ -48,6 +48,10 @@ export default function Navigation() {
       return pathname === "/tiktok-charts" || pathname.startsWith("/tiktok-charts/");
     }
 
+    if (href === "/configuracoes") {
+      return pathname === "/configuracoes" || pathname.startsWith("/configuracoes/");
+    }
+
     return pathname === href;
   }
 

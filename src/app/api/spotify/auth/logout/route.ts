@@ -5,7 +5,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const response = NextResponse.redirect(new URL("/curadoria", request.url));
+  const requestUrl = new URL(request.url);
+  const nextPath = requestUrl.searchParams.get("next");
+  const targetPath =
+    nextPath && nextPath.startsWith("/") ? nextPath : "/curadoria";
+  const response = NextResponse.redirect(new URL(targetPath, request.url));
 
   clearSpotifyAuthCookies(response);
 

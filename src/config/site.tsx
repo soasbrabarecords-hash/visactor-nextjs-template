@@ -7,6 +7,7 @@ import {
   BarChart2,
   Flame,
   Sparkles,
+  Settings2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -62,5 +63,10 @@ export const navigations: Navigation[] = [
     icon: Library,
     name: "Label OS",
     href: "/label-os",
+  },
+  {
+    icon: Settings2,
+    name: "Configuracoes",
+    href: "/configuracoes",
   },
 ];

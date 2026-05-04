@@ -7,7 +7,6 @@ import {
   getSnapshotTracks,
   getSnapshotWithComparison,
   type ChartSnapshotTrack,
-  type ChartSnapshotTrackWithMovement,
 } from "@/lib/chart-snapshots";
 import { getChartsData } from "@/lib/charts-data";
 import { getDashboardData } from "@/lib/dashboard-data";

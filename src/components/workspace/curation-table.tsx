@@ -99,10 +99,6 @@ function normalizeText(value: string) {
     .toLowerCase();
 }
 
-function countMatches(text: string, terms: string[]) {
-  return terms.reduce((score, term) => score + (text.includes(term) ? 1 : 0), 0);
-}
-
 function detectTrackStyle(row: DecisionTrack): TrackStyle {
   // Delegates to shared genre-detection.ts — same logic as playlist-kworb-suggestions
   return detectGenre(row.artists, row.name);
@@ -256,7 +252,6 @@ function MovementBadge({ row }: { row: DecisionTrack }) {
 
 export default function CurationTable({
   rows,
-  previousDate,
 }: {
   rows: DecisionTrack[];
   previousDate: string | null;
@@ -270,7 +265,7 @@ export default function CurationTable({
     Record<string, string>
   >({});
   const [addingKey, setAddingKey] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const loadPlaylists = useCallback(() => {
     startTransition(async () => {
@@ -359,10 +354,6 @@ export default function CurationTable({
           !row.alreadyInPlaylists &&
           (row.recommendedAction === "add" || row.recommendedAction === "observe"),
       ).length,
-    [sortedRows],
-  );
-  const inBaseCount = useMemo(
-    () => sortedRows.filter((row) => row.alreadyInPlaylists).length,
     [sortedRows],
   );
   const top20Count = useMemo(

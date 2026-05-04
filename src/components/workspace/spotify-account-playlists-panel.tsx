@@ -17,18 +17,8 @@ import { Button } from "@/components/ui/button";
 import {
   getSpotifyAccountPlaylistsClient,
   invalidateSpotifyAccountPlaylistsClientCache,
-  type SpotifyAccountPlaylistClient,
   type SpotifyPlaylistsClientResponse,
 } from "@/lib/spotify-account-playlists-client";
-import StatusBadge from "./status-badge";
-
-type SpotifyAccountPlaylist = SpotifyAccountPlaylistClient & {
-  ownerId: string;
-  ownerName: string;
-  spotifyUrl: string;
-  isPublic: boolean;
-  isCollaborative: boolean;
-};
 
 type SpotifyPlaylistsResponse = SpotifyPlaylistsClientResponse;
 

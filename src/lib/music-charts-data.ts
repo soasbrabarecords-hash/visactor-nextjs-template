@@ -27,7 +27,6 @@ import {
   type SpotifyTrackRecord,
 } from "./spotify";
 import {
-  fetchLatestSpotifyChartEntries,
   fetchLatestFromSnapshotTracks,
   fetchTrackStreamSnapshots,
   type SpotifyChartEntryRow,
