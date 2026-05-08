@@ -1499,22 +1499,6 @@ function buildCurationRows(
   });
 }
 
-function buildActionItems(rows: DecisionTrack[], fallback: string) {
-  return rows.length > 0
-    ? rows.map((track) => {
-        const targetLabel = track.suggestedPlaylistName
-          ? ` · boa para ${track.suggestedPlaylistName}`
-          : track.accountPlaylistCount > 0
-            ? track.accountPlaylistNames.length > 0
-              ? ` · ja em ${track.accountPlaylistCount} playlist${track.accountPlaylistCount > 1 ? "s" : ""}`
-              : " · ja na base"
-            : "";
-
-        return `${track.name} · ${track.artists}${targetLabel}`;
-      })
-    : [fallback];
-}
-
 function normalizeTrackKey(name: string, artistName: string | null | undefined) {
   return `${name.trim().toLowerCase()}::${(artistName ?? "").trim().toLowerCase()}`;
 }
@@ -2603,9 +2587,9 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     const biggestRiseFallback = [...radarMusic.rows]
       .filter((row) => (row.rankChange ?? 0) > 0)
       .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
-    const addNowFallback = addNowQueueFallback.slice(0, 3);
-    const observeFallback = observeQueueFallback.slice(0, 3);
-    const removeFallback = removeQueueFallback.slice(0, 3);
+    const addNowFallback = addNowQueueFallback.slice(0, 2);
+    const observeFallback = observeQueueFallback.slice(0, 2);
+    const removeFallback = removeQueueFallback.slice(0, 2);
     const editorialSpotlightsFallback = buildDashboardEditorialSpotlights({
       addNowQueue: addNowQueueFallback,
       observeQueue: observeQueueFallback,
@@ -2704,43 +2688,10 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         },
       ],
       editorialSpotlights: editorialSpotlightsFallback,
-      recommendedActions: [
-        {
-          title: "Adicionar agora",
-          summary:
-            "Faixas com melhor equilibrio entre subida, baixa saturacao e fit com sua base.",
-          tone: "green",
-          items: buildActionItems(
-            addNowFallback,
-            "Ainda sem faixa pronta para entrada imediata.",
-          ),
-        },
-        {
-          title: "Observar",
-          summary:
-            "Sinais que ainda precisam de mais validacao antes de entrar na base principal.",
-          tone: "yellow",
-          items: buildActionItems(
-            observeFallback,
-            "Nenhum sinal em observacao forte agora.",
-          ),
-        },
-        {
-          title: "Remover/Testar",
-          summary:
-            "Faixas com queda ou desgaste que pedem teste, troca ou limpeza de repertorio.",
-          tone: "red",
-          items: buildActionItems(
-            removeFallback,
-            "Sem urgencia de remocao ou teste neste momento.",
-          ),
-        },
-      ],
       addNow: addNowFallback,
       observe: observeFallback,
       removeOrTest: removeFallback,
-      topRadarRows: radarMusic.rows.slice(0, 10),
-      playlistBaseRows: [],
+      topRadarRows: radarMusic.rows.slice(0, 4),
     };
   }
 
@@ -2762,9 +2713,9 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
   const biggestRise = [...radarRows]
     .filter((row) => (row.rankChange ?? 0) > 0)
     .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
-  const addNow = addNowQueue.slice(0, 3);
-  const observe = observeQueue.slice(0, 3);
-  const removeOrTest = removeQueue.slice(0, 3);
+  const addNow = addNowQueue.slice(0, 2);
+  const observe = observeQueue.slice(0, 2);
+  const removeOrTest = removeQueue.slice(0, 2);
   const accountBaseMatches = curationRows.filter(
     (row) => row.accountPlaylistCount > 0,
   ).length;
@@ -2872,42 +2823,9 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
       },
     ],
     editorialSpotlights,
-    recommendedActions: [
-      {
-        title: "Adicionar agora",
-        summary:
-          "Faixas com melhor equilibrio entre subida, baixa saturacao e fit com sua base.",
-        tone: "green",
-        items: buildActionItems(
-          addNow,
-          "Ainda sem faixa pronta para entrada imediata.",
-        ),
-      },
-      {
-        title: "Observar",
-        summary:
-          "Sinais que ainda precisam de mais validacao antes de entrar na base principal.",
-        tone: "yellow",
-        items: buildActionItems(
-          observe,
-          "Nenhum sinal em observacao forte agora.",
-        ),
-      },
-      {
-        title: "Remover/Testar",
-        summary:
-          "Faixas com queda ou desgaste que pedem teste, troca ou limpeza de repertorio.",
-        tone: "red",
-        items: buildActionItems(
-          removeOrTest,
-          "Sem urgencia de remocao ou teste neste momento.",
-        ),
-      },
-    ],
     addNow,
     observe,
     removeOrTest,
-    topRadarRows: radarRows.slice(0, 10),
-    playlistBaseRows: [],
+    topRadarRows: radarRows.slice(0, 4),
   };
 }

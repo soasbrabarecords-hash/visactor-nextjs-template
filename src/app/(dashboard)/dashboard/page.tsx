@@ -91,8 +91,8 @@ function QueuePanel({
   emptyLabel: string;
 }) {
   return (
-    <section className={`rounded-[24px] border p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)] ${panelToneClasses(tone)}`}>
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <section className={`rounded-[22px] border p-3.5 text-white shadow-[0_16px_42px_rgba(0,0,0,0.16)] ${panelToneClasses(tone)}`}>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70">
             {icon}
@@ -109,31 +109,31 @@ function QueuePanel({
         </StatusBadge>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {tracks.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-4 text-sm text-white/55">
             {emptyLabel}
           </div>
         ) : (
-          tracks.slice(0, 3).map((track) => (
+          tracks.slice(0, 2).map((track) => (
             <article
               key={`${title}-${track.trackId}`}
-              className="relative grid grid-cols-[42px_minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20 px-3 py-3"
+              className="relative grid grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2.5 overflow-hidden rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5"
             >
               <div
                 className="absolute inset-0 opacity-[0.14]"
                 style={coverStyle(track.coverUrl)}
               />
               <div
-                className="relative h-10 w-10 rounded-xl border border-white/10 bg-white/5"
+                className="relative h-9 w-9 rounded-xl border border-white/10 bg-white/5"
                 style={coverStyle(track.coverUrl)}
               />
               <div className="relative min-w-0">
-                <div className="truncate text-sm font-medium text-white">
+                <div className="truncate text-[13px] font-medium text-white">
                   {track.name}
                 </div>
-                <div className="truncate text-xs text-white/55">{track.artists}</div>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                <div className="truncate text-[11px] text-white/55">{track.artists}</div>
+                <div className="mt-1 flex flex-wrap gap-1">
                   <StatusBadge tone={track.movement.tone} className="px-2 py-0.5 text-[10px]">
                     {track.chartDeltaLabel}
                   </StatusBadge>
@@ -170,17 +170,17 @@ function QueuePanel({
 
 function MetricStrip({ metrics }: { metrics: WorkspaceMetric[] }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
       {metrics.slice(0, 4).map((metric) => (
         <article
           key={metric.title}
-          className={`rounded-[20px] border px-4 py-3 text-white ${metricToneClasses(metric.tone)}`}
+          className={`rounded-[18px] border px-3.5 py-2.5 text-white ${metricToneClasses(metric.tone)}`}
         >
           <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
             {metric.title}
           </div>
-          <div className="mt-2 text-2xl font-semibold tracking-tight">{metric.value}</div>
-          <div className="mt-1 truncate text-xs text-white/55">{metric.helper}</div>
+          <div className="mt-1.5 text-[1.3rem] font-semibold tracking-tight">{metric.value}</div>
+          <div className="mt-1 truncate text-[11px] text-white/55">{metric.helper}</div>
         </article>
       ))}
     </div>
@@ -197,11 +197,11 @@ function EditorialStrip({
   }
 
   return (
-    <div className="grid gap-3 xl:grid-cols-3">
-      {spotlights.slice(0, 3).map((spotlight) => (
+    <div className="grid gap-2.5 xl:grid-cols-2">
+      {spotlights.slice(0, 2).map((spotlight) => (
         <article
           key={`${spotlight.title}-${spotlight.trackName}`}
-          className={`group relative overflow-hidden rounded-[24px] border p-4 text-white shadow-[0_20px_54px_rgba(0,0,0,0.18)] ${panelToneClasses(spotlight.tone)}`}
+          className={`group relative overflow-hidden rounded-[22px] border p-3.5 text-white shadow-[0_16px_42px_rgba(0,0,0,0.16)] ${panelToneClasses(spotlight.tone)}`}
         >
           <div
             className="absolute inset-0 opacity-[0.18] transition duration-300 group-hover:opacity-[0.24]"
@@ -214,23 +214,23 @@ function EditorialStrip({
               <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
                 {spotlight.title}
               </div>
-              <h3 className="mt-2 truncate text-base font-semibold">
+              <h3 className="mt-1.5 truncate text-[15px] font-semibold">
                 {spotlight.trackName}
               </h3>
-              <p className="truncate text-xs text-white/55">{spotlight.artists}</p>
+              <p className="truncate text-[11px] text-white/55">{spotlight.artists}</p>
             </div>
             <div
-              className="h-12 w-12 shrink-0 rounded-2xl border border-white/10 bg-white/5"
+              className="h-10 w-10 shrink-0 rounded-2xl border border-white/10 bg-white/5"
               style={coverStyle(spotlight.coverUrl)}
             />
           </div>
 
-          <div className="relative mt-4 flex items-center justify-between gap-3">
+          <div className="relative mt-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <StatusBadge tone={spotlight.tone} className="px-2 py-0.5 text-[10px]">
                 {spotlight.badge}
               </StatusBadge>
-              <div className="mt-2 truncate text-xs text-white/62">
+              <div className="mt-1.5 truncate text-[11px] text-white/62">
                 {spotlight.stats[0] ?? spotlight.summary}
               </div>
             </div>
@@ -259,12 +259,12 @@ function EditorialStrip({
 
 function RadarStrip({ rows }: { rows: RadarMusicRow[] }) {
   return (
-    <section className="rounded-[24px] border border-white/10 bg-[#0b1116]/92 p-4 text-white shadow-[0_18px_48px_rgba(0,0,0,0.18)]">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <section className="rounded-[22px] border border-white/10 bg-[#0b1116]/92 p-3.5 text-white shadow-[0_16px_42px_rgba(0,0,0,0.16)]">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Radar quente</h2>
           <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-            top 5 do momento
+            top 4 do momento
           </p>
         </div>
         <Link
@@ -276,19 +276,19 @@ function RadarStrip({ rows }: { rows: RadarMusicRow[] }) {
         </Link>
       </div>
 
-      <div className="space-y-2">
-        {rows.slice(0, 5).map((row) => (
+      <div className="space-y-1.5">
+        {rows.slice(0, 4).map((row) => (
           <article
             key={row.trackId}
-            className="grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
+            className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
           >
             <div className="text-center">
-              <div className="text-lg font-semibold leading-none">{row.rank}</div>
+              <div className="text-base font-semibold leading-none">{row.rank}</div>
               <div className="mt-1 text-[10px] text-white/45">{movementLabel(row)}</div>
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-medium">{row.name}</div>
-              <div className="truncate text-xs text-white/55">{row.artists}</div>
+              <div className="truncate text-[13px] font-medium">{row.name}</div>
+              <div className="truncate text-[11px] text-white/55">{row.artists}</div>
             </div>
             <Link
               href={row.spotifyUrl}
@@ -312,7 +312,7 @@ export default async function DashboardPage() {
 
   return (
     <Container className="py-2.5">
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="green" className="px-2.5 py-0.5 text-[10px]">
@@ -346,9 +346,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_284px]">
           <section
-            className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#08100c] px-4 py-3 text-white shadow-[0_20px_54px_rgba(0,0,0,0.22)]"
+            className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#08100c] px-4 py-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.2)]"
             style={coverStyle(heroTrack?.coverUrl)}
           >
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,8,0.1),rgba(7,10,8,0.82)_55%,rgba(7,10,8,0.95))]" />
@@ -430,7 +430,7 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <div className="grid gap-4">
+          <div className="grid gap-2.5">
             <QueuePanel
               title="Entrar hoje"
               tone="green"
@@ -445,7 +445,7 @@ export default async function DashboardPage() {
         <MetricStrip metrics={data.metrics} />
         <EditorialStrip spotlights={data.editorialSpotlights} />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <QueuePanel
             title="Observar"
             tone="yellow"

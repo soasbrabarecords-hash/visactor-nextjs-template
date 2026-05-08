@@ -33,13 +33,6 @@ export type HeroInsight = {
   supportingPoints: string[];
 };
 
-export type RecommendedAction = {
-  title: string;
-  summary: string;
-  tone: StatusTone;
-  items: string[];
-};
-
 export type PrimaryAction = {
   track: DecisionTrack | null;
   reason: string;
@@ -66,12 +59,10 @@ export type DashboardWorkspaceData = {
   metrics: WorkspaceMetric[];
   primaryAction: PrimaryAction;
   editorialSpotlights: DashboardEditorialSpotlight[];
-  recommendedActions: RecommendedAction[];
   addNow: DecisionTrack[];
   observe: DecisionTrack[];
   removeOrTest: DecisionTrack[];
   topRadarRows: RadarMusicRow[];
-  playlistBaseRows: PlaylistBaseRow[];
 };
 
 export type MovementType = "up" | "down" | "same" | "new" | "reentry";
