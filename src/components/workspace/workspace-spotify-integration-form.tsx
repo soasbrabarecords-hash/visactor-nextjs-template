@@ -108,7 +108,7 @@ export default function WorkspaceSpotifyIntegrationForm({
 
   return (
     <form
-      className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5"
+      className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4"
       onSubmit={handleSubmit}
     >
       <div className="grid gap-3 md:grid-cols-2">
@@ -127,7 +127,7 @@ export default function WorkspaceSpotifyIntegrationForm({
       </div>
 
       {appMode === "workspace_app" ? (
-        <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-4">
+        <div className="mt-4 rounded-[22px] border border-white/10 bg-black/20 p-4">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
               <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
@@ -165,7 +165,7 @@ export default function WorkspaceSpotifyIntegrationForm({
         </div>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={isSaving || isPending}

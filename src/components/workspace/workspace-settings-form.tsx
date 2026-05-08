@@ -125,10 +125,10 @@ export default function WorkspaceSettingsForm({
 
   return (
     <form
-      className="mt-6 rounded-[26px] border border-white/10 bg-white/[0.04] p-5"
+      className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4"
       onSubmit={handleSubmit}
     >
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_300px]">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             Workspace
@@ -176,7 +176,7 @@ export default function WorkspaceSettingsForm({
             </label>
           </div>
 
-          <div className="mt-6 text-[11px] uppercase tracking-[0.16em] text-white/40">
+          <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-white/40">
             Curadoria
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr_1fr]">
@@ -211,7 +211,7 @@ export default function WorkspaceSettingsForm({
           </div>
         </div>
 
-        <aside className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+        <aside className="rounded-[22px] border border-white/10 bg-black/20 p-4">
           <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
             Resumo
           </div>
@@ -244,7 +244,7 @@ export default function WorkspaceSettingsForm({
         </aside>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={isSaving || isPending}

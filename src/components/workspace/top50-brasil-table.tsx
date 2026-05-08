@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
 import Container from "@/components/container";
@@ -131,9 +132,12 @@ export default function Top50BrasilTable() {
                     {/* Album art */}
                     <td className="px-2 py-2">
                       {track.albumArt ? (
-                        <img
+                        <Image
                           src={track.albumArt}
                           alt={track.albumName}
+                          width={32}
+                          height={32}
+                          unoptimized
                           className="h-8 w-8 rounded object-cover"
                         />
                       ) : (

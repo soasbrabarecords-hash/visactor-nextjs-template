@@ -54,7 +54,7 @@ function MiniCard({
   tone: "green" | "blue" | "yellow" | "slate";
 }) {
   return (
-    <article className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+    <article className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
       <div className="flex items-center justify-between gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80">
           {icon}
@@ -90,7 +90,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+    <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
@@ -130,9 +130,9 @@ export default function SettingsHub({
     workspace?.spotifyIntegration.hasAppClientSecret ?? false;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_22%),radial-gradient(circle_at_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
-      <Container className="py-8">
-        <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(3,7,18,0.96))] p-6 text-white shadow-[0_24px_80px_-42px_rgba(15,23,42,0.95)] laptop:p-8">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_22%),radial-gradient(circle_at_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
+      <Container className="py-5">
+        <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(3,7,18,0.96))] p-5 text-white shadow-[0_24px_80px_-42px_rgba(15,23,42,0.95)] laptop:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="blue">Settings</StatusBadge>
             <StatusBadge tone={spotify.connected ? "green" : "yellow"}>
@@ -143,15 +143,15 @@ export default function SettingsHub({
             </StatusBadge>
           </div>
 
-          <div className="mt-5 grid gap-6 laptop:grid-cols-[minmax(0,1.15fr)_360px]">
+          <div className="mt-4 grid gap-5 laptop:grid-cols-[minmax(0,1.15fr)_340px]">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-white">
+              <h2 className="text-2xl font-semibold tracking-tight text-white">
                 Configuracoes do workspace
               </h2>
-              <p className="mt-2 text-sm text-white/60">
+              <p className="mt-1.5 text-sm text-white/60">
                 {workspaceName}
               </p>
-              <p className="mt-3 text-sm text-white/45">
+              <p className="mt-2 text-sm text-white/45">
                 Ajuste regras da curadoria e a integracao logo abaixo.
               </p>
               {!workspace ? (
@@ -160,7 +160,7 @@ export default function SettingsHub({
                 </p>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <a
                   href={connectHref}
                   className="inline-flex items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
@@ -189,7 +189,7 @@ export default function SettingsHub({
               </div>
             </div>
 
-            <aside className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
+            <aside className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
               <div className="flex items-center gap-3">
                 {spotify.connected ? (
                   spotify.account.imageUrl ? (
@@ -239,7 +239,7 @@ export default function SettingsHub({
           </div>
         </section>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MiniCard
             icon={<Music2 className="h-5 w-5" />}
             title="Integracao"
@@ -311,7 +311,7 @@ export default function SettingsHub({
           />
         </SectionCard>
 
-        <section className="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+        <section className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
           <div className="flex flex-wrap items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-300" />
             <span className="text-sm font-medium text-white">Workspace ativo</span>

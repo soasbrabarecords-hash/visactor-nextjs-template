@@ -225,7 +225,7 @@ export default function SpotifyChartsClient({
     }
   }
 
-  const tracks = snapshot?.tracks ?? [];
+  const tracks = useMemo(() => snapshot?.tracks ?? [], [snapshot?.tracks]);
   const prevDate = snapshot?.previousDate ?? null;
   const hasHistory = dates.length > 0;
 
