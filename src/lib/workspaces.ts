@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -253,7 +254,7 @@ async function bootstrapWorkspaceForCurrentUser(user: {
   } satisfies WorkspaceRow;
 }
 
-export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | null> {
+const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
   const supabase = await createClient();
   const dataClient = createAdminClient() ?? supabase;
   const {
@@ -388,7 +389,11 @@ export async function getCurrentWorkspaceContext(): Promise<WorkspaceContext | n
         DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
     },
   };
-}
+};
+
+export const getCurrentWorkspaceContext = cache(
+  getCurrentWorkspaceContextUncached,
+);
 
 export async function updateCurrentWorkspaceSpotifyIntegration(
   input: WorkspaceSpotifyIntegrationInput,

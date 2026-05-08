@@ -70,6 +70,15 @@ type AggregatedTrack = {
   streamScore: number | null;
 };
 
+type MusicChartsDataCacheEntry = {
+  value: MusicChartsData;
+  expiresAt: number;
+};
+
+const MUSIC_CHARTS_DATA_TTL_MS = 2 * 60 * 1000;
+const musicChartsDataCache = new Map<string, MusicChartsDataCacheEntry>();
+const musicChartsDataInFlight = new Map<string, Promise<MusicChartsData>>();
+
 const MUSIC_MARKET_OPTIONS: MusicMarketOption[] = [
   { value: "BR", label: "Brasil", locale: "pt_BR" },
   { value: "US", label: "Estados Unidos", locale: "en_US" },
@@ -1498,6 +1507,20 @@ export async function getMusicChartsData({
   country?: string;
   genre?: string;
 }): Promise<MusicChartsData> {
+  const cacheKey = `${country?.trim().toUpperCase() || "BR"}:${genre?.trim().toLowerCase() || "all"}`;
+  const cachedEntry = musicChartsDataCache.get(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    return cachedEntry.value;
+  }
+
+  const inFlight = musicChartsDataInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = (async () => {
   const marketOption = getMarketOption(country);
   const genreOption = getGenreOption(genre);
   const marketData = await loadFeaturedPlaylistTracks(
@@ -1610,33 +1633,49 @@ export async function getMusicChartsData({
     genreLabel: genreOption.label,
   });
 
-  return {
-    summaryCards: buildSummaryCards(
-      streamAwareFocusTracks,
+    const result = {
+      summaryCards: buildSummaryCards(
+        streamAwareFocusTracks,
+        workbenchTracks,
+        movementResult.context,
+      ),
+      topTracks: buildTopTracks(streamAwareFocusTracks),
+      artistDistribution: buildArtistDistribution(streamAwareFocusTracks),
+      popularityHealth: buildPopularityHealth(streamAwareFocusTracks),
+      tracks: buildTrackInsights(streamAwareFocusTracks),
+      topMovers,
+      newEntries,
+      recurringTracks,
       workbenchTracks,
-      movementResult.context,
-    ),
-    topTracks: buildTopTracks(streamAwareFocusTracks),
-    artistDistribution: buildArtistDistribution(streamAwareFocusTracks),
-    popularityHealth: buildPopularityHealth(streamAwareFocusTracks),
-    tracks: buildTrackInsights(streamAwareFocusTracks),
-    topMovers,
-    newEntries,
-    recurringTracks,
-    workbenchTracks,
-    opportunities: buildOpportunities(
-      streamAwareFocusTracks,
-      marketOption.label,
-      genreOption.label,
-    ),
-    featuredPlaylists: marketData.featuredPlaylists,
-    dataTrust,
-    movementContext: movementResult.context,
-    hottestGenres: genreHeat,
-    dominantArtists,
-    countryValue: marketOption.value,
-    countryLabel: marketOption.label,
-    genreValue: genreOption.value,
-    genreLabel: genreOption.label,
-  };
+      opportunities: buildOpportunities(
+        streamAwareFocusTracks,
+        marketOption.label,
+        genreOption.label,
+      ),
+      featuredPlaylists: marketData.featuredPlaylists,
+      dataTrust,
+      movementContext: movementResult.context,
+      hottestGenres: genreHeat,
+      dominantArtists,
+      countryValue: marketOption.value,
+      countryLabel: marketOption.label,
+      genreValue: genreOption.value,
+      genreLabel: genreOption.label,
+    } satisfies MusicChartsData;
+
+    musicChartsDataCache.set(cacheKey, {
+      value: result,
+      expiresAt: Date.now() + MUSIC_CHARTS_DATA_TTL_MS,
+    });
+
+    return result;
+  })();
+
+  musicChartsDataInFlight.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    musicChartsDataInFlight.delete(cacheKey);
+  }
 }
