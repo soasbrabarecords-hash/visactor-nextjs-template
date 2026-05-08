@@ -170,7 +170,7 @@ function QueuePanel({
 
 function MetricStrip({ metrics }: { metrics: WorkspaceMetric[] }) {
   return (
-    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
       {metrics.slice(0, 4).map((metric) => (
         <article
           key={metric.title}
@@ -311,8 +311,8 @@ export default async function DashboardPage() {
   const hotSummary = data.heroInsight.supportingPoints[1] ?? "Sem pico forte agora";
 
   return (
-    <Container className="py-2.5">
-      <div className="space-y-2.5">
+    <Container className="py-2">
+      <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="green" className="px-2.5 py-0.5 text-[10px]">
@@ -346,20 +346,24 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_284px]">
+        <div className="grid gap-2 xl:grid-cols-[minmax(0,1.08fr)_304px]">
           <section
-            className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#08100c] px-4 py-3 text-white shadow-[0_18px_46px_rgba(0,0,0,0.2)]"
-            style={coverStyle(heroTrack?.coverUrl)}
+            className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0b1116]/95 px-4 py-3 text-white shadow-[0_16px_42px_rgba(0,0,0,0.16)]"
           >
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,8,0.1),rgba(7,10,8,0.82)_55%,rgba(7,10,8,0.95))]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(30,215,96,0.08),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(8,11,14,0.96))]" />
             <div className="relative">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge tone={heroTrack?.movement.tone ?? "slate"} className="px-2 py-0.5 text-[10px]">
-                  {heroTrack?.chartDeltaLabel ?? "Sem movimento"}
-                </StatusBadge>
-                <StatusBadge tone="yellow" className="px-2 py-0.5 text-[10px]">
-                  Score {heroTrack?.decisionScore ?? 0}
-                </StatusBadge>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                    Melhor ação do dia
+                  </div>
+                  <StatusBadge tone={heroTrack?.movement.tone ?? "slate"} className="px-2 py-0.5 text-[10px]">
+                    {heroTrack?.chartDeltaLabel ?? "Sem movimento"}
+                  </StatusBadge>
+                  <StatusBadge tone="yellow" className="px-2 py-0.5 text-[10px]">
+                    Score {heroTrack?.decisionScore ?? 0}
+                  </StatusBadge>
+                </div>
                 {heroTrack?.suggestedPlaylistName ? (
                   <StatusBadge tone="green" className="px-2 py-0.5 text-[10px]">
                     {heroTrack.suggestedPlaylistName}
@@ -367,39 +371,36 @@ export default async function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="mt-2 grid gap-2.5 lg:grid-cols-[52px_minmax(0,1fr)] lg:items-start">
+              <div className="mt-3 grid gap-3 lg:grid-cols-[78px_minmax(0,1fr)_220px] lg:items-center">
                 <div
-                  className="h-[52px] w-[52px] rounded-[16px] border border-white/10 bg-white/5 shadow-[0_12px_26px_rgba(0,0,0,0.24)]"
+                  className="h-[78px] w-[78px] rounded-[20px] border border-white/10 bg-white/5 shadow-[0_14px_30px_rgba(0,0,0,0.24)]"
                   style={coverStyle(heroTrack?.coverUrl)}
                 />
 
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/42">
-                    Melhor ação do dia
-                  </div>
-                  <h1 className="mt-1 truncate text-[1.18rem] font-semibold tracking-tight md:text-[1.32rem]">
+                  <h1 className="truncate text-[1.05rem] font-semibold tracking-tight md:text-[1.18rem]">
                     {heroTrack?.name ?? "Sem prioridade definida"}
                   </h1>
-                  <p className="mt-0.5 truncate text-[11px] text-white/68">
+                  <p className="mt-0.5 truncate text-[12px] text-white/68">
                     {heroTrack?.artists ?? "Aguardando novo sinal"}
                   </p>
-                  <p className="mt-1 max-w-2xl text-[11px] leading-4 text-white/70 line-clamp-1">
+                  <p className="mt-2 max-w-2xl text-[12px] leading-5 text-white/72 line-clamp-2">
                     {data.primaryAction.reason}
                   </p>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <SpotifyPlaylistAddButton
                       spotifyTrackId={heroTrack?.spotifyTrackId ?? null}
                       suggestedPlaylistName={heroTrack?.suggestedPlaylistName}
                       label="Adicionar"
-                      className="h-7 rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.14em]"
+                      className="h-8 rounded-full px-3.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
                     />
                     {heroTrack ? (
                       <Link
                         href={heroTrack.spotifyUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
                       >
                         Abrir
                         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -407,23 +408,23 @@ export default async function DashboardPage() {
                     ) : null}
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-2 grid gap-2 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
-                    Fit editorial
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Fit editorial
+                    </div>
+                    <div className="mt-1 text-[11px] leading-4 text-white/78 line-clamp-2">
+                      {heroTrack?.accountFitContext ?? "Sem leitura de base no momento"}
+                    </div>
                   </div>
-                  <div className="mt-1 text-[11px] leading-4 text-white/78 line-clamp-2">
-                    {heroTrack?.accountFitContext ?? "Sem leitura de base no momento"}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
-                    Resumo
-                  </div>
-                  <div className="mt-1 text-[11px] leading-4 text-white/78 line-clamp-2">
-                    {data.heroInsight.supportingPoints[0] ?? "Sem resumo quente agora"}
+                  <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Leitura rápida
+                    </div>
+                    <div className="mt-1 text-[11px] leading-4 text-white/78 line-clamp-2">
+                      {data.heroInsight.supportingPoints[0] ?? "Sem resumo quente agora"}
+                    </div>
                   </div>
                 </div>
               </div>
