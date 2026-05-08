@@ -311,15 +311,15 @@ export default async function DashboardPage() {
   const hotSummary = data.heroInsight.supportingPoints[1] ?? "Sem pico forte agora";
 
   return (
-    <Container className="py-4">
-      <div className="space-y-4">
+    <Container className="py-3">
+      <div className="space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="green" className="px-2.5 py-0.5 text-[10px]">
               <Sparkles className="mr-1 h-3.5 w-3.5" />
               Hoje
             </StatusBadge>
-            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-foreground/80">
+            <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-foreground/80">
               {hotSummary}
             </div>
           </div>
@@ -346,9 +346,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_360px]">
+        <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.18fr)_320px]">
           <section
-            className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08100c] p-4 text-white shadow-[0_24px_64px_rgba(0,0,0,0.24)]"
+            className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[#08100c] px-4 py-3.5 text-white shadow-[0_24px_64px_rgba(0,0,0,0.24)]"
             style={coverStyle(heroTrack?.coverUrl)}
           >
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,8,0.1),rgba(7,10,8,0.82)_55%,rgba(7,10,8,0.95))]" />
@@ -367,9 +367,9 @@ export default async function DashboardPage() {
                 ) : null}
               </div>
 
-              <div className="mt-3 grid gap-3 lg:grid-cols-[74px_minmax(0,1fr)_auto] lg:items-center">
+              <div className="mt-2.5 grid gap-3 lg:grid-cols-[62px_minmax(0,1fr)_auto] lg:items-center">
                 <div
-                  className="h-[74px] w-[74px] rounded-[20px] border border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
+                  className="h-[62px] w-[62px] rounded-[18px] border border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(0,0,0,0.28)]"
                   style={coverStyle(heroTrack?.coverUrl)}
                 />
 
@@ -377,13 +377,13 @@ export default async function DashboardPage() {
                   <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
                     Melhor ação do dia
                   </div>
-                  <h1 className="mt-1.5 truncate text-[2rem] font-semibold tracking-tight">
+                  <h1 className="mt-1 truncate text-[1.55rem] font-semibold tracking-tight md:text-[1.72rem]">
                     {heroTrack?.name ?? "Sem prioridade definida"}
                   </h1>
                   <p className="mt-1 truncate text-xs text-white/68">
                     {heroTrack?.artists ?? "Aguardando novo sinal"}
                   </p>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-white/72 line-clamp-2">
+                  <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/72 line-clamp-2">
                     {data.primaryAction.reason}
                   </p>
                 </div>
@@ -393,14 +393,14 @@ export default async function DashboardPage() {
                     spotifyTrackId={heroTrack?.spotifyTrackId ?? null}
                     suggestedPlaylistName={heroTrack?.suggestedPlaylistName}
                     label="Adicionar"
-                    className="h-8 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
+                    className="h-8 rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.14em]"
                   />
                   {heroTrack ? (
                     <Link
                       href={heroTrack.spotifyUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
+                      className="inline-flex h-8 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75 transition hover:bg-white/10 hover:text-white"
                     >
                       Abrir
                       <ArrowUpRight className="h-3.5 w-3.5" />
@@ -409,8 +409,8 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2.5 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+              <div className="mt-2.5 grid gap-2 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
                     Fit editorial
                   </div>
@@ -418,7 +418,7 @@ export default async function DashboardPage() {
                     {heroTrack?.accountFitContext ?? "Sem leitura de base no momento"}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-white/42">
                     Resumo
                   </div>
