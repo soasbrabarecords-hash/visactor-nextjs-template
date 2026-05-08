@@ -3,7 +3,7 @@ import PageIntro from "@/components/page-intro";
 import { getSnapshotDates, getSnapshotWithComparison } from "@/lib/chart-snapshots";
 import SpotifyChartsClient from "./spotify-charts-client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 type Props = {
   searchParams: Promise<{ date?: string; country?: string }>;

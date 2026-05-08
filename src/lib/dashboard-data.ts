@@ -35,6 +35,15 @@ type PlaylistRow = {
   score: number | string | null;
 };
 
+type DashboardDataCacheEntry = {
+  value: DashboardData;
+  expiresAt: number;
+};
+
+const DASHBOARD_DATA_TTL_MS = 2 * 60 * 1000;
+let dashboardDataCache: DashboardDataCacheEntry | null = null;
+let dashboardDataInFlight: Promise<DashboardData> | null = null;
+
 function toNumber(value: number | string | null | undefined) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -381,22 +390,44 @@ function emptyDashboardData(): DashboardData {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  try {
-    const rows = (await fetchPlaylistsFromSupabase()) as PlaylistRow[];
-    const playlists = normalizePlaylists(rows);
-    const enrichedPlaylists = await enrichPlaylists(playlists);
-    const scoreHealth = buildScoreHealth(enrichedPlaylists);
+  if (dashboardDataCache && dashboardDataCache.expiresAt > Date.now()) {
+    return dashboardDataCache.value;
+  }
 
-    return {
-      metrics: buildMetrics(enrichedPlaylists),
-      playlistActivity: buildPlaylistActivity(enrichedPlaylists),
-      topFollowers: buildTopFollowers(enrichedPlaylists),
-      scoreDistribution: buildScoreDistribution(enrichedPlaylists),
-      scoreHealth: scoreHealth.scoreHealth,
-      playlistCount: scoreHealth.playlistCount,
-      playlists: enrichedPlaylists,
-    };
-  } catch {
-    return emptyDashboardData();
+  if (dashboardDataInFlight) {
+    return dashboardDataInFlight;
+  }
+
+  dashboardDataInFlight = (async () => {
+    try {
+      const rows = (await fetchPlaylistsFromSupabase()) as PlaylistRow[];
+      const playlists = normalizePlaylists(rows);
+      const enrichedPlaylists = await enrichPlaylists(playlists);
+      const scoreHealth = buildScoreHealth(enrichedPlaylists);
+      const result = {
+        metrics: buildMetrics(enrichedPlaylists),
+        playlistActivity: buildPlaylistActivity(enrichedPlaylists),
+        topFollowers: buildTopFollowers(enrichedPlaylists),
+        scoreDistribution: buildScoreDistribution(enrichedPlaylists),
+        scoreHealth: scoreHealth.scoreHealth,
+        playlistCount: scoreHealth.playlistCount,
+        playlists: enrichedPlaylists,
+      } satisfies DashboardData;
+
+      dashboardDataCache = {
+        value: result,
+        expiresAt: Date.now() + DASHBOARD_DATA_TTL_MS,
+      };
+
+      return result;
+    } catch {
+      return emptyDashboardData();
+    }
+  })();
+
+  try {
+    return await dashboardDataInFlight;
+  } finally {
+    dashboardDataInFlight = null;
   }
 }

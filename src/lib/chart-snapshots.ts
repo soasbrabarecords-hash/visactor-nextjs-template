@@ -60,6 +60,83 @@ export type ChartSnapshotTrackInput = {
   image_url?: string | null;
 };
 
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const SNAPSHOT_CACHE_TTL_MS = 2 * 60 * 1000;
+const snapshotDatesCache = new Map<string, CacheEntry<string[]>>();
+const snapshotDatesInFlight = new Map<string, Promise<string[]>>();
+const snapshotByDateCache = new Map<string, CacheEntry<ChartSnapshot | null>>();
+const snapshotByDateInFlight = new Map<
+  string,
+  Promise<ChartSnapshot | null>
+>();
+const snapshotTracksCache = new Map<
+  string,
+  CacheEntry<ChartSnapshotTrack[]>
+>();
+const snapshotTracksInFlight = new Map<
+  string,
+  Promise<ChartSnapshotTrack[]>
+>();
+const snapshotComparisonCache = new Map<
+  string,
+  CacheEntry<{
+    snapshot: ChartSnapshot | null;
+    tracks: ChartSnapshotTrackWithMovement[];
+    previousDate: string | null;
+  }>
+>();
+const snapshotComparisonInFlight = new Map<
+  string,
+  Promise<{
+    snapshot: ChartSnapshot | null;
+    tracks: ChartSnapshotTrackWithMovement[];
+    previousDate: string | null;
+  }>
+>();
+
+function clearSnapshotCaches() {
+  snapshotDatesCache.clear();
+  snapshotDatesInFlight.clear();
+  snapshotByDateCache.clear();
+  snapshotByDateInFlight.clear();
+  snapshotTracksCache.clear();
+  snapshotTracksInFlight.clear();
+  snapshotComparisonCache.clear();
+  snapshotComparisonInFlight.clear();
+}
+
+function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string) {
+  const entry = cache.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedValue<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+) {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + SNAPSHOT_CACHE_TTL_MS,
+  });
+
+  return value;
+}
+
 // ── Upsert snapshot header ────────────────────────────────────────────────────
 //
 // Uses select-then-update-or-insert to avoid depending on a unique constraint
@@ -105,6 +182,7 @@ export async function upsertChartSnapshot(
       return existing as ChartSnapshot; // return existing row even if update fails
     }
 
+    clearSnapshotCaches();
     return updated as ChartSnapshot;
   }
 
@@ -128,6 +206,7 @@ export async function upsertChartSnapshot(
     return null;
   }
 
+  clearSnapshotCaches();
   return inserted as ChartSnapshot;
 }
 
@@ -193,35 +272,61 @@ export async function upsertChartSnapshotTracks(
       return { count: 0, error: `${msg} | fallback: ${msg3}` };
     }
 
+    clearSnapshotCaches();
     return { count: tracks.length, error: null };
   }
 
+  clearSnapshotCaches();
   return { count: tracks.length, error: null };
 }
 
 // ── List available dates ──────────────────────────────────────────────────────
 
 export async function getSnapshotDates(country = "BR"): Promise<string[]> {
-  const supabase = await createClient();
+  const cacheKey = country.trim().toUpperCase();
+  const cachedValue = getCachedValue(snapshotDatesCache, cacheKey);
 
-  const { data, error } = await supabase
-    .from("chart_snapshots")
-    .select("chart_date")
-    .eq("country", country)
-    .order("chart_date", { ascending: false });
-
-  if (error) return [];
-
-  // Deduplica e mantém a ordem DESC — chart_date é string ISO, ordem lexicográfica = cronológica
-  const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const r of data ?? []) {
-    if (!seen.has(r.chart_date)) {
-      seen.add(r.chart_date);
-      unique.push(r.chart_date);
-    }
+  if (cachedValue !== null) {
+    return cachedValue;
   }
-  return unique;
+
+  const inFlight = snapshotDatesInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const supabase = await createClient();
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("chart_snapshots")
+      .select("chart_date")
+      .eq("country", country)
+      .order("chart_date", { ascending: false });
+
+    if (error) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const row of data ?? []) {
+      if (!seen.has(row.chart_date)) {
+        seen.add(row.chart_date);
+        unique.push(row.chart_date);
+      }
+    }
+
+    return setCachedValue(snapshotDatesCache, cacheKey, unique);
+  })();
+
+  snapshotDatesInFlight.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    snapshotDatesInFlight.delete(cacheKey);
+  }
 }
 
 // ── Get snapshot header for a date ───────────────────────────────────────────
@@ -230,17 +335,42 @@ export async function getSnapshotByDate(
   chartDate: string,
   country = "BR",
 ): Promise<ChartSnapshot | null> {
+  const cacheKey = `${country.trim().toUpperCase()}:${chartDate}`;
+  const cachedValue = getCachedValue(snapshotByDateCache, cacheKey);
+
+  if (cachedValue !== null) {
+    return cachedValue;
+  }
+
+  const inFlight = snapshotByDateInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
   const supabase = await createClient();
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("chart_snapshots")
+      .select("*")
+      .eq("chart_date", chartDate)
+      .eq("country", country)
+      .maybeSingle();
 
-  const { data, error } = await supabase
-    .from("chart_snapshots")
-    .select("*")
-    .eq("chart_date", chartDate)
-    .eq("country", country)
-    .maybeSingle();
+    return setCachedValue(
+      snapshotByDateCache,
+      cacheKey,
+      error || !data ? null : (data as ChartSnapshot),
+    );
+  })();
 
-  if (error || !data) return null;
-  return data as ChartSnapshot;
+  snapshotByDateInFlight.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    snapshotByDateInFlight.delete(cacheKey);
+  }
 }
 
 // ── Get snapshot tracks (raw) for a date ─────────────────────────────────────
@@ -248,16 +378,41 @@ export async function getSnapshotByDate(
 export async function getSnapshotTracks(
   snapshotId: string,
 ): Promise<ChartSnapshotTrack[]> {
+  const cacheKey = snapshotId.trim();
+  const cachedValue = getCachedValue(snapshotTracksCache, cacheKey);
+
+  if (cachedValue !== null) {
+    return cachedValue;
+  }
+
+  const inFlight = snapshotTracksInFlight.get(cacheKey);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
   const supabase = await createClient();
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("chart_snapshot_tracks")
+      .select("*")
+      .eq("snapshot_id", snapshotId)
+      .order("position", { ascending: true });
 
-  const { data, error } = await supabase
-    .from("chart_snapshot_tracks")
-    .select("*")
-    .eq("snapshot_id", snapshotId)
-    .order("position", { ascending: true });
+    return setCachedValue(
+      snapshotTracksCache,
+      cacheKey,
+      error ? [] : ((data ?? []) as ChartSnapshotTrack[]),
+    );
+  })();
 
-  if (error) return [];
-  return (data ?? []) as ChartSnapshotTrack[];
+  snapshotTracksInFlight.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    snapshotTracksInFlight.delete(cacheKey);
+  }
 }
 
 // ── Get snapshot with movement comparison ─────────────────────────────────────
@@ -273,113 +428,159 @@ export async function getSnapshotWithComparison(
   tracks: ChartSnapshotTrackWithMovement[];
   previousDate: string | null;
 }> {
-  // 1. Get target snapshot
-  const snapshot = await getSnapshotByDate(chartDate, country);
-  if (!snapshot) return { snapshot: null, tracks: [], previousDate: null };
+  const cacheKey = `${country.trim().toUpperCase()}:${chartDate}`;
+  const cachedValue = getCachedValue(snapshotComparisonCache, cacheKey);
 
-  const rawTracks = await getSnapshotTracks(snapshot.id);
+  if (cachedValue !== null) {
+    return cachedValue;
+  }
 
-  // 1b. Enrich image_url from spotify_chart_entries (same spotify_track_id)
-  const supabase = await createClient();
-  const trackIds = rawTracks
-    .map((t) => t.spotify_track_id)
-    .filter((id): id is string => !!id);
+  const inFlight = snapshotComparisonInFlight.get(cacheKey);
 
-  const imageUrlMap = new Map<string, string>();
-  if (trackIds.length > 0) {
-    const { data: entryRows } = await supabase
-      .from("spotify_chart_entries")
-      .select("spotify_track_id,image_url")
-      .in("spotify_track_id", trackIds)
-      .not("image_url", "is", null)
-      .limit(trackIds.length * 2);
+  if (inFlight) {
+    return inFlight;
+  }
 
-    for (const row of entryRows ?? []) {
-      if (row.spotify_track_id && row.image_url && !imageUrlMap.has(row.spotify_track_id)) {
-        imageUrlMap.set(row.spotify_track_id, row.image_url);
+  const request = (async () => {
+    const snapshot = await getSnapshotByDate(chartDate, country);
+    if (!snapshot) {
+      return setCachedValue(snapshotComparisonCache, cacheKey, {
+        snapshot: null,
+        tracks: [],
+        previousDate: null,
+      });
+    }
+
+    const rawTracks = await getSnapshotTracks(snapshot.id);
+    const supabase = await createClient();
+    const trackIds = rawTracks
+      .map((track) => track.spotify_track_id)
+      .filter((id): id is string => Boolean(id));
+
+    const imageUrlMap = new Map<string, string>();
+    if (trackIds.length > 0) {
+      const { data: entryRows } = await supabase
+        .from("spotify_chart_entries")
+        .select("spotify_track_id,image_url")
+        .in("spotify_track_id", trackIds)
+        .not("image_url", "is", null)
+        .limit(trackIds.length * 2);
+
+      for (const row of entryRows ?? []) {
+        if (
+          row.spotify_track_id &&
+          row.image_url &&
+          !imageUrlMap.has(row.spotify_track_id)
+        ) {
+          imageUrlMap.set(row.spotify_track_id, row.image_url);
+        }
       }
     }
-  }
 
-  const currentTracks: ChartSnapshotTrack[] = rawTracks.map((t) => ({
-    ...t,
-    image_url: t.image_url ?? (t.spotify_track_id ? imageUrlMap.get(t.spotify_track_id) ?? null : null),
-  }));
-
-  // 2. Find previous snapshot date
-  const { data: prevData } = await supabase
-    .from("chart_snapshots")
-    .select("id, chart_date")
-    .eq("country", country)
-    .lt("chart_date", chartDate)
-    .order("chart_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const previousDate = prevData?.chart_date ?? null;
-
-  if (!previousDate || !prevData?.id) {
-    // No previous snapshot — all tracks are "new"
-    const tracks = currentTracks.map((t) => ({
-      ...t,
-      position_change: null,
-      status: "new" as const,
-      stream_change: null,
-      stream_growth_percent: null,
+    const currentTracks: ChartSnapshotTrack[] = rawTracks.map((track) => ({
+      ...track,
+      image_url:
+        track.image_url ??
+        (track.spotify_track_id
+          ? imageUrlMap.get(track.spotify_track_id) ?? null
+          : null),
     }));
-    return { snapshot, tracks, previousDate: null };
-  }
 
-  // 3. Load previous snapshot tracks (index by spotify_track_id)
-  const prevTracks = await getSnapshotTracks(prevData.id);
-  const prevByTrackId = new Map<string, ChartSnapshotTrack>();
-  const prevByName = new Map<string, ChartSnapshotTrack>();
+    const { data: previousSnapshot } = await supabase
+      .from("chart_snapshots")
+      .select("id, chart_date")
+      .eq("country", country)
+      .lt("chart_date", chartDate)
+      .order("chart_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  for (const t of prevTracks) {
-    if (t.spotify_track_id) prevByTrackId.set(t.spotify_track_id, t);
-    // Fallback key: track_name + artist_name lowercased
-    const nameKey = `${t.track_name?.toLowerCase()}::${t.artist_name?.toLowerCase() ?? ""}`;
-    prevByName.set(nameKey, t);
-  }
+    const previousDate = previousSnapshot?.chart_date ?? null;
 
-  // 4. Build enriched tracks
-  const tracks: ChartSnapshotTrackWithMovement[] = currentTracks.map((t) => {
-    const prev =
-      (t.spotify_track_id ? prevByTrackId.get(t.spotify_track_id) : undefined) ??
-      prevByName.get(`${t.track_name?.toLowerCase()}::${t.artist_name?.toLowerCase() ?? ""}`);
-
-    if (!prev) {
-      return {
-        ...t,
-        position_change: null,
-        status: "new" as const,
-        stream_change: null,
-        stream_growth_percent: null,
-      };
+    if (!previousDate || !previousSnapshot?.id) {
+      return setCachedValue(snapshotComparisonCache, cacheKey, {
+        snapshot,
+        tracks: currentTracks.map((track) => ({
+          ...track,
+          position_change: null,
+          status: "new" as const,
+          stream_change: null,
+          stream_growth_percent: null,
+        })),
+        previousDate: null,
+      });
     }
 
-    const posChange = prev.position - t.position; // positive = subiu (menor número = melhor)
-    const status =
-      posChange > 0 ? "up" : posChange < 0 ? "down" : "stable";
+    const previousTracks = await getSnapshotTracks(previousSnapshot.id);
+    const previousByTrackId = new Map<string, ChartSnapshotTrack>();
+    const previousByName = new Map<string, ChartSnapshotTrack>();
 
-    const streamChange =
-      t.streams !== null && prev.streams !== null
-        ? t.streams - prev.streams
-        : null;
+    for (const track of previousTracks) {
+      if (track.spotify_track_id) {
+        previousByTrackId.set(track.spotify_track_id, track);
+      }
+      previousByName.set(
+        `${track.track_name?.toLowerCase()}::${track.artist_name?.toLowerCase() ?? ""}`,
+        track,
+      );
+    }
 
-    const streamGrowthPct =
-      streamChange !== null && prev.streams !== null && prev.streams > 0
-        ? Math.round((streamChange / prev.streams) * 10000) / 100
-        : null;
+    const tracks: ChartSnapshotTrackWithMovement[] = currentTracks.map((track) => {
+      const previousTrack =
+        (track.spotify_track_id
+          ? previousByTrackId.get(track.spotify_track_id)
+          : undefined) ??
+        previousByName.get(
+          `${track.track_name?.toLowerCase()}::${track.artist_name?.toLowerCase() ?? ""}`,
+        );
 
-    return {
-      ...t,
-      position_change: posChange,
-      status,
-      stream_change: streamChange,
-      stream_growth_percent: streamGrowthPct,
-    };
-  });
+      if (!previousTrack) {
+        return {
+          ...track,
+          position_change: null,
+          status: "new" as const,
+          stream_change: null,
+          stream_growth_percent: null,
+        };
+      }
 
-  return { snapshot, tracks, previousDate };
+      const positionChange = previousTrack.position - track.position;
+      const status =
+        positionChange > 0 ? "up" : positionChange < 0 ? "down" : "stable";
+
+      const streamChange =
+        track.streams !== null && previousTrack.streams !== null
+          ? track.streams - previousTrack.streams
+          : null;
+
+      const streamGrowthPercent =
+        streamChange !== null &&
+        previousTrack.streams !== null &&
+        previousTrack.streams > 0
+          ? Math.round((streamChange / previousTrack.streams) * 10000) / 100
+          : null;
+
+      return {
+        ...track,
+        position_change: positionChange,
+        status,
+        stream_change: streamChange,
+        stream_growth_percent: streamGrowthPercent,
+      };
+    });
+
+    return setCachedValue(snapshotComparisonCache, cacheKey, {
+      snapshot,
+      tracks,
+      previousDate,
+    });
+  })();
+
+  snapshotComparisonInFlight.set(cacheKey, request);
+
+  try {
+    return await request;
+  } finally {
+    snapshotComparisonInFlight.delete(cacheKey);
+  }
 }

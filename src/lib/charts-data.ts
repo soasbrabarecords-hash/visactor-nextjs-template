@@ -35,6 +35,15 @@ type AggregatedTrack = {
   coverUrl: string | null;
 };
 
+type ChartsDataCacheEntry = {
+  value: ChartsData;
+  expiresAt: number;
+};
+
+const CHARTS_DATA_TTL_MS = 2 * 60 * 1000;
+let chartsDataCache: ChartsDataCacheEntry | null = null;
+let chartsDataInFlight: Promise<ChartsData> | null = null;
+
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
@@ -318,45 +327,68 @@ async function loadMarketTrackGroups() {
 }
 
 export async function getChartsData(): Promise<ChartsData> {
-  try {
-    const [{ analyzedPlaylists, trackGroups }, marketData] = await Promise.all([
-      loadPlaylistTrackGroups(),
-      loadMarketTrackGroups(),
-    ]);
+  if (chartsDataCache && chartsDataCache.expiresAt > Date.now()) {
+    return chartsDataCache.value;
+  }
 
-    const radarTracks = aggregateTracks(trackGroups);
-    const marketTracks = aggregateTracks(marketData.trackGroups);
-    const radarTrackInsights = buildTrackInsights(radarTracks);
-    const marketTrackInsights = buildTrackInsights(marketTracks);
-    const explicitTracks = radarTracks.filter((track) => track.explicit);
-    const topRepeatedTrack = radarTracks[0]?.name ?? "No data yet";
-    const radarIds = new Set(radarTracks.map((track) => track.id));
-    const sharedMomentumCount = marketTracks.filter((track) =>
-      radarIds.has(track.id),
-    ).length;
+  if (chartsDataInFlight) {
+    return chartsDataInFlight;
+  }
 
-    return {
-      metrics: buildMetrics(radarTracks, marketTracks),
-      topTracks: buildTopTracks(radarTracks),
-      artistDistribution: buildArtistDistribution(radarTracks),
-      popularityHealth: buildPopularityHealth(radarTracks),
-      analyzedPlaylists,
-      tracks: radarTrackInsights,
-      marketTracks: marketTrackInsights,
-      featuredPlaylists: marketData.featuredPlaylists,
-      topRepeatedTrack,
-      explicitShare:
-        radarTracks.length > 0
-          ? `${Math.round((explicitTracks.length / radarTracks.length) * 100)}%`
-          : "0%",
-      marketHighlight: buildMarketHighlight(
-        marketData.featuredPlaylists,
+  chartsDataInFlight = (async () => {
+    try {
+      const [{ analyzedPlaylists, trackGroups }, marketData] = await Promise.all([
+        loadPlaylistTrackGroups(),
+        loadMarketTrackGroups(),
+      ]);
+
+      const radarTracks = aggregateTracks(trackGroups);
+      const marketTracks = aggregateTracks(marketData.trackGroups);
+      const radarTrackInsights = buildTrackInsights(radarTracks);
+      const marketTrackInsights = buildTrackInsights(marketTracks);
+      const explicitTracks = radarTracks.filter((track) => track.explicit);
+      const topRepeatedTrack = radarTracks[0]?.name ?? "No data yet";
+      const radarIds = new Set(radarTracks.map((track) => track.id));
+      const sharedMomentumCount = marketTracks.filter((track) =>
+        radarIds.has(track.id),
+      ).length;
+
+      const result = {
+        metrics: buildMetrics(radarTracks, marketTracks),
+        topTracks: buildTopTracks(radarTracks),
+        artistDistribution: buildArtistDistribution(radarTracks),
+        popularityHealth: buildPopularityHealth(radarTracks),
+        analyzedPlaylists,
+        tracks: radarTrackInsights,
+        marketTracks: marketTrackInsights,
+        featuredPlaylists: marketData.featuredPlaylists,
+        topRepeatedTrack,
+        explicitShare:
+          radarTracks.length > 0
+            ? `${Math.round((explicitTracks.length / radarTracks.length) * 100)}%`
+            : "0%",
+        marketHighlight: buildMarketHighlight(
+          marketData.featuredPlaylists,
+          sharedMomentumCount,
+        ),
         sharedMomentumCount,
-      ),
-      sharedMomentumCount,
-    };
-  } catch {
-    return emptyChartsData();
+      } satisfies ChartsData;
+
+      chartsDataCache = {
+        value: result,
+        expiresAt: Date.now() + CHARTS_DATA_TTL_MS,
+      };
+
+      return result;
+    } catch {
+      return emptyChartsData();
+    }
+  })();
+
+  try {
+    return await chartsDataInFlight;
+  } finally {
+    chartsDataInFlight = null;
   }
 }
 

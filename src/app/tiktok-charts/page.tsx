@@ -2,7 +2,7 @@ import PageIntro from "@/components/page-intro";
 import TikTokChartsTable from "@/components/workspace/tiktok-charts-table";
 import { fetchTikTokPublicChart } from "@/lib/tiktok-public-charts";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function TikTokChartsPage() {
   const chart = await fetchTikTokPublicChart().catch(() => null);

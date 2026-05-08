@@ -1,18 +1,19 @@
 import "server-only";
 
 import {
-  detectGenre,
-  detectPlaylistGenre,
-  GENRE_LABEL,
   normalizeGenreText,
   type TrackGenre,
 } from "@/lib/genre-detection";
 import {
+  buildSpotifyAccountProfile,
+  extractSpotifyArtistNames as extractArtistNames,
+  getSpotifyGenreDisplayLabel as getGenreDisplayLabel,
+  resolveSpotifyTrackGenre as resolveTrackGenre,
+  type SpotifyAccountProfile as AccountPlaylistProfile,
+} from "@/lib/spotify-account-profile";
+import {
   fetchSpotifyAccountPlaylists,
-  fetchSpotifyEditablePlaylist,
   withSpotifyToken,
-  type SpotifyAccountPlaylist,
-  type SpotifyEditablePlaylist,
 } from "@/lib/spotify-user";
 import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 import type { StatusTone, WorkspaceMetric } from "@/types/workspace";
@@ -88,29 +89,6 @@ type SpotifyAlbumTracksResponse = {
 
 type SpotifyTracksBatchResponse = {
   tracks?: Array<SpotifyTrackObject | null>;
-};
-
-type AccountPlaylistTarget = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  tracksTotal: number;
-  genre: TrackGenre;
-  trackIds: Set<string>;
-  artistNames: Set<string>;
-  genreCounts: Map<TrackGenre, number>;
-};
-
-type AccountPlaylistProfile = {
-  playlistsCount: number;
-  uniqueTrackCount: number;
-  dominantGenre: TrackGenre | null;
-  dominantGenreLabel: string | null;
-  dominantArtists: string[];
-  trackPlaylistNamesById: Map<string, string[]>;
-  artistPlaylistCountByName: Map<string, number>;
-  genreTrackCountByType: Map<TrackGenre, number>;
-  playlistTargets: AccountPlaylistTarget[];
 };
 
 type ListeningArtist = {
@@ -246,73 +224,12 @@ const MAX_RELEASES = 18;
 const FRESH_RELEASE_WINDOW_DAYS = 120;
 const DEFAULT_RELEASE_SCORE_THRESHOLD = 70;
 
-const KNOWN_TRACK_GENRES = new Set<TrackGenre>([
-  "funk",
-  "trap",
-  "rap",
-  "sertanejo",
-  "pagode",
-  "pagodao",
-  "piseiro",
-  "pop",
-  "rock",
-  "reggae",
-  "unknown",
-]);
-
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
-}
-
-function normalizeArtistName(value: string) {
-  return normalizeGenreText(value).replace(/\s+/g, " ").trim();
-}
-
-function extractArtistNames(value: string) {
-  return value
-    .split(/,| feat\. | feat | ft\. | ft | part\./i)
-    .map((artist) => normalizeArtistName(artist))
-    .filter(Boolean);
-}
-
-function resolveTrackGenre(
-  genreLabel: string | null | undefined,
-  artists: string,
-  trackName: string,
-): TrackGenre {
-  const normalizedGenre = normalizeGenreText(genreLabel ?? "");
-
-  if (KNOWN_TRACK_GENRES.has(normalizedGenre as TrackGenre)) {
-    return normalizedGenre as TrackGenre;
-  }
-
-  if (normalizedGenre === "forro") {
-    return "piseiro";
-  }
-
-  if (normalizedGenre === "samba") {
-    return "pagode";
-  }
-
-  return detectGenre(artists, trackName);
-}
-
-function pickTopGenre(genreCounts: Map<TrackGenre, number>) {
-  return [...genreCounts.entries()]
-    .filter(([genre]) => genre !== "unknown")
-    .sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
-}
-
-function getGenreDisplayLabel(genre: TrackGenre | null) {
-  if (!genre || genre === "unknown") {
-    return null;
-  }
-
-  return GENRE_LABEL[genre];
 }
 
 function mapWithConcurrency<TItem, TResult>(
@@ -839,121 +756,6 @@ function buildArtistSources(artist: ListeningArtist) {
   return sources;
 }
 
-async function buildAccountPlaylistProfile(playlists: SpotifyAccountPlaylist[]) {
-  if (playlists.length === 0) {
-    return null;
-  }
-
-  const editablePlaylists = await mapWithConcurrency(
-    playlists,
-    2,
-    async (playlist) => {
-      const { result } = await fetchSpotifyEditablePlaylist(playlist.id);
-
-      if (!result.connected || !result.playlist) {
-        return null;
-      }
-
-      return result.playlist;
-    },
-  );
-
-  return mapEditablePlaylistsToProfile(
-    editablePlaylists.filter(
-      (playlist): playlist is SpotifyEditablePlaylist => Boolean(playlist),
-    ),
-  );
-}
-
-function mapEditablePlaylistsToProfile(playlists: SpotifyEditablePlaylist[]) {
-  if (playlists.length === 0) {
-    return null;
-  }
-
-  const trackPlaylistNamesById = new Map<string, string[]>();
-  const artistPlaylistCountByName = new Map<string, number>();
-  const genreTrackCountByType = new Map<TrackGenre, number>();
-  const playlistTargets: AccountPlaylistTarget[] = [];
-
-  for (const playlist of playlists) {
-    const playlistTrackIds = new Set<string>();
-    const playlistArtistNames = new Set<string>();
-    const playlistGenreCounts = new Map<TrackGenre, number>();
-
-    for (const track of playlist.tracks) {
-      if (!track.id || playlistTrackIds.has(track.id)) {
-        continue;
-      }
-
-      playlistTrackIds.add(track.id);
-      const trackPlaylists = trackPlaylistNamesById.get(track.id) ?? [];
-
-      if (!trackPlaylists.includes(playlist.name)) {
-        trackPlaylists.push(playlist.name);
-      }
-
-      trackPlaylistNamesById.set(track.id, trackPlaylists);
-
-      const detectedGenre = resolveTrackGenre(null, track.artists, track.name);
-
-      if (detectedGenre !== "unknown") {
-        genreTrackCountByType.set(
-          detectedGenre,
-          (genreTrackCountByType.get(detectedGenre) ?? 0) + 1,
-        );
-        playlistGenreCounts.set(
-          detectedGenre,
-          (playlistGenreCounts.get(detectedGenre) ?? 0) + 1,
-        );
-      }
-
-      for (const artistName of extractArtistNames(track.artists)) {
-        playlistArtistNames.add(artistName);
-      }
-    }
-
-    for (const artistName of playlistArtistNames) {
-      artistPlaylistCountByName.set(
-        artistName,
-        (artistPlaylistCountByName.get(artistName) ?? 0) + 1,
-      );
-    }
-
-    const playlistGenre =
-      detectPlaylistGenre(playlist.name, playlist.description) !== "unknown"
-        ? detectPlaylistGenre(playlist.name, playlist.description)
-        : pickTopGenre(playlistGenreCounts) ?? "unknown";
-
-    playlistTargets.push({
-      id: playlist.id,
-      name: playlist.name,
-      imageUrl: playlist.imageUrl,
-      tracksTotal: playlist.tracksTotal,
-      genre: playlistGenre,
-      trackIds: playlistTrackIds,
-      artistNames: playlistArtistNames,
-      genreCounts: playlistGenreCounts,
-    });
-  }
-
-  const dominantGenre = pickTopGenre(genreTrackCountByType);
-
-  return {
-    playlistsCount: playlistTargets.length,
-    uniqueTrackCount: trackPlaylistNamesById.size,
-    dominantGenre,
-    dominantGenreLabel: getGenreDisplayLabel(dominantGenre),
-    dominantArtists: [...artistPlaylistCountByName.entries()]
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 5)
-      .map(([artistName]) => artistName),
-    trackPlaylistNamesById,
-    artistPlaylistCountByName,
-    genreTrackCountByType,
-    playlistTargets,
-  } satisfies AccountPlaylistProfile;
-}
-
 function buildFitSummary({
   accountProfile,
   trackId,
@@ -1121,7 +923,7 @@ export async function getSpotifyReleaseRadarPageData(): Promise<SpotifyReleaseRa
   }
 
   try {
-    const accountProfilePromise = buildAccountPlaylistProfile(result.playlists);
+    const accountProfilePromise = buildSpotifyAccountProfile(result.playlists);
     const spotifyProfile = await withSpotifyToken(async (accessToken) => {
       const [topArtists, topTracks, followedArtists] = await Promise.all([
         fetchTopArtists(accessToken),

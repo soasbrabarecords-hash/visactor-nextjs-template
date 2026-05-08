@@ -13,6 +13,15 @@ export type PlaylistSnapshotRow = {
   captured_at: string | null;
 };
 
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const PLAYLIST_SNAPSHOTS_TTL_MS = 2 * 60 * 1000;
+let playlistSnapshotsCache: CacheEntry<PlaylistSnapshotRow[]> | null = null;
+let playlistSnapshotsInFlight: Promise<PlaylistSnapshotRow[]> | null = null;
+
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -35,6 +44,17 @@ function buildHeaders(env: { anonKey: string }) {
 }
 
 export async function fetchPlaylistSnapshots(): Promise<PlaylistSnapshotRow[]> {
+  if (
+    playlistSnapshotsCache &&
+    playlistSnapshotsCache.expiresAt > Date.now()
+  ) {
+    return playlistSnapshotsCache.value;
+  }
+
+  if (playlistSnapshotsInFlight) {
+    return playlistSnapshotsInFlight;
+  }
+
   const env = getSupabaseEnv();
 
   if (!env) {
@@ -49,19 +69,33 @@ export async function fetchPlaylistSnapshots(): Promise<PlaylistSnapshotRow[]> {
   url.searchParams.set("order", "captured_at.desc");
   url.searchParams.set("limit", "500");
 
-  const response = await fetch(url.toString(), {
-    headers: buildHeaders(env),
-    cache: "no-store",
-  }).catch(() => null);
+  playlistSnapshotsInFlight = (async () => {
+    const response = await fetch(url.toString(), {
+      headers: buildHeaders(env),
+      cache: "no-store",
+    }).catch(() => null);
 
-  if (!response || !response.ok) {
-    return [];
+    if (!response || !response.ok) {
+      return [];
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | PlaylistSnapshotRow[]
+      | SupabaseSnapshotResponse
+      | null;
+
+    const rows = Array.isArray(payload) ? payload : [];
+    playlistSnapshotsCache = {
+      value: rows,
+      expiresAt: Date.now() + PLAYLIST_SNAPSHOTS_TTL_MS,
+    };
+
+    return rows;
+  })();
+
+  try {
+    return await playlistSnapshotsInFlight;
+  } finally {
+    playlistSnapshotsInFlight = null;
   }
-
-  const payload = (await response.json().catch(() => null)) as
-    | PlaylistSnapshotRow[]
-    | SupabaseSnapshotResponse
-    | null;
-
-  return Array.isArray(payload) ? payload : [];
 }

@@ -115,12 +115,47 @@ export type SpotifyFeaturedPlaylist = {
   tracksTotal: number;
 };
 
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
 let spotifyToken:
   | {
       value: string;
       expiresAt: number;
     }
   | undefined;
+
+const PLAYLIST_METADATA_TTL_MS = 5 * 60 * 1000;
+const PLAYLIST_TRACKS_TTL_MS = 3 * 60 * 1000;
+const FEATURED_PLAYLISTS_TTL_MS = 3 * 60 * 1000;
+const ARTIST_TOP_TRACKS_TTL_MS = 5 * 60 * 1000;
+
+const playlistMetadataCache = new Map<
+  string,
+  CacheEntry<SpotifyPlaylistMetadata>
+>();
+const playlistTracksCache = new Map<string, CacheEntry<SpotifyTrackRecord[]>>();
+const featuredPlaylistsCache = new Map<
+  string,
+  CacheEntry<SpotifyFeaturedPlaylist[]>
+>();
+const artistTopTracksCache = new Map<string, CacheEntry<SpotifyTrackRecord[]>>();
+
+const playlistMetadataInFlight = new Map<
+  string,
+  Promise<SpotifyPlaylistMetadata>
+>();
+const playlistTracksInFlight = new Map<string, Promise<SpotifyTrackRecord[]>>();
+const featuredPlaylistsInFlight = new Map<
+  string,
+  Promise<SpotifyFeaturedPlaylist[]>
+>();
+const artistTopTracksInFlight = new Map<
+  string,
+  Promise<SpotifyTrackRecord[]>
+>();
 
 function getSpotifyEnv() {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -138,6 +173,72 @@ function getSpotifyEnv() {
 
 function parseNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string) {
+  const entry = cache.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return entry.value;
+}
+
+function setCachedValue<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+  ttlMs: number,
+) {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+
+  return value;
+}
+
+async function resolveCachedValue<T>({
+  cache,
+  inFlight,
+  key,
+  ttlMs,
+  loader,
+}: {
+  cache: Map<string, CacheEntry<T>>;
+  inFlight: Map<string, Promise<T>>;
+  key: string;
+  ttlMs: number;
+  loader: () => Promise<T>;
+}) {
+  const cachedValue = getCachedValue(cache, key);
+
+  if (cachedValue !== null) {
+    return cachedValue;
+  }
+
+  const pending = inFlight.get(key);
+
+  if (pending) {
+    return pending;
+  }
+
+  const request = (async () =>
+    setCachedValue(cache, key, await loader(), ttlMs))();
+
+  inFlight.set(key, request);
+
+  try {
+    return await request;
+  } finally {
+    inFlight.delete(key);
+  }
 }
 
 export function calculatePlaylistScore({
@@ -256,60 +357,90 @@ function mapSpotifyTrack(track: SpotifyTrackObject): SpotifyTrackRecord | null {
 export async function fetchSpotifyPlaylistMetadata(
   playlistId: string,
 ): Promise<SpotifyPlaylistMetadata> {
-  const playlist = await spotifyFetch<SpotifyPlaylistResponse>(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images(url),followers(total),tracks(total),external_urls(spotify)`,
-  );
+  const cacheKey = playlistId.trim();
 
-  return {
-    playlistId,
-    name: playlist.name?.trim() || "Spotify Playlist",
-    coverUrl: playlist.images?.[0]?.url?.trim() || null,
-    followers: parseNumber(playlist.followers?.total),
-    tracks: parseNumber(playlist.tracks?.total),
-    url:
-      playlist.external_urls?.spotify ||
-      `https://open.spotify.com/playlist/${playlistId}`,
-  };
+  return resolveCachedValue({
+    cache: playlistMetadataCache,
+    inFlight: playlistMetadataInFlight,
+    key: cacheKey,
+    ttlMs: PLAYLIST_METADATA_TTL_MS,
+    loader: async () => {
+      const playlist = await spotifyFetch<SpotifyPlaylistResponse>(
+        `https://api.spotify.com/v1/playlists/${playlistId}?fields=name,images(url),followers(total),tracks(total),external_urls(spotify)`,
+      );
+
+      return {
+        playlistId,
+        name: playlist.name?.trim() || "Spotify Playlist",
+        coverUrl: playlist.images?.[0]?.url?.trim() || null,
+        followers: parseNumber(playlist.followers?.total),
+        tracks: parseNumber(playlist.tracks?.total),
+        url:
+          playlist.external_urls?.spotify ||
+          `https://open.spotify.com/playlist/${playlistId}`,
+      };
+    },
+  });
 }
 
 export async function fetchSpotifyPlaylistTracks(
   playlistId: string,
   market = "BR",
 ): Promise<SpotifyTrackRecord[]> {
-  const tracks: SpotifyTrackRecord[] = [];
-  let nextUrl:
-    | string
-    | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&market=${market}&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(id,name),album(name,images(url)))),next`;
+  const cacheKey = `${playlistId.trim()}:${market.trim().toUpperCase()}`;
 
-  while (nextUrl) {
-    const payload: SpotifyPlaylistTracksResponse =
-      await spotifyFetch<SpotifyPlaylistTracksResponse>(nextUrl);
+  return resolveCachedValue({
+    cache: playlistTracksCache,
+    inFlight: playlistTracksInFlight,
+    key: cacheKey,
+    ttlMs: PLAYLIST_TRACKS_TTL_MS,
+    loader: async () => {
+      const tracks: SpotifyTrackRecord[] = [];
+      let nextUrl:
+        | string
+        | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&market=${market}&fields=items(track(id,name,popularity,explicit,duration_ms,external_urls(spotify),artists(id,name),album(name,images(url)))),next`;
 
-    for (const item of payload.items ?? []) {
-      const mappedTrack = item.track ? mapSpotifyTrack(item.track) : null;
+      while (nextUrl) {
+        const payload: SpotifyPlaylistTracksResponse =
+          await spotifyFetch<SpotifyPlaylistTracksResponse>(nextUrl);
 
-      if (mappedTrack) {
-        tracks.push(mappedTrack);
+        for (const item of payload.items ?? []) {
+          const mappedTrack = item.track ? mapSpotifyTrack(item.track) : null;
+
+          if (mappedTrack) {
+            tracks.push(mappedTrack);
+          }
+        }
+
+        nextUrl = payload.next ?? null;
       }
-    }
 
-    nextUrl = payload.next ?? null;
-  }
-
-  return tracks;
+      return tracks;
+    },
+  });
 }
 
 export async function fetchArtistTopTracks(
   artistId: string,
   market = "BR",
 ): Promise<SpotifyTrackRecord[]> {
-  const payload = await spotifyFetch<SpotifyArtistTopTracksResponse>(
-    `https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=${market}`,
-  );
+  const cacheKey = `${artistId.trim()}:${market.trim().toUpperCase()}`;
 
-  return (payload.tracks ?? [])
-    .map((track) => mapSpotifyTrack(track))
-    .filter((track): track is SpotifyTrackRecord => Boolean(track));
+  return resolveCachedValue({
+    cache: artistTopTracksCache,
+    inFlight: artistTopTracksInFlight,
+    key: cacheKey,
+    ttlMs: ARTIST_TOP_TRACKS_TTL_MS,
+    loader: async () => {
+      const payload = await spotifyFetch<SpotifyArtistTopTracksResponse>(
+        `https://api.spotify.com/v1/artists/${artistId}/top-tracks?market=${market}`,
+      );
+
+      return (payload.tracks ?? [])
+        .map((track) => mapSpotifyTrack(track))
+        .filter((track): track is SpotifyTrackRecord => Boolean(track));
+    },
+  });
 }
 
 export async function fetchFeaturedPlaylists(
@@ -317,20 +448,30 @@ export async function fetchFeaturedPlaylists(
   limit = 6,
   locale = "pt_BR",
 ): Promise<SpotifyFeaturedPlaylist[]> {
-  const payload = await spotifyFetch<SpotifyFeaturedPlaylistsResponse>(
-    `https://api.spotify.com/v1/browse/featured-playlists?country=${country}&locale=${locale}&limit=${limit}`,
-  );
+  const cacheKey = `${country.trim().toUpperCase()}:${limit}:${locale.trim()}`;
 
-  return (payload.playlists?.items ?? [])
-    .map((playlist) => ({
-      id: playlist.id?.trim() || "",
-      name: playlist.name?.trim() || "Playlist em destaque",
-      description: playlist.description?.trim() || "",
-      coverUrl: playlist.images?.[0]?.url?.trim() || null,
-      spotifyUrl: playlist.external_urls?.spotify?.trim() || "",
-      tracksTotal: parseNumber(playlist.tracks?.total),
-    }))
-    .filter((playlist) => Boolean(playlist.id && playlist.spotifyUrl));
+  return resolveCachedValue({
+    cache: featuredPlaylistsCache,
+    inFlight: featuredPlaylistsInFlight,
+    key: cacheKey,
+    ttlMs: FEATURED_PLAYLISTS_TTL_MS,
+    loader: async () => {
+      const payload = await spotifyFetch<SpotifyFeaturedPlaylistsResponse>(
+        `https://api.spotify.com/v1/browse/featured-playlists?country=${country}&locale=${locale}&limit=${limit}`,
+      );
+
+      return (payload.playlists?.items ?? [])
+        .map((playlist) => ({
+          id: playlist.id?.trim() || "",
+          name: playlist.name?.trim() || "Playlist em destaque",
+          description: playlist.description?.trim() || "",
+          coverUrl: playlist.images?.[0]?.url?.trim() || null,
+          spotifyUrl: playlist.external_urls?.spotify?.trim() || "",
+          tracksTotal: parseNumber(playlist.tracks?.total),
+        }))
+        .filter((playlist) => Boolean(playlist.id && playlist.spotifyUrl));
+    },
+  });
 }
 
 export async function searchSpotifyTracks(

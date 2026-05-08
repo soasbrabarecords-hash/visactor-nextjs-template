@@ -34,35 +34,121 @@ type SupabaseUpdatePlaylistInput = {
 const PLAYLIST_COLUMNS =
   "id,created_at,url,name,image_url,followers,tracks,score";
 
-export async function fetchPlaylistsFromSupabase(): Promise<SupabasePlaylistRow[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("playlists")
-    .select(PLAYLIST_COLUMNS)
-    .order("followers", { ascending: false, nullsFirst: false });
+type CacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
 
-  if (error) {
-    throw new Error(error.message || "Failed to fetch playlists from Supabase.");
+const PLAYLISTS_CACHE_TTL_MS = 2 * 60 * 1000;
+const PLAYLIST_BY_ID_CACHE_TTL_MS = 2 * 60 * 1000;
+
+let playlistsCache: CacheEntry<SupabasePlaylistRow[]> | null = null;
+let playlistsInFlight: Promise<SupabasePlaylistRow[]> | null = null;
+const playlistByIdCache = new Map<
+  string,
+  CacheEntry<SupabasePlaylistRow | null>
+>();
+const playlistByIdInFlight = new Map<
+  string,
+  Promise<SupabasePlaylistRow | null>
+>();
+
+function clearPlaylistCaches(id?: string) {
+  playlistsCache = null;
+
+  if (id) {
+    playlistByIdCache.delete(id);
+    playlistByIdInFlight.delete(id);
+    return;
   }
 
-  return (data ?? []) as SupabasePlaylistRow[];
+  playlistByIdCache.clear();
+  playlistByIdInFlight.clear();
+}
+
+export async function fetchPlaylistsFromSupabase(): Promise<SupabasePlaylistRow[]> {
+  if (playlistsCache && playlistsCache.expiresAt > Date.now()) {
+    return playlistsCache.value;
+  }
+
+  if (playlistsInFlight) {
+    return playlistsInFlight;
+  }
+
+  const supabase = await createClient();
+  playlistsInFlight = (async () => {
+    const { data, error } = await supabase
+      .from("playlists")
+      .select(PLAYLIST_COLUMNS)
+      .order("followers", { ascending: false, nullsFirst: false });
+
+    if (error) {
+      throw new Error(
+        error.message || "Failed to fetch playlists from Supabase.",
+      );
+    }
+
+    const rows = (data ?? []) as SupabasePlaylistRow[];
+    playlistsCache = {
+      value: rows,
+      expiresAt: Date.now() + PLAYLISTS_CACHE_TTL_MS,
+    };
+
+    return rows;
+  })();
+
+  try {
+    return await playlistsInFlight;
+  } finally {
+    playlistsInFlight = null;
+  }
 }
 
 export async function fetchPlaylistByIdFromSupabase(
   id: string,
 ): Promise<SupabasePlaylistRow | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("playlists")
-    .select(PLAYLIST_COLUMNS)
-    .eq("id", id)
-    .maybeSingle();
+  const cachedEntry = playlistByIdCache.get(id);
 
-  if (error) {
-    throw new Error(error.message || "Failed to fetch playlist from Supabase.");
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    return cachedEntry.value;
   }
 
-  return (data as SupabasePlaylistRow | null) ?? null;
+  const inFlight = playlistByIdInFlight.get(id);
+
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const supabase = await createClient();
+  const request = (async () => {
+    const { data, error } = await supabase
+      .from("playlists")
+      .select(PLAYLIST_COLUMNS)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        error.message || "Failed to fetch playlist from Supabase.",
+      );
+    }
+
+    const row = (data as SupabasePlaylistRow | null) ?? null;
+    playlistByIdCache.set(id, {
+      value: row,
+      expiresAt: Date.now() + PLAYLIST_BY_ID_CACHE_TTL_MS,
+    });
+
+    return row;
+  })();
+
+  playlistByIdInFlight.set(id, request);
+
+  try {
+    return await request;
+  } finally {
+    playlistByIdInFlight.delete(id);
+  }
 }
 
 export async function insertPlaylistIntoSupabase(
@@ -90,6 +176,7 @@ export async function insertPlaylistIntoSupabase(
     );
   }
 
+  clearPlaylistCaches(String(data.id));
   return data as SupabasePlaylistRow;
 }
 
@@ -105,4 +192,6 @@ export async function updatePlaylistInSupabase(
       error.message || "Failed to update playlist in Supabase.",
     );
   }
+
+  clearPlaylistCaches(id);
 }
