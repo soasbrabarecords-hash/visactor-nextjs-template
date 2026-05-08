@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import {
-  CustomerSatisfication,
-  Metrics,
-  TicketByChannels,
-} from "@/components/chart-blocks";
+import Metrics from "@/components/chart-blocks/charts/metrics";
 import Container from "@/components/container";
 import TracksTable from "@/components/charts/tracks-table";
 import CuratorNotesPanel from "@/components/playlists/curator-notes-panel";
+import PlaylistAnalysisCharts from "@/components/playlists/playlist-analysis-charts";
 import SuggestedTracksTable from "@/components/playlists/suggested-tracks-table";
 import { Button } from "@/components/ui/button";
 import { getPlaylistAnalysisData } from "@/lib/playlist-analysis-data";
@@ -85,28 +82,11 @@ export default async function PlaylistAnalysisPage({
           />
         </Container>
 
-        <Container className="py-4 laptop:col-span-1">
-          <TicketByChannels
-            data={analysis.artistDistribution}
-            title="Artist DNA"
-            centerLabel="Artistas dominantes"
-          />
-        </Container>
-
-        <Container className="py-4 laptop:col-span-1">
-          <CustomerSatisfication
-            customerSatisfication={analysis.popularityHealth}
-            totalCustomers={analysis.currentTracks.length}
-            title="Faixa Health"
-            totalLabel="Faixas atuais"
-            totalSuffix="tracks"
-            labels={{
-              positive: "Alta tracao",
-              neutral: "Media tracao",
-              negative: "Baixa tracao",
-            }}
-          />
-        </Container>
+        <PlaylistAnalysisCharts
+          artistDistribution={analysis.artistDistribution}
+          popularityHealth={analysis.popularityHealth}
+          totalTracks={analysis.currentTracks.length}
+        />
       </div>
 
       <div className="border-b border-border">

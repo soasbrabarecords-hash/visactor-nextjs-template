@@ -1,5 +1,3 @@
-import type { DateRange } from "react-day-picker";
-
 export type PlaylistTimelineMetric = {
   date: string;
   type: "created" | "scored";
@@ -53,15 +51,4 @@ export type DashboardData = {
   scoreHealth: ScoreBreakdown;
   playlistCount: number;
   playlists: PlaylistRecord[];
-};
-
-export type PlaylistActivityProps = {
-  data: PlaylistActivityDatum[];
-};
-
-export type DateRangePickerProps = {
-  className?: string;
-  dateRange: DateRange | undefined;
-  setDateRange: (range: DateRange | undefined) => void;
-  availableDates: string[];
 };
