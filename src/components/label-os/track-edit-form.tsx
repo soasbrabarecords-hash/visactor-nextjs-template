@@ -3,6 +3,7 @@
 import { FileAudio2, FileImage } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import type { LabelTrack } from "@/lib/label-os-types";
 
 const INPUT_CLASS =
@@ -24,20 +25,6 @@ const GENRE_OPTIONS = [
   "Afro / Latin",
   "Rock / Alternativo",
 ];
-
-async function uploadFile(file: File | null, bucket: string): Promise<string | null> {
-  if (!file || file.size === 0) return null;
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("bucket", bucket);
-  const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
-  if (!res.ok) {
-    const payload = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error ?? `Erro no upload para ${bucket}`);
-  }
-  const json = (await res.json()) as { url: string };
-  return json.url;
-}
 
 async function readApiError(res: Response, fallback: string): Promise<string> {
   try {
@@ -94,18 +81,12 @@ export default function TrackEditForm({ track }: Props) {
       const warnings: string[] = [];
 
       if (coverFile) {
-        try {
-          coverUrl = await uploadFile(coverFile, "label-covers");
-        } catch (err) {
-          warnings.push(
-            err instanceof Error ? `Capa nao atualizada: ${err.message}` : "Capa nao atualizada.",
-          );
-        }
+        coverUrl = await uploadLabelOsFile(coverFile, "label-covers");
       }
 
       if (audioFile) {
         try {
-          audioUrl = await uploadFile(audioFile, "label-audio");
+          audioUrl = await uploadLabelOsFile(audioFile, "label-audio");
         } catch (err) {
           warnings.push(
             err instanceof Error ? `Audio nao atualizado: ${err.message}` : "Audio nao atualizado.",

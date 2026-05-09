@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  createLabelStoragePath,
+  ensureLabelStorageBucket,
+  isLabelStorageBucket,
+  validateLabelStorageFile,
+} from "@/lib/label-os-storage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type AllowedBucket = "label-audio" | "label-covers" | "label-contracts";
-
-const ALLOWED_BUCKETS: AllowedBucket[] = [
-  "label-audio",
-  "label-covers",
-  "label-contracts",
-];
 
 export async function POST(request: Request) {
   try {
@@ -23,19 +21,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Arquivo não encontrado." }, { status: 400 });
     }
 
-    if (!bucket || !ALLOWED_BUCKETS.includes(bucket as AllowedBucket)) {
+    if (!isLabelStorageBucket(bucket)) {
       return NextResponse.json({ error: "Bucket inválido." }, { status: 400 });
     }
 
-    const ext = file.name.split(".").pop() ?? "bin";
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const validationError = validateLabelStorageFile({
+      bucket,
+      contentType: file.type,
+      size: file.size,
+    });
 
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
+    await ensureLabelStorageBucket(bucket);
+    const path = createLabelStoragePath(bucket, file.name);
     const supabase = createAdminClient() ?? (await createClient());
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const { error } = await supabase.storage
-      .from(bucket as AllowedBucket)
+      .from(bucket)
       .upload(path, buffer, {
         contentType: file.type,
         upsert: false,
@@ -55,12 +62,12 @@ export async function POST(request: Request) {
     }
 
     if (bucket === "label-covers") {
-      const { data } = supabase.storage.from(bucket as AllowedBucket).getPublicUrl(path);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
       return NextResponse.json({ url: data.publicUrl }, { status: 200 });
     }
 
     const signed = await supabase.storage
-      .from(bucket as AllowedBucket)
+      .from(bucket)
       .createSignedUrl(path, 60 * 60 * 24 * 30);
 
     if (signed.error) {

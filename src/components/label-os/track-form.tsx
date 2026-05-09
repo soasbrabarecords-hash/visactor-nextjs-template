@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LabelArtist } from "@/lib/label-os-types";
 import type { LabelEntity } from "@/lib/label-entities-types";
+import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import {
   formatPercentage,
   isPercentageEqual,
@@ -123,20 +124,6 @@ function totalBg(total: number, target: number): string {
   if (isPercentageEqual(total, target))
     return "border-sky-200/18 bg-sky-200/[0.08] text-sky-100";
   return "border-amber-200/18 bg-amber-200/[0.08] text-amber-100";
-}
-
-async function uploadFile(file: File | null, bucket: string): Promise<string | null> {
-  if (!file || file.size === 0) return null;
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("bucket", bucket);
-  const res = await fetch("/api/label-os/upload", { method: "POST", body: fd });
-  if (!res.ok) {
-    const j = (await res.json()) as { error?: string };
-    throw new Error(j.error ?? `Erro no upload para ${bucket}`);
-  }
-  const json = (await res.json()) as { url: string };
-  return json.url;
 }
 
 async function readApiError(res: Response, fallback: string): Promise<string> {
@@ -542,9 +529,9 @@ export default function TrackForm({ artists }: TrackFormProps) {
     setLoading(true);
 
     try {
-      const coverUrl = await uploadFile(trackData.coverFile, "label-covers");
-      const audioUrl = await uploadFile(trackData.audioFile, "label-audio");
-      const contractUrl = await uploadFile(trackData.contractFile, "label-contracts");
+      const coverUrl = await uploadLabelOsFile(trackData.coverFile, "label-covers");
+      const audioUrl = await uploadLabelOsFile(trackData.audioFile, "label-audio");
+      const contractUrl = await uploadLabelOsFile(trackData.contractFile, "label-contracts");
 
       const trackRes = await fetch("/api/label-os/tracks", {
         method: "POST",
