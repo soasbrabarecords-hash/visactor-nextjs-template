@@ -12,13 +12,13 @@ export default function AppShell({
   const isAuthRoute = pathname === "/login";
 
   if (isAuthRoute) {
-    return <div className="min-h-[100dvh]">{children}</div>;
+    return <div className="theme-adaptive min-h-[100dvh]">{children}</div>;
   }
 
   return (
     <div className="flex min-h-[100dvh]">
       <SideNav />
-      <div className="flex-grow overflow-auto">{children}</div>
+      <div className="theme-adaptive flex-grow overflow-auto">{children}</div>
     </div>
   );
 }

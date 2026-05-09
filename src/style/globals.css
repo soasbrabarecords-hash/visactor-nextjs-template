@@ -69,3 +69,58 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .light .theme-adaptive {
+    color-scheme: light;
+  }
+
+  .light .theme-adaptive :where([class*="linear-gradient(180deg,#040816"]),
+  .light .theme-adaptive :where([class*="linear-gradient(180deg,#03111f"]),
+  .light .theme-adaptive :where([class*="linear-gradient(180deg,#080d16"]),
+  .light .theme-adaptive :where([class*="linear-gradient(180deg,#0"]),
+  .light .theme-adaptive :where([class*="bg-[#0"]),
+  .light .theme-adaptive :where([class*="bg-[radial-gradient"]),
+  .light .theme-adaptive :where([class*="bg-[linear-gradient"]) {
+    background:
+      radial-gradient(circle at top left, hsl(204 100% 96% / 0.9), transparent 38%),
+      radial-gradient(circle at top right, hsl(153 78% 92% / 0.7), transparent 36%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted))) !important;
+  }
+
+  .light .theme-adaptive :where([class*="bg-black/"]) {
+    background-color: hsl(var(--muted) / 0.82) !important;
+  }
+
+  .light .theme-adaptive :where([class*="bg-white/"]) {
+    background-color: hsl(var(--card) / 0.78) !important;
+  }
+
+  .light .theme-adaptive :where([class*="border-white/"]) {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .light .theme-adaptive :where(.text-white) {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .light .theme-adaptive :where([class*="text-white/8"], [class*="text-white/7"]) {
+    color: hsl(var(--foreground) / 0.84) !important;
+  }
+
+  .light .theme-adaptive :where([class*="text-white/6"], [class*="text-white/5"]) {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .light .theme-adaptive :where([class*="text-white/4"], [class*="text-white/3"], [class*="text-white/2"]) {
+    color: hsl(var(--muted-foreground) / 0.78) !important;
+  }
+
+  .light .theme-adaptive :where([class*="placeholder:text-white/"])::placeholder {
+    color: hsl(var(--muted-foreground) / 0.62) !important;
+  }
+
+  .light .theme-adaptive :where([class*="shadow-[0_24px"], [class*="shadow-[0_28px"], [class*="shadow-[0_18px"], [class*="shadow-[0_16px"]) {
+    box-shadow: 0 18px 48px hsl(217 33% 17% / 0.08) !important;
+  }
+}
