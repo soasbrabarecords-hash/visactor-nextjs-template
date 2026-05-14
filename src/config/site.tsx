@@ -2,11 +2,9 @@ import {
   Compass,
   Gauge,
   ListMusic,
-  Radio,
   Library,
   BarChart2,
   Flame,
-  Sparkles,
   Settings2,
   type LucideIcon,
 } from "lucide-react";
@@ -30,24 +28,14 @@ export const navigations: Navigation[] = [
     href: "/dashboard",
   },
   {
-    icon: Radio,
-    name: "Radar Music",
-    href: "/radar-music",
-  },
-  {
     icon: ListMusic,
-    name: "Playlists Concorrentes",
+    name: "Playlists Analytics",
     href: "/playlists-concorrentes",
   },
   {
     icon: Compass,
-    name: "Curadoria",
+    name: "Playlists",
     href: "/curadoria",
-  },
-  {
-    icon: Sparkles,
-    name: "Novidades",
-    href: "/novidades",
   },
   {
     icon: BarChart2,
