@@ -34,7 +34,7 @@ function getDiagnosis(row: PlaylistBaseRow) {
   }
 
   return {
-    label: "Baixa ameaca",
+    label: "Baixo sinal",
     tone: "slate" as const,
     note: "Use como contraste para entender o que evitar.",
   };
@@ -47,16 +47,27 @@ export default function CompetitorPlaylistsTable({
 }) {
   return (
     <Container className="border-b border-border py-6">
-      <div className="mb-4">
-        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Playlists concorrentes
+      <section className="rounded-[32px] border border-white/70 bg-white/[0.66] p-4 shadow-[0_20px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.035] dark:shadow-[0_24px_90px_rgba(0,0,0,0.28)] tablet:p-5">
+        <div className="mb-5 flex flex-col gap-3 tablet:flex-row tablet:items-end tablet:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Playlists Analytics
+            </div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+              Mapa de performance
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Uma visao objetiva das playlists monitoradas para comparar forca,
+              repertorio e oportunidade.
+            </p>
+          </div>
+          <StatusBadge tone="blue">Benchmark ativo</StatusBadge>
         </div>
-        <h2 className="mt-2 text-2xl font-semibold">Mapa de concorrencia</h2>
-      </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-card/60">
-        <table className="min-w-[980px] w-full divide-y divide-border text-left">
-          <thead className="bg-muted/20">
+        <div className="overflow-hidden rounded-[26px] border border-border/80 bg-background/[0.72] shadow-inner shadow-slate-950/[0.03] dark:border-white/10 dark:bg-black/[0.18]">
+          <div className="overflow-x-auto">
+            <table className="min-w-[980px] w-full divide-y divide-border/70 text-left">
+          <thead className="bg-muted/35 dark:bg-white/[0.035]">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="px-4 py-3">Playlist</th>
               <th className="px-4 py-3">Followers</th>
@@ -73,7 +84,7 @@ export default function CompetitorPlaylistsTable({
                   colSpan={6}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
-                  Adicione playlists concorrentes para iniciar a leitura.
+                  Adicione playlists para iniciar a leitura de mercado.
                 </td>
               </tr>
             ) : (
@@ -81,11 +92,14 @@ export default function CompetitorPlaylistsTable({
                 const diagnosis = getDiagnosis(row);
 
                 return (
-                  <tr key={row.playlist.id} className="hover:bg-muted/10">
-                    <td className="px-4 py-3">
+                  <tr
+                    key={row.playlist.id}
+                    className="transition-colors hover:bg-emerald-500/[0.055] dark:hover:bg-white/[0.035]"
+                  >
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
                         <div
-                          className="h-11 w-11 shrink-0 rounded-lg bg-muted"
+                          className="h-12 w-12 shrink-0 rounded-2xl border border-border/70 bg-muted shadow-[0_12px_28px_rgba(15,23,42,0.12)] dark:border-white/10"
                           style={coverStyle(row.playlist.coverUrl)}
                         />
                         <div className="min-w-0">
@@ -93,17 +107,17 @@ export default function CompetitorPlaylistsTable({
                             {row.playlist.name}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Concorrente monitorado
+                            Playlist monitorada
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm">{row.followersLabel}</td>
-                    <td className="px-4 py-3 text-sm">{row.tracksLabel}</td>
-                    <td className="px-4 py-3 text-sm font-semibold">
+                    <td className="px-4 py-3.5 text-sm">{row.followersLabel}</td>
+                    <td className="px-4 py-3.5 text-sm">{row.tracksLabel}</td>
+                    <td className="px-4 py-3.5 text-sm font-semibold">
                       {row.scoreLabel}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <div className="space-y-1">
                         <StatusBadge tone={diagnosis.tone}>
                           {diagnosis.label}
@@ -113,10 +127,10 @@ export default function CompetitorPlaylistsTable({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <Link
                         href={`/playlists/${row.playlist.id}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm text-primary hover:bg-muted/30"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-background/70 px-3.5 py-2 text-sm font-medium text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-primary/[0.08] dark:border-white/10 dark:bg-white/[0.035]"
                       >
                         Analise
                         <ExternalLink className="h-3.5 w-3.5" />
@@ -128,7 +142,9 @@ export default function CompetitorPlaylistsTable({
             )}
           </tbody>
         </table>
+          </div>
       </div>
+      </section>
     </Container>
   );
 }

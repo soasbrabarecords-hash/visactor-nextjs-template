@@ -2187,7 +2187,7 @@ export async function getRadarMusicPageData({
         "Mesa operacional que cruza Spotify Charts, TikTok Charts Brasil e o DNA da tua conta para decidir o que entra, o que testa e o que pede revisao.",
       primaryCtaLabel: "Ir para Curadoria",
       primaryCtaHref: "/curadoria",
-      secondaryCtaLabel: "Ver Playlists Concorrentes",
+      secondaryCtaLabel: "Ver Playlists Analytics",
       secondaryCtaHref: "/playlists-concorrentes",
     },
     heroInsight: buildRadarMusicHeroInsight({
@@ -2299,7 +2299,7 @@ export async function getRadarPlaylistsPageData(): Promise<RadarPlaylistsData> {
   return {
     hero: {
       eyebrow: "Radar interno",
-      title: "Playlists Concorrentes",
+      title: "Playlists Analytics",
       description:
         "Leitura cruzada das playlists monitoradas para saber quais faixas realmente estao se repetindo na sua base e quais tambem estao acelerando no radar externo.",
       primaryCtaLabel: "Abrir Radar Music",
@@ -2442,7 +2442,7 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
   return {
     hero: {
       eyebrow: "Base monitorada",
-      title: "Playlists Concorrentes",
+      title: "Playlists Analytics",
       description:
         "Area dedicada para cadastrar novas URLs, acompanhar score, monitorar a saude da base e abrir a analise individual de cada playlist.",
       primaryCtaLabel: "Abrir Curadoria",
@@ -2512,7 +2512,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
         "Fila final de decisao baseada em leitura de streams BR, fit com playlists da conta e sinais editoriais para acelerar adicao e observacao de repertorio.",
       primaryCtaLabel: "Abrir Radar Music",
       primaryCtaHref: "/radar-music",
-      secondaryCtaLabel: "Ver Playlists Concorrentes",
+      secondaryCtaLabel: "Ver Playlists Analytics",
       secondaryCtaHref: "/playlists-concorrentes",
     },
     heroInsight: buildCurationHeroInsight(rows),

@@ -74,24 +74,30 @@ export default function AddPlaylistForm({
   };
 
   return (
-    <Container className="border-b border-border py-4">
-      <section className="grid gap-4 rounded-2xl border border-border bg-muted/10 p-5 laptop:grid-cols-[1.2fr_1fr] laptop:items-center">
-        <div className="space-y-2">
+    <Container className="border-b border-border py-5">
+      <section className="relative overflow-hidden rounded-[30px] border border-white/70 bg-white/70 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_22px_80px_rgba(0,0,0,0.24)] laptop:grid laptop:grid-cols-[1.05fr_1fr] laptop:items-center laptop:gap-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(255,255,255,0.9),transparent_32%),radial-gradient(circle_at_100%_0%,rgba(34,197,94,0.12),transparent_34%)] dark:bg-[radial-gradient(circle_at_0%_0%,rgba(255,255,255,0.11),transparent_32%),radial-gradient(circle_at_100%_0%,rgba(34,197,94,0.10),transparent_34%)]" />
+        <div className="relative space-y-2">
           <ChartTitle title={title} icon={Music2} />
           <p className="max-w-2xl text-sm text-muted-foreground">
             {description}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="relative mt-5 flex flex-col gap-3 laptop:mt-0">
           <div className="flex flex-col gap-3 tablet:flex-row">
             <Input
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://open.spotify.com/playlist/..."
               aria-label="Playlist URL"
+              className="h-12 rounded-2xl border-border/80 bg-background/70 px-4 shadow-inner shadow-slate-950/[0.03] backdrop-blur-xl focus-visible:ring-1 focus-visible:ring-emerald-400/45 focus-visible:ring-offset-0 dark:border-white/10 dark:bg-black/20"
             />
-            <Button type="submit" disabled={isPending}>
+            <Button
+              type="submit"
+              disabled={isPending}
+              className="h-12 rounded-2xl bg-slate-950 px-5 text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-white/90"
+            >
               <Plus />
               {isPending ? "Adicionando..." : buttonLabel}
             </Button>
