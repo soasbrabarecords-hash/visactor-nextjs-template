@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Gauge, ListChecks, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Gauge, ListChecks, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
   PlaylistDecisionAction,
@@ -144,11 +144,18 @@ function OrderPreviewRow({ decision }: { decision: PlaylistTrackDecision }) {
 export default function PlaylistIntelligencePanel({
   intelligence,
   isEnriching,
+  isApplyingOrder = false,
+  applyDisabledReason,
+  onApplySuggestedOrder,
 }: {
   intelligence: PlaylistIntelligenceResult;
   isEnriching: boolean;
+  isApplyingOrder?: boolean;
+  applyDisabledReason?: string;
+  onApplySuggestedOrder?: () => Promise<boolean>;
 }) {
   const [view, setView] = useState<"summary" | "order">("summary");
+  const [confirmingApply, setConfirmingApply] = useState(false);
   const { summary } = intelligence;
   const hasOrderChanges = summary.orderChangesCount > 0;
   const priority = intelligence.decisions
@@ -167,6 +174,18 @@ export default function PlaylistIntelligencePanel({
     .filter((decision, index, list) => list.findIndex((item) => item.trackKey === decision.trackKey) === index)
     .slice(0, 6);
   const suggestedOrder = [...intelligence.decisions].sort((a, b) => a.suggestedIndex - b.suggestedIndex);
+  const canApplyOrder = Boolean(
+    onApplySuggestedOrder && hasOrderChanges && !isEnriching && !isApplyingOrder && !applyDisabledReason,
+  );
+
+  async function handleConfirmApply() {
+    if (!onApplySuggestedOrder || !canApplyOrder) return;
+    const success = await onApplySuggestedOrder();
+    if (success) {
+      setConfirmingApply(false);
+      setView("summary");
+    }
+  }
 
   return (
     <section className="relative overflow-hidden rounded-[30px] border border-border/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(241,245,249,0.68))] p-4 shadow-[0_24px_90px_-58px_rgba(15,23,42,0.48)] dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.72),rgba(3,7,18,0.92))] tablet:p-5">
@@ -196,10 +215,54 @@ export default function PlaylistIntelligencePanel({
               >
                 {view === "order" ? "Voltar ao resumo" : "Ver ordem sugerida"}
               </Button>
-              <Button type="button" size="sm" variant="outline" disabled className="rounded-full">
-                Aplicar em breve
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setView("order");
+                  setConfirmingApply(true);
+                }}
+                disabled={!canApplyOrder}
+                className="rounded-full"
+                title={applyDisabledReason}
+              >
+                {isApplyingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                Aplicar ordem
               </Button>
             </div>
+            {confirmingApply && (
+              <div className="mt-3 rounded-[20px] border border-amber-400/30 bg-amber-400/10 p-3">
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
+                  Confirmacao
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  Salvar {summary.orderChangesCount} ajustes direto no Spotify?
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleConfirmApply()}
+                    disabled={!canApplyOrder}
+                    className="rounded-full"
+                  >
+                    {isApplyingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
+                    Confirmar e salvar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmingApply(false)}
+                    disabled={isApplyingOrder}
+                    className="rounded-full"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">

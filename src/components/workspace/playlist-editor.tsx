@@ -424,12 +424,11 @@ export default function PlaylistEditor({
     }
   }
 
-  // ── Confirmar reordenação ─────────────────────────────────────────────────
-  async function handleConfirmReorder() {
+  async function savePlaylistOrder(nextTracks: TrackWithStreams[]) {
     setSaving(true);
     setError(null);
     try {
-      const uris = tracks.map((t) => `spotify:track:${t.id}`);
+      const uris = nextTracks.map((t) => `spotify:track:${t.id}`);
       const res = await fetch(`/api/spotify/playlists/${playlistId}/tracks/reorder-full`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -438,13 +437,23 @@ export default function PlaylistEditor({
       const data = (await res.json()) as { success?: boolean; snapshotId?: string; message?: string };
       if (!res.ok || !data.success) throw new Error(data.message ?? "Erro ao salvar ordem.");
       if (data.snapshotId) setSnapshotId(data.snapshotId);
-      setSavedTracks([...tracks]);
+      setTracks([...nextTracks]);
+      setSavedTracks([...nextTracks]);
       setPendingReorder(false);
+      setSelectedSet(new Set());
+      lastClickedIndex.current = null;
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar ordem.");
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Confirmar reordenação ─────────────────────────────────────────────────
+  async function handleConfirmReorder() {
+    await savePlaylistOrder(tracks);
   }
 
   function handleCancelReorder() {
@@ -638,6 +647,27 @@ export default function PlaylistEditor({
     [intelligence.decisions],
   );
   const isIntelligenceEnriching = chartLoading || tracks.some((track) => track.streamsLoading);
+  async function handleApplySuggestedOrder() {
+    if (pendingReorder) {
+      setError("Salve ou cancele a ordem manual antes de aplicar a sugestao da IA.");
+      return false;
+    }
+
+    const trackByKey = new Map(
+      tracks.map((track, index) => [`${track.id}:${index}`, track]),
+    );
+    const suggestedTracks = [...intelligence.decisions]
+      .sort((a, b) => a.suggestedIndex - b.suggestedIndex)
+      .map((decision) => trackByKey.get(decision.trackKey))
+      .filter((track): track is TrackWithStreams => Boolean(track));
+
+    if (suggestedTracks.length !== tracks.length) {
+      setError("Nao foi possivel montar a ordem sugerida. Recarregue a playlist e tente de novo.");
+      return false;
+    }
+
+    return savePlaylistOrder(suggestedTracks);
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -645,6 +675,15 @@ export default function PlaylistEditor({
       <PlaylistIntelligencePanel
         intelligence={intelligence}
         isEnriching={isIntelligenceEnriching}
+        isApplyingOrder={saving}
+        applyDisabledReason={
+          pendingReorder
+            ? "Salve ou cancele a ordem manual antes."
+            : isIntelligenceEnriching
+              ? "Aguarde os sinais terminarem de carregar."
+              : undefined
+        }
+        onApplySuggestedOrder={handleApplySuggestedOrder}
       />
 
       {/* Barra de controles — legendas escondem em mobile */}
