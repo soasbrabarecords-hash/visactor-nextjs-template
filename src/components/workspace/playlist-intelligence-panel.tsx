@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { ArrowDown, ArrowUp, Gauge, ListChecks, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type {
   PlaylistDecisionAction,
   PlaylistIntelligenceResult,
@@ -32,6 +36,13 @@ function actionIcon(action: PlaylistDecisionAction) {
   if (action === "raise") return <ArrowUp className="h-3.5 w-3.5" />;
   if (action === "lower" || action === "test") return <ArrowDown className="h-3.5 w-3.5" />;
   return <ListChecks className="h-3.5 w-3.5" />;
+}
+
+function movementLabel(decision: PlaylistTrackDecision) {
+  const delta = decision.currentIndex - decision.suggestedIndex;
+  if (delta > 0) return `sobe ${delta}`;
+  if (delta < 0) return `desce ${Math.abs(delta)}`;
+  return "mantem";
 }
 
 function DecisionCard({ decision }: { decision: PlaylistTrackDecision }) {
@@ -75,6 +86,61 @@ function DecisionCard({ decision }: { decision: PlaylistTrackDecision }) {
   );
 }
 
+function OrderPreviewRow({ decision }: { decision: PlaylistTrackDecision }) {
+  const delta = decision.currentIndex - decision.suggestedIndex;
+  const isUp = delta > 0;
+  const isDown = delta < 0;
+
+  return (
+    <article className="grid gap-3 rounded-[20px] border border-border/80 bg-background/[0.76] p-3 transition hover:border-primary/30 dark:border-white/10 dark:bg-white/[0.035] tablet:grid-cols-[72px_1fr_150px] tablet:items-center">
+      <div className="flex items-center gap-2 tablet:block">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Nova</span>
+        <div className="mt-0 text-2xl font-black tabular-nums tracking-[-0.04em] text-foreground tablet:mt-1">
+          #{decision.suggestedIndex + 1}
+        </div>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-3">
+        <div
+          className="h-12 w-12 shrink-0 rounded-[16px] border border-border/70 bg-muted shadow-inner dark:border-white/10"
+          style={coverStyle(decision.imageUrl)}
+        />
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-black text-foreground">{decision.name}</h4>
+          <p className="truncate text-xs font-medium text-muted-foreground">{decision.artists}</p>
+          <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-muted-foreground">{decision.reason}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 tablet:justify-end">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
+            actionClasses(decision.action),
+          )}
+        >
+          {actionIcon(decision.action)}
+          {decision.label}
+        </span>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold tabular-nums",
+            isUp && "border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200",
+            isDown && "border-amber-400/30 bg-amber-400/10 text-amber-700 dark:text-amber-200",
+            !isUp && !isDown && "border-border bg-muted/50 text-muted-foreground",
+          )}
+        >
+          {isUp ? <ArrowUp className="h-3 w-3" /> : isDown ? <ArrowDown className="h-3 w-3" /> : <ListChecks className="h-3 w-3" />}
+          #{decision.currentIndex + 1} | {movementLabel(decision)}
+        </span>
+        <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+          {formatPercent(decision.score)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 export default function PlaylistIntelligencePanel({
   intelligence,
   isEnriching,
@@ -82,7 +148,9 @@ export default function PlaylistIntelligencePanel({
   intelligence: PlaylistIntelligenceResult;
   isEnriching: boolean;
 }) {
+  const [view, setView] = useState<"summary" | "order">("summary");
   const { summary } = intelligence;
+  const hasOrderChanges = summary.orderChangesCount > 0;
   const priority = intelligence.decisions
     .filter((decision) => decision.action === "priority" || decision.action === "raise")
     .sort((a, b) => a.suggestedIndex - b.suggestedIndex)
@@ -98,6 +166,7 @@ export default function PlaylistIntelligencePanel({
   const focusList = [...priority, ...review, ...orderPreview]
     .filter((decision, index, list) => list.findIndex((item) => item.trackKey === decision.trackKey) === index)
     .slice(0, 6);
+  const suggestedOrder = [...intelligence.decisions].sort((a, b) => a.suggestedIndex - b.suggestedIndex);
 
   return (
     <section className="relative overflow-hidden rounded-[30px] border border-border/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(241,245,249,0.68))] p-4 shadow-[0_24px_90px_-58px_rgba(15,23,42,0.48)] dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.72),rgba(3,7,18,0.92))] tablet:p-5">
@@ -115,8 +184,22 @@ export default function PlaylistIntelligencePanel({
               Ordem sugerida da semana
             </h3>
             <p className="mt-2 max-w-md text-sm font-medium leading-relaxed text-muted-foreground">
-              Leitura segura: popularidade, chart BR e Kworb. Nada e salvo no Spotify aqui.
+              Leitura segura: popularidade, chart BR e Kworb. Nada salva no Spotify aqui.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setView(view === "order" ? "summary" : "order")}
+                disabled={!hasOrderChanges && view !== "order"}
+                className="rounded-full"
+              >
+                {view === "order" ? "Voltar ao resumo" : "Ver ordem sugerida"}
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled className="rounded-full">
+                Aplicar em breve
+              </Button>
+            </div>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">
@@ -129,8 +212,8 @@ export default function PlaylistIntelligencePanel({
               <p className="mt-1 text-xl font-black tabular-nums">{summary.priorityCount + summary.raiseCount}</p>
             </div>
             <div className="rounded-[18px] border border-border/70 bg-muted/40 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Revisar</p>
-              <p className="mt-1 text-xl font-black tabular-nums">{summary.reviewCount}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Mudancas</p>
+              <p className="mt-1 text-xl font-black tabular-nums">{summary.orderChangesCount}</p>
             </div>
           </div>
 
@@ -154,7 +237,26 @@ export default function PlaylistIntelligencePanel({
         </div>
 
         <div className="rounded-[24px] border border-border/70 bg-background/60 p-3 dark:border-white/10 dark:bg-black/20">
-          {focusList.length > 0 ? (
+          {view === "order" && hasOrderChanges ? (
+            <div>
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2 px-1">
+                <div>
+                  <h4 className="text-sm font-black text-foreground">Preview da nova ordem</h4>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Conferencia visual. A ordem real continua igual ate salvar manualmente.
+                  </p>
+                </div>
+                <span className="rounded-full border border-border/70 bg-muted/50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                  {summary.orderChangesCount} ajustes
+                </span>
+              </div>
+              <div className="grid max-h-[460px] gap-2 overflow-y-auto pr-1">
+                {suggestedOrder.map((decision) => (
+                  <OrderPreviewRow key={decision.trackKey} decision={decision} />
+                ))}
+              </div>
+            </div>
+          ) : focusList.length > 0 ? (
             <div className="grid gap-3 tablet:grid-cols-2">
               {focusList.map((decision) => (
                 <DecisionCard key={decision.trackKey} decision={decision} />

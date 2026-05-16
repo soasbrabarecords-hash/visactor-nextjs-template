@@ -42,6 +42,7 @@ export type PlaylistIntelligenceSummary = {
   averageScore: number;
   chartMatches: number;
   streamMatches: number;
+  orderChangesCount: number;
   priorityCount: number;
   raiseCount: number;
   reviewCount: number;
@@ -232,6 +233,9 @@ export function buildPlaylistIntelligence(
   const chartMatches = tracks.filter((track) => Boolean(track.chartPosition)).length;
   const streamMatches = tracks.filter((track) => Boolean(track.dailyStreams)).length;
   const readyStreams = tracks.filter((track) => !track.streamsLoading).length;
+  const orderChangesCount = decisions.filter(
+    (decision) => decision.currentIndex !== decision.suggestedIndex,
+  ).length;
   const averageScore = decisions.length
     ? Math.round(decisions.reduce((total, decision) => total + decision.score, 0) / decisions.length)
     : 0;
@@ -247,6 +251,7 @@ export function buildPlaylistIntelligence(
       averageScore,
       chartMatches,
       streamMatches,
+      orderChangesCount,
       priorityCount: decisions.filter((decision) => decision.action === "priority").length,
       raiseCount: decisions.filter((decision) => decision.action === "raise").length,
       reviewCount: decisions.filter(
