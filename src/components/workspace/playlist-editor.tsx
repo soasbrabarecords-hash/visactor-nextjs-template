@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -17,8 +17,10 @@ import {
   Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PlaylistIntelligencePanel from "@/components/workspace/playlist-intelligence-panel";
 import ResizableTableOverlay from "@/components/workspace/resizable-table-overlay";
 import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
+import { buildPlaylistIntelligence } from "@/lib/playlist-intelligence";
 import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -605,10 +607,45 @@ export default function PlaylistEditor({
   }
 
   const isActivelyDragging = dragFrom !== null && dragTo !== null;
+  const intelligence = useMemo(
+    () => buildPlaylistIntelligence(
+      tracks.map((track, index) => {
+        const chartData = chartMap.get(track.id) ?? null;
+
+        return {
+          id: track.id,
+          name: track.name,
+          artists: track.artists,
+          imageUrl: track.imageUrl,
+          currentIndex: index,
+          popularity: track.popularity,
+          chartPosition: chartData?.position ?? null,
+          chartMovement: chartData?.movement ?? null,
+          chartPositionChange: chartData?.positionChange ?? null,
+          chartStreams: chartData?.streams ?? null,
+          dailyStreams: track.streams?.dailyStreams ?? null,
+          dailyDelta: track.streams?.dailyDelta ?? null,
+          streamTrend: track.streams?.trend ?? null,
+          streamsLoading: track.streamsLoading,
+          signalsLoading: chartLoading || track.streamsLoading,
+        };
+      }),
+    ),
+    [chartLoading, chartMap, tracks],
+  );
+  const decisionByTrackKey = useMemo(
+    () => new Map(intelligence.decisions.map((decision) => [decision.trackKey, decision])),
+    [intelligence.decisions],
+  );
+  const isIntelligenceEnriching = chartLoading || tracks.some((track) => track.streamsLoading);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+      <PlaylistIntelligencePanel
+        intelligence={intelligence}
+        isEnriching={isIntelligenceEnriching}
+      />
 
       {/* Barra de controles — legendas escondem em mobile */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -694,6 +731,7 @@ export default function PlaylistEditor({
               const isInsertTarget = isActivelyDragging && dragTo === index;
               const isDeleting = deletingIndices.has(index);
               const translateY = getTranslateY(index);
+              const decision = decisionByTrackKey.get(`${track.id}:${index}`);
 
               return (
                 <tr
@@ -762,6 +800,16 @@ export default function PlaylistEditor({
                         >
                           {track.artists}
                         </div>
+                        {decision && (
+                          <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                            <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                              {decision.label}
+                            </span>
+                            <span className="hidden truncate text-[10px] font-medium text-muted-foreground laptop:inline">
+                              sugerida #{decision.suggestedIndex + 1} | {decision.score}%
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
