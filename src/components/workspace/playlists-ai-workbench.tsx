@@ -82,9 +82,9 @@ type PlaylistCreation = {
 };
 
 type PlaylistsAiAgentResponse = {
-  action?: "clarifying_question" | "playlist_plan";
+  action?: "clarifying_question" | "playlist_brief" | "playlist_plan";
   message?: string;
-  mode?: "openai-agent" | "fallback" | "clarifying_question";
+  mode?: "openai-agent" | "fallback" | "clarifying_question" | "brief";
   questions?: string[];
   plan?: PlaylistPlan;
 };
@@ -181,6 +181,35 @@ function normalizeTrackKey(title: string, artist: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function normalizeChatText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasBriefInConversation(conversation: Array<{ role: ChatRole; content: string }>) {
+  return conversation.some((message) => {
+    if (message.role !== "assistant") return false;
+    const content = normalizeChatText(message.content);
+    return content.includes("brief da playlist") || content.includes("brand da playlist");
+  });
+}
+
+function isPlaylistGenerationConfirmation(prompt: string) {
+  const normalized = normalizeChatText(prompt);
+  if (/\b(nao|muda|ajusta|troca|sem|menos|mais|porem|mas|antes|prefiro)\b/.test(normalized)) {
+    return false;
+  }
+
+  return /\b(confirmo|confirmado|pode gerar|pode criar|pode mandar|gera|gerar|cria|criar|manda|fechado|fechou|bora|segue|sim|ok|okay|isso|ta bom|esta bom|ta certo|esta certo|perfeito)\b/.test(
+    normalized,
+  );
 }
 
 function dedupeTrackSuggestions(tracks: TrackSuggestion[]) {
@@ -490,6 +519,15 @@ async function buildAgentPlan(
     };
   }
 
+  if (body.action === "playlist_brief" || body.mode === "brief") {
+    return {
+      plan: null,
+      message:
+        body.message ??
+        "Montei o brief da playlist. Se estiver certo, confirma para eu pesquisar fundo e gerar a lista.",
+    };
+  }
+
   if (!body.plan) {
     throw new Error(body.message ?? "A Playlists IA nao retornou uma playlist.");
   }
@@ -562,7 +600,7 @@ function PlaylistPlanCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Blueprint de playlist
+              Lista sugerida
             </div>
             <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-foreground">
               {plan.title}
@@ -797,7 +835,7 @@ function MessageBubble({
       <div className={cn("max-w-[92%]", isUser ? "tablet:max-w-[74%]" : "tablet:max-w-[92%]")}>
         <div
           className={cn(
-            "rounded-[24px] border px-4 py-3 text-sm font-medium leading-6",
+            "whitespace-pre-line rounded-[24px] border px-4 py-3 text-sm font-medium leading-6",
             isUser
               ? "border-sky-400/30 bg-sky-400/[0.12] text-foreground dark:bg-sky-400/10"
               : "border-border/80 bg-background/[0.72] text-foreground dark:border-white/10 dark:bg-white/[0.035]",
@@ -864,7 +902,17 @@ export default function PlaylistsAiWorkbench({
           role: message.role,
           content: message.content,
         }));
+      const canUsePlanFallback =
+        hasBriefInConversation(conversation) && isPlaylistGenerationConfirmation(cleanPrompt);
       const result = await buildAgentPlan(cleanPrompt, conversation).catch(async () => {
+        if (!canUsePlanFallback) {
+          return {
+            plan: null,
+            message:
+              "Nao consegui acionar o agente agora. Me manda a vibe de novo ou confirma o brief quando ele aparecer, que eu gero a lista na etapa certa.",
+          };
+        }
+
         const fallback = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
         return {
           plan: fallback.plan,
@@ -972,10 +1020,10 @@ export default function PlaylistsAiWorkbench({
               Playlists IA
             </span>
             <h2 className="mt-5 text-4xl font-black tracking-[-0.06em] text-foreground">
-              Um chat para transformar ideia em playlist.
+              Um chat para lapidar a ideia antes de criar.
             </h2>
             <p className="mt-4 text-sm font-medium leading-6 text-muted-foreground">
-              O builder conversa com o agente, pesquisa com ChatGPT quando configurado, cruza Spotify API, TikTok/Kworb, charts internos e libera criacao privada apos revisao.
+              Primeiro ele monta o brief, espera tua confirmacao e so depois pesquisa fundo com ChatGPT, Spotify API, TikTok/Kworb e charts internos.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -1005,7 +1053,7 @@ export default function PlaylistsAiWorkbench({
                   Saida
                 </div>
                 <p className="mt-2 text-sm font-semibold text-foreground">
-                  Blueprint revisavel antes de criar no Spotify.
+                  Brief, lista sugerida e criacao privada no Spotify.
                 </p>
               </div>
             </div>
@@ -1065,7 +1113,7 @@ export default function PlaylistsAiWorkbench({
               </div>
               <div className="rounded-[24px] border border-border/80 bg-background/[0.72] px-4 py-3 text-sm font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.035]">
                 <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                montando blueprint...
+                alinhando brief e pesquisa...
               </div>
             </article>
           )}
@@ -1088,7 +1136,7 @@ export default function PlaylistsAiWorkbench({
               </p>
               <Button type="submit" disabled={!input.trim() || isThinking} className="rounded-full">
                 {isThinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Gerar blueprint
+                Enviar
               </Button>
             </div>
           </div>

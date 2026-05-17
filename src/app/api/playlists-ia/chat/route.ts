@@ -104,6 +104,11 @@ type CuratorIntent =
       questions: string[];
     }
   | {
+      action: "playlist_brief";
+      message: string;
+      questions: string[];
+    }
+  | {
       action: "playlist_plan";
       plan: PlaylistPlan;
     };
@@ -224,6 +229,11 @@ function buildClarifyingQuestions(prompt: string, conversation: ConversationMess
 
 function shouldAskForMoreContext(prompt: string, conversation: ConversationMessage[]) {
   const normalized = normalizeText(prompt);
+  const hasPriorBrief = hasPriorPlaylistBrief(conversation);
+  const confirmedBrief = hasPriorBrief && isPlaylistGenerationConfirmation(prompt);
+
+  if (confirmedBrief) return false;
+
   const hasPriorAssistantQuestion = conversation.some(
     (message) =>
       message.role === "assistant" &&
@@ -241,6 +251,135 @@ function shouldAskForMoreContext(prompt: string, conversation: ConversationMessa
   ].filter((pattern) => pattern.test(normalized)).length;
 
   return signals < 2 && normalized.split(" ").length < 10;
+}
+
+function hasPriorPlaylistBrief(conversation: ConversationMessage[]) {
+  return conversation.some((message) => {
+    if (message.role !== "assistant") return false;
+    const content = normalizeText(message.content);
+    return content.includes("brief da playlist") || content.includes("brand da playlist");
+  });
+}
+
+function isPlaylistGenerationConfirmation(prompt: string) {
+  const normalized = normalizeText(prompt);
+  if (!normalized) return false;
+
+  const revisionSignals = /\b(nao|muda|ajusta|troca|sem|menos|mais|porem|mas|antes|prefiro)\b/;
+  if (revisionSignals.test(normalized)) return false;
+
+  return /\b(confirmo|confirmado|pode gerar|pode criar|pode mandar|gera|gerar|cria|criar|manda|fechado|fechou|bora|segue|sim|ok|okay|isso|ta bom|esta bom|ta certo|esta certo|perfeito)\b/.test(
+    normalized,
+  );
+}
+
+function inferBriefValue(
+  context: string,
+  matches: Array<[RegExp, string]>,
+  fallback: string,
+) {
+  return matches.find(([pattern]) => pattern.test(context))?.[1] ?? fallback;
+}
+
+function buildPlaylistBriefResponse(prompt: string, conversation: ConversationMessage[]) {
+  const context = normalizeText(
+    [...conversation.map((message) => message.content), prompt].join(" "),
+  );
+  const lastUserContext = [
+    ...conversation.filter((message) => message.role === "user").map((message) => message.content),
+    prompt,
+  ]
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const genre = inferBriefValue(
+    context,
+    [
+      [/\bfunk|baile|mandela\b/, "funk/baile com leitura viral"],
+      [/\btrap|rap|plug|drill\b/, "trap/rap BR moderno"],
+      [/\bsertanejo|sofrencia\b/, "sertanejo/pop romantico"],
+      [/\bpagode|samba\b/, "pagode/samba popular"],
+      [/\bpop\b/, "pop brasileiro atual"],
+      [/\beletronica|house|edm|phonk\b/, "eletronica/club"],
+    ],
+    "hits brasileiros com curadoria de demanda real",
+  );
+  const useCase = inferBriefValue(
+    context,
+    [
+      [/\bfesta|balada|baile|churrasco\b/, "festa e descoberta rapida"],
+      [/\btreino|academia|corrida\b/, "treino sem queda de energia"],
+      [/\bcarro|viagem|estrada\b/, "carro/viagem com alto replay"],
+      [/\bbar|loja|ambiente\b/, "ambiente comercial com skip baixo"],
+      [/\bromantica|romance|love|sofrencia\b/, "clima afetivo e cantavel"],
+      [/\bviral|tiktok|reels|shorts\b/, "radar viral para crescimento"],
+    ],
+    "playlist editorial para crescer no Spotify",
+  );
+  const energy = inferBriefValue(
+    context,
+    [
+      [/\bpesada|agressiva|energia alta|pique|explodir\b/, "alta, direta e com picos fortes"],
+      [/\bdancante|dançante|festa|baile\b/, "dancante, quente e facil de entrar"],
+      [/\bcalma|leve|relax|melodica\b/, "mais leve, melodica e sustentada"],
+      [/\bcrescente|subindo|progressiva\b/, "crescente, com blocos bem marcados"],
+    ],
+    "media-alta, com abertura forte e meio consistente",
+  );
+  const era = inferBriefValue(
+    context,
+    [
+      [/\bclassico|antigo|nostalgia|2000|2010|anos\b/, "mistura de catalogo forte com faixas atuais"],
+      [/\batual|novo|novidade|2026|2025|viral|reels|tiktok|shorts\b/, "foco em sinais atuais e virais"],
+    ],
+    "atual, mas sem ignorar catalogo quando fizer sentido",
+  );
+  const size = inferBriefValue(
+    context,
+    [
+      [/\b(100|cem)\b/, "100 faixas"],
+      [/\b(80|oitenta)\b/, "80 faixas"],
+      [/\b(60|sessenta)\b/, "60 faixas"],
+      [/\b(50|cinquenta)\b/, "50 faixas"],
+      [/\b(30|trinta)\b/, "30 faixas"],
+    ],
+    "50 a 60 faixas",
+  );
+
+  const questions = [
+    "Se esse brief estiver certo, responde: confirmo, pode gerar.",
+    "Se quiser ajustar, manda o ajuste em uma frase.",
+  ];
+  const message = [
+    "Brief da playlist",
+    `Brand: ${genre}.`,
+    `Uso: ${useCase}.`,
+    `Energia: ${energy}.`,
+    `Recorte: ${era}.`,
+    `Tamanho alvo: ${size}.`,
+    "Pesquisa apos confirmar: TikTok, Reels, Shorts, Spotify/Viral charts, noticias musicais e dados internos do sistema.",
+    lastUserContext ? `Base do pedido: ${lastUserContext.slice(0, 220)}${lastUserContext.length > 220 ? "..." : ""}` : null,
+    "",
+    ...questions,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  return {
+    action: "playlist_brief" as const,
+    message,
+    questions,
+  };
+}
+
+function buildPlanningPrompt(prompt: string, conversation: ConversationMessage[]) {
+  const context = conversation
+    .map((message) => `${message.role === "user" ? "Usuario" : "Assistente"}: ${message.content}`)
+    .join("\n")
+    .slice(-5000);
+
+  return [context, `Confirmacao do usuario: ${prompt}`].filter(Boolean).join("\n\n");
 }
 
 function getMovementBoost(status: CandidateTrack["chartMovement"]) {
@@ -505,8 +644,9 @@ ${researchQueries.map((query) => `  - ${query}`).join("\n")}
 - Nao dependa apenas dos dados internos. Use dados internos para resolver IDs do Spotify e dados externos para confirmar hype/momentum.
 
 Regra de conversa:
-- Se o pedido ainda estiver vago ou faltar vibe/momento/publico/energia, NAO monte playlist ainda. Faça 2 ou 3 perguntas diretas.
-- Se ja houver contexto suficiente no pedido ou no historico, monte a playlist.
+- Esta chamada so deve acontecer depois que o usuario confirmou o brief/brand da playlist.
+- Se mesmo assim faltar algum ponto critico para nao inventar, NAO monte playlist ainda. Faça 2 ou 3 perguntas diretas.
+- Se houver brief confirmado no historico, monte a playlist final com pesquisa profunda.
 
 Regras:
 - Priorize faixas da lista de candidatas quando for criar tracks, porque elas tem ID oficial do Spotify.
@@ -521,6 +661,13 @@ Formato obrigatorio se precisar perguntar:
   "action": "clarifying_question",
   "message": "Pra eu acertar a vibe real antes de criar...",
   "questions": ["pergunta curta"]
+}
+
+Formato reservado para etapa anterior, se for necessario devolver brief:
+{
+  "action": "playlist_brief",
+  "message": "Brief da playlist...",
+  "questions": ["confirmar ou ajustar"]
 }
 
 Formato obrigatorio se for montar playlist:
@@ -978,6 +1125,25 @@ function parseCuratorIntent(
     };
   }
 
+  if (modelJson.action === "playlist_brief") {
+    const questions = Array.isArray(modelJson.questions)
+      ? modelJson.questions
+          .map((question) => (typeof question === "string" ? question.trim() : ""))
+          .filter(Boolean)
+          .slice(0, 3)
+      : ["Confirma o brief ou quer ajustar algum ponto?"];
+    const message = asString(
+      modelJson.message,
+      buildPlaylistBriefResponse(prompt, []).message,
+    );
+
+    return {
+      action: "playlist_brief",
+      message,
+      questions,
+    };
+  }
+
   return {
     action: "playlist_plan",
     plan: buildModelPlan({
@@ -1001,10 +1167,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "prompt e obrigatorio." }, { status: 400 });
     }
 
-    if (shouldAskForMoreContext(prompt, conversation)) {
+    const hasBrief = hasPriorPlaylistBrief(conversation);
+    const confirmedBrief = hasBrief && isPlaylistGenerationConfirmation(prompt);
+    const planningPrompt = confirmedBrief ? buildPlanningPrompt(prompt, conversation) : prompt;
+
+    if (!confirmedBrief && shouldAskForMoreContext(prompt, conversation)) {
       return NextResponse.json({
         mode: "clarifying_question",
         ...buildClarifyingResponse(prompt, conversation),
+      });
+    }
+
+    if (!confirmedBrief) {
+      return NextResponse.json({
+        mode: "brief",
+        ...buildPlaylistBriefResponse(prompt, conversation),
       });
     }
 
@@ -1015,7 +1192,7 @@ export async function POST(request: Request) {
       accountPlaylistsResult,
       userTopResult,
     ] = await Promise.allSettled([
-      getSpotifySearchCandidates(prompt),
+      getSpotifySearchCandidates(planningPrompt),
       getChartCandidates(),
       getTikTokCandidates(),
       fetchSpotifyAccountPlaylists(),
@@ -1061,7 +1238,7 @@ export async function POST(request: Request) {
     try {
       const aiResult = await runOpenAICurator(
         buildOpenAIInput({
-          prompt,
+          prompt: planningPrompt,
           conversation,
           candidates,
           playlistNames: accountPlaylists.map((playlist) => playlist.name),
@@ -1071,7 +1248,7 @@ export async function POST(request: Request) {
       );
 
       if (aiResult) {
-        if (aiResult.json.action !== "clarifying_question") {
+        if (aiResult.json.action !== "clarifying_question" && aiResult.json.action !== "playlist_brief") {
           const externallyResolvedTracks = await resolveModelTracksWithSpotify(aiResult.json);
           if (externallyResolvedTracks.length > 0) {
             candidates = mergeCandidates([candidates, externallyResolvedTracks]);
@@ -1079,7 +1256,7 @@ export async function POST(request: Request) {
         }
 
         const intent = parseCuratorIntent(
-          prompt,
+          planningPrompt,
           aiResult.json,
           candidates,
           aiResult.sources,
@@ -1096,13 +1273,24 @@ export async function POST(request: Request) {
           return response;
         }
 
+        if (intent.action === "playlist_brief") {
+          const response = NextResponse.json({
+            mode: "openai-agent",
+            action: intent.action,
+            message: intent.message,
+            questions: intent.questions,
+          });
+          if (refreshedToken) setSpotifyAuthCookies(response, refreshedToken);
+          return response;
+        }
+
         plan = intent.plan;
         mode = "openai-agent";
         message =
-          "Pesquisei em fontes externas com ChatGPT e cruzei com Spotify API, charts internos, TikTok/Kworb e teu contexto de conta.";
+          "Brief confirmado. Pesquisei em fontes externas com ChatGPT e cruzei com Spotify API, charts internos, TikTok/Kworb e teu contexto de conta. Revisa a lista e, se fizer sentido, cria no Spotify.";
       } else {
         plan = buildFallbackPlan(
-          prompt,
+          planningPrompt,
           candidates,
           "ChatGPT ainda nao configurado. Usei ranking interno com Spotify API, charts e TikTok/Kworb.",
         );
@@ -1112,7 +1300,7 @@ export async function POST(request: Request) {
       }
     } catch (error) {
       plan = buildFallbackPlan(
-        prompt,
+        planningPrompt,
         candidates,
         error instanceof Error
           ? `OpenAI indisponivel agora: ${error.message}`
