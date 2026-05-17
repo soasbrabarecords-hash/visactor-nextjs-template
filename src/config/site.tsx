@@ -4,6 +4,7 @@ import {
   ListMusic,
   Library,
   BarChart2,
+  Bot,
   Flame,
   Settings2,
   type LucideIcon,
@@ -36,6 +37,11 @@ export const navigations: Navigation[] = [
     icon: Compass,
     name: "Playlists",
     href: "/curadoria",
+  },
+  {
+    icon: Bot,
+    name: "Playlists IA",
+    href: "/playlists-ia",
   },
   {
     icon: BarChart2,

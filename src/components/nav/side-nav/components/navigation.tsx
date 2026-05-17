@@ -32,6 +32,10 @@ export default function Navigation() {
       return pathname === "/curadoria";
     }
 
+    if (href === "/playlists-ia") {
+      return pathname === "/playlists-ia" || pathname.startsWith("/playlists-ia/");
+    }
+
     if (href === "/novidades") {
       return pathname === "/novidades";
     }
