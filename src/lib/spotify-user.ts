@@ -1677,12 +1677,17 @@ export async function createSpotifyPlaylist(
   description: string,
   isPublic: boolean,
   base64CoverJpeg: string | null,
+  trackUris: string[] = [],
 ): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
   const { data: playlistId, refreshedToken } = await withSpotifyToken(async (token) => {
     const user = await fetchSpotifyCurrentUserWithToken(token);
     const id = await createPlaylistWithToken(token, user.id ?? "", name, description, isPublic);
     if (base64CoverJpeg) {
       await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
+    }
+    const uniqueTrackUris = Array.from(new Set(trackUris));
+    if (uniqueTrackUris.length > 0) {
+      await replacePlaylistTracksWithToken(token, id, uniqueTrackUris);
     }
     clearSpotifyReadCachesForToken(token);
     return id;

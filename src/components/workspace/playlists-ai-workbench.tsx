@@ -6,6 +6,7 @@ import {
   Bot,
   CheckCircle2,
   Disc3,
+  ExternalLink,
   ListMusic,
   Loader2,
   MessageSquareText,
@@ -34,6 +35,7 @@ type TrackSuggestion = {
 };
 
 type PlaylistPlan = {
+  id: string;
   title: string;
   subtitle: string;
   targetSize: number;
@@ -46,6 +48,9 @@ type PlaylistPlan = {
   strategy: string[];
   tracks: TrackSuggestion[];
   nextSteps: string[];
+  spotifyResolvedCount: number;
+  chartResolvedCount: number;
+  dataSource: "spotify-api" | "charts-fallback" | "local-fallback";
 };
 
 type ChatMessage = {
@@ -53,6 +58,22 @@ type ChatMessage = {
   role: ChatRole;
   content: string;
   plan?: PlaylistPlan;
+};
+
+type SpotifySearchTrack = {
+  id: string;
+  name: string;
+  artists: string;
+  albumName: string;
+  imageUrl: string | null;
+  durationLabel: string;
+  spotifyUrl: string;
+  popularity: number;
+};
+
+type PlaylistCreation = {
+  playlistId: string;
+  playlistUrl: string;
 };
 
 export type PlaylistsAiChartTrack = {
@@ -136,6 +157,66 @@ function compactStreams(streams: number | null) {
   return `${streams}`;
 }
 
+function clampScore(value: number, min = 35, max = 98) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeTrackKey(title: string, artist: string) {
+  return `${title}::${artist}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function dedupeTrackSuggestions(tracks: TrackSuggestion[]) {
+  const seen = new Set<string>();
+
+  return tracks.filter((track) => {
+    const key = track.spotifyTrackId
+      ? `spotify:${track.spotifyTrackId}`
+      : normalizeTrackKey(track.title, track.artist);
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getSpotifySearchQueries(prompt: string, mood: string) {
+  const cleanPrompt = prompt
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  const moodQuery = {
+    funk: "funk brasil hits atuais 2026",
+    romantica: "romanticas brasil pop sertanejo classicos",
+    treino: "trap funk treino energia brasil",
+    trap: "trap brasil rap hits atuais 2026",
+  }[mood] ?? "hits brasil atuais";
+  const intentQuery = /viral|tiktok|reels|bomb/i.test(prompt)
+    ? "viral brasil tiktok reels spotify"
+    : "spotify brasil top tracks";
+
+  return Array.from(new Set([cleanPrompt, moodQuery, intentQuery].filter(Boolean))).slice(0, 3);
+}
+
+async function fetchSpotifySearchTracks(query: string, limit = 8) {
+  const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(body.message ?? "Falha ao pesquisar no Spotify.");
+  }
+
+  const body = (await response.json()) as { tracks?: SpotifySearchTrack[] };
+  return body.tracks ?? [];
+}
+
 function getMoodKeywords(mood: string) {
   if (mood === "funk") return ["mc", "dj", "funk", "baile", "mandela", "set"];
   if (mood === "romantica") return ["amor", "love", "saudade", "volta", "coracao", "sentimento"];
@@ -166,12 +247,32 @@ function chartToSuggestion(track: PlaylistsAiChartTrack, mood: string): TrackSug
     artist: track.artist,
     imageUrl: track.imageUrl,
     source: "Spotify",
-    energy: Math.max(35, Math.min(98, baseEnergy + rankBoost + movementBoost)),
+    energy: clampScore(baseEnergy + rankBoost + movementBoost),
     reason: `#${track.position} no Spotify Charts BR, ${movement}${streamLabel ? `, ${streamLabel} streams` : ""}.`,
     chartPosition: track.position,
     movement: track.status,
     spotifyTrackId: track.spotifyTrackId,
     streams: track.streams,
+  };
+}
+
+function spotifySearchToSuggestion(
+  track: SpotifySearchTrack,
+  mood: string,
+  query: string,
+): TrackSuggestion {
+  const moodEnergy = mood === "romantica" ? 46 : mood === "treino" ? 88 : mood === "funk" ? 90 : 84;
+  const popularityBoost = Math.round((track.popularity - 50) / 3);
+
+  return {
+    id: `spotify-api-${track.id}`,
+    title: track.name,
+    artist: track.artists || "Artista nao identificado",
+    imageUrl: track.imageUrl,
+    source: "Spotify",
+    energy: clampScore(moodEnergy + popularityBoost),
+    reason: `Encontrada pela Spotify API em "${query}", popularidade ${track.popularity}/100.`,
+    spotifyTrackId: track.id,
   };
 }
 
@@ -198,11 +299,11 @@ function buildPlaylistPlan(
   const mood = inferMood(prompt);
   const fallbackTracks = catalogTracks[mood] ?? catalogTracks.trap;
   const realTracks = getRealTrackSuggestions(prompt, chartTracks, mood);
-  const seen = new Set(realTracks.map((track) => `${track.title}::${track.artist}`.toLowerCase()));
-  const tracks = [
+  const seen = new Set(realTracks.map((track) => normalizeTrackKey(track.title, track.artist)));
+  const tracks = dedupeTrackSuggestions([
     ...realTracks,
-    ...fallbackTracks.filter((track) => !seen.has(`${track.title}::${track.artist}`.toLowerCase())),
-  ].slice(0, 8);
+    ...fallbackTracks.filter((track) => !seen.has(normalizeTrackKey(track.title, track.artist))),
+  ]).slice(0, 8);
   const wantsClassic = /classico|antigo|anos|2000|2010/i.test(prompt);
   const wantsViral = /viral|tiktok|reels|bomb/i.test(prompt);
   const wantsCurrent = /atual|novo|2026|moderno|charts/i.test(prompt);
@@ -220,6 +321,7 @@ function buildPlaylistPlan(
   }
 
   return {
+    id: newId("plan"),
     title:
       mood === "funk"
         ? "Baile em Alta"
@@ -247,7 +349,117 @@ function buildPlaylistPlan(
       "Escolher capa, nome e tamanho final da playlist.",
       "Criar no Spotify apenas depois de revisar a lista.",
     ],
+    spotifyResolvedCount: tracks.filter((track) => Boolean(track.spotifyTrackId)).length,
+    chartResolvedCount: realTracks.length,
+    dataSource: hasRealCharts ? "charts-fallback" : "local-fallback",
   };
+}
+
+async function buildSpotifyBackedPlan(
+  prompt: string,
+  chartTracks: PlaylistsAiChartTrack[],
+  chartDate: string | null,
+) {
+  const mood = inferMood(prompt);
+  const basePlan = buildPlaylistPlan(prompt, chartTracks, chartDate);
+  const queries = getSpotifySearchQueries(prompt, mood);
+
+  try {
+    const settledBatches = await Promise.allSettled(
+      queries.map(async (query) => ({
+        query,
+        tracks: await fetchSpotifySearchTracks(query, 8),
+      })),
+    );
+    const batches = settledBatches.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
+
+    if (batches.length === 0) {
+      const firstError = settledBatches.find(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      throw new Error(
+        firstError?.reason instanceof Error
+          ? firstError.reason.message
+          : "Falha ao usar a Spotify API.",
+      );
+    }
+
+    const spotifySuggestions = dedupeTrackSuggestions(
+      batches.flatMap((batch) =>
+        batch.tracks.map((track) => spotifySearchToSuggestion(track, mood, batch.query)),
+      ),
+    ).slice(0, 10);
+
+    if (spotifySuggestions.length === 0) {
+      return {
+        plan: basePlan,
+        usedSpotifyApi: false,
+        error: "A Spotify API nao retornou faixas para esse pedido.",
+      };
+    }
+
+    const fallbackTracks = catalogTracks[mood] ?? catalogTracks.trap;
+    const realTracks = getRealTrackSuggestions(prompt, chartTracks, mood);
+    const tracks = dedupeTrackSuggestions([
+      ...spotifySuggestions,
+      ...realTracks,
+      ...fallbackTracks,
+    ]).slice(0, 12);
+    const spotifyResolvedCount = tracks.filter((track) => Boolean(track.spotifyTrackId)).length;
+    const chartResolvedCount = tracks.filter((track) => Boolean(track.chartPosition)).length;
+    const spotifyBlend = Math.min(72, Math.max(basePlan.marketBlend.spotify, 64));
+    const catalogBlend = Math.max(8, Math.min(24, basePlan.marketBlend.catalog));
+    const tiktokBlend = Math.max(8, 100 - spotifyBlend - catalogBlend);
+
+    return {
+      plan: {
+        ...basePlan,
+        confidence: Math.min(96, Math.max(basePlan.confidence, 90 + Math.min(spotifyResolvedCount, 6))),
+        marketBlend: {
+          spotify: spotifyBlend,
+          tiktok: tiktokBlend,
+          catalog: catalogBlend,
+        },
+        strategy: [
+          "Pesquisar faixas oficiais pela Spotify API a partir do pedido do chat.",
+          chartTracks.length > 0
+            ? `Cruzar com Spotify Charts BR${chartDate ? ` de ${chartDate}` : ""} para priorizar demanda real.`
+            : "Usar catalogo e curadoria como fallback se nao houver snapshot importado.",
+          "Deduplicar por ID oficial e ordenar por aderencia, popularidade e energia.",
+        ],
+        tracks,
+        nextSteps: [
+          `${spotifyResolvedCount} faixas tem ID oficial para criacao direta no Spotify.`,
+          "Revisar capa, nome e tamanho antes de publicar.",
+          "Criar como playlist privada e depois ajustar no editor do sistema.",
+        ],
+        spotifyResolvedCount,
+        chartResolvedCount,
+        dataSource: "spotify-api" as const,
+      },
+      usedSpotifyApi: true,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      plan: basePlan,
+      usedSpotifyApi: false,
+      error: error instanceof Error ? error.message : "Falha ao usar a Spotify API.",
+    };
+  }
+}
+
+function getSpotifyTrackUris(plan: PlaylistPlan) {
+  return Array.from(
+    new Set(
+      plan.tracks
+        .map((track) => track.spotifyTrackId)
+        .filter((id): id is string => Boolean(id))
+        .map((id) => `spotify:track:${id}`),
+    ),
+  );
 }
 
 function SourceBadge({ source }: { source: TrackSuggestion["source"] }) {
@@ -275,7 +487,22 @@ function coverStyle(imageUrl: string | null) {
   };
 }
 
-function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
+function PlaylistPlanCard({
+  plan,
+  creation,
+  creationError,
+  isCreating,
+  onCreatePlaylist,
+}: {
+  plan: PlaylistPlan;
+  creation?: PlaylistCreation;
+  creationError?: string;
+  isCreating: boolean;
+  onCreatePlaylist: (plan: PlaylistPlan) => void;
+}) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const spotifyTrackUris = getSpotifyTrackUris(plan);
+
   return (
     <section className="mt-4 overflow-hidden rounded-[28px] border border-border/80 bg-background/[0.72] shadow-[0_20px_70px_-48px_rgba(15,23,42,0.55)] dark:border-white/10 dark:bg-white/[0.035]">
       <div className="border-b border-border/70 p-4 dark:border-white/10 tablet:p-5">
@@ -296,6 +523,9 @@ function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
               Confianca
             </div>
             <div className="text-2xl font-black tabular-nums text-foreground">{plan.confidence}%</div>
+            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700/80 dark:text-emerald-200/80">
+              {plan.spotifyResolvedCount} ids oficiais
+            </div>
           </div>
         </div>
 
@@ -384,9 +614,76 @@ function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
                 </p>
               ))}
             </div>
-            <Button type="button" size="sm" disabled className="mt-4 w-full rounded-full">
-              Criar no Spotify em breve
-            </Button>
+            <div className="mt-4 space-y-2">
+              {creation ? (
+                <div className="rounded-[18px] border border-emerald-400/30 bg-emerald-400/10 p-3">
+                  <p className="text-xs font-black text-emerald-700 dark:text-emerald-200">
+                    Playlist criada no Spotify.
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    <a
+                      href={creation.playlistUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-400/15 dark:text-emerald-200"
+                    >
+                      Abrir no Spotify
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                </div>
+              ) : null}
+
+              {creationError ? (
+                <p className="rounded-[16px] border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs font-bold text-red-700 dark:text-red-200">
+                  {creationError}
+                </p>
+              ) : null}
+
+              {!creation && isConfirming ? (
+                <div className="grid gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isCreating}
+                    onClick={() => onCreatePlaylist(plan)}
+                    className="w-full rounded-full"
+                  >
+                    {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                    Confirmar criacao privada
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isCreating}
+                    onClick={() => setIsConfirming(false)}
+                    className="w-full rounded-full"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              ) : null}
+
+              {!creation && !isConfirming ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={spotifyTrackUris.length === 0 || isCreating}
+                  onClick={() => setIsConfirming(true)}
+                  className="w-full rounded-full"
+                >
+                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                  Criar no Spotify
+                </Button>
+              ) : null}
+
+              <p className="text-[11px] font-medium leading-4 text-muted-foreground">
+                {spotifyTrackUris.length > 0
+                  ? `${spotifyTrackUris.length} faixas prontas para envio. Cria privada por seguranca.`
+                  : "Gere com Spotify API para liberar criacao direta."}
+              </p>
+            </div>
           </div>
         </aside>
       </div>
@@ -394,7 +691,19 @@ function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  createdPlaylists,
+  creationErrors,
+  creatingPlanId,
+  onCreatePlaylist,
+}: {
+  message: ChatMessage;
+  createdPlaylists: Record<string, PlaylistCreation>;
+  creationErrors: Record<string, string>;
+  creatingPlanId: string | null;
+  onCreatePlaylist: (plan: PlaylistPlan) => void;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -415,7 +724,15 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         >
           {message.content}
         </div>
-        {message.plan ? <PlaylistPlanCard plan={message.plan} /> : null}
+        {message.plan ? (
+          <PlaylistPlanCard
+            plan={message.plan}
+            creation={createdPlaylists[message.plan.id]}
+            creationError={creationErrors[message.plan.id]}
+            isCreating={creatingPlanId === message.plan.id}
+            onCreatePlaylist={onCreatePlaylist}
+          />
+        ) : null}
       </div>
     </article>
   );
@@ -435,14 +752,17 @@ export default function PlaylistsAiWorkbench({
       role: "assistant",
       content:
         hasChartData
-          ? `Estou lendo ${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}. Me fala a vibe, genero, energia e objetivo.`
-          : "Me fala a vibe, genero, ano, energia e objetivo. Eu monto um blueprint de playlist pronto para revisar.",
+          ? `Estou pronto para buscar na Spotify API e cruzar com ${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}. Me fala a vibe, genero, energia e objetivo.`
+          : "Estou pronto para buscar na Spotify API. Me fala a vibe, genero, ano, energia e objetivo.",
     },
   ]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [creatingPlanId, setCreatingPlanId] = useState<string | null>(null);
+  const [createdPlaylists, setCreatedPlaylists] = useState<Record<string, PlaylistCreation>>({});
+  const [creationErrors, setCreationErrors] = useState<Record<string, string>>({});
 
-  function submitPrompt(prompt: string) {
+  async function submitPrompt(prompt: string) {
     const cleanPrompt = prompt.trim();
     if (!cleanPrompt || isThinking) return;
 
@@ -456,29 +776,95 @@ export default function PlaylistsAiWorkbench({
     setInput("");
     setIsThinking(true);
 
-    window.setTimeout(() => {
+    try {
+      const result = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
       startTransition(() => {
-        const plan = buildPlaylistPlan(cleanPrompt, chartTracks, chartDate);
         setMessages((current) => [
           ...current,
           {
             id: newId("assistant"),
             role: "assistant",
             content:
-              hasChartData
-                ? "Fechei uma primeira versao usando os dados reais do Spotify Charts que ja estao no sistema. Ainda nao cria no Spotify sem revisao."
-                : "Fechei uma primeira versao segura com fallback local. Quando houver snapshot, eu troco para dados reais do chart.",
-            plan,
+              result.usedSpotifyApi
+                ? "Agora sim: montei usando Spotify API como fonte principal, com charts internos como reforco de demanda."
+                : `A Spotify API nao respondeu agora${result.error ? ` (${result.error})` : ""}. Montei uma versao segura com charts/fallback para nao travar o fluxo.`,
+            plan: result.plan,
           },
         ]);
         setIsThinking(false);
       });
-    }, 520);
+    } catch (error) {
+      startTransition(() => {
+        setMessages((current) => [
+          ...current,
+          {
+            id: newId("assistant"),
+            role: "assistant",
+            content:
+              error instanceof Error
+                ? `Nao consegui montar agora: ${error.message}`
+                : "Nao consegui montar agora. Tenta de novo em instantes.",
+          },
+        ]);
+        setIsThinking(false);
+      });
+    }
+  }
+
+  async function createPlaylistFromPlan(plan: PlaylistPlan) {
+    const trackUris = getSpotifyTrackUris(plan);
+    if (trackUris.length === 0 || creatingPlanId) return;
+
+    setCreatingPlanId(plan.id);
+    setCreationErrors((current) => {
+      const next = { ...current };
+      delete next[plan.id];
+      return next;
+    });
+
+    try {
+      const response = await fetch("/api/spotify/playlists/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: plan.title,
+          description: `Criada pela Playlists IA. Pedido: ${plan.subtitle}`.slice(0, 300),
+          isPublic: false,
+          trackUris,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        playlistId?: string;
+        playlistUrl?: string;
+        message?: string;
+      };
+
+      if (!response.ok || !body.playlistId) {
+        throw new Error(body.message ?? "Erro ao criar playlist no Spotify.");
+      }
+
+      const playlistId = body.playlistId;
+      const playlistUrl = body.playlistUrl ?? `https://open.spotify.com/playlist/${playlistId}`;
+      setCreatedPlaylists((current) => ({
+        ...current,
+        [plan.id]: {
+          playlistId,
+          playlistUrl,
+        },
+      }));
+    } catch (error) {
+      setCreationErrors((current) => ({
+        ...current,
+        [plan.id]: error instanceof Error ? error.message : "Erro ao criar playlist no Spotify.",
+      }));
+    } finally {
+      setCreatingPlanId(null);
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    submitPrompt(input);
+    void submitPrompt(input);
   }
 
   return (
@@ -496,7 +882,7 @@ export default function PlaylistsAiWorkbench({
               Um chat para transformar ideia em playlist.
             </h2>
             <p className="mt-4 text-sm font-medium leading-6 text-muted-foreground">
-              Agora o builder ja usa snapshots reais do Spotify Charts quando eles existem. A IA externa e a criacao no Spotify entram depois, com revisao.
+              O builder busca faixas oficiais na Spotify API, cruza com seus snapshots de charts e libera criacao privada no Spotify apos revisao.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -516,8 +902,8 @@ export default function PlaylistsAiWorkbench({
                 </div>
                 <p className="mt-2 text-sm font-semibold text-foreground">
                   {hasChartData
-                    ? `${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}.`
-                    : "Spotify, TikTok/Reels, catalogo e curadoria."}
+                    ? `Spotify API + ${chartTracks.length} faixas do Charts BR${chartDate ? ` (${chartDate})` : ""}.`
+                    : "Spotify API + catalogo e curadoria."}
                 </p>
               </div>
               <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
@@ -540,7 +926,7 @@ export default function PlaylistsAiWorkbench({
               <button
                 key={preset}
                 type="button"
-                onClick={() => submitPrompt(preset)}
+                onClick={() => void submitPrompt(preset)}
                 disabled={isThinking}
                 className="w-full rounded-[18px] border border-border/70 bg-background/[0.62] px-3 py-3 text-left text-xs font-semibold leading-5 text-muted-foreground transition hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground disabled:opacity-60 dark:border-white/10 dark:bg-black/20"
               >
@@ -563,14 +949,21 @@ export default function PlaylistsAiWorkbench({
               </h3>
             </div>
             <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
-              {hasChartData ? "charts reais" : "fallback seguro"}
+              {hasChartData ? "spotify api + charts" : "spotify api"}
             </span>
           </div>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-4 tablet:p-5">
           {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble
+              key={message.id}
+              message={message}
+              createdPlaylists={createdPlaylists}
+              creationErrors={creationErrors}
+              creatingPlanId={creatingPlanId}
+              onCreatePlaylist={createPlaylistFromPlan}
+            />
           ))}
           {isThinking && (
             <article className="flex gap-3">
@@ -597,8 +990,8 @@ export default function PlaylistsAiWorkbench({
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-2 py-2 dark:border-white/10">
               <p className="text-xs font-medium text-muted-foreground">
                 {hasChartData
-                  ? "Usando dados internos. Ainda nao chama IA externa."
-                  : "Nesta fase ainda nao chama API externa."}
+                  ? "Spotify API + charts internos. IA externa ainda nao entra."
+                  : "Spotify API com fallback local se a conexao falhar."}
               </p>
               <Button type="submit" disabled={!input.trim() || isThinking} className="rounded-full">
                 {isThinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

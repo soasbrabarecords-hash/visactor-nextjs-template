@@ -9,7 +9,21 @@ type CreatePlaylistBody = {
   description?: unknown;
   isPublic?: unknown;
   coverBase64?: unknown;
+  trackUris?: unknown;
 };
+
+function parseTrackUris(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value.filter(
+        (uri): uri is string =>
+          typeof uri === "string" && /^spotify:track:[A-Za-z0-9]+$/.test(uri),
+      ),
+    ),
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +33,7 @@ export async function POST(request: Request) {
     const description = typeof body.description === "string" ? body.description.trim() : "";
     const isPublic = body.isPublic !== false;
     const coverBase64 = typeof body.coverBase64 === "string" ? body.coverBase64 : null;
+    const trackUris = parseTrackUris(body.trackUris);
 
     if (!name) {
       return NextResponse.json({ message: "name é obrigatório." }, { status: 400 });
@@ -29,9 +44,14 @@ export async function POST(request: Request) {
       description,
       isPublic,
       coverBase64,
+      trackUris,
     );
 
-    const res = NextResponse.json({ playlistId });
+    const res = NextResponse.json({
+      playlistId,
+      playlistUrl: `https://open.spotify.com/playlist/${playlistId}`,
+      trackCount: trackUris.length,
+    });
     if (refreshedToken) setSpotifyAuthCookies(res, refreshedToken);
     return res;
   } catch (error) {
