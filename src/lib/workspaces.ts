@@ -66,6 +66,12 @@ export type WorkspaceContext = {
     providerAccountLabel: string | null;
     grantedScopes: string | null;
   };
+  openaiIntegration: {
+    appMode: WorkspaceIntegrationRow["app_mode"];
+    connectionStatus: WorkspaceIntegrationRow["connection_status"];
+    model: string | null;
+    hasApiKey: boolean;
+  };
 };
 
 export type WorkspaceSpotifyIntegrationInput = {
@@ -83,9 +89,22 @@ export type WorkspaceSettingsInput = {
   prioritizeTopTracks: boolean;
 };
 
+export type WorkspaceOpenAIIntegrationInput = {
+  appMode: "global_app" | "workspace_app";
+  apiKey?: string | null;
+  model?: string | null;
+};
+
 export type EffectiveSpotifyCredentials = {
   clientId: string;
   clientSecret: string;
+  source: "global_app" | "workspace_app";
+  workspaceId: string | null;
+};
+
+export type EffectiveOpenAICredentials = {
+  apiKey: string;
+  model: string;
   source: "global_app" | "workspace_app";
   workspaceId: string | null;
 };
@@ -118,6 +137,13 @@ const DEFAULT_SPOTIFY_INTEGRATION = {
   providerAccountId: null,
   providerAccountLabel: null,
   grantedScopes: null,
+} as const;
+
+const DEFAULT_OPENAI_INTEGRATION = {
+  appMode: "global_app",
+  connectionStatus: "not_connected",
+  model: null,
+  hasApiKey: false,
 } as const;
 
 type WorkspaceDbClient =
@@ -191,18 +217,37 @@ async function ensureWorkspaceDefaults(workspaceId: string) {
         },
         { onConflict: "workspace_id,provider" },
       ),
+      client.from("workspace_integrations").upsert(
+        {
+          workspace_id: workspaceId,
+          provider: "openai",
+          app_mode: "global_app",
+          connection_status: "not_connected",
+        },
+        { onConflict: "workspace_id,provider" },
+      ),
     ]);
 
-  const [{ error: settingsError }, { error: integrationError }] =
+  const [
+    { error: settingsError },
+    { error: spotifyIntegrationError },
+    { error: openaiIntegrationError },
+  ] =
     await runUpserts(supabase);
 
   if (settingsError) {
     throw new Error(`ensureWorkspaceDefaults(settings): ${settingsError.message}`);
   }
 
-  if (integrationError) {
+  if (spotifyIntegrationError) {
     throw new Error(
-      `ensureWorkspaceDefaults(integrations): ${integrationError.message}`,
+      `ensureWorkspaceDefaults(spotify): ${spotifyIntegrationError.message}`,
+    );
+  }
+
+  if (openaiIntegrationError) {
+    throw new Error(
+      `ensureWorkspaceDefaults(openai): ${openaiIntegrationError.message}`,
     );
   }
 }
@@ -307,7 +352,11 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     await ensureWorkspaceDefaults(workspace.id);
   }
 
-  const [{ data: settingsRow, error: settingsError }, { data: spotifyIntegrationRow, error: integrationsError }] =
+  const [
+    { data: settingsRow, error: settingsError },
+    { data: spotifyIntegrationRow, error: spotifyIntegrationError },
+    { data: openaiIntegrationRow, error: openaiIntegrationError },
+  ] =
     await Promise.all([
       dataClient
         .from("workspace_settings")
@@ -324,6 +373,14 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
         .eq("workspace_id", workspace.id)
         .eq("provider", "spotify")
         .maybeSingle(),
+      dataClient
+        .from("workspace_integrations")
+        .select(
+          "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret",
+        )
+        .eq("workspace_id", workspace.id)
+        .eq("provider", "openai")
+        .maybeSingle(),
     ]);
 
   if (settingsError) {
@@ -332,14 +389,21 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     );
   }
 
-  if (integrationsError) {
+  if (spotifyIntegrationError) {
     throw new Error(
-      `getCurrentWorkspaceContext(integrations): ${integrationsError.message}`,
+      `getCurrentWorkspaceContext(spotify): ${spotifyIntegrationError.message}`,
+    );
+  }
+
+  if (openaiIntegrationError) {
+    throw new Error(
+      `getCurrentWorkspaceContext(openai): ${openaiIntegrationError.message}`,
     );
   }
 
   const settings = settingsRow as WorkspaceSettingsRow | null;
   const spotifyIntegration = spotifyIntegrationRow as WorkspaceIntegrationRow | null;
+  const openaiIntegration = openaiIntegrationRow as WorkspaceIntegrationRow | null;
 
   return {
     workspace: {
@@ -387,6 +451,17 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
       grantedScopes:
         spotifyIntegration?.granted_scopes ??
         DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
+    },
+    openaiIntegration: {
+      appMode: openaiIntegration?.app_mode ?? DEFAULT_OPENAI_INTEGRATION.appMode,
+      connectionStatus:
+        openaiIntegration?.connection_status ??
+        DEFAULT_OPENAI_INTEGRATION.connectionStatus,
+      model: openaiIntegration?.app_client_id ?? DEFAULT_OPENAI_INTEGRATION.model,
+      hasApiKey:
+        openaiIntegration?.app_client_secret != null
+          ? Boolean(openaiIntegration.app_client_secret)
+          : DEFAULT_OPENAI_INTEGRATION.hasApiKey,
     },
   };
 };
@@ -443,6 +518,64 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
 
   if (error) {
     throw new Error(`updateCurrentWorkspaceSpotifyIntegration: ${error.message}`);
+  }
+
+  return getCurrentWorkspaceContext();
+}
+
+export async function updateCurrentWorkspaceOpenAIIntegration(
+  input: WorkspaceOpenAIIntegrationInput,
+) {
+  const workspace = await getCurrentWorkspaceContext();
+
+  if (!workspace) {
+    throw new Error("Workspace indisponivel.");
+  }
+
+  if (!["owner", "admin"].includes(workspace.membership.role)) {
+    throw new Error("Sem permissao para editar a integracao.");
+  }
+
+  const dataClient = await getWorkspaceDbClient();
+  const normalizedApiKey = input.apiKey?.trim() || null;
+  const normalizedModel = input.model?.trim() || "gpt-5.5";
+  const currentHasApiKey = workspace.openaiIntegration.hasApiKey;
+
+  if (
+    input.appMode === "workspace_app" &&
+    !normalizedApiKey &&
+    !currentHasApiKey
+  ) {
+    throw new Error("Para usar a chave do workspace, preencha a API key.");
+  }
+
+  const payload: Record<string, unknown> = {
+    app_mode: input.appMode,
+    app_client_id: normalizedModel,
+    connection_status:
+      input.appMode === "workspace_app" || process.env.OPENAI_API_KEY?.trim()
+        ? "connected"
+        : "not_connected",
+    updated_at: new Date().toISOString(),
+  };
+
+  if (normalizedApiKey !== null) {
+    payload.app_client_secret = normalizedApiKey;
+  }
+
+  const { error } = await dataClient
+    .from("workspace_integrations")
+    .upsert(
+      {
+        workspace_id: workspace.workspace.id,
+        provider: "openai",
+        ...payload,
+      },
+      { onConflict: "workspace_id,provider" },
+    );
+
+  if (error) {
+    throw new Error(`updateCurrentWorkspaceOpenAIIntegration: ${error.message}`);
   }
 
   return getCurrentWorkspaceContext();
@@ -548,6 +681,58 @@ export async function getEffectiveSpotifyCredentials(): Promise<EffectiveSpotify
   return {
     clientId: globalClientId,
     clientSecret: globalClientSecret,
+    source: "global_app",
+    workspaceId: workspace?.workspace.id ?? null,
+  };
+}
+
+export async function getEffectiveOpenAICredentials(): Promise<EffectiveOpenAICredentials | null> {
+  const globalApiKey = process.env.OPENAI_API_KEY?.trim() || "";
+  const globalModel =
+    process.env.OPENAI_PLAYLISTS_MODEL?.trim() ||
+    process.env.OPENAI_MODEL?.trim() ||
+    "gpt-5.5";
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const workspaceModel = workspace?.openaiIntegration.model?.trim() || globalModel;
+
+  if (
+    workspace?.openaiIntegration.appMode === "workspace_app" &&
+    workspace.openaiIntegration.hasApiKey
+  ) {
+    const supabase = await getWorkspaceDbClient();
+    const { data, error } = await supabase
+      .from("workspace_integrations")
+      .select("workspace_id, app_client_id, app_client_secret")
+      .eq("workspace_id", workspace.workspace.id)
+      .eq("provider", "openai")
+      .single();
+
+    if (error) {
+      throw new Error(`getEffectiveOpenAICredentials: ${error.message}`);
+    }
+
+    const row = data as Pick<
+      WorkspaceIntegrationRow,
+      "workspace_id" | "app_client_id" | "app_client_secret"
+    >;
+
+    if (row.app_client_secret) {
+      return {
+        apiKey: row.app_client_secret,
+        model: row.app_client_id?.trim() || workspaceModel,
+        source: "workspace_app",
+        workspaceId: row.workspace_id,
+      };
+    }
+  }
+
+  if (!globalApiKey) {
+    return null;
+  }
+
+  return {
+    apiKey: globalApiKey,
+    model: workspaceModel,
     source: "global_app",
     workspaceId: workspace?.workspace.id ?? null,
   };

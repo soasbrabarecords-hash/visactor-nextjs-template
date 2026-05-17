@@ -14,6 +14,7 @@ export default async function ConfiguracoesPage() {
     process.env.SPOTIFY_CLIENT_ID?.trim() &&
       process.env.SPOTIFY_CLIENT_SECRET?.trim(),
   );
+  const openaiReady = Boolean(process.env.OPENAI_API_KEY?.trim());
 
   return (
     <>
@@ -21,6 +22,7 @@ export default async function ConfiguracoesPage() {
       <SettingsHub
         spotify={spotify}
         spotifyAppReady={spotifyAppReady}
+        openaiReady={openaiReady}
         workspace={workspace}
       />
     </>

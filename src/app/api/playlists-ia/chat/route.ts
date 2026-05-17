@@ -8,6 +8,7 @@ import {
 import { searchSpotifyTracks, type SpotifyTrackRecord } from "@/lib/spotify";
 import { getSnapshotDates, getSnapshotWithComparison } from "@/lib/chart-snapshots";
 import { fetchTikTokPublicChart } from "@/lib/tiktok-public-charts";
+import { getEffectiveOpenAICredentials } from "@/lib/workspaces";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,9 +90,6 @@ type SpotifyTopTracksResponse = {
 };
 
 type OpenAIResponseObject = Record<string, unknown>;
-
-const OPENAI_MODEL =
-  process.env.OPENAI_PLAYLISTS_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-5.5";
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -499,17 +497,17 @@ function collectOpenAISources(response: OpenAIResponseObject) {
 }
 
 async function runOpenAICurator(input: string) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  const credentials = await getEffectiveOpenAICredentials();
+  if (!credentials) return null;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${credentials.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model: credentials.model,
       reasoning: { effort: "low" },
       tools: [
         {
@@ -686,7 +684,7 @@ function buildFallbackPlan(prompt: string, candidates: CandidateTrack[], reason:
     tracks,
     nextSteps: [
       "Revisar as faixas sugeridas antes de criar no Spotify.",
-      "Configurar OPENAI_API_KEY para ativar pesquisa ampla com ChatGPT.",
+      "Configurar ChatGPT em Configuracoes para ativar pesquisa ampla.",
       "Salvar a playlist como privada e ajustar no editor do sistema.",
     ],
     spotifyResolvedCount: tracks.filter((track) => Boolean(track.spotifyTrackId)).length,
@@ -849,11 +847,11 @@ export async function POST(request: Request) {
         plan = buildFallbackPlan(
           prompt,
           candidates,
-          "OPENAI_API_KEY ainda nao configurada. Usei ranking interno com Spotify API, charts e TikTok/Kworb.",
+          "ChatGPT ainda nao configurado. Usei ranking interno com Spotify API, charts e TikTok/Kworb.",
         );
         mode = "fallback";
         message =
-          "Montei com ranking interno. Para pesquisa ampla com ChatGPT, configure OPENAI_API_KEY.";
+          "Montei com ranking interno. Para pesquisa ampla com ChatGPT, conecte a OpenAI em Configuracoes.";
       }
     } catch (error) {
       plan = buildFallbackPlan(

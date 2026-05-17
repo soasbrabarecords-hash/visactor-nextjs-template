@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 import {
   ArrowUpRight,
+  Bot,
   CheckCircle2,
   KeyRound,
   LogOut,
   Music2,
-  ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
 import Container from "@/components/container";
 import StatusBadge from "@/components/workspace/status-badge";
+import WorkspaceOpenAIIntegrationForm from "@/components/workspace/workspace-openai-integration-form";
 import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-form";
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
 import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
@@ -18,6 +19,7 @@ import type { WorkspaceContext } from "@/lib/workspaces";
 type SettingsHubProps = {
   spotify: SpotifyConnectionStatusResult;
   spotifyAppReady: boolean;
+  openaiReady: boolean;
   workspace: WorkspaceContext | null;
 };
 
@@ -108,6 +110,7 @@ function SectionCard({
 export default function SettingsHub({
   spotify,
   spotifyAppReady,
+  openaiReady,
   workspace,
 }: SettingsHubProps) {
   const connectHref = "/api/spotify/auth/login?next=/configuracoes";
@@ -128,6 +131,17 @@ export default function SettingsHub({
   const integrationClientId = workspace?.spotifyIntegration.appClientId ?? null;
   const hasIntegrationSecret =
     workspace?.spotifyIntegration.hasAppClientSecret ?? false;
+  const openaiMode = workspace?.openaiIntegration.appMode ?? "global_app";
+  const openaiModeLabel =
+    openaiMode === "workspace_app" ? "Chave do workspace" : "Chave global";
+  const openaiModel =
+    workspace?.openaiIntegration.model ??
+    process.env.OPENAI_PLAYLISTS_MODEL ??
+    process.env.OPENAI_MODEL ??
+    "gpt-5.5";
+  const hasOpenAIWorkspaceKey = workspace?.openaiIntegration.hasApiKey ?? false;
+  const effectiveOpenAIReady =
+    openaiMode === "workspace_app" ? hasOpenAIWorkspaceKey : openaiReady;
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_22%),radial-gradient(circle_at_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
@@ -140,6 +154,9 @@ export default function SettingsHub({
             </StatusBadge>
             <StatusBadge tone={spotifyAppReady ? "green" : "red"}>
               {spotifyAppReady ? "App pronta" : "Credenciais faltando"}
+            </StatusBadge>
+            <StatusBadge tone={effectiveOpenAIReady ? "green" : "yellow"}>
+              {effectiveOpenAIReady ? "ChatGPT ativo" : "ChatGPT pendente"}
             </StatusBadge>
           </div>
 
@@ -256,7 +273,7 @@ export default function SettingsHub({
           />
           <MiniCard
             icon={<KeyRound className="h-5 w-5" />}
-            title="Credenciais"
+            title="Spotify App"
             value={spotifyModeLabel}
             hint={
               integrationMode === "workspace_app"
@@ -266,11 +283,11 @@ export default function SettingsHub({
             tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
           />
           <MiniCard
-            icon={<ShieldCheck className="h-5 w-5" />}
-            title="Infra"
-            value="Segredos internos"
-            hint="Ficam fora do cliente."
-            tone="slate"
+            icon={<Bot className="h-5 w-5" />}
+            title="Playlists IA"
+            value={openaiModel}
+            hint={effectiveOpenAIReady ? openaiModeLabel : "Conectar OpenAI."}
+            tone={effectiveOpenAIReady ? "green" : "yellow"}
           />
         </section>
 
@@ -308,6 +325,23 @@ export default function SettingsHub({
             initialAppMode={integrationMode}
             initialAppClientId={integrationClientId}
             hasAppClientSecret={hasIntegrationSecret}
+          />
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Integracao ChatGPT"
+          title="OpenAI para Playlists IA"
+          badge={
+            <StatusBadge tone={effectiveOpenAIReady ? "green" : "yellow"}>
+              {effectiveOpenAIReady ? "Ativo" : "Pendente"}
+            </StatusBadge>
+          }
+        >
+          <WorkspaceOpenAIIntegrationForm
+            initialAppMode={openaiMode}
+            initialModel={openaiModel}
+            hasApiKey={hasOpenAIWorkspaceKey}
+            globalOpenAIReady={openaiReady}
           />
         </SectionCard>
 
