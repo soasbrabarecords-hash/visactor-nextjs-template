@@ -15,9 +15,15 @@ export const dynamic = "force-dynamic";
 
 type ChatBody = {
   prompt?: unknown;
+  messages?: unknown;
 };
 
 type TrackSource = "Spotify" | "TikTok" | "Catalogo" | "Curadoria";
+
+type ConversationMessage = {
+  role: "assistant" | "user";
+  content: string;
+};
 
 type CandidateTrack = {
   key: string;
@@ -91,6 +97,17 @@ type SpotifyTopTracksResponse = {
 
 type OpenAIResponseObject = Record<string, unknown>;
 
+type CuratorIntent =
+  | {
+      action: "clarifying_question";
+      message: string;
+      questions: string[];
+    }
+  | {
+      action: "playlist_plan";
+      plan: PlaylistPlan;
+    };
+
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -99,6 +116,21 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function parseConversationMessages(value: unknown): ConversationMessage[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .flatMap((item): ConversationMessage[] => {
+      const record = asRecord(item);
+      if (!record) return [];
+      const role = record.role === "assistant" ? "assistant" : record.role === "user" ? "user" : null;
+      const content = typeof record.content === "string" ? record.content.trim() : "";
+      if (!role || !content) return [];
+      return [{ role, content: content.slice(0, 1000) }];
+    })
+    .slice(-10);
 }
 
 function normalizeText(value: string) {
@@ -154,6 +186,61 @@ function getSpotifyQueries(prompt: string) {
     : "spotify brasil top tracks";
 
   return Array.from(new Set([cleanPrompt, moodQuery, viralQuery].filter(Boolean))).slice(0, 4);
+}
+
+function buildClarifyingQuestions(prompt: string, conversation: ConversationMessage[]) {
+  const context = normalizeText(
+    [prompt, ...conversation.map((message) => message.content)].join(" "),
+  );
+  const questions: string[] = [];
+
+  const hasGenre =
+    /\b(funk|trap|rap|pop|sertanejo|pagode|eletronica|phonk|indie|rock|reggaeton|afro|r b|rnb)\b/.test(context);
+  const hasUseCase =
+    /\b(festa|treino|academia|churrasco|carro|loja|bar|viagem|romantica|sofrencia|viral|balada|estudo|relax)\b/.test(context);
+  const hasEnergy =
+    /\b(leve|pesada|alto astral|energia|calma|agressiva|melodica|dançante|dancante|noturna|pique|bpm)\b/.test(context);
+  const hasEra =
+    /\b(atual|novo|novidade|2026|2025|classico|anos|2000|2010|antigo|nostalgia)\b/.test(context);
+
+  if (!hasGenre) {
+    questions.push("Qual genero ou mistura manda: funk, trap, pop, sertanejo, pagode, eletronica ou outro?");
+  }
+
+  if (!hasUseCase) {
+    questions.push("Essa playlist e para qual momento: festa, treino, carro, bar, romance, discovery ou viral?");
+  }
+
+  if (!hasEnergy) {
+    questions.push("A energia deve ser mais pesada, dançante, melodica, calma ou crescente?");
+  }
+
+  if (!hasEra && questions.length < 3) {
+    questions.push("Quer foco em lancamentos atuais, virais da semana ou mistura com classicos?");
+  }
+
+  return questions.slice(0, 3);
+}
+
+function shouldAskForMoreContext(prompt: string, conversation: ConversationMessage[]) {
+  const normalized = normalizeText(prompt);
+  const hasPriorAssistantQuestion = conversation.some(
+    (message) =>
+      message.role === "assistant" &&
+      normalizeText(message.content).includes("pra eu acertar a vibe"),
+  );
+
+  if (hasPriorAssistantQuestion) return false;
+  if (normalized.length < 18) return true;
+
+  const signals = [
+    /\b(funk|trap|rap|pop|sertanejo|pagode|eletronica|phonk|rock|reggaeton|afro|rnb)\b/,
+    /\b(festa|treino|academia|carro|bar|romantica|viral|balada|discovery|churrasco)\b/,
+    /\b(atual|novo|2026|2025|classico|anos|viral|reels|tiktok|shorts)\b/,
+    /\b(pesada|leve|calma|energia|melodica|dancante|noturna|alto astral)\b/,
+  ].filter((pattern) => pattern.test(normalized)).length;
+
+  return signals < 2 && normalized.split(" ").length < 10;
 }
 
 function getMovementBoost(status: CandidateTrack["chartMovement"]) {
@@ -373,22 +460,35 @@ function candidateForPrompt(candidate: CandidateTrack) {
 
 function buildOpenAIInput({
   prompt,
+  conversation,
   candidates,
   playlistNames,
   chartDate,
   tiktokDate,
 }: {
   prompt: string;
+  conversation: ConversationMessage[];
   candidates: CandidateTrack[];
   playlistNames: string[];
   chartDate: string | null;
   tiktokDate: string | null;
 }) {
-  return `Voce e um curador musical profissional para playlists brasileiras.
-Objetivo: responder ao pedido do usuario montando uma playlist util, pesquisada e pronta para revisar/criar no Spotify.
+  const researchQueries = [
+    `musicas bombando TikTok Brasil ${prompt}`,
+    `musicas em alta Instagram Reels Brasil ${prompt}`,
+    `musicas virais YouTube Shorts Brasil ${prompt}`,
+    `Spotify Viral Brasil musicas em alta ${prompt}`,
+    `noticias musica brasileira viral hit ${prompt}`,
+  ];
+
+  return `Voce e um agente de pesquisa e curadoria musical profissional para playlists brasileiras.
+Objetivo: conversar com o usuario ate entender a vibe real e, so entao, montar uma playlist pesquisada e pronta para revisar/criar no Spotify.
 
 Pedido do usuario:
 ${prompt}
+
+Historico recente da conversa:
+${conversation.length > 0 ? JSON.stringify(conversation) : "[]"}
 
 Dados internos disponiveis:
 - Spotify Charts BR snapshot: ${chartDate ?? "indisponivel"}
@@ -397,16 +497,35 @@ Dados internos disponiveis:
 - Candidatas resolvidas por Spotify API, charts e perfil:
 ${JSON.stringify(candidates.slice(0, 70).map(candidateForPrompt))}
 
-Use web_search para pesquisar sinais atuais quando isso ajudar: TikTok, Reels, Shorts, Spotify viral, musicas em alta e contexto de mercado.
+Pesquisa externa obrigatoria quando for montar playlist:
+- Use web_search para buscar sinais atuais em pelo menos 4 frentes: TikTok, Instagram Reels, YouTube Shorts, Spotify/Viral charts e noticias/sites musicais.
+- Consultas sugeridas:
+${researchQueries.map((query) => `  - ${query}`).join("\n")}
+- Dê preferencia a fontes confiaveis e/ou verificaveis: charts, plataformas, paginas oficiais, veiculos de musica/entretenimento, rankings publicos e agregadores reconheciveis.
+- Nao dependa apenas dos dados internos. Use dados internos para resolver IDs do Spotify e dados externos para confirmar hype/momentum.
+
+Regra de conversa:
+- Se o pedido ainda estiver vago ou faltar vibe/momento/publico/energia, NAO monte playlist ainda. Faça 2 ou 3 perguntas diretas.
+- Se ja houver contexto suficiente no pedido ou no historico, monte a playlist.
+
 Regras:
 - Priorize faixas da lista de candidatas quando for criar tracks, porque elas tem ID oficial do Spotify.
 - Nao invente spotifyTrackId. Use apenas IDs fornecidos nas candidatas.
 - Pode incluir classicos/catalogo se o usuario pedir, mas explique quando nao houver ID.
 - Monte 10 a 14 faixas, ordenadas com logica editorial.
+- Cada reason deve citar sinais concretos: TikTok/Reels/Shorts/Spotify chart/noticia/perfil da conta, quando houver.
 - Responda somente JSON valido, sem markdown.
 
-Formato obrigatorio:
+Formato obrigatorio se precisar perguntar:
 {
+  "action": "clarifying_question",
+  "message": "Pra eu acertar a vibe real antes de criar...",
+  "questions": ["pergunta curta"]
+}
+
+Formato obrigatorio se for montar playlist:
+{
+  "action": "playlist_plan",
   "title": "nome curto da playlist",
   "subtitle": "resumo do pedido",
   "targetSize": 50,
@@ -521,7 +640,7 @@ async function runOpenAICurator(input: string) {
           },
         },
       ],
-      tool_choice: "auto",
+      tool_choice: "required",
       include: ["web_search_call.action.sources"],
       input,
     }),
@@ -593,6 +712,62 @@ function findCandidateForTrack(track: Record<string, unknown>, candidates: Candi
   const key = candidateKey(title, artist);
 
   return candidates.find((candidate) => candidateKey(candidate.title, candidate.artist) === key) ?? null;
+}
+
+function getModelTrackRequests(modelJson: Record<string, unknown>) {
+  if (!Array.isArray(modelJson.tracks)) return [];
+
+  const seen = new Set<string>();
+
+  return modelJson.tracks.flatMap((item): Array<{ title: string; artist: string }> => {
+    const record = asRecord(item);
+    if (!record) return [];
+    const title = typeof record.title === "string" ? record.title.trim() : "";
+    const artist = typeof record.artist === "string" ? record.artist.trim() : "";
+    const key = candidateKey(title, artist);
+
+    if (!title || !artist || seen.has(key)) return [];
+    seen.add(key);
+    return [{ title, artist }];
+  });
+}
+
+async function resolveModelTracksWithSpotify(modelJson: Record<string, unknown>) {
+  const requests = getModelTrackRequests(modelJson).slice(0, 16);
+  const settled = await Promise.allSettled(
+    requests.map(async (request) => {
+      const tracks = await searchSpotifyTracks(
+        `track:${request.title} artist:${request.artist}`,
+        "BR",
+        5,
+      );
+      const requestKey = candidateKey(request.title, request.artist);
+      const bestMatch =
+        tracks
+          .map((track) => ({
+            track,
+            score:
+              (candidateKey(track.name, track.artists.join(" ")) === requestKey ? 20 : 0) +
+              (normalizeText(track.name).includes(normalizeText(request.title)) ? 8 : 0) +
+              (normalizeText(track.artists.join(" ")).includes(normalizeText(request.artist)) ? 8 : 0) +
+              Math.round(track.popularity / 20),
+          }))
+          .sort((left, right) => right.score - left.score)[0]?.track ?? null;
+
+      return bestMatch
+        ? spotifyRecordToCandidate(
+            bestMatch,
+            74,
+            "Resolvida na Spotify API depois da pesquisa externa",
+          )
+        : null;
+    }),
+  );
+
+  return settled.flatMap((result): Array<Omit<CandidateTrack, "key">> => {
+    if (result.status !== "fulfilled" || !result.value) return [];
+    return [result.value];
+  });
 }
 
 function candidateToPlanTrack(candidate: CandidateTrack, index: number): PlaylistPlanTrack {
@@ -761,15 +936,76 @@ function buildModelPlan({
   };
 }
 
+function buildClarifyingResponse(prompt: string, conversation: ConversationMessage[]) {
+  const questions = buildClarifyingQuestions(prompt, conversation);
+  const message = [
+    "Pra eu acertar a vibe real antes de criar, me responde rapidinho:",
+    ...questions.map((question, index) => `${index + 1}. ${question}`),
+  ].join("\n");
+
+  return {
+    action: "clarifying_question" as const,
+    message,
+    questions,
+  };
+}
+
+function parseCuratorIntent(
+  prompt: string,
+  modelJson: Record<string, unknown>,
+  candidates: CandidateTrack[],
+  sources: AgentSource[],
+): CuratorIntent {
+  if (modelJson.action === "clarifying_question") {
+    const questions = Array.isArray(modelJson.questions)
+      ? modelJson.questions
+          .map((question) => (typeof question === "string" ? question.trim() : ""))
+          .filter(Boolean)
+          .slice(0, 3)
+      : [];
+    const message = asString(
+      modelJson.message,
+      [
+        "Pra eu acertar a vibe real antes de criar, me responde rapidinho:",
+        ...questions.map((question, index) => `${index + 1}. ${question}`),
+      ].join("\n"),
+    );
+
+    return {
+      action: "clarifying_question",
+      message,
+      questions,
+    };
+  }
+
+  return {
+    action: "playlist_plan",
+    plan: buildModelPlan({
+      prompt,
+      modelJson,
+      candidates,
+      sources,
+    }),
+  };
+}
+
 export async function POST(request: Request) {
   let refreshedToken: SpotifyOAuthTokenResponse | null = null;
 
   try {
     const body = (await request.json()) as ChatBody;
     const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+    const conversation = parseConversationMessages(body.messages);
 
     if (!prompt) {
       return NextResponse.json({ message: "prompt e obrigatorio." }, { status: 400 });
+    }
+
+    if (shouldAskForMoreContext(prompt, conversation)) {
+      return NextResponse.json({
+        mode: "clarifying_question",
+        ...buildClarifyingResponse(prompt, conversation),
+      });
     }
 
     const [
@@ -811,7 +1047,7 @@ export async function POST(request: Request) {
       refreshedToken = userTopResult.value.refreshedToken ?? refreshedToken;
     }
 
-    const candidates = mergeCandidates([
+    let candidates = mergeCandidates([
       spotifySearchTracks,
       chartTracks,
       tiktokTracks,
@@ -826,6 +1062,7 @@ export async function POST(request: Request) {
       const aiResult = await runOpenAICurator(
         buildOpenAIInput({
           prompt,
+          conversation,
           candidates,
           playlistNames: accountPlaylists.map((playlist) => playlist.name),
           chartDate,
@@ -834,15 +1071,35 @@ export async function POST(request: Request) {
       );
 
       if (aiResult) {
-        plan = buildModelPlan({
+        if (aiResult.json.action !== "clarifying_question") {
+          const externallyResolvedTracks = await resolveModelTracksWithSpotify(aiResult.json);
+          if (externallyResolvedTracks.length > 0) {
+            candidates = mergeCandidates([candidates, externallyResolvedTracks]);
+          }
+        }
+
+        const intent = parseCuratorIntent(
           prompt,
-          modelJson: aiResult.json,
+          aiResult.json,
           candidates,
-          sources: aiResult.sources,
-        });
+          aiResult.sources,
+        );
+
+        if (intent.action === "clarifying_question") {
+          const response = NextResponse.json({
+            mode: "openai-agent",
+            action: intent.action,
+            message: intent.message,
+            questions: intent.questions,
+          });
+          if (refreshedToken) setSpotifyAuthCookies(response, refreshedToken);
+          return response;
+        }
+
+        plan = intent.plan;
         mode = "openai-agent";
         message =
-          "Pesquisei com ChatGPT, cruzei Spotify API, charts internos, TikTok/Kworb e teu contexto de conta.";
+          "Pesquisei em fontes externas com ChatGPT e cruzei com Spotify API, charts internos, TikTok/Kworb e teu contexto de conta.";
       } else {
         plan = buildFallbackPlan(
           prompt,

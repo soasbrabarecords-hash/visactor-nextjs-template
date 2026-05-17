@@ -82,8 +82,10 @@ type PlaylistCreation = {
 };
 
 type PlaylistsAiAgentResponse = {
+  action?: "clarifying_question" | "playlist_plan";
   message?: string;
-  mode?: "openai-agent" | "fallback";
+  mode?: "openai-agent" | "fallback" | "clarifying_question";
+  questions?: string[];
   plan?: PlaylistPlan;
 };
 
@@ -462,18 +464,34 @@ async function buildSpotifyBackedPlan(
   }
 }
 
-async function buildAgentPlan(prompt: string) {
+async function buildAgentPlan(
+  prompt: string,
+  conversation: Array<{ role: ChatRole; content: string }>,
+) {
   const response = await fetch("/api/playlists-ia/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, messages: conversation }),
   });
   const body = (await response.json().catch(() => ({}))) as PlaylistsAiAgentResponse & {
     message?: string;
   };
 
-  if (!response.ok || !body.plan) {
+  if (!response.ok) {
     throw new Error(body.message ?? "Falha ao acionar a Playlists IA.");
+  }
+
+  if (body.action === "clarifying_question" || body.mode === "clarifying_question") {
+    return {
+      plan: null,
+      message:
+        body.message ??
+        "Pra eu acertar a vibe real antes de criar, me passa mais alguns detalhes.",
+    };
+  }
+
+  if (!body.plan) {
+    throw new Error(body.message ?? "A Playlists IA nao retornou uma playlist.");
   }
 
   return {
@@ -840,7 +858,13 @@ export default function PlaylistsAiWorkbench({
     setIsThinking(true);
 
     try {
-      const result = await buildAgentPlan(cleanPrompt).catch(async () => {
+      const conversation = [...messages, userMessage]
+        .slice(-10)
+        .map((message) => ({
+          role: message.role,
+          content: message.content,
+        }));
+      const result = await buildAgentPlan(cleanPrompt, conversation).catch(async () => {
         const fallback = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
         return {
           plan: fallback.plan,
@@ -857,7 +881,7 @@ export default function PlaylistsAiWorkbench({
             id: newId("assistant"),
             role: "assistant",
             content: result.message,
-            plan: result.plan,
+            plan: result.plan ?? undefined,
           },
         ]);
         setIsThinking(false);
