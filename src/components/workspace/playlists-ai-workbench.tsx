@@ -20,11 +20,17 @@ import { cn } from "@/lib/utils";
 type ChatRole = "assistant" | "user";
 
 type TrackSuggestion = {
+  id: string;
   title: string;
   artist: string;
+  imageUrl: string | null;
   source: "Spotify" | "TikTok" | "Catalogo" | "Curadoria";
   energy: number;
   reason: string;
+  chartPosition?: number;
+  movement?: "new" | "up" | "down" | "stable";
+  spotifyTrackId?: string | null;
+  streams?: number | null;
 };
 
 type PlaylistPlan = {
@@ -49,6 +55,18 @@ type ChatMessage = {
   plan?: PlaylistPlan;
 };
 
+export type PlaylistsAiChartTrack = {
+  id: string;
+  spotifyTrackId: string | null;
+  title: string;
+  artist: string;
+  imageUrl: string | null;
+  position: number;
+  status: "new" | "up" | "down" | "stable";
+  positionChange: number | null;
+  streams: number | null;
+};
+
 const promptPresets = [
   "Cria uma playlist trap BR atual, com energia alta e musicas para bombar no fim de semana.",
   "Monta uma playlist funk para festa, misturando hits atuais com algumas apostas virais.",
@@ -58,36 +76,36 @@ const promptPresets = [
 
 const catalogTracks: Record<string, TrackSuggestion[]> = {
   trap: [
-    { title: "Noite Cara", artist: "KayBlack", source: "Spotify", energy: 86, reason: "Funciona como ancora popular para abrir a playlist." },
-    { title: "Flow de Rua", artist: "Veigh", source: "Spotify", energy: 88, reason: "Mantem linguagem atual e alto encaixe com trap BR." },
-    { title: "Luxo e Lama", artist: "Wiu", source: "TikTok", energy: 82, reason: "Boa ponte entre descoberta social e consumo de streaming." },
-    { title: "Vitrine", artist: "Teto", source: "Curadoria", energy: 79, reason: "Ajuda a deixar o bloco mais melodico sem perder identidade." },
-    { title: "Sem Sinal", artist: "Brandao85", source: "Catalogo", energy: 76, reason: "Aposta de textura para nao ficar so no obvio." },
-    { title: "Plug Nacional", artist: "Alee", source: "Curadoria", energy: 81, reason: "Boa faixa de meio para sustentar retencao." },
+    { id: "fallback-trap-1", title: "Noite Cara", artist: "KayBlack", imageUrl: null, source: "Spotify", energy: 86, reason: "Funciona como ancora popular para abrir a playlist." },
+    { id: "fallback-trap-2", title: "Flow de Rua", artist: "Veigh", imageUrl: null, source: "Spotify", energy: 88, reason: "Mantem linguagem atual e alto encaixe com trap BR." },
+    { id: "fallback-trap-3", title: "Luxo e Lama", artist: "Wiu", imageUrl: null, source: "TikTok", energy: 82, reason: "Boa ponte entre descoberta social e consumo de streaming." },
+    { id: "fallback-trap-4", title: "Vitrine", artist: "Teto", imageUrl: null, source: "Curadoria", energy: 79, reason: "Ajuda a deixar o bloco mais melodico sem perder identidade." },
+    { id: "fallback-trap-5", title: "Sem Sinal", artist: "Brandao85", imageUrl: null, source: "Catalogo", energy: 76, reason: "Aposta de textura para nao ficar so no obvio." },
+    { id: "fallback-trap-6", title: "Plug Nacional", artist: "Alee", imageUrl: null, source: "Curadoria", energy: 81, reason: "Boa faixa de meio para sustentar retencao." },
   ],
   funk: [
-    { title: "Sequencia de Vapo", artist: "DJ GBR", source: "TikTok", energy: 94, reason: "Abre com impacto e leitura viral clara." },
-    { title: "Ela Joga", artist: "MC Tuto", source: "Spotify", energy: 91, reason: "Hit direto para manter skip baixo no comeco." },
-    { title: "Baile Acendeu", artist: "DJ Arana", source: "TikTok", energy: 93, reason: "Funciona como faixa de pico para festa." },
-    { title: "Modo Mandela", artist: "MC GW", source: "Curadoria", energy: 89, reason: "Entrega identidade de baile e movimento." },
-    { title: "Tropa da Madruga", artist: "MC IG", source: "Spotify", energy: 86, reason: "Conecta funk com publico de trap/funk." },
-    { title: "Paredao Ligado", artist: "DJ Topo", source: "Catalogo", energy: 90, reason: "Aposta para variar assinatura sonora." },
+    { id: "fallback-funk-1", title: "Sequencia de Vapo", artist: "DJ GBR", imageUrl: null, source: "TikTok", energy: 94, reason: "Abre com impacto e leitura viral clara." },
+    { id: "fallback-funk-2", title: "Ela Joga", artist: "MC Tuto", imageUrl: null, source: "Spotify", energy: 91, reason: "Hit direto para manter skip baixo no comeco." },
+    { id: "fallback-funk-3", title: "Baile Acendeu", artist: "DJ Arana", imageUrl: null, source: "TikTok", energy: 93, reason: "Funciona como faixa de pico para festa." },
+    { id: "fallback-funk-4", title: "Modo Mandela", artist: "MC GW", imageUrl: null, source: "Curadoria", energy: 89, reason: "Entrega identidade de baile e movimento." },
+    { id: "fallback-funk-5", title: "Tropa da Madruga", artist: "MC IG", imageUrl: null, source: "Spotify", energy: 86, reason: "Conecta funk com publico de trap/funk." },
+    { id: "fallback-funk-6", title: "Paredao Ligado", artist: "DJ Topo", imageUrl: null, source: "Catalogo", energy: 90, reason: "Aposta para variar assinatura sonora." },
   ],
   romantica: [
-    { title: "Ainda Bem", artist: "Marisa Monte", source: "Catalogo", energy: 46, reason: "Classico afetivo para criar memoria emocional." },
-    { title: "Seu Astral", artist: "Jorge & Mateus", source: "Catalogo", energy: 58, reason: "Funciona como ponte popular e cantavel." },
-    { title: "Idiota", artist: "Jao", source: "Spotify", energy: 62, reason: "Traz pop brasileiro moderno para renovar o clima." },
-    { title: "Meu Abrigo", artist: "Melim", source: "Spotify", energy: 54, reason: "Mantem leveza e alto reconhecimento." },
-    { title: "Temporal", artist: "Lagum", source: "Curadoria", energy: 57, reason: "Boa transicao entre pop e romantico alternativo." },
-    { title: "Pra Voce Guardei", artist: "Nando Reis", source: "Catalogo", energy: 49, reason: "Fecha bloco com valor de catalogo forte." },
+    { id: "fallback-romantica-1", title: "Ainda Bem", artist: "Marisa Monte", imageUrl: null, source: "Catalogo", energy: 46, reason: "Classico afetivo para criar memoria emocional." },
+    { id: "fallback-romantica-2", title: "Seu Astral", artist: "Jorge & Mateus", imageUrl: null, source: "Catalogo", energy: 58, reason: "Funciona como ponte popular e cantavel." },
+    { id: "fallback-romantica-3", title: "Idiota", artist: "Jao", imageUrl: null, source: "Spotify", energy: 62, reason: "Traz pop brasileiro moderno para renovar o clima." },
+    { id: "fallback-romantica-4", title: "Meu Abrigo", artist: "Melim", imageUrl: null, source: "Spotify", energy: 54, reason: "Mantem leveza e alto reconhecimento." },
+    { id: "fallback-romantica-5", title: "Temporal", artist: "Lagum", imageUrl: null, source: "Curadoria", energy: 57, reason: "Boa transicao entre pop e romantico alternativo." },
+    { id: "fallback-romantica-6", title: "Pra Voce Guardei", artist: "Nando Reis", imageUrl: null, source: "Catalogo", energy: 49, reason: "Fecha bloco com valor de catalogo forte." },
   ],
   treino: [
-    { title: "Modo Aviao", artist: "Matue", source: "Spotify", energy: 90, reason: "Energia alta e refrao forte para inicio de treino." },
-    { title: "Toma Toma Vapo Vapo", artist: "Ze Felipe", source: "TikTok", energy: 92, reason: "Hook rapido para manter ritmo e humor." },
-    { title: "Poesia Acustica Energia", artist: "Pineapple StormTV", source: "Curadoria", energy: 78, reason: "Respiro de rap sem derrubar totalmente o BPM." },
-    { title: "Acorda Pedrinho", artist: "Jovem Dionisio", source: "Catalogo", energy: 74, reason: "Contraste conhecido para evitar fadiga." },
-    { title: "Foguete", artist: "Oruam", source: "Spotify", energy: 88, reason: "Mantem intensidade urbana no meio da sequencia." },
-    { title: "Mega Energia", artist: "DJ GM", source: "TikTok", energy: 95, reason: "Bloco de pico para sprint ou final." },
+    { id: "fallback-treino-1", title: "Modo Aviao", artist: "Matue", imageUrl: null, source: "Spotify", energy: 90, reason: "Energia alta e refrao forte para inicio de treino." },
+    { id: "fallback-treino-2", title: "Toma Toma Vapo Vapo", artist: "Ze Felipe", imageUrl: null, source: "TikTok", energy: 92, reason: "Hook rapido para manter ritmo e humor." },
+    { id: "fallback-treino-3", title: "Poesia Acustica Energia", artist: "Pineapple StormTV", imageUrl: null, source: "Curadoria", energy: 78, reason: "Respiro de rap sem derrubar totalmente o BPM." },
+    { id: "fallback-treino-4", title: "Acorda Pedrinho", artist: "Jovem Dionisio", imageUrl: null, source: "Catalogo", energy: 74, reason: "Contraste conhecido para evitar fadiga." },
+    { id: "fallback-treino-5", title: "Foguete", artist: "Oruam", imageUrl: null, source: "Spotify", energy: 88, reason: "Mantem intensidade urbana no meio da sequencia." },
+    { id: "fallback-treino-6", title: "Mega Energia", artist: "DJ GM", imageUrl: null, source: "TikTok", energy: 95, reason: "Bloco de pico para sprint ou final." },
   ],
 };
 
@@ -104,16 +122,102 @@ function inferMood(prompt: string) {
   return "trap";
 }
 
-function buildPlaylistPlan(prompt: string): PlaylistPlan {
+function movementLabel(status: PlaylistsAiChartTrack["status"], change: number | null) {
+  if (status === "new") return "entrada nova";
+  if (status === "up") return `subiu ${Math.abs(change ?? 0)} posicoes`;
+  if (status === "down") return `caiu ${Math.abs(change ?? 0)} posicoes`;
+  return "estavel";
+}
+
+function compactStreams(streams: number | null) {
+  if (!streams) return null;
+  if (streams >= 1_000_000) return `${(streams / 1_000_000).toFixed(1)}M`;
+  if (streams >= 1_000) return `${Math.round(streams / 1_000)}K`;
+  return `${streams}`;
+}
+
+function getMoodKeywords(mood: string) {
+  if (mood === "funk") return ["mc", "dj", "funk", "baile", "mandela", "set"];
+  if (mood === "romantica") return ["amor", "love", "saudade", "volta", "coracao", "sentimento"];
+  if (mood === "treino") return ["mc", "dj", "trap", "funk", "beat", "mega"];
+  return ["mc", "trap", "matue", "veigh", "teto", "kay", "wiu", "orochi", "oruan", "poze", "borges"];
+}
+
+function getChartTrackScore(track: PlaylistsAiChartTrack, mood: string) {
+  const searchable = `${track.title} ${track.artist}`.toLowerCase();
+  const keywordHit = getMoodKeywords(mood).some((keyword) => searchable.includes(keyword));
+  const movementBoost = track.status === "new" ? 22 : track.status === "up" ? 16 : track.status === "stable" ? 6 : -8;
+  const rankScore = Math.max(0, 220 - track.position);
+  const moodBoost = keywordHit ? 42 : mood === "romantica" ? -4 : 0;
+
+  return rankScore + movementBoost + moodBoost;
+}
+
+function chartToSuggestion(track: PlaylistsAiChartTrack, mood: string): TrackSuggestion {
+  const streamLabel = compactStreams(track.streams);
+  const movement = movementLabel(track.status, track.positionChange);
+  const baseEnergy = mood === "romantica" ? 48 : mood === "treino" ? 86 : mood === "funk" ? 88 : 82;
+  const rankBoost = Math.max(0, 18 - Math.floor(track.position / 10));
+  const movementBoost = track.status === "up" || track.status === "new" ? 6 : track.status === "down" ? -4 : 0;
+
+  return {
+    id: `chart-${track.id}`,
+    title: track.title,
+    artist: track.artist,
+    imageUrl: track.imageUrl,
+    source: "Spotify",
+    energy: Math.max(35, Math.min(98, baseEnergy + rankBoost + movementBoost)),
+    reason: `#${track.position} no Spotify Charts BR, ${movement}${streamLabel ? `, ${streamLabel} streams` : ""}.`,
+    chartPosition: track.position,
+    movement: track.status,
+    spotifyTrackId: track.spotifyTrackId,
+    streams: track.streams,
+  };
+}
+
+function getRealTrackSuggestions(
+  prompt: string,
+  chartTracks: PlaylistsAiChartTrack[],
+  mood: string,
+) {
+  if (chartTracks.length === 0) return [];
+
+  const wantsViral = /viral|tiktok|reels|bomb/i.test(prompt);
+  const source = [...chartTracks]
+    .sort((a, b) => getChartTrackScore(b, mood) - getChartTrackScore(a, mood))
+    .slice(0, wantsViral ? 8 : 6);
+
+  return source.map((track) => chartToSuggestion(track, mood));
+}
+
+function buildPlaylistPlan(
+  prompt: string,
+  chartTracks: PlaylistsAiChartTrack[],
+  chartDate: string | null,
+): PlaylistPlan {
   const mood = inferMood(prompt);
-  const tracks = catalogTracks[mood] ?? catalogTracks.trap;
+  const fallbackTracks = catalogTracks[mood] ?? catalogTracks.trap;
+  const realTracks = getRealTrackSuggestions(prompt, chartTracks, mood);
+  const seen = new Set(realTracks.map((track) => `${track.title}::${track.artist}`.toLowerCase()));
+  const tracks = [
+    ...realTracks,
+    ...fallbackTracks.filter((track) => !seen.has(`${track.title}::${track.artist}`.toLowerCase())),
+  ].slice(0, 8);
   const wantsClassic = /classico|antigo|anos|2000|2010/i.test(prompt);
   const wantsViral = /viral|tiktok|reels|bomb/i.test(prompt);
   const wantsCurrent = /atual|novo|2026|moderno|charts/i.test(prompt);
+  const hasRealCharts = realTracks.length > 0;
 
-  const spotify = wantsCurrent ? 50 : 42;
-  const tiktok = wantsViral ? 34 : mood === "funk" ? 30 : 22;
-  const catalog = wantsClassic ? 34 : Math.max(12, 100 - spotify - tiktok);
+  let spotify = hasRealCharts ? 58 : wantsCurrent ? 50 : 42;
+  let tiktok = wantsViral ? 34 : mood === "funk" ? 30 : 22;
+  let catalog = Math.max(12, 100 - spotify - tiktok);
+
+  if (wantsClassic) {
+    catalog = 34;
+    const remaining = 100 - catalog;
+    spotify = Math.min(spotify, Math.round(remaining * 0.68));
+    tiktok = remaining - spotify;
+  }
 
   return {
     title:
@@ -126,16 +230,20 @@ function buildPlaylistPlan(prompt: string): PlaylistPlan {
             : "Trap BR Radar",
     subtitle: prompt,
     targetSize: mood === "romantica" ? 45 : 60,
-    confidence: wantsCurrent || wantsViral ? 84 : 76,
+    confidence: hasRealCharts ? 88 : wantsCurrent || wantsViral ? 84 : 76,
     marketBlend: { spotify, tiktok, catalog },
     strategy: [
       "Abrir com faixas reconheciveis para reduzir skip nos primeiros minutos.",
-      "Intercalar apostas com hits para testar descoberta sem perder retencao.",
+      hasRealCharts
+        ? `Usar Spotify Charts BR${chartDate ? ` de ${chartDate}` : ""} como base real de demanda.`
+        : "Intercalar apostas com hits para testar descoberta sem perder retencao.",
       "Organizar a energia em blocos: entrada forte, meio sustentado e final com pico.",
     ],
     tracks,
     nextSteps: [
-      "Conectar com charts reais do banco para substituir este mock.",
+      hasRealCharts
+        ? "Cruzar esta lista com suas playlists para evitar repeticao e achar lacunas."
+        : "Importar ou atualizar snapshots para ativar leitura real de charts.",
       "Escolher capa, nome e tamanho final da playlist.",
       "Criar no Spotify apenas depois de revisar a lista.",
     ],
@@ -155,6 +263,16 @@ function SourceBadge({ source }: { source: TrackSuggestion["source"] }) {
       {source}
     </span>
   );
+}
+
+function coverStyle(imageUrl: string | null) {
+  if (!imageUrl) return undefined;
+
+  return {
+    backgroundImage: `url(${imageUrl})`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
 }
 
 function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
@@ -208,11 +326,14 @@ function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
           <div className="space-y-2">
             {plan.tracks.map((track, index) => (
               <article
-                key={`${track.title}-${track.artist}`}
-                className="grid gap-3 rounded-[20px] border border-border/70 bg-background/[0.66] p-3 dark:border-white/10 dark:bg-black/20 tablet:grid-cols-[42px_1fr_auto] tablet:items-center"
+                key={track.id}
+                className="grid gap-3 rounded-[20px] border border-border/70 bg-background/[0.66] p-3 dark:border-white/10 dark:bg-black/20 tablet:grid-cols-[48px_1fr_auto] tablet:items-center"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/70 bg-muted/60 text-sm font-black tabular-nums dark:border-white/10">
-                  {index + 1}
+                <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-border/70 bg-muted/60 dark:border-white/10">
+                  <div className="absolute inset-0" style={coverStyle(track.imageUrl)} />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-sm font-black tabular-nums text-white">
+                    {index + 1}
+                  </div>
                 </div>
                 <div className="min-w-0">
                   <h5 className="truncate text-sm font-black text-foreground">{track.title}</h5>
@@ -221,6 +342,11 @@ function PlaylistPlanCard({ plan }: { plan: PlaylistPlan }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 tablet:justify-end">
                   <SourceBadge source={track.source} />
+                  {track.chartPosition ? (
+                    <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
+                      chart #{track.chartPosition}
+                    </span>
+                  ) : null}
                   <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
                     energia {track.energy}
                   </span>
@@ -295,13 +421,22 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-export default function PlaylistsAiWorkbench() {
+export default function PlaylistsAiWorkbench({
+  chartTracks = [],
+  chartDate = null,
+}: {
+  chartTracks?: PlaylistsAiChartTrack[];
+  chartDate?: string | null;
+}) {
+  const hasChartData = chartTracks.length > 0;
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
       content:
-        "Me fala a vibe, genero, ano, energia e objetivo. Eu monto um blueprint de playlist pronto para revisar.",
+        hasChartData
+          ? `Estou lendo ${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}. Me fala a vibe, genero, energia e objetivo.`
+          : "Me fala a vibe, genero, ano, energia e objetivo. Eu monto um blueprint de playlist pronto para revisar.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -323,14 +458,16 @@ export default function PlaylistsAiWorkbench() {
 
     window.setTimeout(() => {
       startTransition(() => {
-        const plan = buildPlaylistPlan(cleanPrompt);
+        const plan = buildPlaylistPlan(cleanPrompt, chartTracks, chartDate);
         setMessages((current) => [
           ...current,
           {
             id: newId("assistant"),
             role: "assistant",
             content:
-              "Fechei uma primeira versao segura. Ainda e um mock local, mas ja mostra como o motor vai pensar quando conectarmos charts reais e criacao no Spotify.",
+              hasChartData
+                ? "Fechei uma primeira versao usando os dados reais do Spotify Charts que ja estao no sistema. Ainda nao cria no Spotify sem revisao."
+                : "Fechei uma primeira versao segura com fallback local. Quando houver snapshot, eu troco para dados reais do chart.",
             plan,
           },
         ]);
@@ -359,7 +496,7 @@ export default function PlaylistsAiWorkbench() {
               Um chat para transformar ideia em playlist.
             </h2>
             <p className="mt-4 text-sm font-medium leading-6 text-muted-foreground">
-              Primeiro montamos a experiencia. Depois ligamos charts reais, IA externa e criacao no Spotify com revisao.
+              Agora o builder ja usa snapshots reais do Spotify Charts quando eles existem. A IA externa e a criacao no Spotify entram depois, com revisao.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -378,7 +515,9 @@ export default function PlaylistsAiWorkbench() {
                   Leitura
                 </div>
                 <p className="mt-2 text-sm font-semibold text-foreground">
-                  Spotify, TikTok/Reels, catalogo e curadoria.
+                  {hasChartData
+                    ? `${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}.`
+                    : "Spotify, TikTok/Reels, catalogo e curadoria."}
                 </p>
               </div>
               <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
@@ -424,7 +563,7 @@ export default function PlaylistsAiWorkbench() {
               </h3>
             </div>
             <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
-              mock seguro
+              {hasChartData ? "charts reais" : "fallback seguro"}
             </span>
           </div>
         </div>
@@ -457,7 +596,9 @@ export default function PlaylistsAiWorkbench() {
             />
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-2 py-2 dark:border-white/10">
               <p className="text-xs font-medium text-muted-foreground">
-                Nesta fase ainda nao chama API externa.
+                {hasChartData
+                  ? "Usando dados internos. Ainda nao chama IA externa."
+                  : "Nesta fase ainda nao chama API externa."}
               </p>
               <Button type="submit" disabled={!input.trim() || isThinking} className="rounded-full">
                 {isThinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
