@@ -17,7 +17,7 @@ const SPOTIFY_NEXT_COOKIE = "spotify_auth_next";
 const SPOTIFY_PRODUCTION_REDIRECT_URI =
   "https://system.soasbraba.com/api/spotify/auth/callback";
 
-type SpotifyOAuthTokenResponse = {
+export type SpotifyOAuthTokenResponse = {
   access_token: string;
   refresh_token?: string;
   expires_in: number;

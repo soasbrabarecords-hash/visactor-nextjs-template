@@ -50,7 +50,12 @@ type PlaylistPlan = {
   nextSteps: string[];
   spotifyResolvedCount: number;
   chartResolvedCount: number;
-  dataSource: "spotify-api" | "charts-fallback" | "local-fallback";
+  dataSource: "openai-agent" | "spotify-api" | "charts-fallback" | "local-fallback";
+  researchSummary?: string;
+  researchSources?: Array<{
+    title: string;
+    url: string;
+  }>;
 };
 
 type ChatMessage = {
@@ -74,6 +79,12 @@ type SpotifySearchTrack = {
 type PlaylistCreation = {
   playlistId: string;
   playlistUrl: string;
+};
+
+type PlaylistsAiAgentResponse = {
+  message?: string;
+  mode?: "openai-agent" | "fallback";
+  plan?: PlaylistPlan;
 };
 
 export type PlaylistsAiChartTrack = {
@@ -451,6 +462,30 @@ async function buildSpotifyBackedPlan(
   }
 }
 
+async function buildAgentPlan(prompt: string) {
+  const response = await fetch("/api/playlists-ia/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  const body = (await response.json().catch(() => ({}))) as PlaylistsAiAgentResponse & {
+    message?: string;
+  };
+
+  if (!response.ok || !body.plan) {
+    throw new Error(body.message ?? "Falha ao acionar a Playlists IA.");
+  }
+
+  return {
+    plan: body.plan,
+    message:
+      body.message ??
+      (body.mode === "openai-agent"
+        ? "Pesquisei com ChatGPT e cruzei com os dados reais do sistema."
+        : "Montei com ranking interno e dados reais disponiveis."),
+  };
+}
+
 function getSpotifyTrackUris(plan: PlaylistPlan) {
   return Array.from(
     new Set(
@@ -520,7 +555,7 @@ function PlaylistPlanCard({
           </div>
           <div className="rounded-[20px] border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-right">
             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
-              Confianca
+              {plan.dataSource === "openai-agent" ? "ChatGPT" : "Confianca"}
             </div>
             <div className="text-2xl font-black tabular-nums text-foreground">{plan.confidence}%</div>
             <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700/80 dark:text-emerald-200/80">
@@ -587,6 +622,34 @@ function PlaylistPlanCard({
         </div>
 
         <aside className="space-y-3">
+          {plan.researchSummary ? (
+            <div className="rounded-[22px] border border-sky-400/25 bg-sky-400/10 p-4 dark:border-sky-300/15 dark:bg-sky-300/[0.08]">
+              <h4 className="flex items-center gap-2 text-sm font-black text-foreground">
+                <Sparkles className="h-4 w-4" />
+                Pesquisa
+              </h4>
+              <p className="mt-3 text-xs font-medium leading-5 text-muted-foreground">
+                {plan.researchSummary}
+              </p>
+              {plan.researchSources && plan.researchSources.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {plan.researchSources.slice(0, 4).map((source) => (
+                    <a
+                      key={source.url}
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-2 text-[11px] font-bold text-muted-foreground transition hover:border-sky-400/35 hover:text-foreground dark:border-white/10 dark:bg-black/20"
+                    >
+                      <span className="line-clamp-1">{source.title}</span>
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="rounded-[22px] border border-border/70 bg-muted/35 p-4 dark:border-white/10 dark:bg-black/20">
             <h4 className="flex items-center gap-2 text-sm font-black text-foreground">
               <Wand2 className="h-4 w-4" />
@@ -777,17 +840,23 @@ export default function PlaylistsAiWorkbench({
     setIsThinking(true);
 
     try {
-      const result = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
+      const result = await buildAgentPlan(cleanPrompt).catch(async () => {
+        const fallback = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
+        return {
+          plan: fallback.plan,
+          message:
+            fallback.usedSpotifyApi
+              ? "O agente nao respondeu agora; montei usando Spotify API e charts internos como fallback."
+              : `O agente nao respondeu agora. ${fallback.error ? `Fallback: ${fallback.error}` : "Usei a versao segura local."}`,
+        };
+      });
       startTransition(() => {
         setMessages((current) => [
           ...current,
           {
             id: newId("assistant"),
             role: "assistant",
-            content:
-              result.usedSpotifyApi
-                ? "Agora sim: montei usando Spotify API como fonte principal, com charts internos como reforco de demanda."
-                : `A Spotify API nao respondeu agora${result.error ? ` (${result.error})` : ""}. Montei uma versao segura com charts/fallback para nao travar o fluxo.`,
+            content: result.message,
             plan: result.plan,
           },
         ]);
@@ -882,7 +951,7 @@ export default function PlaylistsAiWorkbench({
               Um chat para transformar ideia em playlist.
             </h2>
             <p className="mt-4 text-sm font-medium leading-6 text-muted-foreground">
-              O builder busca faixas oficiais na Spotify API, cruza com seus snapshots de charts e libera criacao privada no Spotify apos revisao.
+              O builder conversa com o agente, pesquisa com ChatGPT quando configurado, cruza Spotify API, TikTok/Kworb, charts internos e libera criacao privada apos revisao.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -902,8 +971,8 @@ export default function PlaylistsAiWorkbench({
                 </div>
                 <p className="mt-2 text-sm font-semibold text-foreground">
                   {hasChartData
-                    ? `Spotify API + ${chartTracks.length} faixas do Charts BR${chartDate ? ` (${chartDate})` : ""}.`
-                    : "Spotify API + catalogo e curadoria."}
+                    ? `ChatGPT + Spotify API + ${chartTracks.length} faixas do Charts BR${chartDate ? ` (${chartDate})` : ""}.`
+                    : "ChatGPT + Spotify API + TikTok/Kworb."}
                 </p>
               </div>
               <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
@@ -949,7 +1018,7 @@ export default function PlaylistsAiWorkbench({
               </h3>
             </div>
             <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
-              {hasChartData ? "spotify api + charts" : "spotify api"}
+              {hasChartData ? "agente + dados reais" : "agente ia"}
             </span>
           </div>
         </div>
@@ -990,8 +1059,8 @@ export default function PlaylistsAiWorkbench({
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-2 py-2 dark:border-white/10">
               <p className="text-xs font-medium text-muted-foreground">
                 {hasChartData
-                  ? "Spotify API + charts internos. IA externa ainda nao entra."
-                  : "Spotify API com fallback local se a conexao falhar."}
+                  ? "Agente com ChatGPT quando OPENAI_API_KEY estiver ativa. Fallback interno sempre ligado."
+                  : "ChatGPT + Spotify API com fallback local se a conexao falhar."}
               </p>
               <Button type="submit" disabled={!input.trim() || isThinking} className="rounded-full">
                 {isThinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
