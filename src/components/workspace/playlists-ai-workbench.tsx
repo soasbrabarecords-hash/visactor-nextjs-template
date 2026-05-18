@@ -85,6 +85,8 @@ type PlaylistsAiAgentResponse = {
   action?: "clarifying_question" | "playlist_brief" | "playlist_plan";
   message?: string;
   mode?: "openai-agent" | "fallback" | "clarifying_question" | "brief";
+  aiModel?: string | null;
+  aiSource?: "global_app" | "workspace_app" | null;
   questions?: string[];
   plan?: PlaylistPlan;
 };
@@ -537,7 +539,7 @@ async function buildAgentPlan(
     message:
       body.message ??
       (body.mode === "openai-agent"
-        ? "Pesquisei com ChatGPT e cruzei com os dados reais do sistema."
+        ? `Pesquisei com ${body.aiModel ?? "ChatGPT"} e cruzei com os dados reais do sistema.`
         : "Montei com ranking interno e dados reais disponiveis."),
   };
 }

@@ -97,6 +97,103 @@ type SpotifyTopTracksResponse = {
 
 type OpenAIResponseObject = Record<string, unknown>;
 
+const PLAYLIST_AI_RESPONSE_FORMAT = {
+  type: "json_schema",
+  name: "playlist_ai_response",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      action: {
+        type: "string",
+        enum: ["clarifying_question", "playlist_brief", "playlist_plan"],
+      },
+      message: { type: "string" },
+      questions: {
+        type: "array",
+        items: { type: "string" },
+      },
+      title: { type: "string" },
+      subtitle: { type: "string" },
+      targetSize: { type: "number" },
+      confidence: { type: "number" },
+      marketBlend: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          spotify: { type: "number" },
+          tiktok: { type: "number" },
+          catalog: { type: "number" },
+        },
+        required: ["spotify", "tiktok", "catalog"],
+      },
+      researchSummary: { type: "string" },
+      strategy: {
+        type: "array",
+        items: { type: "string" },
+      },
+      tracks: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            artist: { type: "string" },
+            spotifyTrackId: { type: ["string", "null"] },
+            source: {
+              type: "string",
+              enum: ["Spotify", "TikTok", "Catalogo", "Curadoria"],
+            },
+            energy: { type: "number" },
+            reason: { type: "string" },
+          },
+          required: [
+            "title",
+            "artist",
+            "spotifyTrackId",
+            "source",
+            "energy",
+            "reason",
+          ],
+        },
+      },
+      nextSteps: {
+        type: "array",
+        items: { type: "string" },
+      },
+      researchSources: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            url: { type: "string" },
+          },
+          required: ["title", "url"],
+        },
+      },
+    },
+    required: [
+      "action",
+      "message",
+      "questions",
+      "title",
+      "subtitle",
+      "targetSize",
+      "confidence",
+      "marketBlend",
+      "researchSummary",
+      "strategy",
+      "tracks",
+      "nextSteps",
+      "researchSources",
+    ],
+  },
+} as const;
+
 type CuratorIntent =
   | {
       action: "clarifying_question";
@@ -642,6 +739,10 @@ Pesquisa externa obrigatoria quando for montar playlist:
 ${researchQueries.map((query) => `  - ${query}`).join("\n")}
 - Dê preferencia a fontes confiaveis e/ou verificaveis: charts, plataformas, paginas oficiais, veiculos de musica/entretenimento, rankings publicos e agregadores reconheciveis.
 - Nao dependa apenas dos dados internos. Use dados internos para resolver IDs do Spotify e dados externos para confirmar hype/momentum.
+- Trabalhe como diretor de playlist: defina uma tese editorial, escolha ancoras populares, adicione apostas com sinal real e organize a ordem para reduzir skip.
+- Nao selecione faixa apenas porque e famosa. Cada faixa precisa ter fit com brand, momento de uso, energia, recorte e algum sinal de demanda.
+- Se uma faixa vier de pesquisa externa e nao estiver nas candidatas internas, inclua title/artist e spotifyTrackId null. O sistema tentara resolver na Spotify API depois.
+- Se uma fonte externa nao confirmar um ranking exato, nao invente posicao. Cite o sinal de forma honesta: tendencia social, cobertura, chart publico, artista aquecido ou fit editorial.
 
 Regra de conversa:
 - Esta chamada so deve acontecer depois que o usuario confirmou o brief/brand da playlist.
@@ -655,19 +756,40 @@ Regras:
 - Monte 10 a 14 faixas, ordenadas com logica editorial.
 - Cada reason deve citar sinais concretos: TikTok/Reels/Shorts/Spotify chart/noticia/perfil da conta, quando houver.
 - Responda somente JSON valido, sem markdown.
+- O JSON precisa seguir o schema definido pela API. Mesmo quando action nao for playlist_plan, preencha os campos de playlist com valores neutros: strings vazias, numeros 0 e arrays vazios.
 
 Formato obrigatorio se precisar perguntar:
 {
   "action": "clarifying_question",
   "message": "Pra eu acertar a vibe real antes de criar...",
-  "questions": ["pergunta curta"]
+  "questions": ["pergunta curta"],
+  "title": "",
+  "subtitle": "",
+  "targetSize": 0,
+  "confidence": 0,
+  "marketBlend": { "spotify": 0, "tiktok": 0, "catalog": 0 },
+  "researchSummary": "",
+  "strategy": [],
+  "tracks": [],
+  "nextSteps": [],
+  "researchSources": []
 }
 
 Formato reservado para etapa anterior, se for necessario devolver brief:
 {
   "action": "playlist_brief",
   "message": "Brief da playlist...",
-  "questions": ["confirmar ou ajustar"]
+  "questions": ["confirmar ou ajustar"],
+  "title": "",
+  "subtitle": "",
+  "targetSize": 0,
+  "confidence": 0,
+  "marketBlend": { "spotify": 0, "tiktok": 0, "catalog": 0 },
+  "researchSummary": "",
+  "strategy": [],
+  "tracks": [],
+  "nextSteps": [],
+  "researchSources": []
 }
 
 Formato obrigatorio se for montar playlist:
@@ -774,11 +896,14 @@ async function runOpenAICurator(input: string) {
     },
     body: JSON.stringify({
       model: credentials.model,
-      reasoning: { effort: "low" },
+      reasoning: { effort: "high" },
+      text: {
+        format: PLAYLIST_AI_RESPONSE_FORMAT,
+      },
       tools: [
         {
           type: "web_search",
-          search_context_size: "medium",
+          search_context_size: "high",
           user_location: {
             type: "approximate",
             country: "BR",
@@ -803,6 +928,8 @@ async function runOpenAICurator(input: string) {
   return {
     json: parseJsonObject(extractOpenAIText(body)),
     sources: collectOpenAISources(body),
+    model: credentials.model,
+    source: credentials.source,
   };
 }
 
@@ -1234,6 +1361,8 @@ export async function POST(request: Request) {
     let plan: PlaylistPlan;
     let mode: "openai-agent" | "fallback";
     let message: string;
+    let aiModel: string | null = null;
+    let aiSource: "global_app" | "workspace_app" | null = null;
 
     try {
       const aiResult = await runOpenAICurator(
@@ -1286,8 +1415,10 @@ export async function POST(request: Request) {
 
         plan = intent.plan;
         mode = "openai-agent";
+        aiModel = aiResult.model;
+        aiSource = aiResult.source;
         message =
-          "Brief confirmado. Pesquisei em fontes externas com ChatGPT e cruzei com Spotify API, charts internos, TikTok/Kworb e teu contexto de conta. Revisa a lista e, se fizer sentido, cria no Spotify.";
+          `Brief confirmado. Usei ${aiResult.model} (${aiResult.source === "workspace_app" ? "chave do workspace" : "chave global"}) com pesquisa web profunda e cruzei com Spotify API, charts internos, TikTok/Kworb e teu contexto de conta. Revisa a lista e, se fizer sentido, cria no Spotify.`;
       } else {
         plan = buildFallbackPlan(
           planningPrompt,
@@ -1311,7 +1442,7 @@ export async function POST(request: Request) {
         "A pesquisa com ChatGPT falhou agora, entao usei o ranking interno para nao travar o fluxo.";
     }
 
-    const response = NextResponse.json({ message, mode, plan });
+    const response = NextResponse.json({ message, mode, plan, aiModel, aiSource });
     if (refreshedToken) setSpotifyAuthCookies(response, refreshedToken);
     return response;
   } catch (error) {
