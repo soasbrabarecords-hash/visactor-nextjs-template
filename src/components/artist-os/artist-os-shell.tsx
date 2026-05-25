@@ -10,34 +10,42 @@ export default function ArtistOsShell({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.10),transparent_26%),linear-gradient(180deg,#06101f_0%,#030712_46%,#020617_100%)] text-white">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.15),transparent_24%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_27%),radial-gradient(circle_at_bottom_right,rgba(245,158,11,0.08),transparent_24%),linear-gradient(180deg,#071120_0%,#030712_48%,#020617_100%)] text-white">
       <Container className="py-5">
-        <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.045] p-4 shadow-[0_28px_110px_-70px_rgba(14,165,233,0.45)] backdrop-blur-2xl tablet:p-5">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 left-12 h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-[34px] border border-white/12 bg-[linear-gradient(135deg,rgba(15,23,42,0.88),rgba(8,47,73,0.38),rgba(6,78,59,0.20))] p-4 shadow-[0_28px_120px_-72px_rgba(14,165,233,0.55)] backdrop-blur-2xl tablet:p-5">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-emerald-300/14 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 left-12 h-72 w-72 rounded-full bg-sky-300/14 blur-3xl" />
+          <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-emerald-200/70 via-sky-200/50 to-transparent" />
 
-          <div className="relative flex flex-col gap-4 laptop:flex-row laptop:items-end laptop:justify-between">
+          <div className="relative flex flex-col gap-4 laptop:flex-row laptop:items-center laptop:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
+              <div className="inline-flex rounded-full border border-emerald-300/25 bg-emerald-300/12 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100">
                 ArtistOS
               </div>
-              <h1 className="mt-4 text-3xl font-black tracking-[-0.055em] text-white tablet:text-5xl">
-                Gestão artística sem ruído.
+              <h1 className="mt-4 text-3xl font-black tracking-[-0.045em] text-white tablet:text-5xl">
+                Gestão artística
               </h1>
-              <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-white/56">
-                Shows, caixa, publicidade, contratos e tarefas em um módulo isolado
-                para escalar o System Só As Braba.
+              <p className="mt-2 max-w-3xl text-base font-semibold leading-7 text-white/68">
+                Operação completa para artistas: agenda, vendas, publi, caixa,
+                contratos e tarefas no mesmo painel.
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-3">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-                Arquitetura
+            <div className="grid gap-2 sm:grid-cols-2 laptop:w-[390px]">
+              <div className="rounded-[24px] border border-sky-300/18 bg-sky-300/[0.08] p-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-100/55">
+                  Operação
+                </div>
+                <div className="mt-1 text-sm font-black text-white">Shows + contratos</div>
+                <div className="text-xs font-medium text-sky-50/62">Controle comercial e agenda.</div>
               </div>
-              <div className="mt-1 text-sm font-semibold text-white">
-                Módulo independente
+              <div className="rounded-[24px] border border-emerald-300/18 bg-emerald-300/[0.08] p-3">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100/55">
+                  Caixa
+                </div>
+                <div className="mt-1 text-sm font-black text-white">Financeiro por artista</div>
+                <div className="text-xs font-medium text-emerald-50/62">Entradas, saídas e atrasos.</div>
               </div>
-              <div className="text-xs text-white/44">Pronto para virar produto separado.</div>
             </div>
           </div>
 
@@ -54,10 +62,10 @@ export default function ArtistOsShell({ children }: { children: React.ReactNode 
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase tracking-[0.12em] transition",
+                    "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.12em] transition",
                     active
-                      ? "border-white/30 bg-white text-slate-950 shadow-[0_16px_40px_rgba(255,255,255,0.12)]"
-                      : "border-white/10 bg-white/[0.035] text-white/58 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                      ? "border-white/35 bg-white text-slate-950 shadow-[0_16px_40px_rgba(255,255,255,0.14)]"
+                      : "border-white/12 bg-black/18 text-white/68 hover:border-white/22 hover:bg-white/[0.09] hover:text-white",
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -73,4 +81,3 @@ export default function ArtistOsShell({ children }: { children: React.ReactNode 
     </div>
   );
 }
-

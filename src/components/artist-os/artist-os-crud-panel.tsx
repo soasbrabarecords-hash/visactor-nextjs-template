@@ -16,13 +16,14 @@ import { Button } from "@/components/ui/button";
 import type {
   ArtistOsFieldConfig,
   ArtistOsFilterConfig,
-  ArtistOsResourceConfig,
+  ArtistOsResourceKey,
 } from "@/lib/artist-os-config";
+import { artistOsResources } from "@/lib/artist-os-config";
 import type { ArtistOsArtistOption, ArtistOsRecord } from "@/lib/artist-os-types";
 import { cn } from "@/lib/utils";
 
 type ArtistOsCrudPanelProps = {
-  config: ArtistOsResourceConfig;
+  resourceKey: ArtistOsResourceKey;
   initialRows: ArtistOsRecord[];
   artists: ArtistOsArtistOption[];
   tableReady: boolean;
@@ -117,7 +118,7 @@ function formatCell(
 
 function matchesFilters(
   row: ArtistOsRecord,
-  config: ArtistOsResourceConfig,
+  config: (typeof artistOsResources)[ArtistOsResourceKey],
   query: string,
   filters: Record<string, string>,
 ) {
@@ -277,13 +278,60 @@ function FilterControl({
   );
 }
 
+const resourceTone = {
+  artists: {
+    shell: "from-emerald-400/[0.16] via-white/[0.055] to-sky-400/[0.08]",
+    icon: "border-emerald-300/25 bg-emerald-300/[0.12] text-emerald-100",
+    pill: "border-emerald-300/25 bg-emerald-300/[0.12] text-emerald-100",
+    line: "from-emerald-300 via-sky-300 to-transparent",
+  },
+  shows: {
+    shell: "from-sky-400/[0.17] via-white/[0.055] to-indigo-400/[0.08]",
+    icon: "border-sky-300/25 bg-sky-300/[0.12] text-sky-100",
+    pill: "border-sky-300/25 bg-sky-300/[0.12] text-sky-100",
+    line: "from-sky-300 via-indigo-300 to-transparent",
+  },
+  deals: {
+    shell: "from-violet-400/[0.16] via-white/[0.055] to-sky-400/[0.08]",
+    icon: "border-violet-300/25 bg-violet-300/[0.12] text-violet-100",
+    pill: "border-violet-300/25 bg-violet-300/[0.12] text-violet-100",
+    line: "from-violet-300 via-sky-300 to-transparent",
+  },
+  "brand-deals": {
+    shell: "from-amber-300/[0.18] via-white/[0.055] to-orange-400/[0.08]",
+    icon: "border-amber-300/25 bg-amber-300/[0.12] text-amber-100",
+    pill: "border-amber-300/25 bg-amber-300/[0.12] text-amber-100",
+    line: "from-amber-200 via-orange-300 to-transparent",
+  },
+  finance: {
+    shell: "from-lime-300/[0.16] via-white/[0.055] to-emerald-400/[0.08]",
+    icon: "border-lime-300/25 bg-lime-300/[0.12] text-lime-100",
+    pill: "border-lime-300/25 bg-lime-300/[0.12] text-lime-100",
+    line: "from-lime-200 via-emerald-300 to-transparent",
+  },
+  contracts: {
+    shell: "from-slate-300/[0.14] via-white/[0.055] to-blue-400/[0.08]",
+    icon: "border-slate-200/20 bg-slate-200/[0.10] text-slate-100",
+    pill: "border-slate-200/20 bg-slate-200/[0.10] text-slate-100",
+    line: "from-slate-200 via-blue-300 to-transparent",
+  },
+  tasks: {
+    shell: "from-rose-400/[0.15] via-white/[0.055] to-amber-400/[0.08]",
+    icon: "border-rose-300/25 bg-rose-300/[0.12] text-rose-100",
+    pill: "border-rose-300/25 bg-rose-300/[0.12] text-rose-100",
+    line: "from-rose-300 via-amber-300 to-transparent",
+  },
+} satisfies Record<ArtistOsResourceKey, { shell: string; icon: string; pill: string; line: string }>;
+
 export default function ArtistOsCrudPanel({
-  config,
+  resourceKey,
   initialRows,
   artists,
   tableReady,
   initialError,
 }: ArtistOsCrudPanelProps) {
+  const config = artistOsResources[resourceKey];
+  const tone = resourceTone[resourceKey];
   const [rows, setRows] = useState(initialRows);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -407,20 +455,26 @@ export default function ArtistOsCrudPanel({
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.045] shadow-[0_20px_90px_-60px_rgba(0,0,0,0.9)]">
+      <section
+        className={cn(
+          "relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br shadow-[0_24px_100px_-64px_rgba(0,0,0,0.95)]",
+          tone.shell,
+        )}
+      >
+        <div className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r", tone.line)} />
         <div className="flex flex-col gap-4 border-b border-white/10 p-4 tablet:p-5 laptop:flex-row laptop:items-center laptop:justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white">
+            <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border shadow-inner", tone.icon)}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+              <div className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", tone.pill)}>
                 {config.eyebrow}
               </div>
-              <h2 className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+              <h2 className="mt-2 text-2xl font-black tracking-[-0.035em] text-white">
                 {config.title}
               </h2>
-              <p className="mt-1 max-w-3xl text-sm font-medium leading-6 text-white/50">
+              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-white/62">
                 {config.description}
               </p>
             </div>
@@ -432,7 +486,7 @@ export default function ArtistOsCrudPanel({
               variant="outline"
               onClick={reloadRows}
               disabled={isReloading}
-              className="rounded-full border-white/10 bg-white/[0.03] text-white hover:bg-white/10"
+              className="rounded-full border-white/15 bg-white/[0.06] text-white hover:bg-white/12"
             >
               {isReloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Atualizar
@@ -466,15 +520,15 @@ export default function ArtistOsCrudPanel({
         ) : null}
 
         <div className="grid gap-3 p-4 tablet:p-5 laptop:grid-cols-[minmax(260px,1fr)_auto] laptop:items-end">
-          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-white/38">
+          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-white/50">
             Buscar
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/42" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={`Buscar ${config.singular}...`}
-                className="w-full rounded-2xl border border-white/10 bg-black/24 py-2.5 pl-9 pr-3 text-sm font-semibold text-white outline-none placeholder:text-white/25 focus:border-white/25"
+                className="w-full rounded-2xl border border-white/12 bg-black/30 py-2.5 pl-9 pr-3 text-sm font-semibold text-white outline-none placeholder:text-white/34 focus:border-white/30"
               />
             </div>
           </label>
@@ -495,7 +549,7 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {isFormOpen ? (
-          <form onSubmit={submit} className="mx-4 mb-4 rounded-[26px] border border-white/10 bg-black/24 p-4 tablet:mx-5 tablet:mb-5">
+          <form onSubmit={submit} className="mx-4 mb-4 rounded-[28px] border border-white/12 bg-slate-950/55 p-4 shadow-inner shadow-white/[0.03] tablet:mx-5 tablet:mb-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
@@ -552,10 +606,10 @@ export default function ArtistOsCrudPanel({
           </form>
         ) : null}
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto border-t border-white/10 bg-slate-950/28">
           <table className="w-full min-w-[860px] text-left">
             <thead>
-              <tr className="border-y border-white/10 bg-black/16 text-[11px] font-black uppercase tracking-[0.14em] text-white/38">
+              <tr className="border-y border-white/10 bg-white/[0.035] text-[11px] font-black uppercase tracking-[0.14em] text-white/52">
                 {config.columns.map((column) => (
                   <th key={column.key} className="px-4 py-3">
                     {column.label}
@@ -566,7 +620,7 @@ export default function ArtistOsCrudPanel({
             </thead>
             <tbody>
               {filteredRows.map((row) => (
-                <tr key={row.id} className="border-b border-white/10 text-sm text-white/70 transition hover:bg-white/[0.035]">
+                <tr key={row.id} className="border-b border-white/10 text-sm font-semibold text-white/78 transition hover:bg-white/[0.05]">
                   {config.columns.map((column) => (
                     <td key={column.key} className="max-w-[260px] px-4 py-3">
                       <div className="truncate">

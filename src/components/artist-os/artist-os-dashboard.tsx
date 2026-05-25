@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
   ArrowRight,
@@ -53,32 +54,64 @@ function metricCard({
   value: string | number;
   helper: string;
   tone: "emerald" | "sky" | "amber" | "rose" | "slate";
-  icon: typeof CalendarDays;
+  icon: LucideIcon;
 }) {
   const tones = {
-    emerald: "border-emerald-300/16 bg-emerald-300/[0.08] text-emerald-100",
-    sky: "border-sky-300/16 bg-sky-300/[0.08] text-sky-100",
-    amber: "border-amber-300/18 bg-amber-300/[0.09] text-amber-100",
-    rose: "border-rose-300/18 bg-rose-300/[0.08] text-rose-100",
-    slate: "border-white/10 bg-white/[0.045] text-white",
+    emerald: {
+      card: "border-emerald-300/18 bg-[linear-gradient(145deg,rgba(16,185,129,0.16),rgba(15,23,42,0.78)_58%,rgba(6,78,59,0.18))]",
+      icon: "border-emerald-200/24 bg-emerald-300/[0.13] text-emerald-100",
+      line: "from-emerald-200 via-teal-300 to-transparent",
+      helper: "text-emerald-50/66",
+    },
+    sky: {
+      card: "border-sky-300/18 bg-[linear-gradient(145deg,rgba(14,165,233,0.15),rgba(15,23,42,0.78)_58%,rgba(30,64,175,0.15))]",
+      icon: "border-sky-200/24 bg-sky-300/[0.13] text-sky-100",
+      line: "from-sky-200 via-cyan-300 to-transparent",
+      helper: "text-sky-50/66",
+    },
+    amber: {
+      card: "border-amber-300/20 bg-[linear-gradient(145deg,rgba(245,158,11,0.16),rgba(15,23,42,0.78)_58%,rgba(120,53,15,0.18))]",
+      icon: "border-amber-200/24 bg-amber-300/[0.13] text-amber-100",
+      line: "from-amber-200 via-orange-300 to-transparent",
+      helper: "text-amber-50/68",
+    },
+    rose: {
+      card: "border-rose-300/20 bg-[linear-gradient(145deg,rgba(244,63,94,0.14),rgba(15,23,42,0.78)_58%,rgba(127,29,29,0.16))]",
+      icon: "border-rose-200/24 bg-rose-300/[0.13] text-rose-100",
+      line: "from-rose-200 via-orange-300 to-transparent",
+      helper: "text-rose-50/66",
+    },
+    slate: {
+      card: "border-white/11 bg-[linear-gradient(145deg,rgba(148,163,184,0.11),rgba(15,23,42,0.82)_58%,rgba(30,41,59,0.28))]",
+      icon: "border-white/12 bg-white/[0.075] text-white",
+      line: "from-white/65 via-slate-300/45 to-transparent",
+      helper: "text-white/58",
+    },
   } as const;
+  const toneConfig = tones[tone];
 
   return (
-    <article className={cn("rounded-[26px] border p-4 shadow-[0_18px_70px_-52px_rgba(0,0,0,0.9)]", tones[tone])}>
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-[28px] border p-4 shadow-[0_20px_80px_-55px_rgba(0,0,0,0.95)]",
+        toneConfig.card,
+      )}
+    >
+      <div className={cn("absolute inset-x-5 top-0 h-px bg-gradient-to-r", toneConfig.line)} />
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/42">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">
             {label}
           </div>
           <div className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">
             {value}
           </div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]">
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl border shadow-inner", toneConfig.icon)}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className="mt-3 text-sm font-medium leading-5 text-white/52">{helper}</p>
+      <p className={cn("mt-3 text-sm font-semibold leading-5", toneConfig.helper)}>{helper}</p>
     </article>
   );
 }
@@ -89,15 +122,30 @@ function ListCard({
   rows,
   empty,
   render,
+  tone = "slate",
 }: {
   title: string;
   href: string;
   rows: ArtistOsRecord[];
   empty: string;
   render: (row: ArtistOsRecord) => React.ReactNode;
+  tone?: "emerald" | "sky" | "amber" | "rose" | "slate";
 }) {
+  const tones = {
+    emerald: "border-emerald-300/14 bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.78)_65%)]",
+    sky: "border-sky-300/14 bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.78)_65%)]",
+    amber: "border-amber-300/16 bg-[linear-gradient(145deg,rgba(245,158,11,0.10),rgba(15,23,42,0.78)_65%)]",
+    rose: "border-rose-300/16 bg-[linear-gradient(145deg,rgba(244,63,94,0.10),rgba(15,23,42,0.78)_65%)]",
+    slate: "border-white/10 bg-white/[0.045]",
+  } as const;
+
   return (
-    <section className="rounded-[30px] border border-white/10 bg-white/[0.045] p-4 shadow-[0_20px_80px_-60px_rgba(0,0,0,0.9)]">
+    <section
+      className={cn(
+        "rounded-[30px] border p-4 shadow-[0_20px_80px_-60px_rgba(0,0,0,0.95)]",
+        tones[tone],
+      )}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-base font-black tracking-[-0.02em] text-white">{title}</h2>
         <Link
@@ -110,7 +158,7 @@ function ListCard({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[22px] border border-dashed border-white/10 bg-black/20 p-5 text-sm font-medium text-white/42">
+        <div className="rounded-[22px] border border-dashed border-white/12 bg-black/24 p-5 text-sm font-semibold text-white/50">
           {empty}
         </div>
       ) : (
@@ -239,6 +287,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/shows"
           rows={nextShows}
           empty="Nenhum show cadastrado ainda."
+          tone="sky"
           render={(show) => (
             <RowShell key={show.id}>
               <div className="flex items-center justify-between gap-3">
@@ -261,6 +310,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/deals"
           rows={latestDeals}
           empty="Nenhuma negociação no pipeline."
+          tone="emerald"
           render={(deal) => (
             <RowShell key={deal.id}>
               <div className="flex items-center justify-between gap-3">
@@ -279,6 +329,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/finance"
           rows={latestFinance}
           empty="Nenhuma movimentação financeira."
+          tone="amber"
           render={(row) => (
             <RowShell key={row.id}>
               <div className="flex items-center justify-between gap-3">
@@ -307,6 +358,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/tasks"
           rows={urgentTasks.length > 0 ? urgentTasks : pendingTasks}
           empty="Nenhuma tarefa pendente."
+          tone={urgentTasks.length > 0 ? "rose" : "slate"}
           render={(task) => (
             <RowShell key={task.id}>
               <div className="flex items-center justify-between gap-3">

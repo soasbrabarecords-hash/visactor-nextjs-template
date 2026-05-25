@@ -14,9 +14,9 @@ import ArtistOsCrudPanel from "@/components/artist-os/artist-os-crud-panel";
 import { getArtistOsResource } from "@/lib/artist-os";
 import {
   artistOsNavigation,
-  getArtistOsResourceConfig,
   type ArtistOsResourceKey,
 } from "@/lib/artist-os-config";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -35,24 +35,39 @@ function PlaceholderCard({
   description,
   href,
   icon: Icon,
+  tone = "slate",
 }: {
   title: string;
   description: string;
   href?: string;
   icon: LucideIcon;
+  tone?: "emerald" | "sky" | "amber" | "rose" | "slate";
 }) {
+  const tones = {
+    emerald: "border-emerald-300/16 bg-[linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.78)_62%)] text-emerald-100",
+    sky: "border-sky-300/16 bg-[linear-gradient(145deg,rgba(14,165,233,0.12),rgba(15,23,42,0.78)_62%)] text-sky-100",
+    amber: "border-amber-300/18 bg-[linear-gradient(145deg,rgba(245,158,11,0.12),rgba(15,23,42,0.78)_62%)] text-amber-100",
+    rose: "border-rose-300/18 bg-[linear-gradient(145deg,rgba(244,63,94,0.11),rgba(15,23,42,0.78)_62%)] text-rose-100",
+    slate: "border-white/10 bg-white/[0.045] text-white",
+  } as const;
+
   const content = (
-    <div className="group rounded-[26px] border border-white/10 bg-white/[0.045] p-4 transition hover:-translate-y-0.5 hover:border-white/18 hover:bg-white/[0.065]">
+    <div
+      className={cn(
+        "group rounded-[26px] border p-4 transition hover:-translate-y-0.5 hover:border-white/22 hover:bg-white/[0.07]",
+        tones[tone],
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-black/20">
-          <Icon className="h-5 w-5 text-white/70" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.07] shadow-inner">
+          <Icon className="h-5 w-5" />
         </div>
         {href ? (
           <ArrowRight className="h-4 w-4 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/65" />
         ) : null}
       </div>
       <h3 className="mt-4 text-base font-black text-white">{title}</h3>
-      <p className="mt-1 text-sm font-medium leading-6 text-white/48">{description}</p>
+      <p className="mt-1 text-sm font-semibold leading-6 text-white/56">{description}</p>
     </div>
   );
 
@@ -61,7 +76,7 @@ function PlaceholderCard({
 
 function ReportsPage() {
   return (
-    <section className="rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.9)]">
+    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.80)_48%,rgba(2,6,23,0.92))] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.95)]">
       <div className="max-w-3xl">
         <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
           Relatórios
@@ -81,24 +96,28 @@ function ReportsPage() {
           description="Agenda, cachês, status e cidades mais fortes."
           href="/artist-os/shows"
           icon={CalendarDays}
+          tone="sky"
         />
         <PlaceholderCard
           title="Relatório financeiro"
           description="Entradas, saídas, lucro/prejuízo e atrasos."
           href="/artist-os/finance"
           icon={BadgeDollarSign}
+          tone="emerald"
         />
         <PlaceholderCard
           title="Publicidade"
           description="Campanhas, marcas, entregas e comprovações."
           href="/artist-os/brand-deals"
           icon={Megaphone}
+          tone="amber"
         />
         <PlaceholderCard
           title="Tarefas"
           description="Pendências por responsável, prazo e prioridade."
           href="/artist-os/tasks"
           icon={ClipboardCheck}
+          tone="rose"
         />
         <PlaceholderCard
           title="Por artista"
@@ -113,7 +132,7 @@ function ReportsPage() {
 
 function SettingsPage() {
   return (
-    <section className="rounded-[30px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.9)]">
+    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.80)_48%,rgba(2,6,23,0.92))] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.95)]">
       <div className="flex flex-col gap-4 laptop:flex-row laptop:items-start laptop:justify-between">
         <div className="max-w-3xl">
           <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
@@ -123,7 +142,7 @@ function SettingsPage() {
             ArtistOS pronto para multi-perfis
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-white/50">
-            A base ja nasce com workspace, created_by e estrutura para roles:
+            A base já nasce com workspace, created_by e estrutura para roles:
             admin, manager, financeiro, artista e equipe. No MVP, a autenticação
             atual do sistema continua controlando o acesso.
           </p>
@@ -145,6 +164,7 @@ function SettingsPage() {
             description="Configurações específicas serão plugadas aqui em uma próxima fase."
             href={item.href}
             icon={item.icon}
+            tone={item.key === "brand-deals" ? "amber" : item.key === "tasks" ? "rose" : "sky"}
           />
         ))}
       </div>
@@ -163,14 +183,11 @@ export default async function ArtistOsSectionPage({
   if (section === "settings") return <SettingsPage />;
   if (!resourceSections.has(section)) notFound();
 
-  const config = getArtistOsResourceConfig(section);
-  if (!config) notFound();
-
   const data = await getArtistOsResource(section as ArtistOsResourceKey);
 
   return (
     <ArtistOsCrudPanel
-      config={config}
+      resourceKey={section as ArtistOsResourceKey}
       initialRows={data.rows}
       artists={data.artists}
       tableReady={data.tableReady}
