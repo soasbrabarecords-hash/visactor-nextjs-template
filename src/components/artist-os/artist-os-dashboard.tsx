@@ -58,60 +58,46 @@ function metricCard({
 }) {
   const tones = {
     emerald: {
-      card: "border-emerald-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(110,231,183,0.34),transparent_32%),linear-gradient(135deg,rgba(6,95,70,0.92),rgba(5,46,22,0.80)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-emerald-100/35 bg-emerald-200/20 text-emerald-50",
-      rail: "from-emerald-200 via-lime-300 to-emerald-400",
-      label: "text-emerald-50/76",
-      helper: "text-emerald-50/78",
-      glow: "bg-emerald-300/24",
+      card: "bg-[linear-gradient(145deg,rgba(16,185,129,0.24),rgba(15,23,42,0.94)_62%)] text-emerald-50",
+      icon: "bg-emerald-400/14 text-emerald-100 ring-1 ring-inset ring-emerald-200/14",
+      accent: "text-emerald-100",
+      helper: "text-emerald-50/72",
     },
     sky: {
-      card: "border-sky-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(125,211,252,0.34),transparent_32%),linear-gradient(135deg,rgba(3,105,161,0.92),rgba(12,74,110,0.78)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-sky-100/35 bg-sky-200/20 text-sky-50",
-      rail: "from-sky-200 via-cyan-300 to-blue-400",
-      label: "text-sky-50/76",
-      helper: "text-sky-50/78",
-      glow: "bg-sky-300/24",
+      card: "bg-[linear-gradient(145deg,rgba(14,165,233,0.24),rgba(15,23,42,0.94)_62%)] text-sky-50",
+      icon: "bg-sky-400/14 text-sky-100 ring-1 ring-inset ring-sky-200/14",
+      accent: "text-sky-100",
+      helper: "text-sky-50/72",
     },
     amber: {
-      card: "border-amber-200/38 bg-[radial-gradient(circle_at_85%_12%,rgba(253,230,138,0.38),transparent_32%),linear-gradient(135deg,rgba(180,83,9,0.92),rgba(120,53,15,0.80)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-amber-100/35 bg-amber-200/20 text-amber-50",
-      rail: "from-amber-100 via-yellow-300 to-orange-400",
-      label: "text-amber-50/80",
-      helper: "text-amber-50/80",
-      glow: "bg-amber-300/24",
+      card: "bg-[linear-gradient(145deg,rgba(245,158,11,0.26),rgba(15,23,42,0.94)_62%)] text-amber-50",
+      icon: "bg-amber-400/14 text-amber-100 ring-1 ring-inset ring-amber-200/14",
+      accent: "text-amber-100",
+      helper: "text-amber-50/74",
     },
     rose: {
-      card: "border-rose-200/38 bg-[radial-gradient(circle_at_85%_12%,rgba(253,164,175,0.34),transparent_32%),linear-gradient(135deg,rgba(190,18,60,0.92),rgba(127,29,29,0.82)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-rose-100/35 bg-rose-200/20 text-rose-50",
-      rail: "from-rose-100 via-red-300 to-orange-400",
-      label: "text-rose-50/78",
-      helper: "text-rose-50/78",
-      glow: "bg-rose-300/24",
+      card: "bg-[linear-gradient(145deg,rgba(244,63,94,0.24),rgba(15,23,42,0.94)_62%)] text-rose-50",
+      icon: "bg-rose-400/14 text-rose-100 ring-1 ring-inset ring-rose-200/14",
+      accent: "text-rose-100",
+      helper: "text-rose-50/72",
     },
     violet: {
-      card: "border-violet-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(196,181,253,0.32),transparent_32%),linear-gradient(135deg,rgba(109,40,217,0.90),rgba(76,29,149,0.78)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-violet-100/35 bg-violet-200/20 text-violet-50",
-      rail: "from-violet-100 via-fuchsia-300 to-violet-500",
-      label: "text-violet-50/78",
-      helper: "text-violet-50/78",
-      glow: "bg-violet-300/22",
+      card: "bg-[linear-gradient(145deg,rgba(139,92,246,0.24),rgba(15,23,42,0.94)_62%)] text-violet-50",
+      icon: "bg-violet-400/14 text-violet-100 ring-1 ring-inset ring-violet-200/14",
+      accent: "text-violet-100",
+      helper: "text-violet-50/72",
     },
     cyan: {
-      card: "border-cyan-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(103,232,249,0.32),transparent_32%),linear-gradient(135deg,rgba(14,116,144,0.90),rgba(21,94,117,0.78)_52%,rgba(15,23,42,0.88))]",
-      icon: "border-cyan-100/35 bg-cyan-200/20 text-cyan-50",
-      rail: "from-cyan-100 via-teal-300 to-emerald-400",
-      label: "text-cyan-50/78",
-      helper: "text-cyan-50/78",
-      glow: "bg-cyan-300/22",
+      card: "bg-[linear-gradient(145deg,rgba(6,182,212,0.24),rgba(15,23,42,0.94)_62%)] text-cyan-50",
+      icon: "bg-cyan-400/14 text-cyan-100 ring-1 ring-inset ring-cyan-200/14",
+      accent: "text-cyan-100",
+      helper: "text-cyan-50/72",
     },
     slate: {
-      card: "border-slate-200/22 bg-[radial-gradient(circle_at_85%_12%,rgba(203,213,225,0.18),transparent_32%),linear-gradient(135deg,rgba(51,65,85,0.82),rgba(30,41,59,0.76)_52%,rgba(15,23,42,0.90))]",
-      icon: "border-white/18 bg-white/[0.10] text-white",
-      rail: "from-white/70 via-slate-300/60 to-slate-500",
-      label: "text-white/68",
-      helper: "text-white/64",
-      glow: "bg-white/12",
+      card: "bg-[linear-gradient(145deg,rgba(100,116,139,0.18),rgba(15,23,42,0.94)_62%)] text-white",
+      icon: "bg-white/[0.08] text-white/82 ring-1 ring-inset ring-white/10",
+      accent: "text-white/82",
+      helper: "text-white/60",
     },
   } as const;
   const toneConfig = tones[tone];
@@ -119,28 +105,24 @@ function metricCard({
   return (
     <article
       className={cn(
-        "group relative min-h-[150px] overflow-hidden rounded-[30px] border p-4 shadow-[0_24px_95px_-58px_rgba(0,0,0,0.95)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_30px_105px_-58px_rgba(0,0,0,0.95)]",
+        "relative min-h-[140px] overflow-hidden rounded-[28px] p-4 shadow-[0_18px_70px_-56px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07] transition duration-300 hover:-translate-y-0.5 hover:ring-white/12",
         toneConfig.card,
       )}
     >
-      <div className={cn("absolute inset-y-4 left-0 w-1 rounded-r-full bg-gradient-to-b", toneConfig.rail)} />
-      <div className={cn("pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full blur-2xl", toneConfig.glow)} />
-      <div className={cn("absolute inset-x-5 top-0 h-px bg-gradient-to-r", toneConfig.rail)} />
-
       <div className="relative flex items-start justify-between gap-3">
         <div>
-          <div className={cn("text-[10px] font-black uppercase tracking-[0.18em]", toneConfig.label)}>
+          <div className={cn("text-sm font-medium tracking-[-0.01em]", toneConfig.accent)}>
             {label}
           </div>
-          <div className="mt-3 text-4xl font-black tracking-[-0.055em] text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.35)]">
+          <div className="mt-3 text-4xl font-semibold tracking-[-0.055em] text-white">
             {value}
           </div>
         </div>
-        <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border shadow-inner backdrop-blur", toneConfig.icon)}>
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl backdrop-blur", toneConfig.icon)}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className={cn("relative mt-4 text-sm font-black leading-5", toneConfig.helper)}>
+      <p className={cn("relative mt-4 text-sm font-medium leading-5", toneConfig.helper)}>
         {helper}
       </p>
     </article>
@@ -163,27 +145,27 @@ function ListCard({
   tone?: "emerald" | "sky" | "amber" | "rose" | "violet" | "cyan" | "slate";
 }) {
   const tones = {
-    emerald: "border-emerald-200/24 bg-[radial-gradient(circle_at_top_right,rgba(110,231,183,0.18),transparent_34%),linear-gradient(145deg,rgba(6,78,59,0.54),rgba(15,23,42,0.84)_66%)]",
-    sky: "border-sky-200/24 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.18),transparent_34%),linear-gradient(145deg,rgba(12,74,110,0.56),rgba(15,23,42,0.84)_66%)]",
-    amber: "border-amber-200/26 bg-[radial-gradient(circle_at_top_right,rgba(253,230,138,0.20),transparent_34%),linear-gradient(145deg,rgba(120,53,15,0.56),rgba(15,23,42,0.84)_66%)]",
-    rose: "border-rose-200/26 bg-[radial-gradient(circle_at_top_right,rgba(253,164,175,0.18),transparent_34%),linear-gradient(145deg,rgba(127,29,29,0.56),rgba(15,23,42,0.84)_66%)]",
-    violet: "border-violet-200/24 bg-[radial-gradient(circle_at_top_right,rgba(196,181,253,0.18),transparent_34%),linear-gradient(145deg,rgba(76,29,149,0.54),rgba(15,23,42,0.84)_66%)]",
-    cyan: "border-cyan-200/24 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.18),transparent_34%),linear-gradient(145deg,rgba(21,94,117,0.54),rgba(15,23,42,0.84)_66%)]",
-    slate: "border-white/12 bg-[linear-gradient(145deg,rgba(51,65,85,0.38),rgba(15,23,42,0.86)_66%)]",
+    emerald: "bg-[linear-gradient(145deg,rgba(16,185,129,0.16),rgba(15,23,42,0.94)_68%)]",
+    sky: "bg-[linear-gradient(145deg,rgba(14,165,233,0.16),rgba(15,23,42,0.94)_68%)]",
+    amber: "bg-[linear-gradient(145deg,rgba(245,158,11,0.17),rgba(15,23,42,0.94)_68%)]",
+    rose: "bg-[linear-gradient(145deg,rgba(244,63,94,0.16),rgba(15,23,42,0.94)_68%)]",
+    violet: "bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(15,23,42,0.94)_68%)]",
+    cyan: "bg-[linear-gradient(145deg,rgba(6,182,212,0.16),rgba(15,23,42,0.94)_68%)]",
+    slate: "bg-[linear-gradient(145deg,rgba(100,116,139,0.12),rgba(15,23,42,0.94)_68%)]",
   } as const;
 
   return (
     <section
       className={cn(
-        "rounded-[30px] border p-4 shadow-[0_20px_80px_-60px_rgba(0,0,0,0.95)]",
+        "rounded-[28px] p-4 shadow-[0_18px_70px_-58px_rgba(0,0,0,0.88)] ring-1 ring-inset ring-white/[0.07]",
         tones[tone],
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-black tracking-[-0.02em] text-white">{title}</h2>
+        <h2 className="text-base font-semibold tracking-[-0.02em] text-white/92">{title}</h2>
         <Link
           href={href}
-          className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-white/55 transition hover:border-white/20 hover:text-white"
+          className="inline-flex items-center gap-1 rounded-full bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-white/64 transition hover:bg-white/[0.11] hover:text-white"
         >
           Abrir
           <ArrowRight className="h-3.5 w-3.5" />
@@ -191,7 +173,7 @@ function ListCard({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[22px] border border-dashed border-white/12 bg-black/24 p-5 text-sm font-semibold text-white/50">
+        <div className="rounded-[22px] bg-black/20 p-5 text-sm font-medium text-white/56 ring-1 ring-inset ring-white/[0.06]">
           {empty}
         </div>
       ) : (
@@ -203,7 +185,7 @@ function ListCard({
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-black/20 px-3 py-3 transition hover:border-white/18 hover:bg-white/[0.055]">
+    <div className="rounded-[20px] bg-black/20 px-3 py-3 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.055]">
       {children}
     </div>
   );
@@ -244,10 +226,10 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
   return (
     <div className="space-y-5">
       {!data.tableReady ? (
-        <div className="flex items-start gap-3 rounded-[24px] border border-amber-300/20 bg-amber-300/[0.08] p-4 text-amber-100">
+        <div className="flex items-start gap-3 rounded-[24px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <div className="text-sm font-black">ArtistOS em modo demo</div>
+            <div className="text-sm font-semibold">ArtistOS em modo demo</div>
             <p className="mt-1 text-sm text-amber-100/70">
               A migration ainda precisa ser aplicada no Supabase para gravar dados reais.
             </p>
@@ -325,12 +307,12 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={show.id}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-white">{String(show.event_name ?? "Show")}</div>
+                  <div className="truncate text-sm font-medium text-white/92">{String(show.event_name ?? "Show")}</div>
                   <div className="mt-1 text-xs text-white/45">
                     {String(show.city ?? "Cidade aberta")} · {dateLabel(show.event_date)}
                   </div>
                 </div>
-                <div className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/55">
+                <div className="rounded-full bg-white/[0.07] px-2 py-1 text-xs font-medium text-white/60">
                   {String(show.status ?? "lead").replaceAll("_", " ")}
                 </div>
               </div>
@@ -348,10 +330,10 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={deal.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-white">{String(deal.contact_name ?? "Contato")}</div>
+                  <div className="text-sm font-medium text-white/92">{String(deal.contact_name ?? "Contato")}</div>
                   <div className="mt-1 text-xs text-white/45">{String(deal.event_type ?? "Evento")}</div>
                 </div>
-                <div className="text-sm font-bold text-white/70">{money(deal.estimated_budget)}</div>
+                <div className="text-sm font-medium text-white/70">{money(deal.estimated_budget)}</div>
               </div>
             </RowShell>
           )}
@@ -367,14 +349,14 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={row.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-white">{String(row.description ?? "Movimentação")}</div>
+                  <div className="text-sm font-medium text-white/92">{String(row.description ?? "Movimentação")}</div>
                   <div className="mt-1 text-xs text-white/45">
                     {String(row.category ?? "categoria")} · {String(row.status ?? "previsto")}
                   </div>
                 </div>
                 <div
                   className={cn(
-                    "text-sm font-black",
+                    "text-sm font-semibold",
                     row.transaction_type === "saida" ? "text-rose-200" : "text-emerald-200",
                   )}
                 >
@@ -396,12 +378,12 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={task.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-black text-white">{String(task.title ?? "Tarefa")}</div>
+                  <div className="text-sm font-medium text-white/92">{String(task.title ?? "Tarefa")}</div>
                   <div className="mt-1 text-xs text-white/45">
                     {String(task.assignee ?? "Sem responsável")} · {dateLabel(task.due_at)}
                   </div>
                 </div>
-                <div className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/55">
+                <div className="rounded-full bg-white/[0.07] px-2 py-1 text-xs font-medium text-white/60">
                   {String(task.priority ?? "media")}
                 </div>
               </div>

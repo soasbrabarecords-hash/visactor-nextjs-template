@@ -107,7 +107,7 @@ function formatCell(
 
   if (type === "status") {
     return (
-      <span className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white/70">
+      <span className="inline-flex rounded-full bg-white/[0.07] px-2.5 py-1 text-xs font-medium capitalize text-white/70 ring-1 ring-inset ring-white/[0.06]">
         {statusLabel(value)}
       </span>
     );
@@ -158,7 +158,7 @@ function FieldInput({
   onChange: (value: string | number | boolean | null) => void;
 }) {
   const baseClass =
-    "w-full rounded-2xl border border-white/10 bg-black/24 px-3 py-2.5 text-sm font-medium text-white outline-none transition placeholder:text-white/24 focus:border-white/28";
+    "w-full rounded-2xl bg-black/24 px-3 py-2.5 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] transition placeholder:text-white/28 focus:ring-white/18";
 
   if (field.type === "textarea") {
     return (
@@ -178,10 +178,10 @@ function FieldInput({
         type="button"
         onClick={() => onChange(!value)}
         className={cn(
-          "inline-flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-sm font-black transition",
+          "inline-flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-medium ring-1 ring-inset transition",
           value
-            ? "border-emerald-300/25 bg-emerald-300/12 text-emerald-100"
-            : "border-white/10 bg-black/24 text-white/50",
+            ? "bg-emerald-300/12 text-emerald-100 ring-emerald-200/14"
+            : "bg-black/24 text-white/54 ring-white/[0.07]",
         )}
       >
         <span>{value ? "Sim" : "Não"}</span>
@@ -240,11 +240,11 @@ function FilterControl({
   onChange: (value: string) => void;
 }) {
   const inputClass =
-    "rounded-2xl border border-white/10 bg-black/24 px-3 py-2.5 text-sm font-semibold text-white outline-none transition focus:border-white/25";
+    "rounded-2xl bg-black/24 px-3 py-2.5 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] transition focus:ring-white/18";
 
   if (filter.type === "month") {
     return (
-      <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-white/38">
+      <label className="grid gap-1 text-xs font-medium text-white/50">
         {filter.label}
         <input
           type="month"
@@ -262,7 +262,7 @@ function FilterControl({
       : filter.options ?? [];
 
   return (
-    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-white/38">
+    <label className="grid gap-1 text-xs font-medium text-white/50">
       {filter.label}
       <select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
         <option value="" className="bg-slate-950">
@@ -280,46 +280,46 @@ function FilterControl({
 
 const resourceTone = {
   artists: {
-    shell: "from-emerald-400/[0.26] via-emerald-950/45 to-sky-950/65",
-    icon: "border-emerald-100/35 bg-emerald-200/18 text-emerald-50",
-    pill: "border-emerald-200/35 bg-emerald-300/16 text-emerald-50",
-    line: "from-emerald-100 via-lime-300 to-transparent",
+    shell: "from-emerald-400/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-emerald-300/12 text-emerald-100 ring-1 ring-inset ring-emerald-200/12",
+    pill: "bg-emerald-300/10 text-emerald-100 ring-1 ring-inset ring-emerald-200/10",
+    line: "from-emerald-200/0 via-emerald-200/0 to-transparent",
   },
   shows: {
-    shell: "from-sky-400/[0.28] via-blue-950/48 to-slate-950",
-    icon: "border-sky-100/35 bg-sky-200/18 text-sky-50",
-    pill: "border-sky-200/35 bg-sky-300/16 text-sky-50",
-    line: "from-sky-100 via-cyan-300 to-transparent",
+    shell: "from-sky-400/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-sky-300/12 text-sky-100 ring-1 ring-inset ring-sky-200/12",
+    pill: "bg-sky-300/10 text-sky-100 ring-1 ring-inset ring-sky-200/10",
+    line: "from-sky-200/0 via-sky-200/0 to-transparent",
   },
   deals: {
-    shell: "from-amber-300/[0.28] via-orange-950/48 to-slate-950",
-    icon: "border-amber-100/35 bg-amber-200/18 text-amber-50",
-    pill: "border-amber-200/35 bg-amber-300/16 text-amber-50",
-    line: "from-amber-100 via-yellow-300 to-transparent",
+    shell: "from-amber-300/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-amber-300/12 text-amber-100 ring-1 ring-inset ring-amber-200/12",
+    pill: "bg-amber-300/10 text-amber-100 ring-1 ring-inset ring-amber-200/10",
+    line: "from-amber-200/0 via-amber-200/0 to-transparent",
   },
   "brand-deals": {
-    shell: "from-violet-400/[0.26] via-fuchsia-950/44 to-slate-950",
-    icon: "border-violet-100/35 bg-violet-200/18 text-violet-50",
-    pill: "border-violet-200/35 bg-violet-300/16 text-violet-50",
-    line: "from-violet-100 via-fuchsia-300 to-transparent",
+    shell: "from-violet-400/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-violet-300/12 text-violet-100 ring-1 ring-inset ring-violet-200/12",
+    pill: "bg-violet-300/10 text-violet-100 ring-1 ring-inset ring-violet-200/10",
+    line: "from-violet-200/0 via-violet-200/0 to-transparent",
   },
   finance: {
-    shell: "from-cyan-300/[0.26] via-emerald-950/45 to-slate-950",
-    icon: "border-cyan-100/35 bg-cyan-200/18 text-cyan-50",
-    pill: "border-cyan-200/35 bg-cyan-300/16 text-cyan-50",
-    line: "from-cyan-100 via-emerald-300 to-transparent",
+    shell: "from-cyan-300/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-cyan-300/12 text-cyan-100 ring-1 ring-inset ring-cyan-200/12",
+    pill: "bg-cyan-300/10 text-cyan-100 ring-1 ring-inset ring-cyan-200/10",
+    line: "from-cyan-200/0 via-cyan-200/0 to-transparent",
   },
   contracts: {
-    shell: "from-slate-300/[0.18] via-slate-800/55 to-blue-950/65",
-    icon: "border-slate-100/25 bg-slate-200/14 text-slate-50",
-    pill: "border-slate-200/25 bg-slate-300/12 text-slate-50",
-    line: "from-slate-100 via-blue-300 to-transparent",
+    shell: "from-slate-300/[0.12] via-slate-950/82 to-slate-950",
+    icon: "bg-white/[0.08] text-white/82 ring-1 ring-inset ring-white/10",
+    pill: "bg-white/[0.07] text-white/76 ring-1 ring-inset ring-white/10",
+    line: "from-white/0 via-white/0 to-transparent",
   },
   tasks: {
-    shell: "from-rose-400/[0.28] via-red-950/50 to-slate-950",
-    icon: "border-rose-100/35 bg-rose-200/18 text-rose-50",
-    pill: "border-rose-200/35 bg-rose-300/16 text-rose-50",
-    line: "from-rose-100 via-red-300 to-transparent",
+    shell: "from-rose-400/[0.18] via-slate-950/80 to-slate-950",
+    icon: "bg-rose-300/12 text-rose-100 ring-1 ring-inset ring-rose-200/12",
+    pill: "bg-rose-300/10 text-rose-100 ring-1 ring-inset ring-rose-200/10",
+    line: "from-rose-200/0 via-rose-200/0 to-transparent",
   },
 } satisfies Record<ArtistOsResourceKey, { shell: string; icon: string; pill: string; line: string }>;
 
@@ -457,24 +457,23 @@ export default function ArtistOsCrudPanel({
     <div className="space-y-4">
       <section
         className={cn(
-          "relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br shadow-[0_24px_100px_-64px_rgba(0,0,0,0.95)]",
+          "relative overflow-hidden rounded-[30px] bg-gradient-to-br shadow-[0_20px_86px_-64px_rgba(0,0,0,0.92)] ring-1 ring-inset ring-white/[0.07]",
           tone.shell,
         )}
       >
-        <div className={cn("absolute inset-x-0 top-0 h-px bg-gradient-to-r", tone.line)} />
-        <div className="flex flex-col gap-4 border-b border-white/10 p-4 tablet:p-5 laptop:flex-row laptop:items-center laptop:justify-between">
+        <div className="flex flex-col gap-4 p-4 tablet:p-5 laptop:flex-row laptop:items-center laptop:justify-between">
           <div className="flex items-start gap-3">
-            <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border shadow-inner", tone.icon)}>
+            <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl", tone.icon)}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <div className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]", tone.pill)}>
+              <div className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium", tone.pill)}>
                 {config.eyebrow}
               </div>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.035em] text-white">
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-white/95">
                 {config.title}
               </h2>
-              <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-white/62">
+              <p className="mt-1 max-w-3xl text-sm font-normal leading-6 text-white/60">
                 {config.description}
               </p>
             </div>
@@ -486,12 +485,12 @@ export default function ArtistOsCrudPanel({
               variant="outline"
               onClick={reloadRows}
               disabled={isReloading}
-              className="rounded-full border-white/15 bg-white/[0.06] text-white hover:bg-white/12"
+              className="rounded-full border-transparent bg-white/[0.07] text-white/78 hover:bg-white/12 hover:text-white"
             >
               {isReloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Atualizar
             </Button>
-            <Button type="button" onClick={openCreate} className="rounded-full bg-white text-slate-950 hover:bg-white/90">
+            <Button type="button" onClick={openCreate} className="rounded-full bg-white font-medium text-slate-950 hover:bg-white/90">
               <Plus className="h-4 w-4" />
               {config.newLabel}
             </Button>
@@ -499,7 +498,7 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {!tableReady ? (
-          <div className="mx-4 mt-4 flex items-start gap-3 rounded-[22px] border border-amber-300/20 bg-amber-300/[0.08] p-4 text-amber-100 tablet:mx-5">
+          <div className="mx-4 mt-4 flex items-start gap-3 rounded-[22px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12 tablet:mx-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm font-medium leading-5">
               {initialError ?? "Migration do ArtistOS pendente. A lista pode exibir dados demo."}
@@ -508,19 +507,19 @@ export default function ArtistOsCrudPanel({
         ) : null}
 
         {error ? (
-          <div className="mx-4 mt-4 rounded-[20px] border border-rose-300/20 bg-rose-300/[0.08] px-4 py-3 text-sm font-semibold text-rose-100 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-[20px] bg-rose-300/[0.08] px-4 py-3 text-sm font-medium text-rose-100 ring-1 ring-inset ring-rose-200/12 tablet:mx-5">
             {error}
           </div>
         ) : null}
 
         {success ? (
-          <div className="mx-4 mt-4 rounded-[20px] border border-emerald-300/20 bg-emerald-300/[0.08] px-4 py-3 text-sm font-semibold text-emerald-100 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-[20px] bg-emerald-300/[0.08] px-4 py-3 text-sm font-medium text-emerald-100 ring-1 ring-inset ring-emerald-200/12 tablet:mx-5">
             {success}
           </div>
         ) : null}
 
         <div className="grid gap-3 p-4 tablet:p-5 laptop:grid-cols-[minmax(260px,1fr)_auto] laptop:items-end">
-          <label className="grid gap-1 text-xs font-black uppercase tracking-[0.12em] text-white/50">
+          <label className="grid gap-1 text-xs font-medium text-white/50">
             Buscar
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/42" />
@@ -528,7 +527,7 @@ export default function ArtistOsCrudPanel({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={`Buscar ${config.singular}...`}
-                className="w-full rounded-2xl border border-white/12 bg-black/30 py-2.5 pl-9 pr-3 text-sm font-semibold text-white outline-none placeholder:text-white/34 focus:border-white/30"
+                className="w-full rounded-2xl bg-black/26 py-2.5 pl-9 pr-3 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] placeholder:text-white/34 focus:ring-white/18"
               />
             </div>
           </label>
@@ -549,20 +548,20 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {isFormOpen ? (
-          <form onSubmit={submit} className="mx-4 mb-4 rounded-[28px] border border-white/12 bg-slate-950/55 p-4 shadow-inner shadow-white/[0.03] tablet:mx-5 tablet:mb-5">
+          <form onSubmit={submit} className="mx-4 mb-4 rounded-[26px] bg-slate-950/55 p-4 ring-1 ring-inset ring-white/[0.07] tablet:mx-5 tablet:mb-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-white/35">
+                <div className="text-xs font-medium text-white/42">
                   {editing ? "Editar" : "Criar"}
                 </div>
-                <h3 className="text-lg font-black text-white">
+                <h3 className="text-lg font-semibold text-white/95">
                   {editing ? String(editing[config.primaryField] ?? config.singular) : config.newLabel}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsFormOpen(false)}
-                className="rounded-full border border-white/10 p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                className="rounded-full bg-white/[0.06] p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -573,7 +572,7 @@ export default function ArtistOsCrudPanel({
                 <label
                   key={field.key}
                   className={cn(
-                    "grid gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-white/38",
+                    "grid gap-1.5 text-xs font-medium text-white/46",
                     field.span === "full" ? "md:col-span-2 xl:col-span-3" : null,
                   )}
                 >
@@ -589,7 +588,7 @@ export default function ArtistOsCrudPanel({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaving} className="rounded-full bg-white text-slate-950 hover:bg-white/90">
+              <Button type="submit" disabled={isSaving} className="rounded-full bg-white font-medium text-slate-950 hover:bg-white/90">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Salvar
               </Button>
@@ -598,7 +597,7 @@ export default function ArtistOsCrudPanel({
                 variant="outline"
                 onClick={() => setIsFormOpen(false)}
                 disabled={isSaving}
-                className="rounded-full border-white/10 bg-white/[0.03] text-white hover:bg-white/10"
+                className="rounded-full border-transparent bg-white/[0.06] text-white/76 hover:bg-white/10 hover:text-white"
               >
                 Cancelar
               </Button>
@@ -606,10 +605,10 @@ export default function ArtistOsCrudPanel({
           </form>
         ) : null}
 
-        <div className="overflow-x-auto border-t border-white/10 bg-slate-950/28">
+        <div className="overflow-x-auto bg-slate-950/20">
           <table className="w-full min-w-[860px] text-left">
             <thead>
-              <tr className="border-y border-white/10 bg-white/[0.035] text-[11px] font-black uppercase tracking-[0.14em] text-white/52">
+              <tr className="bg-white/[0.035] text-xs font-medium text-white/52">
                 {config.columns.map((column) => (
                   <th key={column.key} className="px-4 py-3">
                     {column.label}
@@ -620,7 +619,7 @@ export default function ArtistOsCrudPanel({
             </thead>
             <tbody>
               {filteredRows.map((row) => (
-                <tr key={row.id} className="border-b border-white/10 text-sm font-semibold text-white/78 transition hover:bg-white/[0.05]">
+                <tr key={row.id} className="border-t border-white/[0.06] text-sm font-normal text-white/78 transition hover:bg-white/[0.05]">
                   {config.columns.map((column) => (
                     <td key={column.key} className="max-w-[260px] px-4 py-3">
                       <div className="truncate">
@@ -633,7 +632,7 @@ export default function ArtistOsCrudPanel({
                       <button
                         type="button"
                         onClick={() => openEdit(row)}
-                        className="rounded-full border border-white/10 p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                        className="rounded-full bg-white/[0.06] p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
@@ -641,7 +640,7 @@ export default function ArtistOsCrudPanel({
                         type="button"
                         disabled={isDeleting === row.id}
                         onClick={() => void deleteRow(row)}
-                        className="rounded-full border border-rose-300/15 p-2 text-rose-200/60 transition hover:bg-rose-300/10 hover:text-rose-100 disabled:opacity-50"
+                        className="rounded-full bg-rose-300/[0.08] p-2 text-rose-200/60 transition hover:bg-rose-300/12 hover:text-rose-100 disabled:opacity-50"
                       >
                         {isDeleting === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </button>
@@ -654,9 +653,9 @@ export default function ArtistOsCrudPanel({
 
           {filteredRows.length === 0 ? (
             <div className="p-6">
-              <div className="rounded-[24px] border border-dashed border-white/10 bg-black/20 p-8 text-center">
-                <div className="text-base font-black text-white">Nada encontrado</div>
-                <p className="mt-2 text-sm text-white/45">
+              <div className="rounded-[24px] bg-black/20 p-8 text-center ring-1 ring-inset ring-white/[0.06]">
+                <div className="text-base font-semibold text-white/90">Nada encontrado</div>
+                <p className="mt-2 text-sm font-normal text-white/48">
                   Ajuste os filtros ou crie o primeiro registro de {config.singular}.
                 </p>
               </div>

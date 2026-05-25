@@ -44,30 +44,30 @@ function PlaceholderCard({
   tone?: "emerald" | "sky" | "amber" | "rose" | "slate";
 }) {
   const tones = {
-    emerald: "border-emerald-300/16 bg-[linear-gradient(145deg,rgba(16,185,129,0.12),rgba(15,23,42,0.78)_62%)] text-emerald-100",
-    sky: "border-sky-300/16 bg-[linear-gradient(145deg,rgba(14,165,233,0.12),rgba(15,23,42,0.78)_62%)] text-sky-100",
-    amber: "border-amber-300/18 bg-[linear-gradient(145deg,rgba(245,158,11,0.12),rgba(15,23,42,0.78)_62%)] text-amber-100",
-    rose: "border-rose-300/18 bg-[linear-gradient(145deg,rgba(244,63,94,0.11),rgba(15,23,42,0.78)_62%)] text-rose-100",
-    slate: "border-white/10 bg-white/[0.045] text-white",
+    emerald: "bg-[linear-gradient(145deg,rgba(16,185,129,0.14),rgba(15,23,42,0.94)_66%)] text-emerald-100",
+    sky: "bg-[linear-gradient(145deg,rgba(14,165,233,0.14),rgba(15,23,42,0.94)_66%)] text-sky-100",
+    amber: "bg-[linear-gradient(145deg,rgba(245,158,11,0.15),rgba(15,23,42,0.94)_66%)] text-amber-100",
+    rose: "bg-[linear-gradient(145deg,rgba(244,63,94,0.14),rgba(15,23,42,0.94)_66%)] text-rose-100",
+    slate: "bg-[linear-gradient(145deg,rgba(100,116,139,0.12),rgba(15,23,42,0.94)_66%)] text-white",
   } as const;
 
   const content = (
     <div
       className={cn(
-        "group rounded-[26px] border p-4 transition hover:-translate-y-0.5 hover:border-white/22 hover:bg-white/[0.07]",
+        "group rounded-[26px] p-4 ring-1 ring-inset ring-white/[0.07] transition hover:-translate-y-0.5 hover:ring-white/12",
         tones[tone],
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.07] shadow-inner">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.07] ring-1 ring-inset ring-white/[0.07]">
           <Icon className="h-5 w-5" />
         </div>
         {href ? (
           <ArrowRight className="h-4 w-4 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/65" />
         ) : null}
       </div>
-      <h3 className="mt-4 text-base font-black text-white">{title}</h3>
-      <p className="mt-1 text-sm font-semibold leading-6 text-white/56">{description}</p>
+      <h3 className="mt-4 text-base font-semibold text-white/92">{title}</h3>
+      <p className="mt-1 text-sm font-normal leading-6 text-white/56">{description}</p>
     </div>
   );
 
@@ -76,15 +76,15 @@ function PlaceholderCard({
 
 function ReportsPage() {
   return (
-    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.80)_48%,rgba(2,6,23,0.92))] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.95)]">
+    <section className="rounded-[30px] bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.92)_48%,rgba(2,6,23,0.96))] p-5 shadow-[0_18px_80px_-62px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07]">
       <div className="max-w-3xl">
-        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+        <div className="text-xs font-medium text-white/44">
           Relatórios
         </div>
-        <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-white">
+        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
           ArtistOS — inteligência executiva
         </h2>
-        <p className="mt-2 text-sm font-medium leading-6 text-white/50">
+        <p className="mt-2 text-sm font-normal leading-6 text-white/56">
           Estrutura inicial para relatórios de shows, caixa, publicidade, tarefas
           e performance por artista. A geração avançada entra na próxima etapa.
         </p>
@@ -132,24 +132,24 @@ function ReportsPage() {
 
 function SettingsPage() {
   return (
-    <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.80)_48%,rgba(2,6,23,0.92))] p-5 shadow-[0_20px_90px_-60px_rgba(0,0,0,0.95)]">
+    <section className="rounded-[30px] bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.92)_48%,rgba(2,6,23,0.96))] p-5 shadow-[0_18px_80px_-62px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07]">
       <div className="flex flex-col gap-4 laptop:flex-row laptop:items-start laptop:justify-between">
         <div className="max-w-3xl">
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-white/38">
+          <div className="text-xs font-medium text-white/44">
             Configurações
           </div>
-          <h2 className="mt-2 text-3xl font-black tracking-[-0.05em] text-white">
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
             ArtistOS pronto para multi-perfis
           </h2>
-          <p className="mt-2 text-sm font-medium leading-6 text-white/50">
+          <p className="mt-2 text-sm font-normal leading-6 text-white/56">
             A base já nasce com workspace, created_by e estrutura para roles:
             admin, manager, financeiro, artista e equipe. No MVP, a autenticação
             atual do sistema continua controlando o acesso.
           </p>
         </div>
-        <div className="rounded-[24px] border border-emerald-300/18 bg-emerald-300/[0.08] p-4 text-emerald-100">
+        <div className="rounded-[24px] bg-emerald-300/[0.08] p-4 text-emerald-100 ring-1 ring-inset ring-emerald-200/12">
           <Settings2 className="h-5 w-5" />
-          <div className="mt-3 text-sm font-black">MVP seguro</div>
+          <div className="mt-3 text-sm font-semibold">MVP seguro</div>
           <div className="mt-1 text-xs leading-5 text-emerald-100/70">
             Sem mexer em permissões complexas agora.
           </div>
