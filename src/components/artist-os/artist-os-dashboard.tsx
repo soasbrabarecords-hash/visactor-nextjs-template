@@ -53,39 +53,65 @@ function metricCard({
   label: string;
   value: string | number;
   helper: string;
-  tone: "emerald" | "sky" | "amber" | "rose" | "slate";
+  tone: "emerald" | "sky" | "amber" | "rose" | "violet" | "cyan" | "slate";
   icon: LucideIcon;
 }) {
   const tones = {
     emerald: {
-      card: "border-emerald-300/18 bg-[linear-gradient(145deg,rgba(16,185,129,0.16),rgba(15,23,42,0.78)_58%,rgba(6,78,59,0.18))]",
-      icon: "border-emerald-200/24 bg-emerald-300/[0.13] text-emerald-100",
-      line: "from-emerald-200 via-teal-300 to-transparent",
-      helper: "text-emerald-50/66",
+      card: "border-emerald-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(110,231,183,0.34),transparent_32%),linear-gradient(135deg,rgba(6,95,70,0.92),rgba(5,46,22,0.80)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-emerald-100/35 bg-emerald-200/20 text-emerald-50",
+      rail: "from-emerald-200 via-lime-300 to-emerald-400",
+      label: "text-emerald-50/76",
+      helper: "text-emerald-50/78",
+      glow: "bg-emerald-300/24",
     },
     sky: {
-      card: "border-sky-300/18 bg-[linear-gradient(145deg,rgba(14,165,233,0.15),rgba(15,23,42,0.78)_58%,rgba(30,64,175,0.15))]",
-      icon: "border-sky-200/24 bg-sky-300/[0.13] text-sky-100",
-      line: "from-sky-200 via-cyan-300 to-transparent",
-      helper: "text-sky-50/66",
+      card: "border-sky-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(125,211,252,0.34),transparent_32%),linear-gradient(135deg,rgba(3,105,161,0.92),rgba(12,74,110,0.78)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-sky-100/35 bg-sky-200/20 text-sky-50",
+      rail: "from-sky-200 via-cyan-300 to-blue-400",
+      label: "text-sky-50/76",
+      helper: "text-sky-50/78",
+      glow: "bg-sky-300/24",
     },
     amber: {
-      card: "border-amber-300/20 bg-[linear-gradient(145deg,rgba(245,158,11,0.16),rgba(15,23,42,0.78)_58%,rgba(120,53,15,0.18))]",
-      icon: "border-amber-200/24 bg-amber-300/[0.13] text-amber-100",
-      line: "from-amber-200 via-orange-300 to-transparent",
-      helper: "text-amber-50/68",
+      card: "border-amber-200/38 bg-[radial-gradient(circle_at_85%_12%,rgba(253,230,138,0.38),transparent_32%),linear-gradient(135deg,rgba(180,83,9,0.92),rgba(120,53,15,0.80)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-amber-100/35 bg-amber-200/20 text-amber-50",
+      rail: "from-amber-100 via-yellow-300 to-orange-400",
+      label: "text-amber-50/80",
+      helper: "text-amber-50/80",
+      glow: "bg-amber-300/24",
     },
     rose: {
-      card: "border-rose-300/20 bg-[linear-gradient(145deg,rgba(244,63,94,0.14),rgba(15,23,42,0.78)_58%,rgba(127,29,29,0.16))]",
-      icon: "border-rose-200/24 bg-rose-300/[0.13] text-rose-100",
-      line: "from-rose-200 via-orange-300 to-transparent",
-      helper: "text-rose-50/66",
+      card: "border-rose-200/38 bg-[radial-gradient(circle_at_85%_12%,rgba(253,164,175,0.34),transparent_32%),linear-gradient(135deg,rgba(190,18,60,0.92),rgba(127,29,29,0.82)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-rose-100/35 bg-rose-200/20 text-rose-50",
+      rail: "from-rose-100 via-red-300 to-orange-400",
+      label: "text-rose-50/78",
+      helper: "text-rose-50/78",
+      glow: "bg-rose-300/24",
+    },
+    violet: {
+      card: "border-violet-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(196,181,253,0.32),transparent_32%),linear-gradient(135deg,rgba(109,40,217,0.90),rgba(76,29,149,0.78)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-violet-100/35 bg-violet-200/20 text-violet-50",
+      rail: "from-violet-100 via-fuchsia-300 to-violet-500",
+      label: "text-violet-50/78",
+      helper: "text-violet-50/78",
+      glow: "bg-violet-300/22",
+    },
+    cyan: {
+      card: "border-cyan-200/35 bg-[radial-gradient(circle_at_85%_12%,rgba(103,232,249,0.32),transparent_32%),linear-gradient(135deg,rgba(14,116,144,0.90),rgba(21,94,117,0.78)_52%,rgba(15,23,42,0.88))]",
+      icon: "border-cyan-100/35 bg-cyan-200/20 text-cyan-50",
+      rail: "from-cyan-100 via-teal-300 to-emerald-400",
+      label: "text-cyan-50/78",
+      helper: "text-cyan-50/78",
+      glow: "bg-cyan-300/22",
     },
     slate: {
-      card: "border-white/11 bg-[linear-gradient(145deg,rgba(148,163,184,0.11),rgba(15,23,42,0.82)_58%,rgba(30,41,59,0.28))]",
-      icon: "border-white/12 bg-white/[0.075] text-white",
-      line: "from-white/65 via-slate-300/45 to-transparent",
-      helper: "text-white/58",
+      card: "border-slate-200/22 bg-[radial-gradient(circle_at_85%_12%,rgba(203,213,225,0.18),transparent_32%),linear-gradient(135deg,rgba(51,65,85,0.82),rgba(30,41,59,0.76)_52%,rgba(15,23,42,0.90))]",
+      icon: "border-white/18 bg-white/[0.10] text-white",
+      rail: "from-white/70 via-slate-300/60 to-slate-500",
+      label: "text-white/68",
+      helper: "text-white/64",
+      glow: "bg-white/12",
     },
   } as const;
   const toneConfig = tones[tone];
@@ -93,25 +119,30 @@ function metricCard({
   return (
     <article
       className={cn(
-        "relative overflow-hidden rounded-[28px] border p-4 shadow-[0_20px_80px_-55px_rgba(0,0,0,0.95)]",
+        "group relative min-h-[150px] overflow-hidden rounded-[30px] border p-4 shadow-[0_24px_95px_-58px_rgba(0,0,0,0.95)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_30px_105px_-58px_rgba(0,0,0,0.95)]",
         toneConfig.card,
       )}
     >
-      <div className={cn("absolute inset-x-5 top-0 h-px bg-gradient-to-r", toneConfig.line)} />
-      <div className="flex items-start justify-between gap-3">
+      <div className={cn("absolute inset-y-4 left-0 w-1 rounded-r-full bg-gradient-to-b", toneConfig.rail)} />
+      <div className={cn("pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full blur-2xl", toneConfig.glow)} />
+      <div className={cn("absolute inset-x-5 top-0 h-px bg-gradient-to-r", toneConfig.rail)} />
+
+      <div className="relative flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/52">
+          <div className={cn("text-[10px] font-black uppercase tracking-[0.18em]", toneConfig.label)}>
             {label}
           </div>
-          <div className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">
+          <div className="mt-3 text-4xl font-black tracking-[-0.055em] text-white drop-shadow-[0_8px_22px_rgba(0,0,0,0.35)]">
             {value}
           </div>
         </div>
-        <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl border shadow-inner", toneConfig.icon)}>
+        <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border shadow-inner backdrop-blur", toneConfig.icon)}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className={cn("mt-3 text-sm font-semibold leading-5", toneConfig.helper)}>{helper}</p>
+      <p className={cn("relative mt-4 text-sm font-black leading-5", toneConfig.helper)}>
+        {helper}
+      </p>
     </article>
   );
 }
@@ -129,14 +160,16 @@ function ListCard({
   rows: ArtistOsRecord[];
   empty: string;
   render: (row: ArtistOsRecord) => React.ReactNode;
-  tone?: "emerald" | "sky" | "amber" | "rose" | "slate";
+  tone?: "emerald" | "sky" | "amber" | "rose" | "violet" | "cyan" | "slate";
 }) {
   const tones = {
-    emerald: "border-emerald-300/14 bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.78)_65%)]",
-    sky: "border-sky-300/14 bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.78)_65%)]",
-    amber: "border-amber-300/16 bg-[linear-gradient(145deg,rgba(245,158,11,0.10),rgba(15,23,42,0.78)_65%)]",
-    rose: "border-rose-300/16 bg-[linear-gradient(145deg,rgba(244,63,94,0.10),rgba(15,23,42,0.78)_65%)]",
-    slate: "border-white/10 bg-white/[0.045]",
+    emerald: "border-emerald-200/24 bg-[radial-gradient(circle_at_top_right,rgba(110,231,183,0.18),transparent_34%),linear-gradient(145deg,rgba(6,78,59,0.54),rgba(15,23,42,0.84)_66%)]",
+    sky: "border-sky-200/24 bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.18),transparent_34%),linear-gradient(145deg,rgba(12,74,110,0.56),rgba(15,23,42,0.84)_66%)]",
+    amber: "border-amber-200/26 bg-[radial-gradient(circle_at_top_right,rgba(253,230,138,0.20),transparent_34%),linear-gradient(145deg,rgba(120,53,15,0.56),rgba(15,23,42,0.84)_66%)]",
+    rose: "border-rose-200/26 bg-[radial-gradient(circle_at_top_right,rgba(253,164,175,0.18),transparent_34%),linear-gradient(145deg,rgba(127,29,29,0.56),rgba(15,23,42,0.84)_66%)]",
+    violet: "border-violet-200/24 bg-[radial-gradient(circle_at_top_right,rgba(196,181,253,0.18),transparent_34%),linear-gradient(145deg,rgba(76,29,149,0.54),rgba(15,23,42,0.84)_66%)]",
+    cyan: "border-cyan-200/24 bg-[radial-gradient(circle_at_top_right,rgba(103,232,249,0.18),transparent_34%),linear-gradient(145deg,rgba(21,94,117,0.54),rgba(15,23,42,0.84)_66%)]",
+    slate: "border-white/12 bg-[linear-gradient(145deg,rgba(51,65,85,0.38),rgba(15,23,42,0.86)_66%)]",
   } as const;
 
   return (
@@ -234,35 +267,35 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           label: "Em negociação",
           value: negotiatingShows.length,
           helper: "Leads e propostas abertas.",
-          tone: "sky",
+          tone: "amber",
           icon: Clock3,
         })}
         {metricCard({
           label: "Receita prevista",
           value: money(expectedRevenue),
           helper: "Entradas previstas e recebidas.",
-          tone: "emerald",
+          tone: "cyan",
           icon: BadgeDollarSign,
         })}
         {metricCard({
           label: "Caixa disponível",
           value: money(cash),
           helper: "Recebido menos saídas lançadas.",
-          tone: cash >= 0 ? "slate" : "rose",
+          tone: cash >= 0 ? "sky" : "rose",
           icon: Wallet,
         })}
         {metricCard({
           label: "Publicidade",
           value: brandActive.length,
           helper: "Campanhas em andamento.",
-          tone: "amber",
+          tone: "violet",
           icon: Megaphone,
         })}
         {metricCard({
           label: "Tarefas pendentes",
           value: pendingTasks.length,
           helper: `${urgentTasks.length} urgentes agora.`,
-          tone: urgentTasks.length > 0 ? "rose" : "slate",
+          tone: "rose",
           icon: CheckCircle2,
         })}
         {metricCard({
@@ -310,7 +343,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/deals"
           rows={latestDeals}
           empty="Nenhuma negociação no pipeline."
-          tone="emerald"
+          tone="amber"
           render={(deal) => (
             <RowShell key={deal.id}>
               <div className="flex items-center justify-between gap-3">
@@ -329,7 +362,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/finance"
           rows={latestFinance}
           empty="Nenhuma movimentação financeira."
-          tone="amber"
+          tone="cyan"
           render={(row) => (
             <RowShell key={row.id}>
               <div className="flex items-center justify-between gap-3">
@@ -358,7 +391,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           href="/artist-os/tasks"
           rows={urgentTasks.length > 0 ? urgentTasks : pendingTasks}
           empty="Nenhuma tarefa pendente."
-          tone={urgentTasks.length > 0 ? "rose" : "slate"}
+          tone="rose"
           render={(task) => (
             <RowShell key={task.id}>
               <div className="flex items-center justify-between gap-3">
