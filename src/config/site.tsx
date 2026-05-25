@@ -16,6 +16,7 @@ export type Navigation = {
   icon: LucideIcon;
   name: string;
   href: string;
+  children?: Navigation[];
 };
 
 export const siteConfig = {
@@ -31,28 +32,35 @@ export const navigations: Navigation[] = [
   },
   {
     icon: ListMusic,
-    name: "Playlists Analytics",
-    href: "/playlists-concorrentes",
-  },
-  {
-    icon: Compass,
-    name: "Playlists",
+    name: "Playlist OS",
     href: "/curadoria",
-  },
-  {
-    icon: Bot,
-    name: "Playlists IA",
-    href: "/playlists-ia",
-  },
-  {
-    icon: BarChart2,
-    name: "Spotify Charts",
-    href: "/spotify-charts",
-  },
-  {
-    icon: Flame,
-    name: "TikTok Charts",
-    href: "/tiktok-charts",
+    children: [
+      {
+        icon: Compass,
+        name: "Playlists",
+        href: "/curadoria",
+      },
+      {
+        icon: Bot,
+        name: "Playlists IA",
+        href: "/playlists-ia",
+      },
+      {
+        icon: ListMusic,
+        name: "Playlists Analytics",
+        href: "/playlists-concorrentes",
+      },
+      {
+        icon: BarChart2,
+        name: "Spotify Charts",
+        href: "/spotify-charts",
+      },
+      {
+        icon: Flame,
+        name: "TikTok Charts",
+        href: "/tiktok-charts",
+      },
+    ],
   },
   {
     icon: Library,
@@ -61,7 +69,7 @@ export const navigations: Navigation[] = [
   },
   {
     icon: BriefcaseBusiness,
-    name: "ArtistOS",
+    name: "Artist OS",
     href: "/artist-os",
   },
 ];
@@ -69,7 +77,7 @@ export const navigations: Navigation[] = [
 export const systemNavigations: Navigation[] = [
   {
     icon: Settings2,
-    name: "Configuracoes",
+    name: "Configurações",
     href: "/configuracoes",
   },
 ];
