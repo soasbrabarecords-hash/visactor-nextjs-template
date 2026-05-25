@@ -5,6 +5,7 @@ import {
   Library,
   BarChart2,
   Bot,
+  BriefcaseBusiness,
   Flame,
   Settings2,
   type LucideIcon,
@@ -57,6 +58,11 @@ export const navigations: Navigation[] = [
     icon: Library,
     name: "Label OS",
     href: "/label-os",
+  },
+  {
+    icon: BriefcaseBusiness,
+    name: "ArtistOS",
+    href: "/artist-os",
   },
 ];
 

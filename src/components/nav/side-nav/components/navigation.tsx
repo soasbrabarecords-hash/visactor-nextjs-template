@@ -44,6 +44,10 @@ export default function Navigation() {
       return pathname === "/label-os" || pathname.startsWith("/label-os/");
     }
 
+    if (href === "/artist-os") {
+      return pathname === "/artist-os" || pathname.startsWith("/artist-os/");
+    }
+
     if (href === "/spotify-charts") {
       return pathname === "/spotify-charts" || pathname.startsWith("/spotify-charts/");
     }
