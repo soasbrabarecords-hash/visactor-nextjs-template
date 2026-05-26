@@ -9,12 +9,14 @@ import {
   Settings2,
   type LucideIcon,
 } from "lucide-react";
+import type { ModuleKey } from "@/lib/workspace-access";
 
 export type SiteConfig = typeof siteConfig;
 export type Navigation = {
   icon: LucideIcon;
   name: string;
   href: string;
+  moduleKey?: ModuleKey;
   children?: Navigation[];
 };
 
@@ -28,6 +30,7 @@ export const navigations: Navigation[] = [
     icon: ListMusic,
     name: "Playlist OS",
     href: "/playlist-os",
+    moduleKey: "playlist_os",
     children: [
       {
         icon: BarChart2,
@@ -65,11 +68,13 @@ export const navigations: Navigation[] = [
     icon: Library,
     name: "Label OS",
     href: "/label-os",
+    moduleKey: "label_os",
   },
   {
     icon: BriefcaseBusiness,
     name: "Artist OS",
     href: "/artist-os",
+    moduleKey: "artist_os",
   },
 ];
 

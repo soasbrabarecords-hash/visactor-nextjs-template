@@ -2,6 +2,7 @@
 
 import { ChartThemeProvider } from "@/components/providers/chart-theme-provider";
 import { ModeThemeProvider } from "@/components/providers/mode-theme-provider";
+import { WorkspaceAccessProvider } from "@/components/providers/workspace-access-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <ChartThemeProvider>{children}</ChartThemeProvider>
+      <ChartThemeProvider>
+        <WorkspaceAccessProvider>{children}</WorkspaceAccessProvider>
+      </ChartThemeProvider>
     </ModeThemeProvider>
   );
 }

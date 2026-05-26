@@ -5,12 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { navigations, systemNavigations, type Navigation as NavigationItem } from "@/config/site";
+import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { cn } from "@/lib/utils";
 import User from "./user";
 
 export default function Navigation() {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const workspaceAccess = useWorkspaceAccess();
 
   function isActive(href: string) {
     if (href === "/dashboard") {
@@ -194,10 +196,18 @@ export default function Navigation() {
     );
   }
 
+  function isNavigationVisible(navigation: NavigationItem) {
+    if (!navigation.moduleKey || workspaceAccess.isLoading) {
+      return true;
+    }
+
+    return workspaceAccess.canAccessModule(navigation.moduleKey);
+  }
+
   return (
     <div className="flex flex-grow flex-col">
       <nav className="flex flex-grow flex-col gap-y-1.5 p-3">
-        {navigations.map(renderNavigationItem)}
+        {navigations.filter(isNavigationVisible).map(renderNavigationItem)}
       </nav>
 
       <div className="border-t border-border px-3 py-3">

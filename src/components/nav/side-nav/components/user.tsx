@@ -10,11 +10,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCurrentWorkspace } from "@/hooks/use-workspace-access";
 import { createClient } from "@/lib/supabase/client";
 
 export default function User() {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const workspace = useCurrentWorkspace();
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -44,10 +46,10 @@ export default function User() {
             />
             <div className="min-w-0 flex-1 text-left">
               <span className="block truncate whitespace-nowrap text-sm font-semibold text-foreground">
-                SÓ AS BRABA
+                {workspace?.name ?? "SÓ AS BRABA"}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                Equipe interna
+                {workspace?.type === "internal" ? "Equipe interna" : "Workspace ativo"}
               </span>
             </div>
           </div>

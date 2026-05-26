@@ -1,0 +1,117 @@
+export const MODULE_KEYS = ["playlist_os", "label_os", "artist_os"] as const;
+
+export type ModuleKey = (typeof MODULE_KEYS)[number];
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+export type ModuleRole =
+  | "admin"
+  | "manager"
+  | "financeiro"
+  | "artista"
+  | "equipe"
+  | "curador"
+  | "analista"
+  | "cliente"
+  | "label_manager"
+  | "juridico"
+  | "viewer";
+
+export type WorkspaceSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string | null;
+  status: string;
+  role: WorkspaceRole;
+};
+
+export type WorkspaceModuleAccess = {
+  moduleKey: ModuleKey;
+  isEnabled: boolean;
+};
+
+export type WorkspaceModuleRole = {
+  moduleKey: ModuleKey;
+  role: ModuleRole;
+};
+
+export type WorkspaceAccessSnapshot = {
+  currentWorkspace: WorkspaceSummary | null;
+  modules: WorkspaceModuleAccess[];
+  moduleRoles: WorkspaceModuleRole[];
+  isFallbackAccess: boolean;
+};
+
+export const DEFAULT_WORKSPACE: WorkspaceSummary = {
+  id: "fallback-workspace",
+  name: "SÓ AS BRABA Records",
+  slug: "so-as-braba-records",
+  type: "internal",
+  status: "active",
+  role: "owner",
+};
+
+export const DEFAULT_MODULES: WorkspaceModuleAccess[] = MODULE_KEYS.map(
+  (moduleKey) => ({
+    moduleKey,
+    isEnabled: true,
+  }),
+);
+
+export const DEFAULT_MODULE_ROLES: WorkspaceModuleRole[] = MODULE_KEYS.map(
+  (moduleKey) => ({
+    moduleKey,
+    role: "admin",
+  }),
+);
+
+const MANAGER_ROLES_BY_MODULE: Record<ModuleKey, ModuleRole[]> = {
+  playlist_os: ["admin", "curador"],
+  label_os: ["admin", "label_manager", "financeiro", "juridico"],
+  artist_os: ["admin", "manager", "financeiro"],
+};
+
+export function normalizeModuleKey(value: string): ModuleKey | null {
+  return MODULE_KEYS.includes(value as ModuleKey) ? (value as ModuleKey) : null;
+}
+
+export function canAccessModule(
+  moduleKey: ModuleKey,
+  snapshot: WorkspaceAccessSnapshot,
+) {
+  if (snapshot.isFallbackAccess) {
+    return true;
+  }
+
+  if (snapshot.currentWorkspace?.role === "owner" || snapshot.currentWorkspace?.role === "admin") {
+    return true;
+  }
+
+  const moduleAccess = snapshot.modules.find(
+    (moduleItem) => moduleItem.moduleKey === moduleKey,
+  );
+
+  if (!moduleAccess?.isEnabled) {
+    return false;
+  }
+
+  return snapshot.moduleRoles.some((role) => role.moduleKey === moduleKey);
+}
+
+export function canManageModule(
+  moduleKey: ModuleKey,
+  snapshot: WorkspaceAccessSnapshot,
+) {
+  if (snapshot.isFallbackAccess) {
+    return true;
+  }
+
+  if (snapshot.currentWorkspace?.role === "owner" || snapshot.currentWorkspace?.role === "admin") {
+    return true;
+  }
+
+  const role = snapshot.moduleRoles.find(
+    (moduleRole) => moduleRole.moduleKey === moduleKey,
+  )?.role;
+
+  return role ? MANAGER_ROLES_BY_MODULE[moduleKey].includes(role) : false;
+}

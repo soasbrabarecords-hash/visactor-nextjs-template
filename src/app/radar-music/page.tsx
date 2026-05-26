@@ -1,5 +1,6 @@
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
+import ModuleGuard from "@/components/workspace/module-guard";
 import RadarMusicActionBoard from "@/components/workspace/radar-music-action-board";
 import RadarMusicGenreRail from "@/components/workspace/radar-music-genre-rail";
 import RadarMusicHighlightGrid from "@/components/workspace/radar-music-highlight-grid";
@@ -35,7 +36,8 @@ export default async function RadarMusicPage({
   });
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
+    <ModuleGuard moduleKey="playlist_os">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
       <TopNav title="Radar Music" />
 
       <RadarMusicActionBoard
@@ -76,6 +78,7 @@ export default async function RadarMusicPage({
       <RadarMusicHighlightGrid highlights={data.summaryCards} />
 
       <RadarMusicTable rows={data.rows} decisionTracks={data.decisionRows} />
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

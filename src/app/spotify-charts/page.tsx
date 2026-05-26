@@ -1,5 +1,6 @@
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
+import ModuleGuard from "@/components/workspace/module-guard";
 import { getSnapshotDates, getSnapshotWithComparison } from "@/lib/chart-snapshots";
 import SpotifyChartsClient from "./spotify-charts-client";
 
@@ -23,21 +24,23 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
     : null;
 
   return (
-    <div>
-      <PageIntro
-        eyebrow="Curadoria / Radar Music"
-        title="Spotify Charts — Histórico"
-        description="Historico visual do Top 200 Brasil com snapshots diarios para leitura de movimento, comparacao e acao rapida."
-      />
-
-      <Container className="py-8">
-        <SpotifyChartsClient
-          initialDates={dates}
-          initialDate={selectedDate}
-          initialSnapshot={snapshotData}
-          country={country}
+    <ModuleGuard moduleKey="playlist_os">
+      <div>
+        <PageIntro
+          eyebrow="Curadoria / Radar Music"
+          title="Spotify Charts — Histórico"
+          description="Historico visual do Top 200 Brasil com snapshots diarios para leitura de movimento, comparacao e acao rapida."
         />
-      </Container>
-    </div>
+
+        <Container className="py-8">
+          <SpotifyChartsClient
+            initialDates={dates}
+            initialDate={selectedDate}
+            initialSnapshot={snapshotData}
+            country={country}
+          />
+        </Container>
+      </div>
+    </ModuleGuard>
   );
 }

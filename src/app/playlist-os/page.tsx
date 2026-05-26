@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
+import ModuleGuard from "@/components/workspace/module-guard";
 import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
 import StatusBadge from "@/components/workspace/status-badge";
 import { getDashboardWorkspaceData } from "@/lib/workspace-data";
@@ -312,7 +313,7 @@ export default async function DashboardPage() {
   const hotSummary = data.heroInsight.supportingPoints[1] ?? "Sem pico forte agora";
 
   return (
-    <>
+    <ModuleGuard moduleKey="playlist_os">
       <TopNav title="Playlist OS" />
       <Container className="py-2">
         <div className="space-y-2">
@@ -467,6 +468,6 @@ export default async function DashboardPage() {
         </div>
         </div>
       </Container>
-    </>
+    </ModuleGuard>
   );
 }

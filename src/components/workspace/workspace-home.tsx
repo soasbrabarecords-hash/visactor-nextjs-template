@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, CheckCircle2, Disc3, Library } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Container from "@/components/container";
+import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
+import type { ModuleKey } from "@/lib/workspace-access";
 import { cn } from "@/lib/utils";
 
 type WorkspaceOsCard = {
@@ -8,7 +13,8 @@ type WorkspaceOsCard = {
   description: string;
   href: string;
   status: string;
-  icon: typeof Disc3;
+  moduleKey: ModuleKey;
+  icon: LucideIcon;
   tone: "green" | "blue" | "amber";
 };
 
@@ -18,6 +24,7 @@ const osCards: WorkspaceOsCard[] = [
     description: "Curadoria, playlists, charts, radar musical e inteligência de catálogo.",
     href: "/playlist-os",
     status: "Operação ativa",
+    moduleKey: "playlist_os",
     icon: Disc3,
     tone: "green",
   },
@@ -26,6 +33,7 @@ const osCards: WorkspaceOsCard[] = [
     description: "Lançamentos, artistas, obras, fonogramas, splits e distribuição.",
     href: "/label-os",
     status: "Catálogo pronto",
+    moduleKey: "label_os",
     icon: Library,
     tone: "blue",
   },
@@ -34,6 +42,7 @@ const osCards: WorkspaceOsCard[] = [
     description: "Agenda, shows, publicidade, caixa, contratos e tarefas da carreira artística.",
     href: "/artist-os",
     status: "Gestão em expansão",
+    moduleKey: "artist_os",
     icon: BriefcaseBusiness,
     tone: "amber",
   },
@@ -108,6 +117,11 @@ function OsCard({ card }: { card: WorkspaceOsCard }) {
 }
 
 export default function WorkspaceHome() {
+  const { currentWorkspace, isLoading, canAccessModule } = useWorkspaceAccess();
+  const visibleCards = isLoading
+    ? osCards
+    : osCards.filter((card) => canAccessModule(card.moduleKey));
+
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.13),transparent_26%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_28%),linear-gradient(180deg,#071120_0%,#030712_50%,#020617_100%)] text-white">
       <Container className="py-8">
@@ -115,7 +129,7 @@ export default function WorkspaceHome() {
           <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-300/10 blur-3xl" />
           <div className="relative max-w-4xl">
             <div className="inline-flex rounded-full bg-white/[0.07] px-3 py-1 text-xs font-medium text-white/68 ring-1 ring-inset ring-white/[0.08]">
-              Workspace atual: SÓ AS BRABA Records
+              Workspace atual: {currentWorkspace?.name ?? "SÓ AS BRABA Records"}
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] text-white tablet:text-6xl">
               Music Business Workspace
@@ -127,9 +141,14 @@ export default function WorkspaceHome() {
         </section>
 
         <section className="mt-5 grid gap-4 xl:grid-cols-3">
-          {osCards.map((card) => (
+          {visibleCards.map((card) => (
             <OsCard key={card.name} card={card} />
           ))}
+          {!isLoading && visibleCards.length === 0 ? (
+            <div className="rounded-[32px] border border-amber-400/20 bg-amber-300/10 p-6 text-sm text-white/70 xl:col-span-3">
+              Nenhum módulo liberado para este workspace.
+            </div>
+          ) : null}
         </section>
       </Container>
     </div>

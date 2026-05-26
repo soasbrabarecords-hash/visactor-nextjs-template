@@ -2,6 +2,7 @@ import AddPlaylistForm from "@/components/dashboard/add-playlist-form";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
 import CompetitorPlaylistsTable from "@/components/workspace/competitor-playlists-table";
+import ModuleGuard from "@/components/workspace/module-guard";
 import PlaylistComparisonTable from "@/components/workspace/playlist-comparison-table";
 import RadarPlaylistsTable from "@/components/workspace/radar-playlists-table";
 import StatusBadge from "@/components/workspace/status-badge";
@@ -28,7 +29,8 @@ export default async function PlaylistsAnalyticsPage() {
   const topPlaylists = baseData.rows.slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.10),transparent_26%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.12),transparent_28%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--background)))]">
+    <ModuleGuard moduleKey="playlist_os">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.10),transparent_26%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.12),transparent_28%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--background)))]">
       <TopNav title="Playlists Analytics" />
       <Container className="border-b border-border py-6">
         <section className="relative overflow-hidden rounded-[36px] border border-white/70 bg-white/[0.72] p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_28px_110px_rgba(0,0,0,0.35)] tablet:p-7">
@@ -137,6 +139,7 @@ export default async function PlaylistsAnalyticsPage() {
         description="Faixas que aparecem como padrao de repertorio e ajudam a indicar o que observar, testar ou evitar nas suas playlists."
       />
       <PlaylistComparisonTable rows={baseData.comparisonRows} />
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }
