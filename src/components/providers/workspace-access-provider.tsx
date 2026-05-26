@@ -10,13 +10,10 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  DEFAULT_MODULES,
-  DEFAULT_MODULE_ROLES,
-  DEFAULT_WORKSPACE,
-  MODULE_KEYS,
   canAccessModule as canAccessModuleFromSnapshot,
   canManageModule as canManageModuleFromSnapshot,
   normalizeModuleKey,
+  selectCurrentWorkspace,
   type ModuleKey,
   type ModuleRole,
   type WorkspaceAccessSnapshot,
@@ -38,6 +35,9 @@ const WorkspaceAccessContext = createContext<WorkspaceAccessContextValue | null>
   null,
 );
 
+const NO_WORKSPACE_MESSAGE =
+  "Nenhum workspace vinculado. Peça acesso a um administrador.";
+
 function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole {
   if (role === "owner" || role === "admin" || role === "viewer") {
     return role;
@@ -46,19 +46,19 @@ function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole 
   return "member";
 }
 
-function buildFallbackState(error: string | null = null): WorkspaceAccessContextValue {
+function buildBlockedState(error: string | null = null): WorkspaceAccessContextValue {
   const snapshot: WorkspaceAccessSnapshot = {
-    currentWorkspace: DEFAULT_WORKSPACE,
-    modules: DEFAULT_MODULES,
-    moduleRoles: DEFAULT_MODULE_ROLES,
-    isFallbackAccess: true,
+    currentWorkspace: null,
+    modules: [],
+    moduleRoles: [],
+    isFallbackAccess: false,
   };
 
   return {
     ...snapshot,
     isLoading: false,
     error,
-    userWorkspaces: [DEFAULT_WORKSPACE],
+    userWorkspaces: [],
     canAccessModule: (moduleKey) => canAccessModuleFromSnapshot(moduleKey, snapshot),
     canManageModule: (moduleKey) => canManageModuleFromSnapshot(moduleKey, snapshot),
   };
@@ -123,13 +123,13 @@ async function fetchWorkspaceAccess(): Promise<
 
   if (workspaceAccessRows.length === 0) {
     return {
-      currentWorkspace: DEFAULT_WORKSPACE,
-      modules: DEFAULT_MODULES,
-      moduleRoles: DEFAULT_MODULE_ROLES,
-      isFallbackAccess: true,
+      currentWorkspace: null,
+      modules: [],
+      moduleRoles: [],
+      isFallbackAccess: false,
       isLoading: false,
-      error: null,
-      userWorkspaces: [DEFAULT_WORKSPACE],
+      error: NO_WORKSPACE_MESSAGE,
+      userWorkspaces: [],
     };
   }
 
@@ -168,7 +168,19 @@ async function fetchWorkspaceAccess(): Promise<
     })
     .filter(Boolean) as WorkspaceSummary[];
 
-  const currentWorkspace = workspaces[0] ?? DEFAULT_WORKSPACE;
+  const currentWorkspace = selectCurrentWorkspace(workspaces);
+
+  if (!currentWorkspace) {
+    return {
+      currentWorkspace: null,
+      modules: [],
+      moduleRoles: [],
+      isFallbackAccess: false,
+      isLoading: false,
+      error: NO_WORKSPACE_MESSAGE,
+      userWorkspaces: workspaces,
+    };
+  }
 
   const [{ data: moduleRows, error: modulesError }, { data: roleRows, error: rolesError }] =
     await Promise.all([
@@ -221,16 +233,14 @@ async function fetchWorkspaceAccess(): Promise<
     })
     .filter(Boolean) as WorkspaceModuleRole[];
 
-  const isFallbackAccess = modules.length === 0;
-
   return {
     currentWorkspace,
-    modules: isFallbackAccess ? DEFAULT_MODULES : modules,
-    moduleRoles: isFallbackAccess ? DEFAULT_MODULE_ROLES : moduleRoles,
-    isFallbackAccess,
+    modules,
+    moduleRoles,
+    isFallbackAccess: false,
     isLoading: false,
     error: null,
-    userWorkspaces: workspaces.length > 0 ? workspaces : [DEFAULT_WORKSPACE],
+    userWorkspaces: workspaces,
   };
 }
 
@@ -239,9 +249,9 @@ export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
     Omit<WorkspaceAccessContextValue, "canAccessModule" | "canManageModule">
   >({
     currentWorkspace: null,
-    modules: MODULE_KEYS.map((moduleKey) => ({ moduleKey, isEnabled: true })),
+    modules: [],
     moduleRoles: [],
-    isFallbackAccess: true,
+    isFallbackAccess: false,
     isLoading: true,
     error: null,
     userWorkspaces: [],
@@ -266,7 +276,7 @@ export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
             ? error.message
             : "Permissões indisponíveis no momento.";
 
-        setState(buildFallbackState(message));
+        setState(buildBlockedState(message));
       });
 
     return () => {
@@ -302,7 +312,7 @@ export function useWorkspaceAccess() {
   const context = useContext(WorkspaceAccessContext);
 
   if (!context) {
-    return buildFallbackState("WorkspaceAccessProvider não foi inicializado.");
+    return buildBlockedState("WorkspaceAccessProvider não foi inicializado.");
   }
 
   return context;

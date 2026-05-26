@@ -46,10 +46,14 @@ export default function User() {
             />
             <div className="min-w-0 flex-1 text-left">
               <span className="block truncate whitespace-nowrap text-sm font-semibold text-foreground">
-                {workspace?.name ?? "SÓ AS BRABA"}
+                {workspace?.name ?? "Sem workspace"}
               </span>
               <span className="block truncate text-xs text-muted-foreground">
-                {workspace?.type === "internal" ? "Equipe interna" : "Workspace ativo"}
+                {workspace
+                  ? workspace.type === "internal"
+                    ? "Equipe interna"
+                    : "Workspace ativo"
+                  : "Acesso pendente"}
               </span>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACCESS_ADMIN_EMAIL,
+  ACCESS_ADMIN_USER_ID,
   MODULE_KEYS,
   MODULE_ROLE_OPTIONS,
   WORKSPACE_ROLE_OPTIONS,
@@ -138,7 +139,9 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
     throw new AccessAdminError("Sessão indisponível.", 401);
   }
 
-  const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+  const isGlobalAdmin =
+    user.id === ACCESS_ADMIN_USER_ID &&
+    user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
 
   const { data: workspaceUsers } = await dataClient
     .from("workspace_users")
@@ -170,7 +173,7 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
     new Set([...workspaceUserIds, ...membershipIds]),
   );
 
-  if (!isGlobalAdmin && manageableWorkspaceIds.length === 0) {
+  if (!isGlobalAdmin) {
     throw new AccessAdminError(
       "Você não tem permissão para gerenciar acessos deste workspace.",
       403,

@@ -43,12 +43,16 @@ function coverStyle(coverUrl: string | null): CSSProperties | undefined {
 export default function SpotifyPlaylistAddButton({
   spotifyTrackId,
   suggestedPlaylistName,
+  source = "playlist_add_button",
+  chartSnapshotTrackId,
   label = "Adicionar agora",
   compact = false,
   className,
 }: {
   spotifyTrackId: string | null;
   suggestedPlaylistName?: string | null;
+  source?: string;
+  chartSnapshotTrackId?: string | null;
   label?: string;
   compact?: boolean;
   className?: string;
@@ -189,7 +193,11 @@ export default function SpotifyPlaylistAddButton({
       const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackUri: `spotify:track:${spotifyTrackId}` }),
+        body: JSON.stringify({
+          trackUri: `spotify:track:${spotifyTrackId}`,
+          source,
+          chartSnapshotTrackId,
+        }),
       });
       const data = (await response.json()) as {
         success?: boolean;

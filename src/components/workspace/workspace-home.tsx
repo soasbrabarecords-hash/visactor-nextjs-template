@@ -117,7 +117,8 @@ function OsCard({ card }: { card: WorkspaceOsCard }) {
 }
 
 export default function WorkspaceHome() {
-  const { currentWorkspace, isLoading, canAccessModule } = useWorkspaceAccess();
+  const { currentWorkspace, error, isLoading, canAccessModule } =
+    useWorkspaceAccess();
   const visibleCards = isLoading
     ? osCards
     : osCards.filter((card) => canAccessModule(card.moduleKey));
@@ -129,7 +130,7 @@ export default function WorkspaceHome() {
           <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-300/10 blur-3xl" />
           <div className="relative max-w-4xl">
             <div className="inline-flex rounded-full bg-white/[0.07] px-3 py-1 text-xs font-medium text-white/68 ring-1 ring-inset ring-white/[0.08]">
-              Workspace atual: {currentWorkspace?.name ?? "SÓ AS BRABA Records"}
+              Workspace atual: {currentWorkspace?.name ?? "Acesso pendente"}
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] text-white tablet:text-6xl">
               Music Business Workspace
@@ -146,7 +147,9 @@ export default function WorkspaceHome() {
           ))}
           {!isLoading && visibleCards.length === 0 ? (
             <div className="rounded-[32px] border border-amber-400/20 bg-amber-300/10 p-6 text-sm text-white/70 xl:col-span-3">
-              Nenhum módulo liberado para este workspace.
+              {currentWorkspace
+                ? "Nenhum módulo liberado para este workspace."
+                : error ?? "Nenhum workspace vinculado. Peça acesso a um administrador."}
             </div>
           ) : null}
         </section>

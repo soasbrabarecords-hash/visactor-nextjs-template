@@ -3,17 +3,24 @@ import "server-only";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import {
+  selectCurrentWorkspace,
+  type WorkspaceRole,
+  type WorkspaceSummary,
+} from "@/lib/workspace-access";
 
 type WorkspaceRow = {
   id: string;
   name: string;
   slug: string;
-  owner_user_id: string;
+  type: string | null;
+  status: string;
+  owner_user_id: string | null;
 };
 
 type WorkspaceMembershipRow = {
   workspace_id: string;
-  role: "owner" | "admin" | "editor" | "viewer";
+  role: WorkspaceRole | "editor";
 };
 
 type WorkspaceSettingsRow = {
@@ -154,45 +161,6 @@ async function getWorkspaceDbClient(): Promise<WorkspaceDbClient> {
   return createAdminClient() ?? (await createClient());
 }
 
-function slugify(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-}
-
-function buildWorkspaceName(user: {
-  email?: string | null;
-  user_metadata?: Record<string, unknown>;
-}) {
-  const metadataName =
-    typeof user.user_metadata?.full_name === "string"
-      ? user.user_metadata.full_name.trim()
-      : typeof user.user_metadata?.name === "string"
-        ? user.user_metadata.name.trim()
-        : "";
-
-  if (metadataName) {
-    return metadataName;
-  }
-
-  const emailPrefix = user.email?.split("@")[0]?.trim();
-
-  if (emailPrefix) {
-    return emailPrefix;
-  }
-
-  return "Meu workspace";
-}
-
-function buildWorkspaceSlug(name: string, userId: string) {
-  const base = slugify(name) || "workspace";
-  return `${base}-${userId.slice(0, 8)}`;
-}
-
 async function ensureWorkspaceDefaults(workspaceId: string) {
   const supabase = await getWorkspaceDbClient();
 
@@ -252,51 +220,12 @@ async function ensureWorkspaceDefaults(workspaceId: string) {
   }
 }
 
-async function bootstrapWorkspaceForCurrentUser(user: {
-  id: string;
-  email?: string | null;
-  user_metadata?: Record<string, unknown>;
-}) {
-  const supabase = await getWorkspaceDbClient();
-  const name = buildWorkspaceName(user);
-  const slug = buildWorkspaceSlug(name, user.id);
-  const workspaceId = crypto.randomUUID();
-
-  const { error: workspaceError } = await supabase
-    .from("workspaces")
-    .insert({
-      id: workspaceId,
-      name,
-      slug,
-      owner_user_id: user.id,
-    });
-
-  if (workspaceError) {
-    throw new Error(`bootstrapWorkspace(workspace): ${workspaceError.message}`);
+function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole {
+  if (role === "owner" || role === "admin" || role === "viewer") {
+    return role;
   }
 
-  const { error: membershipError } = await supabase
-    .from("workspace_memberships")
-    .insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      role: "owner",
-    });
-
-  if (membershipError) {
-    throw new Error(
-      `bootstrapWorkspace(membership): ${membershipError.message}`,
-    );
-  }
-
-  await ensureWorkspaceDefaults(workspaceId);
-
-  return {
-    id: workspaceId,
-    name,
-    slug,
-    owner_user_id: user.id,
-  } satisfies WorkspaceRow;
+  return "member";
 }
 
 const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
@@ -310,45 +239,111 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     return null;
   }
 
-  let membership: WorkspaceMembershipRow | null = null;
-
-  const { data: membershipRows, error: membershipError } = await dataClient
-    .from("workspace_memberships")
-    .select("workspace_id, role")
+  const { data: accessRows, error: accessError } = await dataClient
+    .from("workspace_users")
+    .select("workspace_id, role, status, created_at")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1);
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
 
-  if (membershipError) {
+  if (accessError) {
     throw new Error(
-      `getCurrentWorkspaceContext(membership): ${membershipError.message}`,
+      `getCurrentWorkspaceContext(access): ${accessError.message}`,
     );
   }
 
-  membership = ((membershipRows ?? [])[0] as WorkspaceMembershipRow | undefined) ?? null;
+  let workspaceAccessRows = (accessRows ?? []) as Array<{
+    workspace_id: string;
+    role: string | null;
+  }>;
 
-  let workspace: WorkspaceRow | null = null;
+  if (workspaceAccessRows.length === 0) {
+    const { data: membershipRows, error: membershipError } = await dataClient
+      .from("workspace_memberships")
+      .select("workspace_id, role, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
 
-  if (!membership) {
-    workspace = await bootstrapWorkspaceForCurrentUser(user);
-    membership = {
-      workspace_id: workspace.id,
-      role: "owner",
-    };
-  } else {
-    const { data: workspaceRow, error: workspaceError } = await dataClient
-      .from("workspaces")
-      .select("id, name, slug, owner_user_id")
-      .eq("id", membership.workspace_id)
-      .single();
-
-    if (workspaceError) {
+    if (membershipError) {
       throw new Error(
-        `getCurrentWorkspaceContext(workspace): ${workspaceError.message}`,
+        `getCurrentWorkspaceContext(membership): ${membershipError.message}`,
       );
     }
 
-    workspace = workspaceRow as WorkspaceRow;
+    workspaceAccessRows = ((membershipRows ?? []) as Array<{
+      workspace_id: string;
+      role: string | null;
+    }>).map((row) => ({
+      workspace_id: row.workspace_id,
+      role: normalizeWorkspaceRole(row.role),
+    }));
+  }
+
+  if (workspaceAccessRows.length === 0) {
+    return null;
+  }
+
+  const workspaceIds = Array.from(
+    new Set(workspaceAccessRows.map((row) => row.workspace_id)),
+  );
+
+  const { data: workspaceRows, error: workspaceError } = await dataClient
+    .from("workspaces")
+    .select("id, name, slug, type, status, owner_user_id")
+    .in("id", workspaceIds);
+
+  if (workspaceError) {
+    throw new Error(
+      `getCurrentWorkspaceContext(workspace): ${workspaceError.message}`,
+    );
+  }
+
+  const accessRoleByWorkspaceId = new Map(
+    workspaceAccessRows.map((row) => [
+      row.workspace_id,
+      normalizeWorkspaceRole(row.role),
+    ]),
+  );
+
+  const accessibleWorkspaces = ((workspaceRows ?? []) as WorkspaceRow[])
+    .map((workspaceRow): WorkspaceSummary | null => {
+      const role = accessRoleByWorkspaceId.get(workspaceRow.id);
+
+      if (!role) {
+        return null;
+      }
+
+      return {
+        id: workspaceRow.id,
+        name: workspaceRow.name,
+        slug: workspaceRow.slug,
+        type: workspaceRow.type,
+        status: workspaceRow.status ?? "active",
+        role,
+      };
+    })
+    .filter(Boolean) as WorkspaceSummary[];
+
+  const selectedWorkspace = selectCurrentWorkspace(accessibleWorkspaces);
+
+  if (!selectedWorkspace) {
+    return null;
+  }
+
+  const workspace = ((workspaceRows ?? []) as WorkspaceRow[]).find(
+    (row) => row.id === selectedWorkspace.id,
+  );
+
+  if (!workspace) {
+    return null;
+  }
+
+  const membership: WorkspaceMembershipRow = {
+    workspace_id: selectedWorkspace.id,
+    role: selectedWorkspace.role,
+  };
+
+  if (selectedWorkspace.role === "owner" || selectedWorkspace.role === "admin") {
     await ensureWorkspaceDefaults(workspace.id);
   }
 

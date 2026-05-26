@@ -42,6 +42,8 @@ const moneyFields = new Set([
 ]);
 
 const booleanFields = new Set(["logistics_included", "advisor_approval"]);
+const NO_WORKSPACE_MESSAGE =
+  "Nenhum workspace vinculado. Peça acesso a um administrador.";
 
 function isMissingTableError(error: { code?: string; message?: string } | null | undefined) {
   return Boolean(
@@ -204,6 +206,16 @@ async function getWorkspaceId() {
   return workspace?.workspace.id ?? null;
 }
 
+async function requireWorkspaceId() {
+  const workspaceId = await getWorkspaceId();
+
+  if (!workspaceId) {
+    throw new Error(NO_WORKSPACE_MESSAGE);
+  }
+
+  return workspaceId;
+}
+
 export async function getArtistOsArtistsOptions(): Promise<ArtistOsArtistOption[]> {
   const result = await getArtistOsResource("artists");
   return result.rows.map((artist) => ({
@@ -220,13 +232,20 @@ export async function getArtistOsResource(
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId();
 
-  let query = supabase.from(config.table).select("*");
-
-  if (workspaceId) {
-    query = query.or(`workspace_id.eq.${workspaceId},workspace_id.is.null`);
+  if (!workspaceId) {
+    return {
+      rows: [],
+      artists: [],
+      tableReady: false,
+      error: NO_WORKSPACE_MESSAGE,
+    };
   }
 
-  const { data, error } = await query.limit(500);
+  const { data, error } = await supabase
+    .from(config.table)
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .limit(500);
 
   if (error) {
     if (isMissingTableError(error)) {
@@ -289,7 +308,7 @@ export async function createArtistOsRecord(
   if (!config) throw new Error("Recurso ArtistOS invalido.");
 
   const supabase = await createClient();
-  const workspaceId = await getWorkspaceId();
+  const workspaceId = await requireWorkspaceId();
   const createdBy = await getCurrentUserId();
   const payload = {
     ...normalizePayload(resource, input),
@@ -320,6 +339,7 @@ export async function updateArtistOsRecord(
   if (!config) throw new Error("Recurso ArtistOS invalido.");
 
   const supabase = await createClient();
+  const workspaceId = await requireWorkspaceId();
   const payload = {
     ...normalizePayload(resource, input),
     updated_at: new Date().toISOString(),
@@ -329,6 +349,7 @@ export async function updateArtistOsRecord(
     .from(config.table)
     .update(payload)
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -345,7 +366,12 @@ export async function deleteArtistOsRecord(resource: ArtistOsResourceKey, id: st
   if (!config) throw new Error("Recurso ArtistOS invalido.");
 
   const supabase = await createClient();
-  const { error } = await supabase.from(config.table).delete().eq("id", id);
+  const workspaceId = await requireWorkspaceId();
+  const { error } = await supabase
+    .from(config.table)
+    .delete()
+    .eq("id", id)
+    .eq("workspace_id", workspaceId);
 
   if (isMissingTableError(error)) {
     throw new Error("A migration do ArtistOS ainda nao foi aplicada no Supabase.");

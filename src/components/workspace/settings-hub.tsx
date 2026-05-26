@@ -120,7 +120,7 @@ export default function SettingsHub({
     workspace?.spotifyIntegration.appMode === "workspace_app"
       ? "App do workspace"
       : "App global";
-  const workspaceName = workspace?.workspace.name ?? "Meu workspace";
+  const workspaceName = workspace?.workspace.name ?? "Acesso pendente";
   const defaultMarket = workspace?.settings.defaultMarket ?? "BR";
   const releaseWindowDays = workspace?.settings.releaseWindowDays ?? 21;
   const suggestionScoreThreshold =
@@ -174,14 +174,19 @@ export default function SettingsHub({
               </p>
               {!workspace ? (
                 <p className="mt-3 text-sm text-amber-200/80">
-                  Painel em modo seguro. Se esta for a primeira carga, salve uma vez para sincronizar o workspace.
+                  Nenhum workspace vinculado. Peça acesso a um administrador.
                 </p>
               ) : null}
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <a
                   href={connectHref}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#1DB954] px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+                  className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition ${
+                    workspace
+                      ? "bg-[#1DB954] hover:brightness-110"
+                      : "pointer-events-none bg-white/10 text-white/45"
+                  }`}
+                  aria-disabled={!workspace}
                 >
                   <Music2 className="h-4 w-4" />
                   {spotify.connected ? "Reconectar Spotify" : "Conectar Spotify"}
@@ -300,64 +305,73 @@ export default function SettingsHub({
           />
         </section>
 
-        <SectionCard
-          eyebrow="Workspace"
-          title="Regras e preferencias"
-          badge={
-            <StatusBadge tone={workspace ? "blue" : "yellow"}>
-              {workspace ? "Editavel" : "Sync pendente"}
-            </StatusBadge>
-          }
-        >
-          <WorkspaceSettingsForm
-            initialWorkspaceName={workspaceName}
-            initialDefaultMarket={defaultMarket}
-            initialReleaseWindowDays={releaseWindowDays}
-            initialSuggestionScoreThreshold={suggestionScoreThreshold}
-            initialPrioritizeFollowedArtists={prioritizeFollowedArtists}
-            initialPrioritizeTopTracks={prioritizeTopTracks}
-          />
-        </SectionCard>
-
-        <SectionCard
-          eyebrow="Integracao Spotify"
-          title="Modo da app"
-          badge={
-            <StatusBadge
-              tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
+        {workspace ? (
+          <>
+            <SectionCard
+              eyebrow="Workspace"
+              title="Regras e preferencias"
+              badge={<StatusBadge tone="blue">Editavel</StatusBadge>}
             >
-              {spotifyModeLabel}
-            </StatusBadge>
-          }
-        >
-          <WorkspaceSpotifyIntegrationForm
-            initialAppMode={integrationMode}
-            initialAppClientId={integrationClientId}
-            hasAppClientSecret={hasIntegrationSecret}
-          />
-        </SectionCard>
+              <WorkspaceSettingsForm
+                initialWorkspaceName={workspaceName}
+                initialDefaultMarket={defaultMarket}
+                initialReleaseWindowDays={releaseWindowDays}
+                initialSuggestionScoreThreshold={suggestionScoreThreshold}
+                initialPrioritizeFollowedArtists={prioritizeFollowedArtists}
+                initialPrioritizeTopTracks={prioritizeTopTracks}
+              />
+            </SectionCard>
 
-        <SectionCard
-          eyebrow="Integracao ChatGPT"
-          title="OpenAI para Playlists IA"
-          badge={
-            <StatusBadge tone={effectiveOpenAIReady ? "green" : "yellow"}>
-              {effectiveOpenAIReady ? "Ativo" : "Pendente"}
-            </StatusBadge>
-          }
-        >
-          <WorkspaceOpenAIIntegrationForm
-            initialAppMode={openaiMode}
-            initialModel={openaiModel}
-            hasApiKey={hasOpenAIWorkspaceKey}
-            globalOpenAIReady={openaiReady}
-          />
-        </SectionCard>
+            <SectionCard
+              eyebrow="Integracao Spotify"
+              title="Modo da app"
+              badge={
+                <StatusBadge
+                  tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
+                >
+                  {spotifyModeLabel}
+                </StatusBadge>
+              }
+            >
+              <WorkspaceSpotifyIntegrationForm
+                initialAppMode={integrationMode}
+                initialAppClientId={integrationClientId}
+                hasAppClientSecret={hasIntegrationSecret}
+              />
+            </SectionCard>
+
+            <SectionCard
+              eyebrow="Integracao ChatGPT"
+              title="OpenAI para Playlists IA"
+              badge={
+                <StatusBadge tone={effectiveOpenAIReady ? "green" : "yellow"}>
+                  {effectiveOpenAIReady ? "Ativo" : "Pendente"}
+                </StatusBadge>
+              }
+            >
+              <WorkspaceOpenAIIntegrationForm
+                initialAppMode={openaiMode}
+                initialModel={openaiModel}
+                hasApiKey={hasOpenAIWorkspaceKey}
+                globalOpenAIReady={openaiReady}
+              />
+            </SectionCard>
+          </>
+        ) : (
+          <section className="mt-3 rounded-[24px] border border-amber-300/20 bg-amber-300/10 p-5 text-white">
+            <h3 className="text-base font-semibold">Acesso pendente</h3>
+            <p className="mt-2 text-sm text-white/60">
+              Nenhum workspace vinculado. Peça acesso a um administrador.
+            </p>
+          </section>
+        )}
 
         <section className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
           <div className="flex flex-wrap items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-            <span className="text-sm font-medium text-white">Workspace ativo</span>
+            <span className="text-sm font-medium text-white">
+              {workspace ? "Workspace ativo" : "Workspace pendente"}
+            </span>
           </div>
           <p className="mt-2 text-sm text-white/55">
             Regras, credenciais e conexao ficam centralizadas nesta tela.

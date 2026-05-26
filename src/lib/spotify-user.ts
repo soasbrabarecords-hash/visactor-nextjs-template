@@ -165,6 +165,13 @@ type ResolvedSpotifySession = {
   refreshToken: string | null;
 };
 
+type SpotifyTokenOptions = {
+  requireWorkspace?: boolean;
+};
+
+const SPOTIFY_WORKSPACE_REQUIRED_MESSAGE =
+  "Conecte uma conta Spotify para adicionar músicas às playlists.";
+
 const CURRENT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
 const ACCOUNT_PLAYLISTS_CACHE_TTL_MS = 90 * 1000;
 const EDITABLE_PLAYLIST_CACHE_TTL_MS = 3 * 60 * 1000;
@@ -346,7 +353,9 @@ function isUsableWorkspaceAccessToken(tokenExpiresAt: string | null | undefined)
   return expiresAt > Date.now() + 60 * 1000;
 }
 
-async function resolveSpotifySession(): Promise<ResolvedSpotifySession | null> {
+async function resolveSpotifySession(
+  options: SpotifyTokenOptions = {},
+): Promise<ResolvedSpotifySession | null> {
   const workspaceAuth = await getCurrentWorkspaceSpotifyStoredAuth().catch(
     () => null,
   );
@@ -371,6 +380,10 @@ async function resolveSpotifySession(): Promise<ResolvedSpotifySession | null> {
   }
 
   if (workspaceAuth && workspaceAuth.connectionStatus !== "connected") {
+    return null;
+  }
+
+  if (options.requireWorkspace) {
     return null;
   }
 
@@ -1119,11 +1132,16 @@ export type SpotifyMutationResponse = {
 
 export async function withSpotifyToken<T>(
   fn: (accessToken: string) => Promise<T>,
+  options: SpotifyTokenOptions = {},
 ): Promise<{ data: T; refreshedToken: SpotifyOAuthTokenResponse | null }> {
-  const session = await resolveSpotifySession();
+  const session = await resolveSpotifySession(options);
 
   if (!session?.accessToken && !session?.refreshToken) {
-    throw new Error("Spotify ainda nao conectado.");
+    throw new Error(
+      options.requireWorkspace
+        ? SPOTIFY_WORKSPACE_REQUIRED_MESSAGE
+        : "Spotify ainda nao conectado.",
+    );
   }
 
   if (session.accessToken) {
@@ -1388,7 +1406,7 @@ export async function addTrackToPlaylist(
       clearSpotifyAccountPlaylistCache(token);
       clearSpotifyEditablePlaylistCache(token, playlistId);
       return result;
-    });
+    }, { requireWorkspace: true });
 
     return {
       result: {

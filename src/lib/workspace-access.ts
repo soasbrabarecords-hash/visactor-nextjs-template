@@ -1,5 +1,6 @@
 export const MODULE_KEYS = ["playlist_os", "label_os", "artist_os"] as const;
 export const ACCESS_ADMIN_EMAIL = "contato@soasbraba.com";
+export const ACCESS_ADMIN_USER_ID = "a4456937-e1af-4e32-91ba-32d66f1f661b";
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
@@ -58,34 +59,37 @@ export type WorkspaceAccessSnapshot = {
   isFallbackAccess: boolean;
 };
 
-export const DEFAULT_WORKSPACE: WorkspaceSummary = {
-  id: "fallback-workspace",
-  name: "SÓ AS BRABA Records",
-  slug: "so-as-braba-records",
-  type: "internal",
-  status: "active",
-  role: "owner",
-};
-
-export const DEFAULT_MODULES: WorkspaceModuleAccess[] = MODULE_KEYS.map(
-  (moduleKey) => ({
-    moduleKey,
-    isEnabled: true,
-  }),
-);
-
-export const DEFAULT_MODULE_ROLES: WorkspaceModuleRole[] = MODULE_KEYS.map(
-  (moduleKey) => ({
-    moduleKey,
-    role: "admin",
-  }),
-);
-
 const MANAGER_ROLES_BY_MODULE: Record<ModuleKey, ModuleRole[]> = {
   playlist_os: ["admin", "curador"],
   label_os: ["admin", "label_manager", "financeiro", "juridico"],
   artist_os: ["admin", "manager", "financeiro"],
 };
+
+export function selectCurrentWorkspace<T extends WorkspaceSummary>(
+  workspaces: T[],
+): T | null {
+  const activeWorkspaces = workspaces.filter(
+    (workspace) => workspace.status === "active",
+  );
+
+  if (activeWorkspaces.length === 0) {
+    return null;
+  }
+
+  const defaultWorkspace = activeWorkspaces.find(
+    (workspace) => workspace.slug === "so-as-braba-records",
+  );
+
+  if (defaultWorkspace) {
+    return defaultWorkspace;
+  }
+
+  if (activeWorkspaces.length === 1) {
+    return activeWorkspaces[0];
+  }
+
+  return null;
+}
 
 export function normalizeModuleKey(value: string): ModuleKey | null {
   return MODULE_KEYS.includes(value as ModuleKey) ? (value as ModuleKey) : null;
@@ -95,20 +99,16 @@ export function canAccessModule(
   moduleKey: ModuleKey,
   snapshot: WorkspaceAccessSnapshot,
 ) {
-  if (snapshot.isFallbackAccess) {
-    return true;
-  }
-
-  if (snapshot.currentWorkspace?.role === "owner" || snapshot.currentWorkspace?.role === "admin") {
-    return true;
-  }
-
   const moduleAccess = snapshot.modules.find(
     (moduleItem) => moduleItem.moduleKey === moduleKey,
   );
 
   if (!moduleAccess?.isEnabled) {
     return false;
+  }
+
+  if (snapshot.currentWorkspace?.role === "owner" || snapshot.currentWorkspace?.role === "admin") {
+    return true;
   }
 
   return snapshot.moduleRoles.some((role) => role.moduleKey === moduleKey);
@@ -118,10 +118,6 @@ export function canManageModule(
   moduleKey: ModuleKey,
   snapshot: WorkspaceAccessSnapshot,
 ) {
-  if (snapshot.isFallbackAccess) {
-    return true;
-  }
-
   if (snapshot.currentWorkspace?.role === "owner" || snapshot.currentWorkspace?.role === "admin") {
     return true;
   }
