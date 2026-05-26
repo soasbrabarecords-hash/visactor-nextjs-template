@@ -88,7 +88,7 @@ export function selectCurrentWorkspace<T extends WorkspaceSummary>(
     return activeWorkspaces[0];
   }
 
-  return null;
+  return activeWorkspaces[0];
 }
 
 export function normalizeModuleKey(value: string): ModuleKey | null {
