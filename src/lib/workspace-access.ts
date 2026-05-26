@@ -1,4 +1,5 @@
 export const MODULE_KEYS = ["playlist_os", "label_os", "artist_os"] as const;
+export const ACCESS_ADMIN_EMAIL = "contato@soasbraba.com";
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
@@ -14,6 +15,22 @@ export type ModuleRole =
   | "label_manager"
   | "juridico"
   | "viewer";
+
+export const WORKSPACE_ROLE_OPTIONS = ["owner", "admin", "member", "viewer"] as const;
+export const WORKSPACE_STATUS_OPTIONS = ["active", "paused", "archived"] as const;
+export const WORKSPACE_TYPE_OPTIONS = ["internal", "label", "artist", "agency", "client"] as const;
+
+export const MODULE_ROLE_OPTIONS: Record<ModuleKey, readonly ModuleRole[]> = {
+  playlist_os: ["admin", "curador", "analista", "cliente", "viewer"],
+  label_os: ["admin", "label_manager", "financeiro", "juridico", "artista", "viewer"],
+  artist_os: ["admin", "manager", "financeiro", "artista", "equipe", "viewer"],
+};
+
+export const MODULE_LABELS: Record<ModuleKey, string> = {
+  playlist_os: "Playlist OS",
+  label_os: "Label OS",
+  artist_os: "Artist OS",
+};
 
 export type WorkspaceSummary = {
   id: string;
