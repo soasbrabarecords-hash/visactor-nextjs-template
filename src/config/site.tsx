@@ -1,6 +1,5 @@
 import {
   Compass,
-  Gauge,
   ListMusic,
   Library,
   BarChart2,
@@ -26,15 +25,15 @@ export const siteConfig = {
 
 export const navigations: Navigation[] = [
   {
-    icon: Gauge,
-    name: "Dashboard",
-    href: "/dashboard",
-  },
-  {
     icon: ListMusic,
     name: "Playlist OS",
-    href: "/curadoria",
+    href: "/playlist-os",
     children: [
+      {
+        icon: BarChart2,
+        name: "Visão geral",
+        href: "/playlist-os",
+      },
       {
         icon: Compass,
         name: "Playlists",

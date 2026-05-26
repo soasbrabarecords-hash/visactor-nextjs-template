@@ -4,7 +4,6 @@ import { ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import Navigation from "./components/navigation";
-import User from "./components/user";
 
 export default function SideNav() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,7 +31,16 @@ export default function SideNav() {
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <User />
+        <div className="flex h-24 items-center border-b border-border px-5">
+          <div>
+            <div className="text-base font-semibold tracking-[-0.02em] text-foreground">
+              SÓ AS BRABA System
+            </div>
+            <div className="mt-1 text-xs font-medium text-muted-foreground">
+              Music Business Workspace
+            </div>
+          </div>
+        </div>
         <Navigation />
       </aside>
     </>

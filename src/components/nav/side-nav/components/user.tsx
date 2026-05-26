@@ -28,9 +28,12 @@ export default function User() {
   }
 
   return (
-    <div className="flex h-20 items-center border-b border-border px-3">
+    <div className="mb-3">
+      <div className="mb-2 px-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
+        Workspace atual
+      </div>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 hover:bg-slate-200 dark:hover:bg-slate-800">
+        <DropdownMenuTrigger className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left transition hover:bg-slate-200 dark:hover:bg-slate-800">
           <div className="flex min-w-0 flex-1 items-center">
             <Image
               src="/avatar.png"
@@ -40,7 +43,7 @@ export default function User() {
               height={40}
             />
             <div className="min-w-0 flex-1 text-left">
-              <span className="block truncate whitespace-nowrap text-sm font-semibold">
+              <span className="block truncate whitespace-nowrap text-sm font-semibold text-foreground">
                 SÓ AS BRABA
               </span>
               <span className="block truncate text-xs text-muted-foreground">

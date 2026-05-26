@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { navigations, systemNavigations, type Navigation as NavigationItem } from "@/config/site";
 import { cn } from "@/lib/utils";
+import User from "./user";
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -14,6 +15,10 @@ export default function Navigation() {
   function isActive(href: string) {
     if (href === "/dashboard") {
       return pathname === "/" || pathname === "/dashboard";
+    }
+
+    if (href === "/playlist-os") {
+      return pathname === "/playlist-os" || pathname.startsWith("/playlist-os/");
     }
 
     if (href === "/radar-music") {
@@ -196,6 +201,7 @@ export default function Navigation() {
       </nav>
 
       <div className="border-t border-border px-3 py-3">
+        <User />
         <div className="mb-2 px-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
           Sistema
         </div>
