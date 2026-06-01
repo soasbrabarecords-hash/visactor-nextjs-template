@@ -17,6 +17,15 @@ import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-sp
 import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
 import type { WorkspaceContext } from "@/lib/workspaces";
 
+const REQUIRED_SPOTIFY_SCOPES = [
+  "playlist-read-private",
+  "playlist-read-collaborative",
+  "playlist-modify-private",
+  "playlist-modify-public",
+  "user-read-email",
+  "user-read-private",
+] as const;
+
 type SettingsHubProps = {
   spotify: SpotifyConnectionStatusResult;
   spotifyAppReady: boolean;
@@ -42,6 +51,67 @@ function getSpotifyPlan(product: string | null) {
   return product.toLowerCase() === "premium"
     ? "Spotify Premium"
     : `Spotify ${product}`;
+}
+
+function parseSpotifyScopes(scopes: string | null | undefined) {
+  return new Set(
+    scopes
+      ?.split(/\s+/)
+      .map((scope) => scope.trim())
+      .filter(Boolean) ?? [],
+  );
+}
+
+function formatTokenDate(value: string | null | undefined) {
+  if (!value) {
+    return "Sem validade";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Validade invalida";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function HealthItem({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "green" | "blue" | "yellow" | "red" | "slate";
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
+        {label}
+      </div>
+      <div
+        className={`mt-1 text-sm font-semibold ${
+          tone === "green"
+            ? "text-emerald-200"
+            : tone === "blue"
+              ? "text-sky-200"
+              : tone === "yellow"
+                ? "text-amber-200"
+                : tone === "red"
+                  ? "text-red-200"
+                  : "text-white/70"
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
 function MiniCard({
@@ -134,6 +204,18 @@ export default function SettingsHub({
   const integrationClientId = workspace?.spotifyIntegration.appClientId ?? null;
   const hasIntegrationSecret =
     workspace?.spotifyIntegration.hasAppClientSecret ?? false;
+  const hasSpotifyAccessToken =
+    workspace?.spotifyIntegration.hasAccessToken ?? false;
+  const hasSpotifyRefreshToken =
+    workspace?.spotifyIntegration.hasRefreshToken ?? false;
+  const spotifySessionSaved = hasSpotifyAccessToken || hasSpotifyRefreshToken;
+  const grantedSpotifyScopes = parseSpotifyScopes(
+    workspace?.spotifyIntegration.grantedScopes,
+  );
+  const missingSpotifyScopes = REQUIRED_SPOTIFY_SCOPES.filter(
+    (scope) => !grantedSpotifyScopes.has(scope),
+  );
+  const spotifyTokenExpiresAt = workspace?.spotifyIntegration.tokenExpiresAt ?? null;
   const openaiMode = workspace?.openaiIntegration.appMode ?? "global_app";
   const openaiModeLabel =
     openaiMode === "workspace_app" ? "Chave do workspace" : "Chave global";
@@ -293,10 +375,18 @@ export default function SettingsHub({
             value={spotifyModeLabel}
             hint={
               integrationMode === "workspace_app"
-                ? "Modo por cliente."
+                ? spotifySessionSaved
+                  ? "Sessao salva no workspace."
+                  : "Reconecte para salvar token."
                 : "Fallback seguro ativo."
             }
-            tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
+            tone={
+              integrationMode === "workspace_app" && spotifySessionSaved
+                ? "green"
+                : integrationMode === "workspace_app"
+                  ? "yellow"
+                  : "blue"
+            }
           />
           <MiniCard
             icon={<Bot className="h-5 w-5" />}
@@ -329,9 +419,23 @@ export default function SettingsHub({
               title="Modo da app"
               badge={
                 <StatusBadge
-                  tone={integrationMode === "workspace_app" ? "yellow" : "blue"}
+                  tone={
+                    integrationMode === "workspace_app" && !spotifySessionSaved
+                      ? "yellow"
+                      : integrationMode === "workspace_app" &&
+                          missingSpotifyScopes.length > 0
+                        ? "yellow"
+                        : integrationMode === "workspace_app"
+                          ? "green"
+                          : "blue"
+                  }
                 >
-                  {spotifyModeLabel}
+                  {integrationMode === "workspace_app" && !spotifySessionSaved
+                    ? "Token ausente"
+                    : integrationMode === "workspace_app" &&
+                        missingSpotifyScopes.length > 0
+                      ? "Reautorizar"
+                      : spotifyModeLabel}
                 </StatusBadge>
               }
             >
@@ -341,6 +445,93 @@ export default function SettingsHub({
                 hasAppClientSecret={hasIntegrationSecret}
                 spotifyRedirectUri={spotifyRedirectUri}
               />
+              <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+                      Diagnostico seguro
+                    </div>
+                    <p className="mt-1 text-sm text-white/55">
+                      Status salvo neste workspace. Segredos nunca aparecem aqui.
+                    </p>
+                  </div>
+                  <StatusBadge
+                    tone={
+                      spotifySessionSaved && missingSpotifyScopes.length === 0
+                        ? "green"
+                        : spotifySessionSaved
+                          ? "yellow"
+                          : "red"
+                    }
+                  >
+                    {spotifySessionSaved
+                      ? missingSpotifyScopes.length === 0
+                        ? "sessao ok"
+                        : "escopos pendentes"
+                      : "token ausente"}
+                  </StatusBadge>
+                </div>
+                <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  <HealthItem
+                    label="Client ID"
+                    value={integrationClientId ? "Salvo" : "Faltando"}
+                    tone={integrationClientId ? "green" : "red"}
+                  />
+                  <HealthItem
+                    label="Client Secret"
+                    value={hasIntegrationSecret ? "Salvo" : "Faltando"}
+                    tone={hasIntegrationSecret ? "green" : "red"}
+                  />
+                  <HealthItem
+                    label="Sessao Spotify"
+                    value={spotifySessionSaved ? "Token salvo" : "Reconectar"}
+                    tone={spotifySessionSaved ? "green" : "yellow"}
+                  />
+                  <HealthItem
+                    label="Refresh token"
+                    value={hasSpotifyRefreshToken ? "Salvo" : "Ausente"}
+                    tone={hasSpotifyRefreshToken ? "green" : "yellow"}
+                  />
+                  <HealthItem
+                    label="Conta vinculada"
+                    value={
+                      workspace.spotifyIntegration.providerAccountLabel ||
+                      workspace.spotifyIntegration.providerAccountId ||
+                      "Nao vinculada"
+                    }
+                    tone={
+                      workspace.spotifyIntegration.providerAccountId
+                        ? "blue"
+                        : "yellow"
+                    }
+                  />
+                  <HealthItem
+                    label="Validade"
+                    value={formatTokenDate(spotifyTokenExpiresAt)}
+                    tone={spotifyTokenExpiresAt ? "blue" : "slate"}
+                  />
+                  <HealthItem
+                    label="Escopos"
+                    value={
+                      missingSpotifyScopes.length === 0
+                        ? "OK"
+                        : `${missingSpotifyScopes.length} faltando`
+                    }
+                    tone={missingSpotifyScopes.length === 0 ? "green" : "yellow"}
+                  />
+                  <HealthItem
+                    label="Workspace"
+                    value={workspace.workspace.name}
+                    tone="blue"
+                  />
+                </div>
+                {missingSpotifyScopes.length > 0 ? (
+                  <p className="mt-3 text-xs leading-5 text-amber-100/80">
+                    Escopos faltando: {missingSpotifyScopes.join(", ")}. Clique em
+                    Reconectar Spotify para autorizar novamente.
+                  </p>
+                ) : null}
+              </div>
             </SectionCard>
 
             <SectionCard

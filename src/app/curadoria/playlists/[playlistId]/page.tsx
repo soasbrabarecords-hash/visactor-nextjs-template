@@ -35,7 +35,11 @@ export default async function SpotifyPlaylistEditorPage({
         <Container className="border-b border-border py-6">
           <div className="flex flex-wrap gap-3">
             <Button asChild>
-              <a href="/api/spotify/auth/login">Conectar Spotify</a>
+              <a
+                href={`/api/spotify/auth/login?next=/curadoria/playlists/${playlistId}`}
+              >
+                Reconectar Spotify
+              </a>
             </Button>
             <Button asChild variant="outline">
               <Link href="/curadoria">Voltar para Curadoria</Link>

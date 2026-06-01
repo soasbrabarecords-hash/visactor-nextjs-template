@@ -70,6 +70,9 @@ export type WorkspaceContext = {
     connectionStatus: WorkspaceIntegrationRow["connection_status"];
     appClientId: string | null;
     hasAppClientSecret: boolean;
+    hasAccessToken: boolean;
+    hasRefreshToken: boolean;
+    tokenExpiresAt: string | null;
     providerAccountId: string | null;
     providerAccountLabel: string | null;
     grantedScopes: string | null;
@@ -143,6 +146,9 @@ const DEFAULT_SPOTIFY_INTEGRATION = {
   connectionStatus: "not_connected",
   appClientId: null,
   hasAppClientSecret: false,
+  hasAccessToken: false,
+  hasRefreshToken: false,
+  tokenExpiresAt: null,
   providerAccountId: null,
   providerAccountLabel: null,
   grantedScopes: null,
@@ -413,7 +419,7 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
       dataClient
         .from("workspace_integrations")
         .select(
-          "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret, provider_account_id, provider_account_label, granted_scopes",
+          "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret, provider_account_id, provider_account_label, access_token, refresh_token, token_expires_at, granted_scopes",
         )
         .eq("workspace_id", workspace.id)
         .eq("provider", "spotify")
@@ -487,6 +493,17 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
         spotifyIntegration?.app_client_secret != null
           ? Boolean(spotifyIntegration.app_client_secret)
           : DEFAULT_SPOTIFY_INTEGRATION.hasAppClientSecret,
+      hasAccessToken:
+        spotifyIntegration?.access_token != null
+          ? Boolean(spotifyIntegration.access_token)
+          : DEFAULT_SPOTIFY_INTEGRATION.hasAccessToken,
+      hasRefreshToken:
+        spotifyIntegration?.refresh_token != null
+          ? Boolean(spotifyIntegration.refresh_token)
+          : DEFAULT_SPOTIFY_INTEGRATION.hasRefreshToken,
+      tokenExpiresAt:
+        spotifyIntegration?.token_expires_at ??
+        DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt,
       providerAccountId:
         spotifyIntegration?.provider_account_id ??
         DEFAULT_SPOTIFY_INTEGRATION.providerAccountId,

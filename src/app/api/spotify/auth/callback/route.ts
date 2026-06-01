@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import {
   clearSpotifyNextCookie,
   clearSpotifyStateCookie,
+  clearSpotifyWorkspaceCookie,
   exchangeSpotifyCode,
   getSpotifyNextCookie,
   getSpotifyRedirectUri,
   getSpotifyStateCookie,
+  getSpotifyWorkspaceCookie,
   setSpotifyAuthCookies,
   syncSpotifyWorkspaceConnection,
 } from "@/lib/spotify-user";
+import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +21,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const expectedState = await getSpotifyStateCookie();
+  const expectedWorkspaceId = await getSpotifyWorkspaceCookie();
   const nextPath = await getSpotifyNextCookie();
   const safeNextPath = nextPath?.startsWith("/") ? nextPath : "/curadoria";
   const redirectUrl = new URL(safeNextPath, url.origin);
@@ -27,11 +31,22 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(redirectUrl);
     clearSpotifyStateCookie(response);
     clearSpotifyNextCookie(response);
+    clearSpotifyWorkspaceCookie(response);
 
     return response;
   }
 
   try {
+    if (expectedWorkspaceId) {
+      const workspace = await getCurrentWorkspaceContext();
+
+      if (workspace?.workspace.id !== expectedWorkspaceId) {
+        throw new Error(
+          "A conexao voltou para outro workspace. Tente conectar novamente no workspace correto.",
+        );
+      }
+    }
+
     const token = await exchangeSpotifyCode({
       code,
       redirectUri: getSpotifyRedirectUri(url.origin),
@@ -43,6 +58,7 @@ export async function GET(request: Request) {
     setSpotifyAuthCookies(response, token);
     clearSpotifyStateCookie(response);
     clearSpotifyNextCookie(response);
+    clearSpotifyWorkspaceCookie(response);
 
     return response;
   } catch (error) {
@@ -53,6 +69,7 @@ export async function GET(request: Request) {
     const response = NextResponse.redirect(redirectUrl);
     clearSpotifyStateCookie(response);
     clearSpotifyNextCookie(response);
+    clearSpotifyWorkspaceCookie(response);
 
     return response;
   }
