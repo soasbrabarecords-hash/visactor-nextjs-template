@@ -6,6 +6,7 @@ import type { NextResponse } from "next/server";
 import {
   clearCurrentWorkspaceSpotifyConnection,
   getEffectiveSpotifyCredentials,
+  getCurrentWorkspaceContext,
   getCurrentWorkspaceSpotifyStoredAuth,
   syncCurrentWorkspaceSpotifyConnection,
 } from "@/lib/workspaces";
@@ -379,6 +380,10 @@ async function resolveSpotifySession(
     };
   }
 
+  if (workspaceAuth?.appMode === "workspace_app") {
+    return null;
+  }
+
   if (workspaceAuth && workspaceAuth.connectionStatus !== "connected") {
     return null;
   }
@@ -551,6 +556,22 @@ export async function exchangeSpotifyCode({
   return (await response.json()) as SpotifyOAuthTokenResponse;
 }
 
+async function getSpotifyErrorMessage(response: Response, fallback: string) {
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        error?: string | { message?: string; status?: number };
+        error_description?: string;
+        message?: string;
+      }
+    | null;
+  const spotifyMessage =
+    typeof payload?.error === "string"
+      ? payload.error_description || payload.error
+      : payload?.error?.message || payload?.message;
+
+  return spotifyMessage ? `${fallback}: ${spotifyMessage}` : fallback;
+}
+
 async function refreshSpotifyToken(refreshToken: string) {
   const env = await getSpotifyOAuthEnv();
 
@@ -581,6 +602,8 @@ async function refreshSpotifyToken(refreshToken: string) {
 export async function syncSpotifyWorkspaceConnection(
   token: SpotifyOAuthTokenResponse,
 ) {
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+
   try {
     const profile = await fetchSpotifyCurrentUserWithToken(token.access_token);
 
@@ -594,6 +617,12 @@ export async function syncSpotifyWorkspaceConnection(
       expiresInSeconds: token.expires_in,
     });
   } catch {
+    if (workspace?.spotifyIntegration.appMode === "workspace_app") {
+      throw new Error(
+        "Spotify conectou, mas nao foi possivel salvar a sessao no workspace.",
+      );
+    }
+
     // sync da conexao no workspace nao deve quebrar o auth principal
   }
 }
@@ -801,7 +830,12 @@ async function fetchSpotifyPlaylistTracksWithToken(
         registerRateLimit("spotify:playlist:tracks", retryAfter);
         throw new Error(`Spotify tracks error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
       }
-      throw new Error(`Spotify tracks error ${response.status}: Failed to fetch Spotify playlist tracks.`);
+      throw new Error(
+        await getSpotifyErrorMessage(
+          response,
+          `Spotify tracks error ${response.status}: Failed to fetch Spotify playlist tracks.`,
+        ),
+      );
     }
 
     clearRateLimit("spotify:playlist:tracks");
@@ -988,7 +1022,12 @@ async function fetchSpotifyEditablePlaylistWithToken(
         `Spotify playlist error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`,
       );
     }
-    throw new Error("Failed to fetch Spotify playlist.");
+    throw new Error(
+      await getSpotifyErrorMessage(
+        response,
+        `Spotify playlist error ${response.status}: Failed to fetch Spotify playlist.`,
+      ),
+    );
   }
 
   clearRateLimit("spotify:playlist:details");

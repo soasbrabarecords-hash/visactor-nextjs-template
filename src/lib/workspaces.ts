@@ -120,6 +120,7 @@ export type EffectiveOpenAICredentials = {
 export type WorkspaceSpotifyStoredAuth = {
   workspaceId: string;
   integrationId: string | null;
+  appMode: WorkspaceIntegrationRow["app_mode"];
   connectionStatus: WorkspaceIntegrationRow["connection_status"];
   accessToken: string | null;
   refreshToken: string | null;
@@ -814,7 +815,7 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
   const { data, error } = await supabase
     .from("workspace_integrations")
     .select(
-      "id, workspace_id, connection_status, access_token, refresh_token, token_expires_at, provider_account_id, provider_account_label, granted_scopes",
+      "id, workspace_id, app_mode, connection_status, access_token, refresh_token, token_expires_at, provider_account_id, provider_account_label, granted_scopes",
     )
     .eq("workspace_id", workspace.workspace.id)
     .eq("provider", "spotify")
@@ -829,6 +830,7 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
   return {
     workspaceId: row.workspace_id,
     integrationId: row.id ?? null,
+    appMode: row.app_mode,
     connectionStatus: row.connection_status,
     accessToken: row.access_token ?? null,
     refreshToken: row.refresh_token ?? null,
@@ -860,6 +862,9 @@ export async function syncCurrentWorkspaceSpotifyConnection(input: {
       : null;
 
   const payload: Record<string, unknown> = {
+    workspace_id: workspace.workspace.id,
+    provider: "spotify",
+    app_mode: workspace.spotifyIntegration.appMode,
     connection_status: "connected",
     provider_account_id: input.providerAccountId,
     provider_account_label: input.providerAccountLabel,
@@ -881,9 +886,7 @@ export async function syncCurrentWorkspaceSpotifyConnection(input: {
 
   const { error } = await supabase
     .from("workspace_integrations")
-    .update(payload)
-    .eq("workspace_id", workspace.workspace.id)
-    .eq("provider", "spotify");
+    .upsert(payload, { onConflict: "workspace_id,provider" });
 
   if (error) {
     throw new Error(`syncCurrentWorkspaceSpotifyConnection: ${error.message}`);

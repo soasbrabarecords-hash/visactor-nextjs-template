@@ -21,10 +21,6 @@ export type SpotifyPlaylistsClientResponse =
       message: string;
     };
 
-const CLIENT_PLAYLISTS_TTL_MS = 60 * 1000;
-
-let cachedResponse: SpotifyPlaylistsClientResponse | null = null;
-let cachedAt = 0;
 let inFlight: Promise<SpotifyPlaylistsClientResponse> | null = null;
 let rateLimitedState: { message: string; until: number } | null = null;
 
@@ -47,10 +43,6 @@ export async function getSpotifyAccountPlaylistsClient({
 } = {}): Promise<SpotifyPlaylistsClientResponse> {
   if (!force && rateLimitedState && rateLimitedState.until > Date.now()) {
     throw new Error(rateLimitedState.message);
-  }
-
-  if (!force && cachedResponse && Date.now() - cachedAt < CLIENT_PLAYLISTS_TTL_MS) {
-    return cachedResponse;
   }
 
   if (!force && inFlight) {
@@ -95,9 +87,6 @@ export async function getSpotifyAccountPlaylistsClient({
       rateLimitedState = null;
     }
 
-    cachedResponse = payload;
-    cachedAt = Date.now();
-
     return payload;
   })();
 
@@ -111,7 +100,5 @@ export async function getSpotifyAccountPlaylistsClient({
 }
 
 export function invalidateSpotifyAccountPlaylistsClientCache() {
-  cachedResponse = null;
-  cachedAt = 0;
   inFlight = null;
 }
