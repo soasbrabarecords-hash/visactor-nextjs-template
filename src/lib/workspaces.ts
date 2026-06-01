@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   selectCurrentWorkspace,
+  type ModuleRole,
   type WorkspaceRole,
   type WorkspaceSummary,
 } from "@/lib/workspace-access";
@@ -152,6 +153,11 @@ const DEFAULT_OPENAI_INTEGRATION = {
   model: null,
   hasApiKey: false,
 } as const;
+const PLAYLIST_OS_INTEGRATION_MANAGER_ROLES = new Set<ModuleRole>([
+  "admin",
+  "curador",
+  "cliente",
+]);
 
 type WorkspaceDbClient =
   | Awaited<ReturnType<typeof createClient>>
@@ -226,6 +232,49 @@ function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole 
   }
 
   return "member";
+}
+
+async function canManagePlaylistOsWorkspaceSettings(workspace: WorkspaceContext) {
+  if (workspace.membership.role === "owner" || workspace.membership.role === "admin") {
+    return true;
+  }
+
+  const supabase = await createClient();
+  const dataClient = createAdminClient() ?? supabase;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return false;
+  }
+
+  const [
+    { data: moduleRow, error: moduleError },
+    { data: roleRow, error: roleError },
+  ] = await Promise.all([
+    dataClient
+      .from("workspace_modules")
+      .select("is_enabled")
+      .eq("workspace_id", workspace.workspace.id)
+      .eq("module_key", "playlist_os")
+      .maybeSingle(),
+    dataClient
+      .from("module_roles")
+      .select("role")
+      .eq("workspace_id", workspace.workspace.id)
+      .eq("user_id", user.id)
+      .eq("module_key", "playlist_os")
+      .maybeSingle(),
+  ]);
+
+  if (moduleError || roleError || !moduleRow?.is_enabled) {
+    return false;
+  }
+
+  const role = roleRow?.role as ModuleRole | null | undefined;
+
+  return role ? PLAYLIST_OS_INTEGRATION_MANAGER_ROLES.has(role) : false;
 }
 
 const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
@@ -474,7 +523,7 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
     throw new Error("Workspace indisponivel.");
   }
 
-  if (!["owner", "admin"].includes(workspace.membership.role)) {
+  if (!(await canManagePlaylistOsWorkspaceSettings(workspace))) {
     throw new Error("Sem permissao para editar a integracao.");
   }
 
@@ -482,6 +531,13 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
   const normalizedClientId = input.appClientId?.trim() || null;
   const normalizedClientSecret = input.appClientSecret?.trim() || null;
   const currentHasSecret = workspace.spotifyIntegration.hasAppClientSecret;
+  const clientIdChanged =
+    normalizedClientId !== null &&
+    normalizedClientId !== workspace.spotifyIntegration.appClientId;
+  const appModeChanged = input.appMode !== workspace.spotifyIntegration.appMode;
+  const credentialsChanged =
+    input.appMode === "workspace_app" &&
+    (appModeChanged || clientIdChanged || normalizedClientSecret !== null);
 
   if (
     input.appMode === "workspace_app" &&
@@ -493,7 +549,12 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
   }
 
   const payload: Record<string, unknown> = {
+    workspace_id: workspace.workspace.id,
+    provider: "spotify",
     app_mode: input.appMode,
+    connection_status: credentialsChanged
+      ? "not_connected"
+      : workspace.spotifyIntegration.connectionStatus,
     updated_at: new Date().toISOString(),
   };
 
@@ -505,11 +566,18 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
     payload.app_client_secret = normalizedClientSecret;
   }
 
+  if (credentialsChanged) {
+    payload.provider_account_id = null;
+    payload.provider_account_label = null;
+    payload.access_token = null;
+    payload.refresh_token = null;
+    payload.token_expires_at = null;
+    payload.granted_scopes = null;
+  }
+
   const { error } = await dataClient
     .from("workspace_integrations")
-    .update(payload)
-    .eq("workspace_id", workspace.workspace.id)
-    .eq("provider", "spotify");
+    .upsert(payload, { onConflict: "workspace_id,provider" });
 
   if (error) {
     throw new Error(`updateCurrentWorkspaceSpotifyIntegration: ${error.message}`);
@@ -527,7 +595,7 @@ export async function updateCurrentWorkspaceOpenAIIntegration(
     throw new Error("Workspace indisponivel.");
   }
 
-  if (!["owner", "admin"].includes(workspace.membership.role)) {
+  if (!(await canManagePlaylistOsWorkspaceSettings(workspace))) {
     throw new Error("Sem permissao para editar a integracao.");
   }
 
@@ -586,7 +654,9 @@ export async function updateCurrentWorkspaceSettings(
   }
 
   if (!["owner", "admin"].includes(workspace.membership.role)) {
-    throw new Error("Sem permissao para editar o workspace.");
+    if (!(await canManagePlaylistOsWorkspaceSettings(workspace))) {
+      throw new Error("Sem permissao para editar o workspace.");
+    }
   }
 
   const workspaceName = input.workspaceName?.trim() || workspace.workspace.name;

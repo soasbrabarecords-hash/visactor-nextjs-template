@@ -1,6 +1,6 @@
 import { TopNav } from "@/components/nav";
 import SettingsHub from "@/components/workspace/settings-hub";
-import { fetchSpotifyConnectionStatus } from "@/lib/spotify-user";
+import { fetchSpotifyConnectionStatus, getSpotifyRedirectUri } from "@/lib/spotify-user";
 import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +11,16 @@ export default async function ConfiguracoesPage() {
     getCurrentWorkspaceContext().catch(() => null),
   ]);
   const spotifyAppReady = Boolean(
-    process.env.SPOTIFY_CLIENT_ID?.trim() &&
-      process.env.SPOTIFY_CLIENT_SECRET?.trim(),
+    workspace?.spotifyIntegration.appMode === "workspace_app"
+      ? workspace.spotifyIntegration.appClientId &&
+          workspace.spotifyIntegration.hasAppClientSecret
+      : process.env.SPOTIFY_CLIENT_ID?.trim() &&
+          process.env.SPOTIFY_CLIENT_SECRET?.trim(),
   );
   const openaiReady = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const spotifyRedirectUri = getSpotifyRedirectUri(
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://system.soasbraba.com",
+  );
 
   return (
     <>
@@ -24,6 +30,7 @@ export default async function ConfiguracoesPage() {
         spotifyAppReady={spotifyAppReady}
         openaiReady={openaiReady}
         workspace={workspace}
+        spotifyRedirectUri={spotifyRedirectUri}
       />
     </>
   );

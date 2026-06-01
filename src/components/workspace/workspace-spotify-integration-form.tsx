@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { Loader2, Save } from "lucide-react";
+import { Check, Copy, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -9,6 +9,7 @@ type WorkspaceSpotifyIntegrationFormProps = {
   initialAppMode: "global_app" | "workspace_app";
   initialAppClientId: string | null;
   hasAppClientSecret: boolean;
+  spotifyRedirectUri: string;
 };
 
 function ModeCard({
@@ -53,6 +54,7 @@ export default function WorkspaceSpotifyIntegrationForm({
   initialAppMode,
   initialAppClientId,
   hasAppClientSecret,
+  spotifyRedirectUri,
 }: WorkspaceSpotifyIntegrationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -64,6 +66,17 @@ export default function WorkspaceSpotifyIntegrationForm({
   const [appClientSecret, setAppClientSecret] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redirectCopied, setRedirectCopied] = useState(false);
+
+  async function copyRedirectUri() {
+    if (!navigator.clipboard) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(spotifyRedirectUri);
+    setRedirectCopied(true);
+    window.setTimeout(() => setRedirectCopied(false), 1800);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,6 +141,34 @@ export default function WorkspaceSpotifyIntegrationForm({
 
       {appMode === "workspace_app" ? (
         <div className="mt-4 rounded-[22px] border border-white/10 bg-black/20 p-4">
+          <div className="mb-4 rounded-[20px] border border-sky-400/20 bg-sky-500/10 p-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-100/75">
+              Redirect URI obrigatório
+            </div>
+            <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center">
+              <code className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-white/10 bg-black/25 px-3 py-2 text-xs text-white/85">
+                {spotifyRedirectUri}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  void copyRedirectUri();
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+              >
+                {redirectCopied ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                {redirectCopied ? "Copiado" : "Copiar"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-sky-50/58">
+              Cadastre exatamente esta URL em Spotify Developers antes de conectar.
+            </p>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
               <div className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">
@@ -160,7 +201,7 @@ export default function WorkspaceSpotifyIntegrationForm({
           </div>
 
           <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/85">
-            Adicione o redirect do sistema na app Spotify do cliente antes de conectar.
+            Depois de salvar as chaves, clique em Conectar Spotify no topo para vincular as playlists deste workspace.
           </div>
         </div>
       ) : null}

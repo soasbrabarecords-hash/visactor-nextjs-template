@@ -22,6 +22,7 @@ type SettingsHubProps = {
   spotifyAppReady: boolean;
   openaiReady: boolean;
   workspace: WorkspaceContext | null;
+  spotifyRedirectUri: string;
 };
 
 function getInitials(name: string) {
@@ -113,6 +114,7 @@ export default function SettingsHub({
   spotifyAppReady,
   openaiReady,
   workspace,
+  spotifyRedirectUri,
 }: SettingsHubProps) {
   const connectHref = "/api/spotify/auth/login?next=/configuracoes";
   const disconnectHref = "/api/spotify/auth/logout?next=/configuracoes";
@@ -337,6 +339,7 @@ export default function SettingsHub({
                 initialAppMode={integrationMode}
                 initialAppClientId={integrationClientId}
                 hasAppClientSecret={hasIntegrationSecret}
+                spotifyRedirectUri={spotifyRedirectUri}
               />
             </SectionCard>
 
