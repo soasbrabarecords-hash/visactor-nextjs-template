@@ -79,6 +79,12 @@ type AccessApiResponse = {
   success: boolean;
   message?: string;
   data?: AccessAdminData;
+  mutation?: {
+    createdAuthUser: boolean;
+    userId: string;
+    email: string | null;
+    temporaryPassword: string | null;
+  } | null;
 };
 
 type AccessTab = "overview" | "workspaces" | "users" | "modules" | "permissions";
@@ -90,6 +96,7 @@ const tabs: Array<{ key: AccessTab; label: string; href: string }> = [
   { key: "modules", label: "Módulos", href: "/settings/access/modules" },
   { key: "permissions", label: "Permissões", href: "/settings/access/permissions" },
 ];
+const WORKSPACE_USER_STATUS_OPTIONS = ["active", "pending", "inactive", "removed"] as const;
 
 function getWorkspaceName(data: AccessAdminData | null, workspaceId: string) {
   return (
@@ -171,6 +178,11 @@ export default function AccessManagementPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [createdCredential, setCreatedCredential] = useState<{
+    email: string;
+    userId: string;
+    temporaryPassword: string;
+  } | null>(null);
   const [workspaceForm, setWorkspaceForm] = useState({
     id: "",
     name: "",
@@ -182,6 +194,7 @@ export default function AccessManagementPanel({
     workspaceId: "",
     userId: "",
     email: "",
+    temporaryPassword: "",
     role: "member",
     status: "active",
   });
@@ -219,6 +232,7 @@ export default function AccessManagementPanel({
     setIsSaving(true);
     setError(null);
     setSuccess(null);
+    setCreatedCredential(null);
 
     try {
       const response = await fetch("/api/settings/access", {
@@ -236,6 +250,17 @@ export default function AccessManagementPanel({
 
       setData(payload.data);
       setSuccess(message);
+      if (
+        payload.mutation?.createdAuthUser &&
+        payload.mutation.email &&
+        payload.mutation.temporaryPassword
+      ) {
+        setCreatedCredential({
+          email: payload.mutation.email,
+          userId: payload.mutation.userId,
+          temporaryPassword: payload.mutation.temporaryPassword,
+        });
+      }
     } catch (actionError) {
       setError(
         actionError instanceof Error
@@ -426,6 +451,21 @@ export default function AccessManagementPanel({
         {success ? (
           <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">
             {success}
+          </div>
+        ) : null}
+        {createdCredential ? (
+          <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-50">
+            <div className="font-semibold">Conta criada no Auth</div>
+            <div className="mt-2 grid gap-1 text-white/72">
+              <span>E-mail: {createdCredential.email}</span>
+              <span>User ID: {createdCredential.userId}</span>
+              <span>
+                Senha temporária:{" "}
+                <code className="rounded-lg bg-white/10 px-2 py-1 text-white">
+                  {createdCredential.temporaryPassword}
+                </code>
+              </span>
+            </div>
           </div>
         ) : null}
         {error ? (
@@ -625,7 +665,7 @@ export default function AccessManagementPanel({
             >
               <div className="text-lg font-semibold">Adicionar usuário</div>
               <p className="mt-1 text-sm text-white/50">
-                Use e-mail se o Service Role estiver ativo. Caso contrário, informe o user_id.
+                Use e-mail para criar ou vincular uma conta. Se ela ainda não existir, o sistema cria com senha temporária.
               </p>
               <div className="mt-4 space-y-3">
                 <div>
@@ -665,6 +705,23 @@ export default function AccessManagementPanel({
                     placeholder="uuid do auth.users"
                   />
                 </div>
+                <div>
+                  <FieldLabel>Senha temporária</FieldLabel>
+                  <Input
+                    value={userForm.temporaryPassword}
+                    onChange={(event) =>
+                      setUserForm((current) => ({
+                        ...current,
+                        temporaryPassword: event.target.value,
+                      }))
+                    }
+                    className="mt-1 rounded-2xl border-white/10 bg-slate-950/70 text-white"
+                    placeholder="opcional, geramos se ficar vazio"
+                  />
+                  <p className="mt-1 text-xs text-white/38">
+                    Usada somente quando o e-mail ainda não existe no Auth.
+                  </p>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <FieldLabel>Role geral</FieldLabel>
@@ -689,9 +746,11 @@ export default function AccessManagementPanel({
                         setUserForm((current) => ({ ...current, status: value }))
                       }
                     >
-                      <option value="active">active</option>
-                      <option value="paused">paused</option>
-                      <option value="archived">archived</option>
+                      {WORKSPACE_USER_STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
                     </SelectField>
                   </div>
                 </div>

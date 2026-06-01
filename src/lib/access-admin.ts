@@ -75,6 +75,13 @@ type AdminContext = {
   manageableWorkspaceIds: string[];
 };
 
+export type AccessWorkspaceUserMutationResult = {
+  createdAuthUser: boolean;
+  userId: string;
+  email: string | null;
+  temporaryPassword: string | null;
+};
+
 export class AccessAdminError extends Error {
   status: number;
 
@@ -104,6 +111,19 @@ function asWorkspaceStatus(value: unknown) {
   return WORKSPACE_STATUS_OPTIONS.includes(value as (typeof WORKSPACE_STATUS_OPTIONS)[number])
     ? (value as (typeof WORKSPACE_STATUS_OPTIONS)[number])
     : "active";
+}
+
+function asWorkspaceUserStatus(value: unknown) {
+  if (
+    value === "active" ||
+    value === "inactive" ||
+    value === "pending" ||
+    value === "removed"
+  ) {
+    return value;
+  }
+
+  return "active";
 }
 
 function asWorkspaceType(value: unknown) {
@@ -221,6 +241,71 @@ async function resolveUserIdByEmail(
 
   const users = await listAuthUsers(adminClient);
   return users.find((user) => user.email?.toLowerCase() === normalizedEmail)?.id ?? null;
+}
+
+function generateTemporaryPassword() {
+  return `Sab-${crypto.randomUUID().replace(/-/g, "").slice(0, 14)}!9`;
+}
+
+async function resolveOrCreateAuthUserByEmail({
+  adminClient,
+  email,
+  temporaryPassword,
+}: {
+  adminClient: AccessDbClient | null;
+  email: string;
+  temporaryPassword?: string | null;
+}): Promise<AccessWorkspaceUserMutationResult | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  if (!adminClient) {
+    throw new AccessAdminError(
+      "Para criar ou localizar usuário por e-mail, configure SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
+
+  const existingUserId = await resolveUserIdByEmail(adminClient, normalizedEmail);
+
+  if (existingUserId) {
+    return {
+      createdAuthUser: false,
+      userId: existingUserId,
+      email: normalizedEmail,
+      temporaryPassword: null,
+    };
+  }
+
+  const password = temporaryPassword?.trim() || generateTemporaryPassword();
+
+  if (password.length < 8) {
+    throw new AccessAdminError("A senha temporária precisa ter pelo menos 8 caracteres.");
+  }
+
+  const { data, error } = await adminClient.auth.admin.createUser({
+    email: normalizedEmail,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      created_from: "so_as_braba_access_management",
+    },
+  });
+
+  if (error || !data.user?.id) {
+    throw new AccessAdminError(
+      error?.message ?? "Não foi possível criar o usuário no Auth.",
+    );
+  }
+
+  return {
+    createdAuthUser: true,
+    userId: data.user.id,
+    email: normalizedEmail,
+    temporaryPassword: password,
+  };
 }
 
 function ensureWorkspaceAllowed(context: AdminContext, workspaceId: string) {
@@ -518,9 +603,10 @@ export async function upsertAccessWorkspaceUser(input: {
   workspaceId?: string | null;
   userId?: string | null;
   email?: string | null;
+  temporaryPassword?: string | null;
   role?: string | null;
   status?: string | null;
-}) {
+}): Promise<AccessWorkspaceUserMutationResult> {
   const context = await getCurrentAdminContext();
   const workspaceId = input.workspaceId?.trim();
 
@@ -530,20 +616,24 @@ export async function upsertAccessWorkspaceUser(input: {
 
   ensureWorkspaceAllowed(context, workspaceId);
 
-  const resolvedUserId =
-    input.userId?.trim() ||
-    (input.email
-      ? await resolveUserIdByEmail(context.adminClient, input.email)
-      : null);
+  const emailResult =
+    !input.userId?.trim() && input.email
+      ? await resolveOrCreateAuthUserByEmail({
+          adminClient: context.adminClient,
+          email: input.email,
+          temporaryPassword: input.temporaryPassword,
+        })
+      : null;
+  const resolvedUserId = input.userId?.trim() || emailResult?.userId || null;
 
   if (!resolvedUserId) {
     throw new AccessAdminError(
-      "Informe um user_id válido. Busca por e-mail exige SUPABASE_SERVICE_ROLE_KEY.",
+      "Informe um user_id válido ou um e-mail para criar/vincular a conta.",
     );
   }
 
   const role = asWorkspaceRole(input.role);
-  const status = input.status === "active" ? "active" : asWorkspaceStatus(input.status);
+  const status = asWorkspaceUserStatus(input.status);
   const membershipRole =
     role === "owner" || role === "admin" || role === "viewer" ? role : "editor";
 
@@ -568,6 +658,15 @@ export async function upsertAccessWorkspaceUser(input: {
       role: membershipRole,
     },
     { onConflict: "workspace_id,user_id" },
+  );
+
+  return (
+    emailResult ?? {
+      createdAuthUser: false,
+      userId: resolvedUserId,
+      email: input.email?.trim().toLowerCase() || null,
+      temporaryPassword: null,
+    }
   );
 }
 

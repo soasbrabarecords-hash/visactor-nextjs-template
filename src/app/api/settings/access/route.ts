@@ -25,6 +25,7 @@ type AccessActionBody = {
     workspaceId?: string | null;
     userId?: string | null;
     email?: string | null;
+    temporaryPassword?: string | null;
     role?: string | null;
     status?: string | null;
   };
@@ -71,11 +72,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AccessActionBody;
+    let mutation:
+      | Awaited<ReturnType<typeof upsertAccessWorkspaceUser>>
+      | null = null;
 
     if (body.action === "upsert_workspace") {
       await upsertAccessWorkspace(body.workspace ?? {});
     } else if (body.action === "upsert_workspace_user") {
-      await upsertAccessWorkspaceUser(body.workspaceUser ?? {});
+      mutation = await upsertAccessWorkspaceUser(body.workspaceUser ?? {});
     } else if (body.action === "remove_workspace_user") {
       await removeAccessWorkspaceUser(body.workspaceUser ?? {});
     } else if (body.action === "update_modules") {
@@ -91,6 +95,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data,
+      mutation,
     });
   } catch (error) {
     return errorResponse(error);
