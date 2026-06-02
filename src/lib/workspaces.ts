@@ -174,6 +174,49 @@ async function getWorkspaceDbClient(): Promise<WorkspaceDbClient> {
   return createAdminClient() ?? (await createClient());
 }
 
+export async function currentUserCanAccessWorkspace(workspaceId: string) {
+  const supabase = await createClient();
+  const dataClient = createAdminClient() ?? supabase;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return false;
+  }
+
+  const { data: accessRow, error: accessError } = await dataClient
+    .from("workspace_users")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (accessError) {
+    throw new Error(`currentUserCanAccessWorkspace(access): ${accessError.message}`);
+  }
+
+  if (accessRow) {
+    return true;
+  }
+
+  const { data: membershipRow, error: membershipError } = await dataClient
+    .from("workspace_memberships")
+    .select("workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    throw new Error(
+      `currentUserCanAccessWorkspace(membership): ${membershipError.message}`,
+    );
+  }
+
+  return Boolean(membershipRow);
+}
+
 async function ensureWorkspaceDefaults(workspaceId: string) {
   const supabase = await getWorkspaceDbClient();
 
@@ -720,10 +763,48 @@ export async function updateCurrentWorkspaceSettings(
   return getCurrentWorkspaceContext();
 }
 
-export async function getEffectiveSpotifyCredentials(): Promise<EffectiveSpotifyCredentials | null> {
+export async function getEffectiveSpotifyCredentials(
+  workspaceId?: string | null,
+): Promise<EffectiveSpotifyCredentials | null> {
   const globalClientId = process.env.SPOTIFY_CLIENT_ID?.trim() || "";
   const globalClientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim() || "";
-  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const workspace = workspaceId
+    ? null
+    : await getCurrentWorkspaceContext().catch(() => null);
+
+  if (workspaceId) {
+    const supabase = await getWorkspaceDbClient();
+    const { data, error } = await supabase
+      .from("workspace_integrations")
+      .select("workspace_id, app_mode, app_client_id, app_client_secret")
+      .eq("workspace_id", workspaceId)
+      .eq("provider", "spotify")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`getEffectiveSpotifyCredentials(workspace): ${error.message}`);
+    }
+
+    const row = data as
+      | Pick<
+          WorkspaceIntegrationRow,
+          "workspace_id" | "app_mode" | "app_client_id" | "app_client_secret"
+        >
+      | null;
+
+    if (
+      row?.app_mode === "workspace_app" &&
+      row.app_client_id &&
+      row.app_client_secret
+    ) {
+      return {
+        clientId: row.app_client_id,
+        clientSecret: row.app_client_secret,
+        source: "workspace_app",
+        workspaceId: row.workspace_id,
+      };
+    }
+  }
 
   if (
     workspace?.spotifyIntegration.appMode === "workspace_app" &&
@@ -765,7 +846,7 @@ export async function getEffectiveSpotifyCredentials(): Promise<EffectiveSpotify
     clientId: globalClientId,
     clientSecret: globalClientSecret,
     source: "global_app",
-    workspaceId: workspace?.workspace.id ?? null,
+    workspaceId: workspaceId ?? workspace?.workspace.id ?? null,
   };
 }
 
@@ -858,30 +939,41 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
   };
 }
 
-export async function syncCurrentWorkspaceSpotifyConnection(input: {
+type WorkspaceSpotifyConnectionInput = {
   providerAccountId: string | null;
   providerAccountLabel: string | null;
   grantedScopes: string | null;
   accessToken?: string | null;
   refreshToken?: string | null;
   expiresInSeconds?: number | null;
-}) {
-  const workspace = await getCurrentWorkspaceContext();
+};
 
-  if (!workspace) {
-    return;
+export async function syncWorkspaceSpotifyConnection(
+  workspaceId: string,
+  input: WorkspaceSpotifyConnectionInput,
+) {
+  const supabase = await getWorkspaceDbClient();
+  const { data: integrationRow, error: integrationError } = await supabase
+    .from("workspace_integrations")
+    .select("app_mode")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "spotify")
+    .maybeSingle();
+
+  if (integrationError) {
+    throw new Error(`syncWorkspaceSpotifyConnection(mode): ${integrationError.message}`);
   }
 
-  const supabase = await getWorkspaceDbClient();
+  const integration = integrationRow as Pick<WorkspaceIntegrationRow, "app_mode"> | null;
   const tokenExpiresAt =
     typeof input.expiresInSeconds === "number" && input.expiresInSeconds > 0
       ? new Date(Date.now() + input.expiresInSeconds * 1000).toISOString()
       : null;
 
   const payload: Record<string, unknown> = {
-    workspace_id: workspace.workspace.id,
+    workspace_id: workspaceId,
     provider: "spotify",
-    app_mode: workspace.spotifyIntegration.appMode,
+    app_mode: integration?.app_mode ?? DEFAULT_SPOTIFY_INTEGRATION.appMode,
     connection_status: "connected",
     provider_account_id: input.providerAccountId,
     provider_account_label: input.providerAccountLabel,
@@ -906,8 +998,20 @@ export async function syncCurrentWorkspaceSpotifyConnection(input: {
     .upsert(payload, { onConflict: "workspace_id,provider" });
 
   if (error) {
-    throw new Error(`syncCurrentWorkspaceSpotifyConnection: ${error.message}`);
+    throw new Error(`syncWorkspaceSpotifyConnection: ${error.message}`);
   }
+}
+
+export async function syncCurrentWorkspaceSpotifyConnection(
+  input: WorkspaceSpotifyConnectionInput,
+) {
+  const workspace = await getCurrentWorkspaceContext();
+
+  if (!workspace) {
+    return;
+  }
+
+  await syncWorkspaceSpotifyConnection(workspace.workspace.id, input);
 }
 
 export async function clearCurrentWorkspaceSpotifyConnection() {

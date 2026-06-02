@@ -11,7 +11,7 @@ import {
   setSpotifyAuthCookies,
   syncSpotifyWorkspaceConnection,
 } from "@/lib/spotify-user";
-import { getCurrentWorkspaceContext } from "@/lib/workspaces";
+import { currentUserCanAccessWorkspace } from "@/lib/workspaces";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,12 +37,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    if (expectedWorkspaceId) {
-      const workspace = await getCurrentWorkspaceContext();
+    if (!expectedWorkspaceId) {
+      throw new Error("Workspace da conexao Spotify nao identificado.");
+    }
 
-      if (workspace?.workspace.id !== expectedWorkspaceId) {
+    if (expectedWorkspaceId) {
+      const canAccessWorkspace =
+        await currentUserCanAccessWorkspace(expectedWorkspaceId);
+
+      if (!canAccessWorkspace) {
         throw new Error(
-          "A conexao voltou para outro workspace. Tente conectar novamente no workspace correto.",
+          "Sem permissao para conectar o Spotify neste workspace.",
         );
       }
     }
@@ -50,8 +55,9 @@ export async function GET(request: Request) {
     const token = await exchangeSpotifyCode({
       code,
       redirectUri: getSpotifyRedirectUri(url.origin),
+      workspaceId: expectedWorkspaceId,
     });
-    await syncSpotifyWorkspaceConnection(token);
+    await syncSpotifyWorkspaceConnection(token, expectedWorkspaceId);
     redirectUrl.searchParams.set("spotify", "connected");
     const response = NextResponse.redirect(redirectUrl);
 

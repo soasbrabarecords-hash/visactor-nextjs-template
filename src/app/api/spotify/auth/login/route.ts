@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     const redirectUrl = await buildSpotifyAuthorizeUrl({
       origin,
       state,
+      workspaceId: workspace.workspace.id,
     });
     const response = NextResponse.redirect(redirectUrl);
     const nextPath = requestUrl.searchParams.get("next");
