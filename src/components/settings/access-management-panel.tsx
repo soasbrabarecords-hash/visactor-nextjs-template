@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Layers3,
   LockKeyhole,
+  PencilLine,
   Save,
   ShieldCheck,
   Trash2,
@@ -97,6 +98,14 @@ const tabs: Array<{ key: AccessTab; label: string; href: string }> = [
   { key: "permissions", label: "Permissões", href: "/settings/access/permissions" },
 ];
 const WORKSPACE_USER_STATUS_OPTIONS = ["active", "pending", "inactive", "removed"] as const;
+const EMPTY_USER_FORM = {
+  workspaceId: "",
+  userId: "",
+  email: "",
+  temporaryPassword: "",
+  role: "member",
+  status: "active",
+};
 
 function getWorkspaceName(data: AccessAdminData | null, workspaceId: string) {
   return (
@@ -191,13 +200,11 @@ export default function AccessManagementPanel({
     status: "active",
   });
   const [userForm, setUserForm] = useState({
-    workspaceId: "",
-    userId: "",
-    email: "",
-    temporaryPassword: "",
-    role: "member",
-    status: "active",
+    ...EMPTY_USER_FORM,
   });
+  const [editingWorkspaceUserId, setEditingWorkspaceUserId] = useState<string | null>(
+    null,
+  );
   const [moduleWorkspaceId, setModuleWorkspaceId] = useState("");
   const [moduleDraft, setModuleDraft] = useState<Record<ModuleKey, boolean>>({
     playlist_os: true,
@@ -261,15 +268,40 @@ export default function AccessManagementPanel({
           temporaryPassword: payload.mutation.temporaryPassword,
         });
       }
+      return true;
     } catch (actionError) {
       setError(
         actionError instanceof Error
           ? actionError.message
           : "Nao foi possivel salvar.",
       );
+      return false;
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function resetUserForm(workspaceId = userForm.workspaceId) {
+    setEditingWorkspaceUserId(null);
+    setUserForm({
+      ...EMPTY_USER_FORM,
+      workspaceId,
+    });
+  }
+
+  function editWorkspaceUser(user: AccessWorkspaceUser) {
+    setError(null);
+    setSuccess(null);
+    setCreatedCredential(null);
+    setEditingWorkspaceUserId(user.id);
+    setUserForm({
+      workspaceId: user.workspaceId,
+      userId: user.userId,
+      email: user.email ?? "",
+      temporaryPassword: "",
+      role: user.role,
+      status: user.status,
+    });
   }
 
   useEffect(() => {
@@ -659,13 +691,23 @@ export default function AccessManagementPanel({
                     action: "upsert_workspace_user",
                     workspaceUser: userForm,
                   },
-                  "Usuário salvo no workspace.",
-                );
+                  editingWorkspaceUserId
+                    ? "Acesso do usuário atualizado."
+                    : "Usuário salvo no workspace.",
+                ).then((saved) => {
+                  if (saved && editingWorkspaceUserId) {
+                    resetUserForm(userForm.workspaceId);
+                  }
+                });
               }}
             >
-              <div className="text-lg font-semibold">Adicionar usuário</div>
+              <div className="text-lg font-semibold">
+                {editingWorkspaceUserId ? "Editar usuário" : "Adicionar usuário"}
+              </div>
               <p className="mt-1 text-sm text-white/50">
-                Use e-mail para criar ou vincular uma conta. Se ela ainda não existir, o sistema cria com senha temporária.
+                {editingWorkspaceUserId
+                  ? "Ajuste role e status sem remover o usuário do workspace."
+                  : "Use e-mail para criar ou vincular uma conta. Se ela ainda não existir, o sistema cria com senha temporária."}
               </p>
               <div className="mt-4 space-y-3">
                 <div>
@@ -719,7 +761,9 @@ export default function AccessManagementPanel({
                     placeholder="opcional, geramos se ficar vazio"
                   />
                   <p className="mt-1 text-xs text-white/38">
-                    Usada somente quando o e-mail ainda não existe no Auth.
+                    {editingWorkspaceUserId
+                      ? "Ignorada no modo edição."
+                      : "Usada somente quando o e-mail ainda não existe no Auth."}
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -755,9 +799,21 @@ export default function AccessManagementPanel({
                   </div>
                 </div>
               </div>
-              <Button disabled={isSaving} className="mt-4 rounded-full bg-white text-slate-950 hover:bg-white/90">
-                Salvar usuário
-              </Button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button disabled={isSaving} className="rounded-full bg-white text-slate-950 hover:bg-white/90">
+                  {editingWorkspaceUserId ? "Atualizar usuário" : "Salvar usuário"}
+                </Button>
+                {editingWorkspaceUserId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                    onClick={() => resetUserForm(userForm.workspaceId)}
+                  >
+                    Cancelar
+                  </Button>
+                ) : null}
+              </div>
             </form>
 
             <div className="rounded-[28px] border border-white/10 bg-white/[0.035] p-4 text-white">
@@ -786,6 +842,15 @@ export default function AccessManagementPanel({
                         <StatusBadge tone={user.status === "active" ? "green" : "yellow"}>
                           {user.status}
                         </StatusBadge>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 rounded-full border-sky-300/20 bg-sky-400/10 px-3 text-xs text-sky-50 hover:bg-sky-400/20 hover:text-white"
+                          onClick={() => editWorkspaceUser(user)}
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                          Editar
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"

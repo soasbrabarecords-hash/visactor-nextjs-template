@@ -226,6 +226,8 @@ type SpotifyWorkspaceDiagnosticsIntegration = {
   connectionStatus: string | null;
   accountLabel: string | null;
   accountId: string | null;
+  hasClientId: boolean;
+  hasClientSecret: boolean;
   hasAccessToken: boolean;
   hasRefreshToken: boolean;
   tokenExpiresAt: string | null;
@@ -848,6 +850,27 @@ async function fetchSpotifyPlaylistTrackTotalWithToken(
   accessToken: string,
   playlistId: string,
 ) {
+  const tracksResponse = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=total&limit=1`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (tracksResponse.ok) {
+    const tracksPayload =
+      (await tracksResponse.json().catch(() => null)) as
+        | SpotifyPlaylistTracksResponse
+        | null;
+
+    if (typeof tracksPayload?.total === "number") {
+      return tracksPayload.total;
+    }
+  }
+
   const response = await fetch(
     `https://api.spotify.com/v1/playlists/${playlistId}?fields=tracks(total)`,
     {
@@ -917,7 +940,6 @@ async function fetchSpotifyAccountPlaylistsWithToken(
   throwIfRateLimited("spotify:me:playlists", "Spotify playlists error");
 
   const requestPromise = (async () => {
-    const currentUser = await fetchSpotifyCurrentUserWithToken(accessToken);
     const playlists: SpotifyAccountPlaylist[] = [];
     let nextUrl:
       | string
@@ -954,10 +976,6 @@ async function fetchSpotifyAccountPlaylistsWithToken(
       const payload = (await response.json()) as SpotifyUserPlaylistsResponse;
 
       for (const playlist of payload.items ?? []) {
-        if (playlist.owner?.id !== currentUser.id) {
-          continue;
-        }
-
         const mappedPlaylist = mapSpotifyAccountPlaylist(playlist);
 
         if (mappedPlaylist) {
@@ -1407,6 +1425,7 @@ async function fetchSpotifyDiagnosticJson<T>(
 }
 
 function buildSpotifyIntegrationDiagnostics(
+  workspace: Awaited<ReturnType<typeof getCurrentWorkspaceContext>>,
   auth: Awaited<ReturnType<typeof getCurrentWorkspaceSpotifyStoredAuth>>,
 ): SpotifyWorkspaceDiagnosticsIntegration {
   return {
@@ -1414,6 +1433,8 @@ function buildSpotifyIntegrationDiagnostics(
     connectionStatus: auth?.connectionStatus ?? null,
     accountLabel: auth?.providerAccountLabel ?? null,
     accountId: auth?.providerAccountId ?? null,
+    hasClientId: Boolean(workspace?.spotifyIntegration.appClientId),
+    hasClientSecret: Boolean(workspace?.spotifyIntegration.hasAppClientSecret),
     hasAccessToken: Boolean(auth?.accessToken),
     hasRefreshToken: Boolean(auth?.refreshToken),
     tokenExpiresAt: auth?.tokenExpiresAt ?? null,
@@ -1437,7 +1458,7 @@ export async function fetchSpotifyWorkspaceDiagnostics({
         name: workspace.workspace.name,
       }
     : null;
-  const integration = buildSpotifyIntegrationDiagnostics(auth);
+  const integration = buildSpotifyIntegrationDiagnostics(workspace, auth);
 
   try {
     const { data, refreshedToken } = await withSpotifyToken(async (token) => {
