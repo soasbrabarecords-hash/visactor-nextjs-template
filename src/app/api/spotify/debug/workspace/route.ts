@@ -13,7 +13,9 @@ export async function GET(request: Request) {
   const { result, refreshedToken } = await fetchSpotifyWorkspaceDiagnostics({
     playlistId,
   });
-  const response = NextResponse.json(result);
+  const response = NextResponse.json(result, {
+    status: result.success ? 200 : 500,
+  });
 
   if (refreshedToken) {
     setSpotifyAuthCookies(response, refreshedToken);
