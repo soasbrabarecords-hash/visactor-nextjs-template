@@ -50,9 +50,12 @@ export async function getSpotifyAccountPlaylistsClient({
   }
 
   const request = (async () => {
-    const response = await fetch("/api/spotify/me/playlists", {
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `/api/spotify/me/playlists${force ? "?force=1" : ""}`,
+      {
+        cache: "no-store",
+      },
+    );
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => ({}))) as { message?: string };

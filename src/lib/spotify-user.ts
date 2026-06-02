@@ -30,6 +30,7 @@ export type SpotifyOAuthTokenResponse = {
 type SpotifyUserPlaylistsResponse = {
   items?: SpotifyUserPlaylistObject[];
   next?: string | null;
+  total?: number;
 };
 
 type SpotifyCurrentUserResponse = {
@@ -68,6 +69,7 @@ type SpotifyUserPlaylistObject = {
 type SpotifyPlaylistTracksResponse = {
   items?: SpotifyPlaylistTrackItem[];
   next?: string | null;
+  total?: number;
 };
 
 type SpotifyPlaylistTrackItem = {
@@ -157,6 +159,87 @@ export type SpotifyConnectionStatusResult =
       account: null;
       message: string;
     };
+
+export type SpotifyWorkspaceDiagnosticsResult =
+  | {
+      success: true;
+      workspace: {
+        id: string;
+        name: string;
+      } | null;
+      integration: SpotifyWorkspaceDiagnosticsIntegration;
+      spotifyUser: {
+        id: string | null;
+        displayName: string | null;
+        email: string | null;
+        product: string | null;
+      } | null;
+      playlistsCheck: {
+        status: number;
+        ok: boolean;
+        total: number | null;
+        itemsCount: number;
+        firstItems: Array<{
+          id: string;
+          name: string;
+          ownerId: string;
+          tracksTotal: number;
+        }>;
+        message: string | null;
+      };
+      selectedPlaylistCheck: {
+        playlistId: string | null;
+        detail: {
+          status: number;
+          ok: boolean;
+          name: string | null;
+          ownerId: string | null;
+          tracksTotal: number | null;
+          embeddedItemsCount: number;
+          message: string | null;
+        } | null;
+        tracks: {
+          status: number;
+          ok: boolean;
+          total: number | null;
+          itemsCount: number;
+          firstItems: Array<{
+            id: string | null;
+            name: string | null;
+          }>;
+          message: string | null;
+        } | null;
+      };
+    }
+  | {
+      success: false;
+      message: string;
+      workspace: {
+        id: string;
+        name: string;
+      } | null;
+      integration: SpotifyWorkspaceDiagnosticsIntegration;
+    };
+
+type SpotifyWorkspaceDiagnosticsIntegration = {
+  appMode: string | null;
+  connectionStatus: string | null;
+  accountLabel: string | null;
+  accountId: string | null;
+  hasAccessToken: boolean;
+  hasRefreshToken: boolean;
+  tokenExpiresAt: string | null;
+  grantedScopes: string | null;
+};
+
+type SpotifyWorkspaceDiagnosticsSuccess = Extract<
+  SpotifyWorkspaceDiagnosticsResult,
+  { success: true }
+>;
+type SpotifyWorkspaceDiagnosticsDetailCheck =
+  SpotifyWorkspaceDiagnosticsSuccess["selectedPlaylistCheck"]["detail"];
+type SpotifyWorkspaceDiagnosticsTracksCheck =
+  SpotifyWorkspaceDiagnosticsSuccess["selectedPlaylistCheck"]["tracks"];
 
 type CacheEntry<T> = {
   value: T;
@@ -761,17 +844,73 @@ function mapSpotifyPlaylistTrackItems(items: SpotifyPlaylistTrackItem[] = []) {
     .filter(Boolean) as SpotifyEditablePlaylistTrack[];
 }
 
-async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
+async function fetchSpotifyPlaylistTrackTotalWithToken(
+  accessToken: string,
+  playlistId: string,
+) {
+  const response = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=tracks(total)`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const detail = (await response.json().catch(() => null)) as
+    | SpotifyUserPlaylistObject
+    | null;
+
+  return typeof detail?.tracks?.total === "number" ? detail.tracks.total : null;
+}
+
+async function enrichSpotifyPlaylistTotals(
+  accessToken: string,
+  playlists: SpotifyAccountPlaylist[],
+) {
+  if (playlists.length === 0) {
+    return playlists;
+  }
+
+  const enrichedPlaylists = await Promise.all(
+    playlists.slice(0, 50).map(async (playlist) => {
+      const tracksTotal = await fetchSpotifyPlaylistTrackTotalWithToken(
+        accessToken,
+        playlist.id,
+      );
+
+      return {
+        ...playlist,
+        tracksTotal: tracksTotal ?? playlist.tracksTotal,
+      };
+    }),
+  );
+
+  return [
+    ...enrichedPlaylists,
+    ...playlists.slice(enrichedPlaylists.length),
+  ];
+}
+
+async function fetchSpotifyAccountPlaylistsWithToken(
+  accessToken: string,
+  { force = false }: { force?: boolean } = {},
+) {
   const cacheKey = buildTokenCacheKey(accessToken);
   const cachedPlaylists = getCachedValue(spotifyAccountPlaylistsCache, cacheKey);
 
-  if (cachedPlaylists) {
+  if (!force && cachedPlaylists) {
     return cachedPlaylists;
   }
 
   const inFlight = spotifyPlaylistsInFlight.get(cacheKey);
 
-  if (inFlight) {
+  if (!force && inFlight) {
     return inFlight;
   }
 
@@ -829,58 +968,29 @@ async function fetchSpotifyAccountPlaylistsWithToken(accessToken: string) {
       nextUrl = payload.next ?? null;
     }
 
-    const detailFallbackNeeded =
-      playlists.length > 0 &&
-      playlists.every((playlist) => playlist.tracksTotal === 0);
-
-    if (detailFallbackNeeded) {
-      const playlistsWithDetails = await Promise.all(
-        playlists.slice(0, 25).map(async (playlist) => {
-          const response = await fetch(
-            `https://api.spotify.com/v1/playlists/${playlist.id}?fields=id,tracks(total)`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-              cache: "no-store",
-            },
-          );
-
-          if (!response.ok) {
-            return playlist;
-          }
-
-          const detail = (await response.json().catch(() => null)) as
-            | SpotifyUserPlaylistObject
-            | null;
-
-          return {
-            ...playlist,
-            tracksTotal:
-              typeof detail?.tracks?.total === "number"
-                ? detail.tracks.total
-                : playlist.tracksTotal,
-          };
-        }),
-      );
-
-      playlists.splice(0, playlistsWithDetails.length, ...playlistsWithDetails);
-    }
+    const playlistsWithDetails = await enrichSpotifyPlaylistTotals(
+      accessToken,
+      playlists,
+    );
 
     return setCachedValue(
       spotifyAccountPlaylistsCache,
       cacheKey,
-      playlists,
+      playlistsWithDetails,
       ACCOUNT_PLAYLISTS_CACHE_TTL_MS,
     );
   })();
 
-  spotifyPlaylistsInFlight.set(cacheKey, requestPromise);
+  if (!force) {
+    spotifyPlaylistsInFlight.set(cacheKey, requestPromise);
+  }
 
   try {
     return await requestPromise;
   } finally {
-    spotifyPlaylistsInFlight.delete(cacheKey);
+    if (!force) {
+      spotifyPlaylistsInFlight.delete(cacheKey);
+    }
   }
 }
 
@@ -1159,13 +1269,17 @@ async function fetchSpotifyEditablePlaylistWithToken(
   }
 }
 
-export async function fetchSpotifyAccountPlaylists(): Promise<{
+export async function fetchSpotifyAccountPlaylists({
+  force = false,
+}: {
+  force?: boolean;
+} = {}): Promise<{
   result: SpotifyAccountPlaylistsResult;
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
     const { data: playlists, refreshedToken } = await withSpotifyToken((token) =>
-      fetchSpotifyAccountPlaylistsWithToken(token),
+      fetchSpotifyAccountPlaylistsWithToken(token, { force }),
     );
     return {
       result: {
@@ -1246,6 +1360,198 @@ export async function fetchSpotifyEditablePlaylist(
           error instanceof Error
             ? error.message
             : "Nao foi possivel carregar a playlist do Spotify.",
+      },
+      refreshedToken: null,
+    };
+  }
+}
+
+function getSpotifyDiagnosticMessage(payload: unknown) {
+  const data = payload as
+    | {
+        error?: string | { message?: string; status?: number };
+        error_description?: string;
+        message?: string;
+      }
+    | null;
+
+  if (!data) {
+    return null;
+  }
+
+  if (typeof data.error === "string") {
+    return data.error_description || data.error;
+  }
+
+  return data.error?.message || data.message || null;
+}
+
+async function fetchSpotifyDiagnosticJson<T>(
+  accessToken: string,
+  url: string,
+) {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => null)) as T | null;
+
+  return {
+    status: response.status,
+    ok: response.ok,
+    payload,
+    message: response.ok ? null : getSpotifyDiagnosticMessage(payload),
+  };
+}
+
+function buildSpotifyIntegrationDiagnostics(
+  auth: Awaited<ReturnType<typeof getCurrentWorkspaceSpotifyStoredAuth>>,
+): SpotifyWorkspaceDiagnosticsIntegration {
+  return {
+    appMode: auth?.appMode ?? null,
+    connectionStatus: auth?.connectionStatus ?? null,
+    accountLabel: auth?.providerAccountLabel ?? null,
+    accountId: auth?.providerAccountId ?? null,
+    hasAccessToken: Boolean(auth?.accessToken),
+    hasRefreshToken: Boolean(auth?.refreshToken),
+    tokenExpiresAt: auth?.tokenExpiresAt ?? null,
+    grantedScopes: auth?.grantedScopes ?? null,
+  };
+}
+
+export async function fetchSpotifyWorkspaceDiagnostics({
+  playlistId,
+}: {
+  playlistId?: string | null;
+} = {}): Promise<{
+  result: SpotifyWorkspaceDiagnosticsResult;
+  refreshedToken: SpotifyOAuthTokenResponse | null;
+}> {
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const auth = await getCurrentWorkspaceSpotifyStoredAuth().catch(() => null);
+  const workspaceSummary = workspace
+    ? {
+        id: workspace.workspace.id,
+        name: workspace.workspace.name,
+      }
+    : null;
+  const integration = buildSpotifyIntegrationDiagnostics(auth);
+
+  try {
+    const { data, refreshedToken } = await withSpotifyToken(async (token) => {
+      const profile = await fetchSpotifyCurrentUserWithToken(token).catch(
+        () => null,
+      );
+      const playlistsResponse =
+        await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistsResponse>(
+          token,
+          "https://api.spotify.com/v1/me/playlists?limit=10",
+        );
+      const playlists = playlistsResponse.payload?.items ?? [];
+      const firstItems = playlists
+        .map((playlist) => mapSpotifyAccountPlaylist(playlist))
+        .filter(Boolean)
+        .slice(0, 10) as SpotifyAccountPlaylist[];
+      const selectedPlaylistId = playlistId?.trim() || firstItems[0]?.id || null;
+      let detailCheck: SpotifyWorkspaceDiagnosticsDetailCheck = null;
+      let tracksCheck: SpotifyWorkspaceDiagnosticsTracksCheck = null;
+
+      if (selectedPlaylistId) {
+        const detailResponse =
+          await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistObject>(
+            token,
+            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}?fields=id,name,owner(id,display_name),tracks(total,items(track(id,name))),snapshot_id`,
+          );
+        const detailPayload = detailResponse.payload;
+
+        detailCheck = {
+          status: detailResponse.status,
+          ok: detailResponse.ok,
+          name: detailPayload?.name ?? null,
+          ownerId: detailPayload?.owner?.id ?? null,
+          tracksTotal:
+            typeof detailPayload?.tracks?.total === "number"
+              ? detailPayload.tracks.total
+              : null,
+          embeddedItemsCount: detailPayload?.tracks?.items?.length ?? 0,
+          message: detailResponse.message,
+        };
+
+        const tracksResponse =
+          await fetchSpotifyDiagnosticJson<SpotifyPlaylistTracksResponse>(
+            token,
+            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/tracks?fields=items(track(id,name)),total,next&limit=10`,
+          );
+        const tracksPayload = tracksResponse.payload;
+
+        tracksCheck = {
+          status: tracksResponse.status,
+          ok: tracksResponse.ok,
+          total:
+            typeof tracksPayload?.total === "number"
+              ? tracksPayload.total
+              : null,
+          itemsCount: tracksPayload?.items?.length ?? 0,
+          firstItems: (tracksPayload?.items ?? []).slice(0, 10).map((item) => ({
+            id: item.track?.id ?? null,
+            name: item.track?.name ?? null,
+          })),
+          message: tracksResponse.message,
+        };
+      }
+
+      return {
+        success: true,
+        workspace: workspaceSummary,
+        integration,
+        spotifyUser: profile
+          ? {
+              id: profile.id ?? null,
+              displayName: profile.display_name ?? null,
+              email: profile.email ?? null,
+              product: profile.product ?? null,
+            }
+          : null,
+        playlistsCheck: {
+          status: playlistsResponse.status,
+          ok: playlistsResponse.ok,
+          total:
+            typeof playlistsResponse.payload?.total === "number"
+              ? playlistsResponse.payload.total
+              : null,
+          itemsCount: playlists.length,
+          firstItems: firstItems.map((playlist) => ({
+            id: playlist.id,
+            name: playlist.name,
+            ownerId: playlist.ownerId,
+            tracksTotal: playlist.tracksTotal,
+          })),
+          message: playlistsResponse.message,
+        },
+        selectedPlaylistCheck: {
+          playlistId: selectedPlaylistId,
+          detail: detailCheck,
+          tracks: tracksCheck,
+        },
+      } satisfies SpotifyWorkspaceDiagnosticsResult;
+    });
+
+    return {
+      result: data,
+      refreshedToken,
+    };
+  } catch (error) {
+    return {
+      result: {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel testar a conexao Spotify.",
+        workspace: workspaceSummary,
+        integration,
       },
       refreshedToken: null,
     };

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  fetchSpotifyAccountPlaylists,
+  fetchSpotifyWorkspaceDiagnostics,
   setSpotifyAuthCookies,
 } from "@/lib/spotify-user";
 
@@ -9,11 +9,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const force = url.searchParams.get("force") === "1";
-  const { result, refreshedToken } = await fetchSpotifyAccountPlaylists({
-    force,
+  const playlistId = url.searchParams.get("playlistId");
+  const { result, refreshedToken } = await fetchSpotifyWorkspaceDiagnostics({
+    playlistId,
   });
-  const response = NextResponse.json(result);
+  const response = NextResponse.json(result, {
+    status: result.success ? 200 : 500,
+  });
 
   if (refreshedToken) {
     setSpotifyAuthCookies(response, refreshedToken);

@@ -470,6 +470,14 @@ export default function SettingsHub({
                         : "escopos pendentes"
                       : "token ausente"}
                   </StatusBadge>
+                  <a
+                    href="/api/spotify/debug/workspace"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white"
+                  >
+                    Testar leitura
+                  </a>
                 </div>
                 <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                   <HealthItem

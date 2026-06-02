@@ -44,6 +44,15 @@ export default async function SpotifyPlaylistEditorPage({
             <Button asChild variant="outline">
               <Link href="/curadoria">Voltar para Curadoria</Link>
             </Button>
+            <Button asChild variant="outline">
+              <a
+                href={`/api/spotify/debug/workspace?playlistId=${playlistId}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Diagnosticar playlist
+              </a>
+            </Button>
           </div>
         </Container>
       </div>
