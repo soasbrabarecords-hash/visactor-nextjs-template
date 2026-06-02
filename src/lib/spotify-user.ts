@@ -9,7 +9,6 @@ import {
   getCurrentWorkspaceContext,
   getCurrentWorkspaceSpotifyStoredAuth,
   syncCurrentWorkspaceSpotifyConnection,
-  syncWorkspaceSpotifyConnection,
 } from "@/lib/workspaces";
 
 const SPOTIFY_ACCESS_TOKEN_COOKIE = "spotify_access_token";
@@ -249,7 +248,6 @@ type CacheEntry<T> = {
 
 type ResolvedSpotifySession = {
   source: "workspace" | "cookie";
-  workspaceId: string | null;
   accessToken: string | null;
   refreshToken: string | null;
 };
@@ -415,8 +413,8 @@ function extractSpotifyTrackId(trackUri: string) {
   return trackUri.replace(/^spotify:track:/, "").trim();
 }
 
-async function getSpotifyOAuthEnv(workspaceId?: string | null) {
-  const credentials = await getEffectiveSpotifyCredentials(workspaceId);
+async function getSpotifyOAuthEnv() {
+  const credentials = await getEffectiveSpotifyCredentials();
 
   if (!credentials?.clientId || !credentials.clientSecret) {
     return null;
@@ -455,7 +453,6 @@ async function resolveSpotifySession(
   ) {
     return {
       source: "workspace",
-      workspaceId: workspaceAuth.workspaceId,
       accessToken: workspaceAuth.accessToken,
       refreshToken: workspaceAuth.refreshToken,
     };
@@ -464,7 +461,6 @@ async function resolveSpotifySession(
   if (workspaceAuth?.refreshToken) {
     return {
       source: "workspace",
-      workspaceId: workspaceAuth.workspaceId,
       accessToken: null,
       refreshToken: workspaceAuth.refreshToken,
     };
@@ -490,7 +486,6 @@ async function resolveSpotifySession(
   if (accessToken || refreshToken) {
     return {
       source: "cookie",
-      workspaceId: null,
       accessToken,
       refreshToken,
     };
@@ -527,13 +522,11 @@ export function getSpotifyRedirectUri(origin: string) {
 export async function buildSpotifyAuthorizeUrl({
   origin,
   state,
-  workspaceId,
 }: {
   origin: string;
   state: string;
-  workspaceId?: string | null;
 }) {
-  const env = await getSpotifyOAuthEnv(workspaceId);
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -639,13 +632,11 @@ export function clearSpotifyAuthCookies(response: NextResponse) {
 export async function exchangeSpotifyCode({
   code,
   redirectUri,
-  workspaceId,
 }: {
   code: string;
   redirectUri: string;
-  workspaceId?: string | null;
 }) {
-  const env = await getSpotifyOAuthEnv(workspaceId);
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -689,11 +680,8 @@ async function getSpotifyErrorMessage(response: Response, fallback: string) {
   return spotifyMessage ? `${fallback}: ${spotifyMessage}` : fallback;
 }
 
-async function refreshSpotifyToken(
-  refreshToken: string,
-  workspaceId?: string | null,
-) {
-  const env = await getSpotifyOAuthEnv(workspaceId);
+async function refreshSpotifyToken(refreshToken: string) {
+  const env = await getSpotifyOAuthEnv();
 
   if (!env) {
     throw new Error("Spotify environment variables are not configured.");
@@ -721,15 +709,13 @@ async function refreshSpotifyToken(
 
 export async function syncSpotifyWorkspaceConnection(
   token: SpotifyOAuthTokenResponse,
-  workspaceId?: string | null,
 ) {
-  const workspace = workspaceId
-    ? null
-    : await getCurrentWorkspaceContext().catch(() => null);
+  const workspace = await getCurrentWorkspaceContext().catch(() => null);
 
   try {
     const profile = await fetchSpotifyCurrentUserWithToken(token.access_token);
-    const payload = {
+
+    await syncCurrentWorkspaceSpotifyConnection({
       providerAccountId: profile.id?.trim() || null,
       providerAccountLabel:
         profile.display_name?.trim() || profile.email?.trim() || null,
@@ -737,15 +723,9 @@ export async function syncSpotifyWorkspaceConnection(
       accessToken: token.access_token,
       refreshToken: token.refresh_token ?? undefined,
       expiresInSeconds: token.expires_in,
-    };
-
-    if (workspaceId) {
-      await syncWorkspaceSpotifyConnection(workspaceId, payload);
-    } else {
-      await syncCurrentWorkspaceSpotifyConnection(payload);
-    }
+    });
   } catch {
-    if (workspaceId || workspace?.spotifyIntegration.appMode === "workspace_app") {
+    if (workspace?.spotifyIntegration.appMode === "workspace_app") {
       throw new Error(
         "Spotify conectou, mas nao foi possivel salvar a sessao no workspace.",
       );
@@ -1613,15 +1593,12 @@ export async function withSpotifyToken<T>(
 
   if (!session.refreshToken) throw new Error("Spotify session unavailable.");
 
-  const refreshedToken = await refreshSpotifyToken(
-    session.refreshToken,
-    session.workspaceId,
-  );
+  const refreshedToken = await refreshSpotifyToken(session.refreshToken);
 
   await syncSpotifyWorkspaceConnection({
     ...refreshedToken,
     refresh_token: refreshedToken.refresh_token ?? session.refreshToken,
-  }, session.workspaceId);
+  });
 
   return { data: await fn(refreshedToken.access_token), refreshedToken };
 }
