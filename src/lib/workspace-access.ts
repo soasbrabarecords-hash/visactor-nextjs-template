@@ -1,6 +1,13 @@
 export const MODULE_KEYS = ["playlist_os", "label_os", "artist_os"] as const;
 export const ACCESS_ADMIN_EMAIL = "contato@soasbraba.com";
 export const ACCESS_ADMIN_USER_ID = "a4456937-e1af-4e32-91ba-32d66f1f661b";
+export const GLOBAL_SPOTIFY_APP_WORKSPACE_SLUG = "so-as-braba-records";
+
+export function canUseGlobalSpotifyApp(
+  workspace: { slug?: string | null } | null | undefined,
+) {
+  return workspace?.slug === GLOBAL_SPOTIFY_APP_WORKSPACE_SLUG;
+}
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";

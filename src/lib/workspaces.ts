@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  canUseGlobalSpotifyApp,
   selectCurrentWorkspace,
   type ModuleRole,
   type WorkspaceRole,
@@ -166,6 +167,19 @@ const PLAYLIST_OS_INTEGRATION_MANAGER_ROLES = new Set<ModuleRole>([
   "cliente",
 ]);
 
+function getDefaultSpotifyAppMode(workspace: { slug?: string | null }) {
+  return canUseGlobalSpotifyApp(workspace) ? "global_app" : "workspace_app";
+}
+
+function getEffectiveSpotifyAppMode(
+  workspace: { slug?: string | null },
+  storedMode: WorkspaceIntegrationRow["app_mode"] | null | undefined,
+) {
+  return canUseGlobalSpotifyApp(workspace)
+    ? storedMode ?? "global_app"
+    : "workspace_app";
+}
+
 type WorkspaceDbClient =
   | Awaited<ReturnType<typeof createClient>>
   | NonNullable<ReturnType<typeof createAdminClient>>;
@@ -174,8 +188,9 @@ async function getWorkspaceDbClient(): Promise<WorkspaceDbClient> {
   return createAdminClient() ?? (await createClient());
 }
 
-async function ensureWorkspaceDefaults(workspaceId: string) {
+async function ensureWorkspaceDefaults(workspaceId: string, workspaceSlug: string) {
   const supabase = await getWorkspaceDbClient();
+  const spotifyAppMode = getDefaultSpotifyAppMode({ slug: workspaceSlug });
 
   const runUpserts = async (
     client:
@@ -193,10 +208,10 @@ async function ensureWorkspaceDefaults(workspaceId: string) {
         {
           workspace_id: workspaceId,
           provider: "spotify",
-          app_mode: "global_app",
+          app_mode: spotifyAppMode,
           connection_status: "not_connected",
         },
-        { onConflict: "workspace_id,provider" },
+        { onConflict: "workspace_id,provider", ignoreDuplicates: true },
       ),
       client.from("workspace_integrations").upsert(
         {
@@ -205,7 +220,7 @@ async function ensureWorkspaceDefaults(workspaceId: string) {
           app_mode: "global_app",
           connection_status: "not_connected",
         },
-        { onConflict: "workspace_id,provider" },
+        { onConflict: "workspace_id,provider", ignoreDuplicates: true },
       ),
     ]);
 
@@ -400,7 +415,7 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
   };
 
   if (selectedWorkspace.role === "owner" || selectedWorkspace.role === "admin") {
-    await ensureWorkspaceDefaults(workspace.id);
+    await ensureWorkspaceDefaults(workspace.id, workspace.slug);
   }
 
   const [
@@ -455,6 +470,18 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
   const settings = settingsRow as WorkspaceSettingsRow | null;
   const spotifyIntegration = spotifyIntegrationRow as WorkspaceIntegrationRow | null;
   const openaiIntegration = openaiIntegrationRow as WorkspaceIntegrationRow | null;
+  const spotifyAppMode = getEffectiveSpotifyAppMode(
+    workspace,
+    spotifyIntegration?.app_mode,
+  );
+  const spotifyStoredSessionBelongsToMode =
+    canUseGlobalSpotifyApp(workspace) ||
+    spotifyIntegration?.app_mode === "workspace_app";
+  const spotifyConnectionStatus =
+    spotifyStoredSessionBelongsToMode
+      ? spotifyIntegration?.connection_status ??
+        DEFAULT_SPOTIFY_INTEGRATION.connectionStatus
+      : "not_connected";
 
   return {
     workspace: {
@@ -482,10 +509,8 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
         DEFAULT_WORKSPACE_SETTINGS.prioritizeTopTracks,
     },
     spotifyIntegration: {
-      appMode: spotifyIntegration?.app_mode ?? DEFAULT_SPOTIFY_INTEGRATION.appMode,
-      connectionStatus:
-        spotifyIntegration?.connection_status ??
-        DEFAULT_SPOTIFY_INTEGRATION.connectionStatus,
+      appMode: spotifyAppMode,
+      connectionStatus: spotifyConnectionStatus,
       appClientId:
         spotifyIntegration?.app_client_id ??
         DEFAULT_SPOTIFY_INTEGRATION.appClientId,
@@ -494,25 +519,33 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
           ? Boolean(spotifyIntegration.app_client_secret)
           : DEFAULT_SPOTIFY_INTEGRATION.hasAppClientSecret,
       hasAccessToken:
-        spotifyIntegration?.access_token != null
+        spotifyStoredSessionBelongsToMode && spotifyIntegration?.access_token != null
           ? Boolean(spotifyIntegration.access_token)
           : DEFAULT_SPOTIFY_INTEGRATION.hasAccessToken,
       hasRefreshToken:
-        spotifyIntegration?.refresh_token != null
+        spotifyStoredSessionBelongsToMode && spotifyIntegration?.refresh_token != null
           ? Boolean(spotifyIntegration.refresh_token)
           : DEFAULT_SPOTIFY_INTEGRATION.hasRefreshToken,
       tokenExpiresAt:
-        spotifyIntegration?.token_expires_at ??
-        DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt,
+        spotifyStoredSessionBelongsToMode
+          ? spotifyIntegration?.token_expires_at ??
+            DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt
+          : DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt,
       providerAccountId:
-        spotifyIntegration?.provider_account_id ??
-        DEFAULT_SPOTIFY_INTEGRATION.providerAccountId,
+        spotifyStoredSessionBelongsToMode
+          ? spotifyIntegration?.provider_account_id ??
+            DEFAULT_SPOTIFY_INTEGRATION.providerAccountId
+          : DEFAULT_SPOTIFY_INTEGRATION.providerAccountId,
       providerAccountLabel:
-        spotifyIntegration?.provider_account_label ??
-        DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel,
+        spotifyStoredSessionBelongsToMode
+          ? spotifyIntegration?.provider_account_label ??
+            DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel
+          : DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel,
       grantedScopes:
-        spotifyIntegration?.granted_scopes ??
-        DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
+        spotifyStoredSessionBelongsToMode
+          ? spotifyIntegration?.granted_scopes ??
+            DEFAULT_SPOTIFY_INTEGRATION.grantedScopes
+          : DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
     },
     openaiIntegration: {
       appMode: openaiIntegration?.app_mode ?? DEFAULT_OPENAI_INTEGRATION.appMode,
@@ -546,19 +579,22 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
   }
 
   const dataClient = await getWorkspaceDbClient();
+  const appMode = canUseGlobalSpotifyApp(workspace.workspace)
+    ? input.appMode
+    : "workspace_app";
   const normalizedClientId = input.appClientId?.trim() || null;
   const normalizedClientSecret = input.appClientSecret?.trim() || null;
   const currentHasSecret = workspace.spotifyIntegration.hasAppClientSecret;
   const clientIdChanged =
     normalizedClientId !== null &&
     normalizedClientId !== workspace.spotifyIntegration.appClientId;
-  const appModeChanged = input.appMode !== workspace.spotifyIntegration.appMode;
+  const appModeChanged = appMode !== workspace.spotifyIntegration.appMode;
   const credentialsChanged =
-    input.appMode === "workspace_app" &&
+    appMode === "workspace_app" &&
     (appModeChanged || clientIdChanged || normalizedClientSecret !== null);
 
   if (
-    input.appMode === "workspace_app" &&
+    appMode === "workspace_app" &&
     (!normalizedClientId || (!normalizedClientSecret && !currentHasSecret))
   ) {
     throw new Error(
@@ -569,7 +605,7 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
   const payload: Record<string, unknown> = {
     workspace_id: workspace.workspace.id,
     provider: "spotify",
-    app_mode: input.appMode,
+    app_mode: appMode,
     connection_status: credentialsChanged
       ? "not_connected"
       : workspace.spotifyIntegration.connectionStatus,
@@ -843,18 +879,32 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
   }
 
   const row = data as WorkspaceIntegrationRow;
+  const appMode = getEffectiveSpotifyAppMode(
+    workspace.workspace,
+    row.app_mode,
+  );
+  const storedSessionBelongsToMode =
+    canUseGlobalSpotifyApp(workspace.workspace) || row.app_mode === "workspace_app";
 
   return {
     workspaceId: row.workspace_id,
     integrationId: row.id ?? null,
-    appMode: row.app_mode,
-    connectionStatus: row.connection_status,
-    accessToken: row.access_token ?? null,
-    refreshToken: row.refresh_token ?? null,
-    tokenExpiresAt: row.token_expires_at ?? null,
-    providerAccountId: row.provider_account_id,
-    providerAccountLabel: row.provider_account_label,
-    grantedScopes: row.granted_scopes,
+    appMode,
+    connectionStatus: storedSessionBelongsToMode
+      ? row.connection_status
+      : "not_connected",
+    accessToken: storedSessionBelongsToMode ? row.access_token ?? null : null,
+    refreshToken: storedSessionBelongsToMode ? row.refresh_token ?? null : null,
+    tokenExpiresAt: storedSessionBelongsToMode
+      ? row.token_expires_at ?? null
+      : null,
+    providerAccountId: storedSessionBelongsToMode
+      ? row.provider_account_id
+      : null,
+    providerAccountLabel: storedSessionBelongsToMode
+      ? row.provider_account_label
+      : null,
+    grantedScopes: storedSessionBelongsToMode ? row.granted_scopes : null,
   };
 }
 

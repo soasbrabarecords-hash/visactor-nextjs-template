@@ -11,6 +11,7 @@ import {
   WORKSPACE_ROLE_OPTIONS,
   WORKSPACE_STATUS_OPTIONS,
   WORKSPACE_TYPE_OPTIONS,
+  canUseGlobalSpotifyApp,
   normalizeModuleKey,
   type ModuleKey,
   type ModuleRole,
@@ -485,7 +486,12 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
 async function ensureWorkspaceDefaults(
   client: AccessDbClient,
   workspaceId: string,
+  workspaceSlug: string,
 ) {
+  const spotifyAppMode = canUseGlobalSpotifyApp({ slug: workspaceSlug })
+    ? "global_app"
+    : "workspace_app";
+
   await Promise.all([
     client.from("workspace_settings").upsert(
       {
@@ -497,10 +503,10 @@ async function ensureWorkspaceDefaults(
       {
         workspace_id: workspaceId,
         provider: "spotify",
-        app_mode: "global_app",
+        app_mode: spotifyAppMode,
         connection_status: "not_connected",
       },
-      { onConflict: "workspace_id,provider" },
+      { onConflict: "workspace_id,provider", ignoreDuplicates: true },
     ),
     client.from("workspace_integrations").upsert(
       {
@@ -509,7 +515,7 @@ async function ensureWorkspaceDefaults(
         app_mode: "global_app",
         connection_status: "not_connected",
       },
-      { onConflict: "workspace_id,provider" },
+      { onConflict: "workspace_id,provider", ignoreDuplicates: true },
     ),
   ]);
 }
@@ -596,7 +602,7 @@ export async function upsertAccessWorkspace(input: {
     { onConflict: "workspace_id,module_key" },
   );
 
-  await ensureWorkspaceDefaults(context.dataClient, workspaceId);
+  await ensureWorkspaceDefaults(context.dataClient, workspaceId, slug);
 }
 
 export async function upsertAccessWorkspaceUser(input: {

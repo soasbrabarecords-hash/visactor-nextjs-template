@@ -16,6 +16,7 @@ import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-for
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
 import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
 import type { WorkspaceContext } from "@/lib/workspaces";
+import { canUseGlobalSpotifyApp } from "@/lib/workspace-access";
 
 const REQUIRED_SPOTIFY_SCOPES = [
   "playlist-read-private",
@@ -188,8 +189,14 @@ export default function SettingsHub({
 }: SettingsHubProps) {
   const connectHref = "/api/spotify/auth/login?next=/configuracoes";
   const disconnectHref = "/api/spotify/auth/logout?next=/configuracoes";
+  const allowGlobalSpotifyApp = canUseGlobalSpotifyApp(workspace?.workspace);
+  const storedIntegrationMode =
+    workspace?.spotifyIntegration.appMode ?? "global_app";
+  const integrationMode = allowGlobalSpotifyApp
+    ? storedIntegrationMode
+    : "workspace_app";
   const spotifyModeLabel =
-    workspace?.spotifyIntegration.appMode === "workspace_app"
+    integrationMode === "workspace_app"
       ? "App do workspace"
       : "App global";
   const workspaceName = workspace?.workspace.name ?? "Acesso pendente";
@@ -200,7 +207,6 @@ export default function SettingsHub({
   const prioritizeFollowedArtists =
     workspace?.settings.prioritizeFollowedArtists ?? true;
   const prioritizeTopTracks = workspace?.settings.prioritizeTopTracks ?? true;
-  const integrationMode = workspace?.spotifyIntegration.appMode ?? "global_app";
   const integrationClientId = workspace?.spotifyIntegration.appClientId ?? null;
   const hasIntegrationSecret =
     workspace?.spotifyIntegration.hasAppClientSecret ?? false;
@@ -444,6 +450,7 @@ export default function SettingsHub({
                 initialAppClientId={integrationClientId}
                 hasAppClientSecret={hasIntegrationSecret}
                 spotifyRedirectUri={spotifyRedirectUri}
+                allowGlobalApp={allowGlobalSpotifyApp}
               />
               <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">

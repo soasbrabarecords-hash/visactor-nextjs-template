@@ -10,26 +10,32 @@ type WorkspaceSpotifyIntegrationFormProps = {
   initialAppClientId: string | null;
   hasAppClientSecret: boolean;
   spotifyRedirectUri: string;
+  allowGlobalApp: boolean;
 };
 
 function ModeCard({
   active,
   title,
   hint,
+  disabled = false,
   onClick,
 }: {
   active: boolean;
   title: string;
   hint: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`rounded-[22px] border p-4 text-left transition ${
         active
           ? "border-sky-400/30 bg-sky-500/10 text-white"
+          : disabled
+            ? "cursor-not-allowed border-white/5 bg-black/10 text-white/35"
           : "border-white/10 bg-black/20 text-white/70"
       }`}
     >
@@ -55,12 +61,13 @@ export default function WorkspaceSpotifyIntegrationForm({
   initialAppClientId,
   hasAppClientSecret,
   spotifyRedirectUri,
+  allowGlobalApp,
 }: WorkspaceSpotifyIntegrationFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSaving, setIsSaving] = useState(false);
   const [appMode, setAppMode] = useState<"global_app" | "workspace_app">(
-    initialAppMode,
+    allowGlobalApp ? initialAppMode : "workspace_app",
   );
   const [appClientId, setAppClientId] = useState(initialAppClientId ?? "");
   const [appClientSecret, setAppClientSecret] = useState("");
@@ -91,7 +98,7 @@ export default function WorkspaceSpotifyIntegrationForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          appMode,
+          appMode: allowGlobalApp ? appMode : "workspace_app",
           appClientId,
           appClientSecret,
         }),
@@ -128,8 +135,17 @@ export default function WorkspaceSpotifyIntegrationForm({
         <ModeCard
           active={appMode === "global_app"}
           title="App global"
-          hint="Usa a configuracao central do sistema."
-          onClick={() => setAppMode("global_app")}
+          hint={
+            allowGlobalApp
+              ? "Usa a configuracao central do sistema."
+              : "Disponivel apenas no workspace admin."
+          }
+          disabled={!allowGlobalApp}
+          onClick={() => {
+            if (allowGlobalApp) {
+              setAppMode("global_app");
+            }
+          }}
         />
         <ModeCard
           active={appMode === "workspace_app"}
