@@ -57,7 +57,7 @@ export default function LoginForm({
           <section className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-4 py-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <Music4 className="h-4 w-4 text-primary" />
-              SÓ AS BRABA System
+              Music Business OS
             </div>
 
             <div className="space-y-4">

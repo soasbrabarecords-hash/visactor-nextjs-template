@@ -6,7 +6,6 @@ import {
   KeyRound,
   LogOut,
   Music2,
-  ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
 import Container from "@/components/container";
@@ -298,14 +297,6 @@ export default function SettingsHub({
                 >
                   <ArrowUpRight className="h-4 w-4" />
                   Abrir Curadoria
-                </a>
-
-                <a
-                  href="/settings/access"
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/35 hover:bg-emerald-300/15"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  Gestão de Acessos
                 </a>
               </div>
             </div>

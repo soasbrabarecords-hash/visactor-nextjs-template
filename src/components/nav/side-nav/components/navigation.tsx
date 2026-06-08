@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { navigations, systemNavigations, type Navigation as NavigationItem } from "@/config/site";
+import { navigations, type Navigation as NavigationItem } from "@/config/site";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { cn } from "@/lib/utils";
 import User from "./user";
@@ -212,12 +212,6 @@ export default function Navigation() {
 
       <div className="border-t border-border px-3 py-3">
         <User />
-        <div className="mb-2 px-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
-          Sistema
-        </div>
-        <nav className="flex flex-col gap-y-1.5">
-          {systemNavigations.map(renderNavigationItem)}
-        </nav>
       </div>
     </div>
   );

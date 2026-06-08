@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ACTIVE_WORKSPACE_COOKIE,
   normalizeModuleKey,
   selectCurrentWorkspace,
   type ModuleRole,
@@ -25,7 +27,7 @@ function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole 
   return "member";
 }
 
-function emptyWorkspaceAccess(error: string | null) {
+function emptyWorkspaceAccess(error: string | null, currentUserEmail: string | null = null) {
   return {
     currentWorkspace: null,
     modules: [],
@@ -34,6 +36,7 @@ function emptyWorkspaceAccess(error: string | null) {
     isLoading: false,
     error,
     userWorkspaces: [],
+    currentUserEmail,
   };
 }
 
@@ -96,7 +99,7 @@ export async function GET() {
     if (workspaceAccessRows.length === 0) {
       return NextResponse.json({
         success: true,
-        data: emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE),
+        data: emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, user.email ?? null),
       });
     }
 
@@ -137,13 +140,19 @@ export async function GET() {
       })
       .filter(Boolean) as WorkspaceSummary[];
 
-    const currentWorkspace = selectCurrentWorkspace(workspaces);
+    const cookieStore = await cookies();
+    const activeWorkspaceId =
+      cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? null;
+    const currentWorkspace = selectCurrentWorkspace(
+      workspaces,
+      activeWorkspaceId,
+    );
 
     if (!currentWorkspace) {
       return NextResponse.json({
         success: true,
         data: {
-          ...emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE),
+          ...emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, user.email ?? null),
           userWorkspaces: workspaces,
         },
       });
@@ -212,6 +221,7 @@ export async function GET() {
         isLoading: false,
         error: null,
         userWorkspaces: workspaces,
+        currentUserEmail: user.email ?? null,
       },
     });
   } catch (error) {

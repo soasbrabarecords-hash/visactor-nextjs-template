@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -19,9 +20,11 @@ import {
 type WorkspaceAccessContextValue = WorkspaceAccessSnapshot & {
   isLoading: boolean;
   error: string | null;
+  currentUserEmail: string | null;
   userWorkspaces: WorkspaceSummary[];
   canAccessModule: (moduleKey: ModuleKey) => boolean;
   canManageModule: (moduleKey: ModuleKey) => boolean;
+  refreshWorkspaceAccess: () => Promise<void>;
 };
 
 const WorkspaceAccessContext = createContext<WorkspaceAccessContextValue | null>(
@@ -40,21 +43,29 @@ function buildBlockedState(error: string | null = null): WorkspaceAccessContextV
     ...snapshot,
     isLoading: false,
     error,
+    currentUserEmail: null,
     userWorkspaces: [],
     canAccessModule: (moduleKey) => canAccessModuleFromSnapshot(moduleKey, snapshot),
     canManageModule: (moduleKey) => canManageModuleFromSnapshot(moduleKey, snapshot),
+    refreshWorkspaceAccess: async () => {},
   };
 }
 
 async function fetchWorkspaceAccess(): Promise<
-  Omit<WorkspaceAccessContextValue, "canAccessModule" | "canManageModule">
+  Omit<
+    WorkspaceAccessContextValue,
+    "canAccessModule" | "canManageModule" | "refreshWorkspaceAccess"
+  >
 > {
   const response = await fetch("/api/workspace/access", {
     cache: "no-store",
   });
   const payload = (await response.json().catch(() => null)) as {
     success?: boolean;
-    data?: Omit<WorkspaceAccessContextValue, "canAccessModule" | "canManageModule">;
+    data?: Omit<
+      WorkspaceAccessContextValue,
+      "canAccessModule" | "canManageModule" | "refreshWorkspaceAccess"
+    >;
     message?: string;
   } | null;
 
@@ -67,7 +78,10 @@ async function fetchWorkspaceAccess(): Promise<
 
 export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<
-    Omit<WorkspaceAccessContextValue, "canAccessModule" | "canManageModule">
+    Omit<
+      WorkspaceAccessContextValue,
+      "canAccessModule" | "canManageModule" | "refreshWorkspaceAccess"
+    >
   >({
     currentWorkspace: null,
     modules: [],
@@ -75,8 +89,14 @@ export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
     isFallbackAccess: false,
     isLoading: true,
     error: null,
+    currentUserEmail: null,
     userWorkspaces: [],
   });
+
+  const refreshWorkspaceAccess = useCallback(async () => {
+    const nextState = await fetchWorkspaceAccess();
+    setState(nextState);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -119,8 +139,9 @@ export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
         canAccessModuleFromSnapshot(moduleKey, snapshot),
       canManageModule: (moduleKey) =>
         canManageModuleFromSnapshot(moduleKey, snapshot),
+      refreshWorkspaceAccess,
     };
-  }, [state]);
+  }, [refreshWorkspaceAccess, state]);
 
   return (
     <WorkspaceAccessContext.Provider value={value}>

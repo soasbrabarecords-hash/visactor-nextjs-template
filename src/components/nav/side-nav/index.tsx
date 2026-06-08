@@ -34,10 +34,10 @@ export default function SideNav() {
         <div className="flex h-24 items-center border-b border-border px-5">
           <div>
             <div className="text-base font-semibold tracking-[-0.02em] text-foreground">
-              SÓ AS BRABA System
+              Music Business OS
             </div>
             <div className="mt-1 text-xs font-medium text-muted-foreground">
-              Music Business Workspace
+              Workspace musical modular
             </div>
           </div>
         </div>

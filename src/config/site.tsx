@@ -21,8 +21,8 @@ export type Navigation = {
 };
 
 export const siteConfig = {
-  title: "SÓ AS BRABA System",
-  description: "Sistema profissional de curadoria musical, radar de charts e inteligencia de playlists.",
+  title: "Music Business OS",
+  description: "Sistema operacional para selos, artistas, curadoria e gestão musical.",
 };
 
 export const navigations: Navigation[] = [

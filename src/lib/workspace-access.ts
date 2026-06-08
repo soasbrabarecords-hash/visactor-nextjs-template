@@ -2,6 +2,7 @@ export const MODULE_KEYS = ["playlist_os", "label_os", "artist_os"] as const;
 export const ACCESS_ADMIN_EMAIL = "contato@soasbraba.com";
 export const ACCESS_ADMIN_USER_ID = "a4456937-e1af-4e32-91ba-32d66f1f661b";
 export const GLOBAL_SPOTIFY_APP_WORKSPACE_SLUG = "so-as-braba-records";
+export const ACTIVE_WORKSPACE_COOKIE = "active_workspace_id";
 
 export function canUseGlobalSpotifyApp(
   workspace: { slug?: string | null } | null | undefined,
@@ -74,6 +75,7 @@ const MANAGER_ROLES_BY_MODULE: Record<ModuleKey, ModuleRole[]> = {
 
 export function selectCurrentWorkspace<T extends WorkspaceSummary>(
   workspaces: T[],
+  preferredWorkspaceId?: string | null,
 ): T | null {
   const activeWorkspaces = workspaces.filter(
     (workspace) => workspace.status === "active",
@@ -81,6 +83,16 @@ export function selectCurrentWorkspace<T extends WorkspaceSummary>(
 
   if (activeWorkspaces.length === 0) {
     return null;
+  }
+
+  if (preferredWorkspaceId) {
+    const preferredWorkspace = activeWorkspaces.find(
+      (workspace) => workspace.id === preferredWorkspaceId,
+    );
+
+    if (preferredWorkspace) {
+      return preferredWorkspace;
+    }
   }
 
   const defaultWorkspace = activeWorkspaces.find(

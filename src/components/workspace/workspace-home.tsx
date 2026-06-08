@@ -133,7 +133,7 @@ export default function WorkspaceHome() {
               Workspace atual: {currentWorkspace?.name ?? "Acesso pendente"}
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] text-white tablet:text-6xl">
-              Music Business Workspace
+              Music Business OS
             </h1>
             <p className="mt-4 max-w-2xl text-base font-normal leading-7 text-white/64 tablet:text-lg">
               Sistema operacional para selos, artistas, curadoria e gestão musical.

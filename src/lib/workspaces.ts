@@ -1,9 +1,11 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ACTIVE_WORKSPACE_COOKIE,
   canUseGlobalSpotifyApp,
   selectCurrentWorkspace,
   type ModuleRole,
@@ -395,7 +397,13 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     })
     .filter(Boolean) as WorkspaceSummary[];
 
-  const selectedWorkspace = selectCurrentWorkspace(accessibleWorkspaces);
+  const cookieStore = await cookies();
+  const activeWorkspaceId =
+    cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? null;
+  const selectedWorkspace = selectCurrentWorkspace(
+    accessibleWorkspaces,
+    activeWorkspaceId,
+  );
 
   if (!selectedWorkspace) {
     return null;
