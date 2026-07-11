@@ -162,6 +162,7 @@ function mapCsvRowToImportRow(
 ): SpotifyChartImportRow {
   const trackReference = getField(record, [
     "spotify_track_id",
+    "spotify_track_uri",
     "track_id",
     "spotify_id",
     "id",
