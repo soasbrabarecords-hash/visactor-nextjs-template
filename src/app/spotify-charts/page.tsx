@@ -6,6 +6,7 @@ import {
   getSnapshotWithComparison,
 } from "@/lib/chart-snapshots";
 import { getLatestSpotifyChartRun } from "@/lib/charts/spotify-chart-runs";
+import { canCurrentUserBackfillSpotifyCharts } from "@/lib/charts/spotify-charts-admin";
 import SpotifyChartsClient from "./spotify-charts-client";
 
 export const revalidate = 300;
@@ -18,9 +19,10 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
   const params = await searchParams;
   const country = params.country ?? "BR";
 
-  const [dates, latestAutomaticRun] = await Promise.all([
+  const [dates, latestAutomaticRun, canBackfill] = await Promise.all([
     getSnapshotDates(country),
     getLatestSpotifyChartRun(country).catch(() => null),
+    canCurrentUserBackfillSpotifyCharts().catch(() => false),
   ]);
 
   // Usa a data do query param ou a mais recente disponível
@@ -46,6 +48,7 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
             initialSnapshot={snapshotData}
             country={country}
             latestAutomaticRun={latestAutomaticRun}
+            canBackfill={canBackfill}
           />
         </Container>
       </div>

@@ -6,6 +6,9 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Database,
   FileUp,
   Loader2,
   Minus,
@@ -31,6 +34,7 @@ type Props = {
   initialSnapshot: SnapshotData | null;
   country: string;
   latestAutomaticRun: SpotifyChartRun | null;
+  canBackfill: boolean;
 };
 
 function coverStyle(coverUrl: string | null): React.CSSProperties | undefined {
@@ -154,6 +158,7 @@ export default function SpotifyChartsClient({
   initialSnapshot,
   country,
   latestAutomaticRun,
+  canBackfill,
 }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -169,6 +174,15 @@ export default function SpotifyChartsClient({
     text: string;
   } | null>(null);
   const [loadingDate, setLoadingDate] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(
+    (initialDate ?? initialDates[0] ?? new Date().toISOString().slice(0, 10))
+      .slice(0, 7),
+  );
+  const [backfillCountry, setBackfillCountry] = useState(country);
+  const [backfillStartDate, setBackfillStartDate] = useState("");
+  const [backfillEndDate, setBackfillEndDate] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   async function handleFile(file: File) {
@@ -224,6 +238,7 @@ export default function SpotifyChartsClient({
   async function loadSnapshot(date: string) {
     setLoadingDate(true);
     setSelectedDate(date);
+    setVisibleMonth(date.slice(0, 7));
 
     try {
       const res = await fetch(
@@ -243,9 +258,81 @@ export default function SpotifyChartsClient({
     }
   }
 
+  async function handleBackfill() {
+    setBackfilling(true);
+    setBackfillMessage(null);
+
+    try {
+      const response = await fetch("/api/spotify-charts/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          country: backfillCountry,
+          chart_type: "top-songs",
+          start_date: backfillStartDate,
+          end_date: backfillEndDate,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            success?: number;
+            failed?: number;
+            rows_count?: number;
+            error?: string;
+          }
+        | null;
+
+      if (!response.ok || payload?.error) {
+        setBackfillMessage(payload?.error ?? "Falha ao importar historico.");
+        return;
+      }
+
+      setBackfillMessage(
+        `${payload?.success ?? 0} dias importados, ${payload?.failed ?? 0} falharam, ${formatCount(payload?.rows_count ?? 0)} faixas salvas.`,
+      );
+      const datesResponse = await fetch(
+        `/api/charts/snapshot-dates?country=${country}`,
+      );
+      const datesPayload = (await datesResponse.json()) as { dates?: string[] };
+      setDates(datesPayload.dates ?? dates);
+      startTransition(() => router.refresh());
+    } catch {
+      setBackfillMessage("Falha de rede ao importar historico.");
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
   const tracks = useMemo(() => snapshot?.tracks ?? [], [snapshot?.tracks]);
   const prevDate = snapshot?.previousDate ?? null;
   const hasHistory = dates.length > 0;
+  const availableDates = useMemo(() => new Set(dates), [dates]);
+  const selectedDateIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const newerDate =
+    selectedDateIndex > 0 ? dates[selectedDateIndex - 1] : null;
+  const olderDate =
+    selectedDateIndex >= 0 && selectedDateIndex < dates.length - 1
+      ? dates[selectedDateIndex + 1]
+      : null;
+  const calendarDays = useMemo(() => {
+    const [year, month] = visibleMonth.split("-").map(Number);
+    const firstDay = new Date(Date.UTC(year, month - 1, 1));
+    const leadingEmptyDays = (firstDay.getUTCDay() + 6) % 7;
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+    return [
+      ...Array.from({ length: leadingEmptyDays }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, index) =>
+        `${visibleMonth}-${String(index + 1).padStart(2, "0")}`,
+      ),
+    ];
+  }, [visibleMonth]);
+
+  function changeMonth(offset: number) {
+    const [year, month] = visibleMonth.split("-").map(Number);
+    const nextMonth = new Date(Date.UTC(year, month - 1 + offset, 1));
+    setVisibleMonth(nextMonth.toISOString().slice(0, 7));
+  }
 
   const topTrack = tracks[0] ?? null;
   const biggestRise = useMemo(
@@ -405,28 +492,94 @@ export default function SpotifyChartsClient({
             <div>
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Dias disponiveis
+                Calendario de snapshots
               </div>
-              <h3 className="mt-2 text-xl font-semibold">Escolha o snapshot</h3>
+              <h3 className="mt-2 text-xl font-semibold">
+                {country} · Top Songs · {selectedDate ? formatDate(selectedDate) : "Sem data"}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {tracks.length} faixas no snapshot selecionado
+              </p>
             </div>
-            <StatusBadge tone="blue">{dates.length} dias</StatusBadge>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={!olderDate}
+                onClick={() => olderDate && void loadSnapshot(olderDate)}
+                className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium transition hover:bg-muted disabled:opacity-40"
+              >
+                <ChevronLeft size={14} /> Dia anterior
+              </button>
+              <button
+                type="button"
+                disabled={!newerDate}
+                onClick={() => newerDate && void loadSnapshot(newerDate)}
+                className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-3 text-xs font-medium transition hover:bg-muted disabled:opacity-40"
+              >
+                Proximo dia <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {dates.map((date) => (
+          <div className="mt-5 max-w-xl rounded-[24px] border border-border bg-background/50 p-4">
+            <div className="flex items-center justify-between gap-3">
               <button
-                key={date}
                 type="button"
-                onClick={() => void loadSnapshot(date)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                  date === selectedDate
-                    ? "border-white bg-white text-slate-950"
-                    : "border-border bg-background/60 text-foreground hover:bg-muted/60"
-                }`}
+                onClick={() => changeMonth(-1)}
+                aria-label="Mes anterior"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border hover:bg-muted"
               >
-                {formatDate(date)}
+                <ChevronLeft size={16} />
               </button>
-            ))}
+              <input
+                type="month"
+                value={visibleMonth}
+                onChange={(event) => setVisibleMonth(event.target.value)}
+                className="h-9 rounded-full border border-border bg-background px-4 text-sm font-medium"
+                aria-label="Mes e ano do calendario"
+              />
+              <button
+                type="button"
+                onClick={() => changeMonth(1)}
+                aria-label="Proximo mes"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border hover:bg-muted"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase text-muted-foreground">
+              {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map((day) => (
+                <span key={day} className="py-1">{day}</span>
+              ))}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {calendarDays.map((date, index) =>
+                date ? (
+                  <button
+                    key={date}
+                    type="button"
+                    disabled={!availableDates.has(date)}
+                    onClick={() => void loadSnapshot(date)}
+                    className={`aspect-square rounded-xl text-sm font-medium transition ${
+                      date === selectedDate
+                        ? "bg-emerald-400 text-slate-950"
+                        : availableDates.has(date)
+                          ? "bg-muted/60 text-foreground hover:bg-emerald-400/20"
+                          : "text-muted-foreground/25"
+                    }`}
+                  >
+                    {Number(date.slice(-2))}
+                  </button>
+                ) : (
+                  <span key={`empty-${index}`} />
+                ),
+              )}
+            </div>
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Datas sem snapshot ficam desabilitadas.</span>
+              <StatusBadge tone="blue">{dates.length} dias</StatusBadge>
+            </div>
           </div>
         </section>
       ) : (
@@ -439,6 +592,81 @@ export default function SpotifyChartsClient({
           </p>
         </section>
       )}
+
+      {canBackfill ? (
+        <section className="rounded-[28px] border border-border bg-card/60 p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl bg-emerald-400/10 p-2.5 text-emerald-300">
+              <Database size={18} />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Admin interno
+              </div>
+              <h3 className="mt-1 text-xl font-semibold">Importar historico</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ate 7 dias por execucao. Cada data gera seu proprio registro de auditoria.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 tablet:grid-cols-4">
+            <label className="grid gap-1.5 text-xs text-muted-foreground">
+              Pais
+              <select
+                value={backfillCountry}
+                onChange={(event) => setBackfillCountry(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+              >
+                <option value="BR">Brasil</option>
+                <option value="GLOBAL">Global</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs text-muted-foreground">
+              Chart type
+              <select
+                value="top-songs"
+                disabled
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+              >
+                <option value="top-songs">Top Songs diario</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs text-muted-foreground">
+              Data inicial
+              <input
+                type="date"
+                value={backfillStartDate}
+                onChange={(event) => setBackfillStartDate(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+              />
+            </label>
+            <label className="grid gap-1.5 text-xs text-muted-foreground">
+              Data final
+              <input
+                type="date"
+                value={backfillEndDate}
+                onChange={(event) => setBackfillEndDate(event.target.value)}
+                className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+              />
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={backfilling || !backfillStartDate || !backfillEndDate}
+              onClick={() => void handleBackfill()}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50"
+            >
+              {backfilling ? <Loader2 size={15} className="animate-spin" /> : <Database size={15} />}
+              {backfilling ? "Importando..." : "Importar historico"}
+            </button>
+            {backfillMessage ? (
+              <span className="text-sm text-muted-foreground">{backfillMessage}</span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {hasHistory && selectedDate ? (
         <section className="overflow-hidden rounded-[30px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">

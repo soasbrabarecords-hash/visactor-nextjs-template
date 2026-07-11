@@ -9,6 +9,7 @@ export type SpotifyChartCsvImportInput = {
   country: string;
   chartDate: string;
   sourceUrl?: string;
+  sourceType?: string;
   genre?: string;
   enrichSpotifyMetadata?: boolean;
 };
@@ -27,6 +28,7 @@ export async function importSpotifyChartCsv({
   country,
   chartDate,
   sourceUrl,
+  sourceType,
   genre,
   enrichSpotifyMetadata = false,
 }: SpotifyChartCsvImportInput): Promise<SpotifyChartCsvImportSummary> {
@@ -48,6 +50,7 @@ export async function importSpotifyChartCsv({
     chartType: normalizedChartType,
     country: normalizedCountry,
     chartDate: date,
+    sourceType,
     genre,
     enrichSpotifyMetadata,
   });

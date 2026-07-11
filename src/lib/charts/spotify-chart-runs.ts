@@ -9,6 +9,7 @@ export type SpotifyChartRun = {
   country: string;
   chart_date: string;
   source_url: string | null;
+  source_type: string | null;
   status: string;
   rows_count: number;
   error_message: string | null;
@@ -21,6 +22,7 @@ export async function startSpotifyChartRun(input: {
   country: string;
   chartDate: string;
   sourceUrl?: string | null;
+  sourceType?: string | null;
 }) {
   const admin = createAdminClient();
 
@@ -37,6 +39,7 @@ export async function startSpotifyChartRun(input: {
       country: input.country,
       chart_date: input.chartDate,
       source_url: input.sourceUrl ?? null,
+      source_type: input.sourceType ?? null,
       status: "running",
       rows_count: 0,
       started_at: new Date().toISOString(),
@@ -59,6 +62,7 @@ export async function finishSpotifyChartRun(
     status: "success" | "error";
     chartDate: string;
     sourceUrl?: string | null;
+    sourceType?: string | null;
     rowsCount?: number;
     errorMessage?: string | null;
   },
@@ -76,6 +80,7 @@ export async function finishSpotifyChartRun(
     .update({
       chart_date: input.chartDate,
       source_url: input.sourceUrl ?? null,
+      source_type: input.sourceType ?? null,
       status: input.status,
       rows_count: input.rowsCount ?? 0,
       error_message: input.errorMessage ?? null,
@@ -95,7 +100,7 @@ export async function getLatestSpotifyChartRun(country?: string) {
   let query = supabase
     .from("spotify_chart_runs")
     .select(
-      "id,chart_type,country,chart_date,source_url,status,rows_count,error_message,started_at,finished_at",
+      "id,chart_type,country,chart_date,source_url,source_type,status,rows_count,error_message,started_at,finished_at",
     )
     .order("started_at", { ascending: false })
     .limit(1);

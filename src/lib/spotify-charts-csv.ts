@@ -16,6 +16,7 @@ type CsvImportDefaults = {
   genre?: string;
   chartDate?: string;
   chartType?: string;
+  sourceType?: string;
 };
 
 function normalizeHeader(value: string) {
@@ -205,7 +206,10 @@ function mapCsvRowToImportRow(
       getField(record, ["chart_name", "chart", "chart_type"]) ??
       defaults.chartType ??
       "top-songs",
-    source_type: getField(record, ["source_type"]) ?? "spotify_chart",
+    source_type:
+      getField(record, ["source_type"]) ??
+      defaults.sourceType ??
+      "spotify_chart",
     chart_date:
       getField(record, ["chart_date", "date", "snapshot_date"]) ??
       defaults.chartDate ??
@@ -287,6 +291,7 @@ export async function importSpotifyChartsCsvContent({
   genre,
   chartDate,
   chartType,
+  sourceType,
   enrichSpotifyMetadata = true,
 }: {
   csvText: string;
@@ -294,6 +299,7 @@ export async function importSpotifyChartsCsvContent({
   genre?: string;
   chartDate?: string;
   chartType?: string;
+  sourceType?: string;
   enrichSpotifyMetadata?: boolean;
 }): Promise<SpotifyChartsImportResult> {
   const parsedRows = parseCsv(csvText);
@@ -303,6 +309,7 @@ export async function importSpotifyChartsCsvContent({
       genre: genre && genre !== "all" ? genre : undefined,
       chartDate: normalizeChartDate(chartDate),
       chartType,
+      sourceType,
     }),
   );
   const enrichedRows = enrichSpotifyMetadata

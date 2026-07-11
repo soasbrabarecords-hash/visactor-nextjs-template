@@ -79,6 +79,7 @@ create table if not exists public.spotify_chart_runs (
   country text not null,
   chart_date date not null,
   source_url text,
+  source_type text,
   status text not null,
   rows_count integer not null default 0,
   error_message text,
