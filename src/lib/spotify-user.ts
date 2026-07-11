@@ -254,6 +254,7 @@ type ResolvedSpotifySession = {
 
 type SpotifyTokenOptions = {
   requireWorkspace?: boolean;
+  forceRefresh?: boolean;
 };
 
 const SPOTIFY_WORKSPACE_REQUIRED_MESSAGE =
@@ -680,6 +681,15 @@ async function getSpotifyErrorMessage(response: Response, fallback: string) {
   return spotifyMessage ? `${fallback}: ${spotifyMessage}` : fallback;
 }
 
+function classifySpotifyError(status: number, message: string | null) {
+  const normalized = (message ?? "").toLowerCase();
+
+  if (status === 401 || normalized.includes("token")) return "invalid_token";
+  if (normalized.includes("scope")) return "missing_scope";
+  if (status === 403) return "forbidden";
+  return "spotify_api_error";
+}
+
 async function refreshSpotifyToken(refreshToken: string) {
   const env = await getSpotifyOAuthEnv();
 
@@ -701,7 +711,13 @@ async function refreshSpotifyToken(refreshToken: string) {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to refresh Spotify account session.");
+    const message = await getSpotifyErrorMessage(
+      response,
+      `Spotify refresh error ${response.status}`,
+    );
+    throw new Error(
+      `status_code=${response.status} category=${classifySpotifyError(response.status, message)} message=${message}`,
+    );
   }
 
   return (await response.json()) as SpotifyOAuthTokenResponse;
@@ -859,14 +875,25 @@ async function fetchSpotifyPlaylistTrackTotalWithToken(
   );
 
   if (!response.ok) {
-    return null;
+    throw new Error(
+      await getSpotifyErrorMessage(
+        response,
+        `Spotify playlist total error ${response.status}`,
+      ),
+    );
   }
 
   const detail = (await response.json().catch(() => null)) as
     | SpotifyUserPlaylistObject
     | null;
 
-  return typeof detail?.tracks?.total === "number" ? detail.tracks.total : null;
+  if (typeof detail?.tracks?.total !== "number") {
+    throw new Error(
+      `Spotify playlist total error ${response.status}: tracks.total ausente na resposta.`,
+    );
+  }
+
+  return detail.tracks.total;
 }
 
 async function enrichSpotifyPlaylistTotals(
@@ -886,7 +913,7 @@ async function enrichSpotifyPlaylistTotals(
 
       return {
         ...playlist,
-        tracksTotal: tracksTotal ?? playlist.tracksTotal,
+        tracksTotal,
       };
     }),
   );
@@ -1224,7 +1251,7 @@ async function fetchSpotifyEditablePlaylistWithToken(
 
     if (playlist.owner?.id !== currentUser.id) {
       throw new Error(
-        "Esta playlist nao foi criada pela conta Spotify conectada.",
+        `owner_mismatch: playlist pertence a ${playlist.owner?.id ?? "desconhecido"}, conta conectada ${currentUser.id}.`,
       );
     }
 
@@ -1402,7 +1429,12 @@ async function fetchSpotifyDiagnosticJson<T>(
     status: response.status,
     ok: response.ok,
     payload,
-    message: response.ok ? null : getSpotifyDiagnosticMessage(payload),
+    message: response.ok
+      ? null
+      : `status_code=${response.status} category=${classifySpotifyError(
+          response.status,
+          getSpotifyDiagnosticMessage(payload),
+        )} message=${getSpotifyDiagnosticMessage(payload) ?? "unknown"}`,
   };
 }
 
@@ -1441,9 +1473,16 @@ export async function fetchSpotifyWorkspaceDiagnostics({
 
   try {
     const { data, refreshedToken } = await withSpotifyToken(async (token) => {
-      const profile = await fetchSpotifyCurrentUserWithToken(token).catch(
-        () => null,
-      );
+      const profile = await fetchSpotifyCurrentUserWithToken(token);
+      if (
+        auth?.providerAccountId &&
+        profile.id &&
+        auth.providerAccountId !== profile.id
+      ) {
+        throw new Error(
+          `token_workspace_mismatch: token pertence a ${profile.id}, mas o workspace esta vinculado a ${auth.providerAccountId}.`,
+        );
+      }
       const playlistsResponse =
         await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistsResponse>(
           token,
@@ -1482,7 +1521,7 @@ export async function fetchSpotifyWorkspaceDiagnostics({
         const tracksResponse =
           await fetchSpotifyDiagnosticJson<SpotifyPlaylistTracksResponse>(
             token,
-            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/tracks?fields=items(track(id,name)),total,next&limit=10`,
+            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/tracks?fields=items(track(id,name)),total,next&limit=1`,
           );
         const tracksPayload = tracksResponse.payload;
 
@@ -1536,6 +1575,9 @@ export async function fetchSpotifyWorkspaceDiagnostics({
           tracks: tracksCheck,
         },
       } satisfies SpotifyWorkspaceDiagnosticsResult;
+    }, {
+      requireWorkspace: auth?.appMode === "workspace_app",
+      forceRefresh: auth?.appMode === "workspace_app",
     });
 
     return {
@@ -1583,7 +1625,7 @@ export async function withSpotifyToken<T>(
     );
   }
 
-  if (session.accessToken) {
+  if (session.accessToken && !options.forceRefresh) {
     try {
       return { data: await fn(session.accessToken), refreshedToken: null };
     } catch (err) {
