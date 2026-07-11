@@ -64,6 +64,11 @@ type SpotifyUserPlaylistObject = {
     items?: SpotifyPlaylistTrackItem[];
     next?: string | null;
   };
+  items?: {
+    total?: number;
+    items?: SpotifyPlaylistTrackItem[];
+    next?: string | null;
+  };
 };
 
 type SpotifyPlaylistTracksResponse = {
@@ -73,6 +78,7 @@ type SpotifyPlaylistTracksResponse = {
 };
 
 type SpotifyPlaylistTrackItem = {
+  item?: SpotifyPlaylistTrackItem["track"];
   track?: {
     id?: string;
     name?: string;
@@ -250,6 +256,7 @@ type ResolvedSpotifySession = {
   source: "workspace" | "cookie";
   accessToken: string | null;
   refreshToken: string | null;
+  playlistItemsPath: "tracks" | "items";
 };
 
 type SpotifyTokenOptions = {
@@ -456,6 +463,8 @@ async function resolveSpotifySession(
       source: "workspace",
       accessToken: workspaceAuth.accessToken,
       refreshToken: workspaceAuth.refreshToken,
+      playlistItemsPath:
+        workspaceAuth.appMode === "workspace_app" ? "items" : "tracks",
     };
   }
 
@@ -464,6 +473,8 @@ async function resolveSpotifySession(
       source: "workspace",
       accessToken: null,
       refreshToken: workspaceAuth.refreshToken,
+      playlistItemsPath:
+        workspaceAuth.appMode === "workspace_app" ? "items" : "tracks",
     };
   }
 
@@ -489,6 +500,7 @@ async function resolveSpotifySession(
       source: "cookie",
       accessToken,
       refreshToken,
+      playlistItemsPath: "tracks",
     };
   }
 
@@ -818,7 +830,11 @@ function mapSpotifyAccountPlaylist(
     ownerName: playlist.owner?.display_name?.trim() || "Spotify",
     imageUrl: playlist.images?.[0]?.url?.trim() || null,
     tracksTotal:
-      typeof playlist.tracks?.total === "number" ? playlist.tracks.total : 0,
+      typeof playlist.items?.total === "number"
+        ? playlist.items.total
+        : typeof playlist.tracks?.total === "number"
+          ? playlist.tracks.total
+          : 0,
     spotifyUrl:
       playlist.external_urls?.spotify ||
       `https://open.spotify.com/playlist/${playlist.id}`,
@@ -830,7 +846,7 @@ function mapSpotifyAccountPlaylist(
 function mapSpotifyEditablePlaylistTrack(
   item: SpotifyPlaylistTrackItem,
 ): SpotifyEditablePlaylistTrack | null {
-  const track = item.track;
+  const track = item.item ?? item.track;
 
   if (!track?.id || !track.name) {
     return null;
@@ -858,70 +874,6 @@ function mapSpotifyPlaylistTrackItems(items: SpotifyPlaylistTrackItem[] = []) {
   return items
     .map((item) => mapSpotifyEditablePlaylistTrack(item))
     .filter(Boolean) as SpotifyEditablePlaylistTrack[];
-}
-
-async function fetchSpotifyPlaylistTrackTotalWithToken(
-  accessToken: string,
-  playlistId: string,
-) {
-  const response = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=tracks(total)`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      await getSpotifyErrorMessage(
-        response,
-        `Spotify playlist total error ${response.status}`,
-      ),
-    );
-  }
-
-  const detail = (await response.json().catch(() => null)) as
-    | SpotifyUserPlaylistObject
-    | null;
-
-  if (typeof detail?.tracks?.total !== "number") {
-    throw new Error(
-      `Spotify playlist total error ${response.status}: tracks.total ausente na resposta.`,
-    );
-  }
-
-  return detail.tracks.total;
-}
-
-async function enrichSpotifyPlaylistTotals(
-  accessToken: string,
-  playlists: SpotifyAccountPlaylist[],
-) {
-  if (playlists.length === 0) {
-    return playlists;
-  }
-
-  const enrichedPlaylists = await Promise.all(
-    playlists.slice(0, 50).map(async (playlist) => {
-      const tracksTotal = await fetchSpotifyPlaylistTrackTotalWithToken(
-        accessToken,
-        playlist.id,
-      );
-
-      return {
-        ...playlist,
-        tracksTotal,
-      };
-    }),
-  );
-
-  return [
-    ...enrichedPlaylists,
-    ...playlists.slice(enrichedPlaylists.length),
-  ];
 }
 
 async function fetchSpotifyAccountPlaylistsWithToken(
@@ -995,15 +947,10 @@ async function fetchSpotifyAccountPlaylistsWithToken(
       nextUrl = payload.next ?? null;
     }
 
-    const playlistsWithDetails = await enrichSpotifyPlaylistTotals(
-      accessToken,
-      playlists,
-    );
-
     return setCachedValue(
       spotifyAccountPlaylistsCache,
       cacheKey,
-      playlistsWithDetails,
+      playlists,
       ACCOUNT_PLAYLISTS_CACHE_TTL_MS,
     );
   })();
@@ -1024,11 +971,12 @@ async function fetchSpotifyAccountPlaylistsWithToken(
 async function fetchSpotifyPlaylistTracksWithToken(
   accessToken: string,
   playlistId: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   throwIfRateLimited("spotify:playlist:tracks", "Spotify tracks error");
 
   const tracks: SpotifyEditablePlaylistTrack[] = [];
-  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`;
+  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
 
   while (nextUrl) {
     const response = await fetch(nextUrl, {
@@ -1073,6 +1021,7 @@ async function fetchSpotifyPlaylistTracksWithToken(
 async function fetchSpotifyPlaylistTrackIdsWithToken(
   accessToken: string,
   playlistId: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
   { force = false }: { force?: boolean } = {},
 ) {
   const cacheKey = buildPlaylistTrackCacheKey(accessToken, playlistId);
@@ -1098,7 +1047,7 @@ async function fetchSpotifyPlaylistTrackIdsWithToken(
     const trackIds: string[] = [];
     let nextUrl:
       | string
-      | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=items(track(id)),next&limit=50`;
+      | null = `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
 
     while (nextUrl) {
       const response = await fetch(nextUrl, {
@@ -1123,13 +1072,17 @@ async function fetchSpotifyPlaylistTrackIdsWithToken(
       clearRateLimit(scope);
 
       const payload = (await response.json()) as {
-        items?: Array<{ track?: { id?: string | null } | null }>;
+        items?: Array<{
+          item?: { id?: string | null } | null;
+          track?: { id?: string | null } | null;
+        }>;
         next?: string | null;
       };
 
       for (const item of payload.items ?? []) {
-        if (item.track?.id) {
-          trackIds.push(item.track.id);
+        const trackId = item.item?.id ?? item.track?.id;
+        if (trackId) {
+          trackIds.push(trackId);
         }
       }
 
@@ -1152,10 +1105,12 @@ async function addTrackToPlaylistWithToken(
   accessToken: string,
   playlistId: string,
   trackUri: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   const existingTrackIds = await fetchSpotifyPlaylistTrackIdsWithToken(
     accessToken,
     playlistId,
+    playlistItemsPath,
   );
   const trackId = extractSpotifyTrackId(trackUri);
 
@@ -1166,7 +1121,7 @@ async function addTrackToPlaylistWithToken(
   }
 
   const response = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
     {
       method: "POST",
       headers: {
@@ -1200,6 +1155,7 @@ async function addTrackToPlaylistWithToken(
 async function fetchSpotifyEditablePlaylistWithToken(
   accessToken: string,
   playlistId: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   const cacheKey = `${buildTokenCacheKey(accessToken)}:${playlistId}`;
   const cachedPlaylist = getCachedValue(spotifyEditablePlaylistCache, cacheKey);
@@ -1264,11 +1220,20 @@ async function fetchSpotifyEditablePlaylistWithToken(
     let tracks: SpotifyEditablePlaylistTrack[];
 
     try {
-      tracks = await fetchSpotifyPlaylistTracksWithToken(accessToken, playlistId);
+      tracks = await fetchSpotifyPlaylistTracksWithToken(
+        accessToken,
+        playlistId,
+        playlistItemsPath,
+      );
     } catch (error) {
-      const embeddedTracks = mapSpotifyPlaylistTrackItems(playlist.tracks?.items);
+      const embeddedTracks = mapSpotifyPlaylistTrackItems(
+        playlist.items?.items ?? playlist.tracks?.items,
+      );
 
-      if (embeddedTracks.length === 0 && (playlist.tracks?.total ?? 0) > 0) {
+      if (
+        embeddedTracks.length === 0 &&
+        (playlist.items?.total ?? playlist.tracks?.total ?? 0) > 0
+      ) {
         throw error;
       }
 
@@ -1368,8 +1333,13 @@ export async function fetchSpotifyEditablePlaylist(
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
-    const { data: playlist, refreshedToken } = await withSpotifyToken((token) =>
-      fetchSpotifyEditablePlaylistWithToken(token, playlistId),
+    const { data: playlist, refreshedToken } = await withSpotifyToken(
+      (token, playlistItemsPath) =>
+        fetchSpotifyEditablePlaylistWithToken(
+          token,
+          playlistId,
+          playlistItemsPath,
+        ),
     );
     return {
       result: {
@@ -1472,7 +1442,10 @@ export async function fetchSpotifyWorkspaceDiagnostics({
   const integration = buildSpotifyIntegrationDiagnostics(auth);
 
   try {
-    const { data, refreshedToken } = await withSpotifyToken(async (token) => {
+    const { data, refreshedToken } = await withSpotifyToken(async (
+      token,
+      playlistItemsPath,
+    ) => {
       const profile = await fetchSpotifyCurrentUserWithToken(token);
       if (
         auth?.providerAccountId &&
@@ -1498,10 +1471,14 @@ export async function fetchSpotifyWorkspaceDiagnostics({
       let tracksCheck: SpotifyWorkspaceDiagnosticsTracksCheck = null;
 
       if (selectedPlaylistId) {
+        const playlistCollectionFields =
+          playlistItemsPath === "items"
+            ? "items(total,items(item(id,name)))"
+            : "tracks(total,items(track(id,name)))";
         const detailResponse =
           await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistObject>(
             token,
-            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}?fields=id,name,owner(id,display_name),tracks(total,items(track(id,name))),snapshot_id`,
+            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}?fields=id,name,owner(id,display_name),${playlistCollectionFields},snapshot_id`,
           );
         const detailPayload = detailResponse.payload;
 
@@ -1511,17 +1488,22 @@ export async function fetchSpotifyWorkspaceDiagnostics({
           name: detailPayload?.name ?? null,
           ownerId: detailPayload?.owner?.id ?? null,
           tracksTotal:
-            typeof detailPayload?.tracks?.total === "number"
-              ? detailPayload.tracks.total
-              : null,
-          embeddedItemsCount: detailPayload?.tracks?.items?.length ?? 0,
+            typeof detailPayload?.items?.total === "number"
+              ? detailPayload.items.total
+              : typeof detailPayload?.tracks?.total === "number"
+                ? detailPayload.tracks.total
+                : null,
+          embeddedItemsCount:
+            detailPayload?.items?.items?.length ??
+            detailPayload?.tracks?.items?.length ??
+            0,
           message: detailResponse.message,
         };
 
         const tracksResponse =
           await fetchSpotifyDiagnosticJson<SpotifyPlaylistTracksResponse>(
             token,
-            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/tracks?fields=items(track(id,name)),total,next&limit=1`,
+            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/${playlistItemsPath}?limit=1`,
           );
         const tracksPayload = tracksResponse.payload;
 
@@ -1534,8 +1516,8 @@ export async function fetchSpotifyWorkspaceDiagnostics({
               : null,
           itemsCount: tracksPayload?.items?.length ?? 0,
           firstItems: (tracksPayload?.items ?? []).slice(0, 10).map((item) => ({
-            id: item.track?.id ?? null,
-            name: item.track?.name ?? null,
+            id: item.item?.id ?? item.track?.id ?? null,
+            name: item.item?.name ?? item.track?.name ?? null,
           })),
           message: tracksResponse.message,
         };
@@ -1612,7 +1594,10 @@ export type SpotifyMutationResponse = {
 };
 
 export async function withSpotifyToken<T>(
-  fn: (accessToken: string) => Promise<T>,
+  fn: (
+    accessToken: string,
+    playlistItemsPath: "tracks" | "items",
+  ) => Promise<T>,
   options: SpotifyTokenOptions = {},
 ): Promise<{ data: T; refreshedToken: SpotifyOAuthTokenResponse | null }> {
   const session = await resolveSpotifySession(options);
@@ -1627,7 +1612,10 @@ export async function withSpotifyToken<T>(
 
   if (session.accessToken && !options.forceRefresh) {
     try {
-      return { data: await fn(session.accessToken), refreshedToken: null };
+      return {
+        data: await fn(session.accessToken, session.playlistItemsPath),
+        refreshedToken: null,
+      };
     } catch (err) {
       if (!session.refreshToken) throw err;
     }
@@ -1642,7 +1630,10 @@ export async function withSpotifyToken<T>(
     refresh_token: refreshedToken.refresh_token ?? session.refreshToken,
   });
 
-  return { data: await fn(refreshedToken.access_token), refreshedToken };
+  return {
+    data: await fn(refreshedToken.access_token, session.playlistItemsPath),
+    refreshedToken,
+  };
 }
 
 async function removeTrackFromPlaylistWithToken(
@@ -1650,9 +1641,10 @@ async function removeTrackFromPlaylistWithToken(
   playlistId: string,
   trackUri: string,
   snapshotId: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   const response = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
     {
       method: "DELETE",
       headers: {
@@ -1660,7 +1652,7 @@ async function removeTrackFromPlaylistWithToken(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        tracks: [{ uri: trackUri }],
+        [playlistItemsPath]: [{ uri: trackUri }],
         snapshot_id: snapshotId,
       }),
       cache: "no-store",
@@ -1682,9 +1674,10 @@ async function reorderPlaylistTracksWithToken(
   rangeStart: number,
   insertBefore: number,
   snapshotId: string,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   const response = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
     {
       method: "PUT",
       headers: {
@@ -1755,10 +1748,11 @@ async function replacePlaylistTracksWithToken(
   accessToken: string,
   playlistId: string,
   uris: string[],
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ) {
   if (uris.length <= 100) {
     const response = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
       {
         method: "PUT",
         headers: {
@@ -1783,7 +1777,7 @@ async function replacePlaylistTracksWithToken(
 
   const firstBatch = uris.slice(0, 100);
   const putResponse = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+    `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
     {
       method: "PUT",
       headers: {
@@ -1811,7 +1805,7 @@ async function replacePlaylistTracksWithToken(
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const postResponse = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+      `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}`,
       {
         method: "POST",
         headers: {
@@ -1849,8 +1843,13 @@ export async function fetchSpotifyPlaylistTrackIds(
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
-    const { data: trackIds, refreshedToken } = await withSpotifyToken((token) =>
-      fetchSpotifyPlaylistTrackIdsWithToken(token, playlistId),
+    const { data: trackIds, refreshedToken } = await withSpotifyToken(
+      (token, playlistItemsPath) =>
+        fetchSpotifyPlaylistTrackIdsWithToken(
+          token,
+          playlistId,
+          playlistItemsPath,
+        ),
     );
 
     return {
@@ -1882,8 +1881,16 @@ export async function addTrackToPlaylist(
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
-    const { data, refreshedToken } = await withSpotifyToken(async (token) => {
-      const result = await addTrackToPlaylistWithToken(token, playlistId, trackUri);
+    const { data, refreshedToken } = await withSpotifyToken(async (
+      token,
+      playlistItemsPath,
+    ) => {
+      const result = await addTrackToPlaylistWithToken(
+        token,
+        playlistId,
+        trackUri,
+        playlistItemsPath,
+      );
       clearSpotifyAccountPlaylistCache(token);
       clearSpotifyEditablePlaylistCache(token, playlistId);
       return result;
@@ -1920,12 +1927,13 @@ export async function removeTrackFromPlaylist(
 }> {
   try {
     const { data: newSnapshotId, refreshedToken } = await withSpotifyToken(
-      async (token) => {
+      async (token, playlistItemsPath) => {
         const nextSnapshotId = await removeTrackFromPlaylistWithToken(
           token,
           playlistId,
           trackUri,
           snapshotId,
+          playlistItemsPath,
         );
         const trackId = extractSpotifyTrackId(trackUri);
 
@@ -1965,13 +1973,14 @@ export async function reorderPlaylistTracks(
 ): Promise<{ result: { success: true; snapshotId: string } | { success: false; message: string }; refreshedToken: SpotifyOAuthTokenResponse | null }> {
   try {
     const { data: newSnapshotId, refreshedToken } = await withSpotifyToken(
-      async (token) => {
+      async (token, playlistItemsPath) => {
         const nextSnapshotId = await reorderPlaylistTracksWithToken(
           token,
           playlistId,
           rangeStart,
           insertBefore,
           snapshotId,
+          playlistItemsPath,
         );
         clearSpotifyEditablePlaylistCache(token, playlistId);
         return nextSnapshotId;
@@ -2000,11 +2009,12 @@ export async function replacePlaylistTracks(
 }> {
   try {
     const { data: snapshotId, refreshedToken } = await withSpotifyToken(
-      async (token) => {
+      async (token, playlistItemsPath) => {
         const nextSnapshotId = await replacePlaylistTracksWithToken(
           token,
           playlistId,
           uris,
+          playlistItemsPath,
         );
         const trackIds = uris.map(extractSpotifyTrackId).filter(Boolean);
         const cacheKey = buildPlaylistTrackCacheKey(token, playlistId);
@@ -2078,9 +2088,12 @@ async function createPlaylistWithToken(
   name: string,
   description: string,
   isPublic: boolean,
+  playlistItemsPath: "tracks" | "items" = "tracks",
 ): Promise<string> {
   const response = await fetch(
-    `https://api.spotify.com/v1/users/${userId}/playlists`,
+    playlistItemsPath === "items"
+      ? "https://api.spotify.com/v1/me/playlists"
+      : `https://api.spotify.com/v1/users/${userId}/playlists`,
     {
       method: "POST",
       headers: {
@@ -2178,15 +2191,30 @@ export async function createSpotifyPlaylist(
   base64CoverJpeg: string | null,
   trackUris: string[] = [],
 ): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
-  const { data: playlistId, refreshedToken } = await withSpotifyToken(async (token) => {
+  const { data: playlistId, refreshedToken } = await withSpotifyToken(async (
+    token,
+    playlistItemsPath,
+  ) => {
     const user = await fetchSpotifyCurrentUserWithToken(token);
-    const id = await createPlaylistWithToken(token, user.id ?? "", name, description, isPublic);
+    const id = await createPlaylistWithToken(
+      token,
+      user.id ?? "",
+      name,
+      description,
+      isPublic,
+      playlistItemsPath,
+    );
     if (base64CoverJpeg) {
       await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
     }
     const uniqueTrackUris = Array.from(new Set(trackUris));
     if (uniqueTrackUris.length > 0) {
-      await replacePlaylistTracksWithToken(token, id, uniqueTrackUris);
+      await replacePlaylistTracksWithToken(
+        token,
+        id,
+        uniqueTrackUris,
+        playlistItemsPath,
+      );
     }
     clearSpotifyReadCachesForToken(token);
     return id;
