@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/spotify-charts/ingest",
+      "schedule": "0 10 * * *"
+    }
+  ]
+}

@@ -25,13 +25,13 @@ export type SpotifyChartEntryRow = {
 };
 
 export type SpotifyChartEntryInput = {
-  spotify_track_id: string;
+  spotify_track_id: string | null;
   track_name: string;
   artist_name: string;
   artist_ids: string[];
   album_name: string;
   image_url: string | null;
-  spotify_url: string;
+  spotify_url: string | null;
   country: string;
   genre: string | null;
   chart_name: string;
@@ -42,6 +42,12 @@ export type SpotifyChartEntryInput = {
   movement_type: string | null;
   daily_streams: number | null;
   captured_at: string;
+  chart_type: string;
+  rank: number;
+  artist_names: string;
+  spotify_track_uri: string | null;
+  streams: number | null;
+  raw_row: Record<string, unknown>;
 };
 
 export type TrackStreamSnapshotRow = {
@@ -148,14 +154,42 @@ export async function upsertSpotifyChartEntries(
   }
 
   const supabase = getAdminOrThrow();
-  const { error } = await supabase
-    .from("spotify_chart_entries")
-    .upsert(rows, {
-      onConflict: "country,chart_name,chart_date,spotify_track_id",
-      ignoreDuplicates: false,
-    });
+  const identifiedRows = rows.filter((row) => Boolean(row.spotify_track_id));
+  const fallbackRows = rows.filter((row) => !row.spotify_track_id);
+  let hasError = false;
 
-  return !error;
+  if (identifiedRows.length > 0) {
+    const { error } = await supabase
+      .from("spotify_chart_entries")
+      .upsert(identifiedRows, {
+        onConflict: "country,chart_name,chart_date,spotify_track_id",
+        ignoreDuplicates: false,
+      });
+    hasError = hasError || Boolean(error);
+  }
+
+  for (const row of fallbackRows) {
+    const { error: deleteError } = await supabase
+      .from("spotify_chart_entries")
+      .delete()
+      .eq("country", row.country)
+      .eq("chart_name", row.chart_name)
+      .eq("chart_date", row.chart_date)
+      .eq("rank_position", row.rank_position)
+      .is("spotify_track_id", null);
+
+    if (deleteError) {
+      hasError = true;
+      continue;
+    }
+
+    const { error: insertError } = await supabase
+      .from("spotify_chart_entries")
+      .insert(row);
+    hasError = hasError || Boolean(insertError);
+  }
+
+  return !hasError;
 }
 
 export async function fetchLatestSpotifyChartEntries({

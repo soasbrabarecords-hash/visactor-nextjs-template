@@ -1,7 +1,11 @@
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import ModuleGuard from "@/components/workspace/module-guard";
-import { getSnapshotDates, getSnapshotWithComparison } from "@/lib/chart-snapshots";
+import {
+  getSnapshotDates,
+  getSnapshotWithComparison,
+} from "@/lib/chart-snapshots";
+import { getLatestSpotifyChartRun } from "@/lib/charts/spotify-chart-runs";
 import SpotifyChartsClient from "./spotify-charts-client";
 
 export const revalidate = 300;
@@ -14,7 +18,10 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
   const params = await searchParams;
   const country = params.country ?? "BR";
 
-  const dates = await getSnapshotDates(country);
+  const [dates, latestAutomaticRun] = await Promise.all([
+    getSnapshotDates(country),
+    getLatestSpotifyChartRun(country).catch(() => null),
+  ]);
 
   // Usa a data do query param ou a mais recente disponível
   const selectedDate = params.date ?? dates[0] ?? null;
@@ -38,6 +45,7 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
             initialDate={selectedDate}
             initialSnapshot={snapshotData}
             country={country}
+            latestAutomaticRun={latestAutomaticRun}
           />
         </Container>
       </div>

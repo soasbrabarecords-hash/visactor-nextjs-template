@@ -15,6 +15,7 @@ import type {
   ChartSnapshot,
   ChartSnapshotTrackWithMovement,
 } from "@/lib/chart-snapshots";
+import type { SpotifyChartRun } from "@/lib/charts/spotify-chart-runs";
 import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
 import StatusBadge from "@/components/workspace/status-badge";
 
@@ -29,6 +30,7 @@ type Props = {
   initialDate: string | null;
   initialSnapshot: SnapshotData | null;
   country: string;
+  latestAutomaticRun: SpotifyChartRun | null;
 };
 
 function coverStyle(coverUrl: string | null): React.CSSProperties | undefined {
@@ -47,6 +49,15 @@ function formatDate(dateStr: string) {
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+}
+
+function formatTimestamp(value: string | null) {
+  if (!value) return "Ainda nao executado";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function getMovementTone(status: "new" | "up" | "down" | "stable") {
@@ -102,8 +113,7 @@ function MovementIcon({
 
   return (
     <StatusBadge tone="slate" className="px-2 py-0.5 text-[10px]">
-      <Minus className="mr-1 h-3 w-3" />
-      —
+      <Minus className="mr-1 h-3 w-3" />—
     </StatusBadge>
   );
 }
@@ -143,17 +153,21 @@ export default function SpotifyChartsClient({
   initialDate,
   initialSnapshot,
   country,
+  latestAutomaticRun,
 }: Props) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [dates, setDates] = useState<string[]>(initialDates);
   const [selectedDate, setSelectedDate] = useState<string | null>(initialDate);
-  const [snapshot, setSnapshot] = useState<SnapshotData | null>(initialSnapshot);
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<{ ok: boolean; text: string } | null>(
-    null,
+  const [snapshot, setSnapshot] = useState<SnapshotData | null>(
+    initialSnapshot,
   );
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
   const [loadingDate, setLoadingDate] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -187,7 +201,9 @@ export default function SpotifyChartsClient({
         ok: true,
         text: `${payload.importedCount} faixas importadas. ${payload.skippedCount} puladas.`,
       });
-      const datesRes = await fetch(`/api/charts/snapshot-dates?country=${country}`);
+      const datesRes = await fetch(
+        `/api/charts/snapshot-dates?country=${country}`,
+      );
       const datesData = (await datesRes.json()) as { dates: string[] };
       const newDates = datesData.dates ?? [];
       setDates(newDates);
@@ -210,7 +226,9 @@ export default function SpotifyChartsClient({
     setSelectedDate(date);
 
     try {
-      const res = await fetch(`/api/charts/snapshot?date=${date}&country=${country}`);
+      const res = await fetch(
+        `/api/charts/snapshot?date=${date}&country=${country}`,
+      );
       if (!res.ok) {
         setSnapshot(null);
         return;
@@ -254,7 +272,9 @@ export default function SpotifyChartsClient({
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone="green">Spotify Charts BR</StatusBadge>
               {selectedDate ? (
-                <StatusBadge tone="slate">{formatDate(selectedDate)}</StatusBadge>
+                <StatusBadge tone="slate">
+                  {formatDate(selectedDate)}
+                </StatusBadge>
               ) : null}
               {prevDate ? (
                 <StatusBadge tone="blue">vs {formatDate(prevDate)}</StatusBadge>
@@ -262,7 +282,8 @@ export default function SpotifyChartsClient({
             </div>
 
             <h2 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-white laptop:text-4xl">
-              Historico diario do Top 200 com leitura rapida de subida, queda e novas entradas.
+              Historico diario do Top 200 com leitura rapida de subida, queda e
+              novas entradas.
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70">
               Importa o CSV do Spotify Charts, salva snapshots diarios e deixa a
@@ -295,13 +316,47 @@ export default function SpotifyChartsClient({
               </button>
               <div className="inline-flex h-11 items-center rounded-full border border-white/10 bg-white/5 px-4 text-sm text-white/70">
                 {uploadMsg ? (
-                  <span className={uploadMsg.ok ? "text-emerald-300" : "text-red-300"}>
+                  <span
+                    className={
+                      uploadMsg.ok ? "text-emerald-300" : "text-red-300"
+                    }
+                  >
                     {uploadMsg.text}
                   </span>
                 ) : (
                   "Nome do arquivo com data, ex: 2025-04-20"
                 )}
               </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/65">
+              <StatusBadge
+                tone={
+                  latestAutomaticRun?.status === "success"
+                    ? "green"
+                    : latestAutomaticRun?.status === "error"
+                      ? "red"
+                      : "slate"
+                }
+              >
+                Auto: {latestAutomaticRun?.status ?? "sem execucao"}
+              </StatusBadge>
+              <span>
+                Ultima atualizacao:{" "}
+                {formatTimestamp(
+                  latestAutomaticRun?.finished_at ??
+                    latestAutomaticRun?.started_at ??
+                    null,
+                )}
+              </span>
+              {latestAutomaticRun?.status === "success" ? (
+                <span>{latestAutomaticRun.rows_count} linhas salvas</span>
+              ) : null}
+              {latestAutomaticRun?.status === "error" &&
+              latestAutomaticRun.error_message ? (
+                <span className="max-w-xl text-red-300">
+                  {latestAutomaticRun.error_message}
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -313,7 +368,9 @@ export default function SpotifyChartsClient({
               <div className="mt-3 text-3xl font-semibold">
                 {hasHistory ? formatCount(tracks.length) : "0"}
               </div>
-              <p className="mt-2 text-sm text-white/65">faixas carregadas na data.</p>
+              <p className="mt-2 text-sm text-white/65">
+                faixas carregadas na data.
+              </p>
             </article>
             <article className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-white">
               <div className="text-xs uppercase tracking-[0.18em] text-white/45">
@@ -325,7 +382,8 @@ export default function SpotifyChartsClient({
                   : "—"}
               </div>
               <p className="mt-2 line-clamp-2 text-sm text-white/65">
-                {biggestRise?.track_name ?? "Sem leitura de subida forte agora."}
+                {biggestRise?.track_name ??
+                  "Sem leitura de subida forte agora."}
               </p>
             </article>
             <article className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-white">
@@ -373,7 +431,9 @@ export default function SpotifyChartsClient({
         </section>
       ) : (
         <section className="rounded-[28px] border border-dashed border-border px-6 py-20 text-center">
-          <div className="text-lg font-medium">Nenhum snapshot salvo ainda.</div>
+          <div className="text-lg font-medium">
+            Nenhum snapshot salvo ainda.
+          </div>
           <p className="mt-2 text-sm text-muted-foreground">
             Importe um CSV do Spotify Charts para iniciar o historico.
           </p>
@@ -406,7 +466,8 @@ export default function SpotifyChartsClient({
               <StatusBadge tone="green">{tracks.length} faixas</StatusBadge>
               {topTrack ? (
                 <StatusBadge tone={getMovementTone(topTrack.status)}>
-                  Lider {getMovementLabel(topTrack.status, topTrack.position_change)}
+                  Lider{" "}
+                  {getMovementLabel(topTrack.status, topTrack.position_change)}
                 </StatusBadge>
               ) : null}
             </div>
@@ -431,10 +492,7 @@ export default function SpotifyChartsClient({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {tracks.map((track) => (
-                    <tr
-                      key={track.id}
-                      className="hover:bg-muted/10"
-                    >
+                    <tr key={track.id} className="hover:bg-muted/10">
                       <td className="px-4 py-3 text-center align-top">
                         <div className="text-lg font-semibold text-white">
                           #{track.position}
@@ -481,7 +539,10 @@ export default function SpotifyChartsClient({
                       </td>
                       <td className="px-4 py-3 align-top">
                         {track.genre ? (
-                          <StatusBadge tone="slate" className="normal-case tracking-[0.04em]">
+                          <StatusBadge
+                            tone="slate"
+                            className="normal-case tracking-[0.04em]"
+                          >
                             {track.genre}
                           </StatusBadge>
                         ) : (

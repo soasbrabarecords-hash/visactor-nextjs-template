@@ -15,6 +15,7 @@ type CsvImportDefaults = {
   country?: string;
   genre?: string;
   chartDate?: string;
+  chartType?: string;
 };
 
 function normalizeHeader(value: string) {
@@ -87,10 +88,7 @@ function parseCsv(content: string): CsvRecord[] {
   });
 }
 
-function getField(
-  record: CsvRecord,
-  keys: string[],
-): string | null {
+function getField(record: CsvRecord, keys: string[]): string | null {
   for (const key of keys) {
     const value = normalizeCell(record[key] ?? "");
 
@@ -113,7 +111,9 @@ function extractSpotifyTrackId(value: string | null) {
     return normalized.replace("spotify:track:", "");
   }
 
-  const trackUrlMatch = normalized.match(/spotify\.com\/track\/([A-Za-z0-9]+)/i);
+  const trackUrlMatch = normalized.match(
+    /spotify\.com\/track\/([A-Za-z0-9]+)/i,
+  );
 
   if (trackUrlMatch?.[1]) {
     return trackUrlMatch[1];
@@ -178,6 +178,13 @@ function mapCsvRowToImportRow(
 
   return {
     spotify_track_id: spotifyTrackId,
+    spotify_track_uri:
+      getField(record, [
+        "spotify_track_uri",
+        "spotify_uri",
+        "track_uri",
+        "uri",
+      ]) ?? (spotifyTrackId ? `spotify:track:${spotifyTrackId}` : null),
     track_name: getField(record, ["track_name", "music", "song_name", "name"]),
     artist_name: getField(record, [
       "artist_name",
@@ -194,7 +201,10 @@ function mapCsvRowToImportRow(
       defaults.country ??
       null,
     genre: getField(record, ["genre"]) ?? defaults.genre ?? null,
-    chart_name: getField(record, ["chart_name", "chart", "chart_type"]) ?? "top-songs",
+    chart_name:
+      getField(record, ["chart_name", "chart", "chart_type"]) ??
+      defaults.chartType ??
+      "top-songs",
     source_type: getField(record, ["source_type"]) ?? "spotify_chart",
     chart_date:
       getField(record, ["chart_date", "date", "snapshot_date"]) ??
@@ -249,8 +259,7 @@ async function enrichRowsWithSpotifyMetadata(
       return {
         ...row,
         track_name: spotifyTrack.name || row.track_name,
-        artist_name:
-          spotifyTrack.artists.join(", ") || row.artist_name,
+        artist_name: spotifyTrack.artists.join(", ") || row.artist_name,
         artist_ids:
           spotifyTrack.artistIds.length > 0
             ? spotifyTrack.artistIds
@@ -262,7 +271,9 @@ async function enrichRowsWithSpotifyMetadata(
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unknown Spotify metadata error.";
+      error instanceof Error
+        ? error.message
+        : "Unknown Spotify metadata error.";
     process.stderr.write(
       `Failed to enrich spotify chart rows with Spotify metadata: ${message}\n`,
     );
@@ -275,11 +286,15 @@ export async function importSpotifyChartsCsvContent({
   country,
   genre,
   chartDate,
+  chartType,
+  enrichSpotifyMetadata = true,
 }: {
   csvText: string;
   country?: string;
   genre?: string;
   chartDate?: string;
+  chartType?: string;
+  enrichSpotifyMetadata?: boolean;
 }): Promise<SpotifyChartsImportResult> {
   const parsedRows = parseCsv(csvText);
   const mappedRows = parsedRows.map((record) =>
@@ -287,12 +302,12 @@ export async function importSpotifyChartsCsvContent({
       country,
       genre: genre && genre !== "all" ? genre : undefined,
       chartDate: normalizeChartDate(chartDate),
+      chartType,
     }),
   );
-  const enrichedRows = await enrichRowsWithSpotifyMetadata(
-    mappedRows,
-    country ?? "BR",
-  );
+  const enrichedRows = enrichSpotifyMetadata
+    ? await enrichRowsWithSpotifyMetadata(mappedRows, country ?? "BR")
+    : mappedRows;
 
   return importSpotifyChartRows(enrichedRows);
 }
@@ -302,11 +317,13 @@ export async function importSpotifyChartsCsvFromUrl({
   country,
   genre,
   chartDate,
+  chartType,
 }: {
   csvUrl: string;
   country?: string;
   genre?: string;
   chartDate?: string;
+  chartType?: string;
 }): Promise<SpotifyChartsImportResult> {
   const response = await fetch(csvUrl, {
     cache: "no-store",
@@ -323,6 +340,7 @@ export async function importSpotifyChartsCsvFromUrl({
     country,
     genre,
     chartDate,
+    chartType,
   });
 }
 

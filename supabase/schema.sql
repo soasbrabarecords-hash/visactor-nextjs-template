@@ -55,3 +55,37 @@ create index if not exists track_stream_snapshots_country_day_idx
 
 create index if not exists track_stream_snapshots_track_day_idx
   on public.track_stream_snapshots (spotify_track_id, chart_date desc);
+
+-- Automatic Spotify Charts ingestion metadata (see migration 20260711).
+alter table public.spotify_chart_entries
+  add column if not exists chart_type text,
+  add column if not exists rank integer,
+  add column if not exists artist_names text,
+  add column if not exists spotify_track_uri text,
+  add column if not exists streams bigint,
+  add column if not exists raw_row jsonb not null default '{}'::jsonb,
+  add column if not exists created_at timestamptz not null default now();
+
+create unique index if not exists spotify_chart_entries_automatic_track_key
+  on public.spotify_chart_entries (chart_type, country, chart_date, spotify_track_id)
+  where spotify_track_id is not null;
+
+create unique index if not exists spotify_chart_entries_automatic_rank_fallback_key
+  on public.spotify_chart_entries (chart_type, country, chart_date, rank)
+  where spotify_track_id is null;
+
+create table if not exists public.spotify_chart_runs (
+  id uuid primary key default gen_random_uuid(),
+  chart_type text not null,
+  country text not null,
+  chart_date date not null,
+  source_url text,
+  status text not null,
+  rows_count integer not null default 0,
+  error_message text,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+
+create index if not exists spotify_chart_runs_latest_idx
+  on public.spotify_chart_runs (started_at desc);

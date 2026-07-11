@@ -47,6 +47,7 @@ export type SpotifyChartImportRow = {
   movement_type?: string | null;
   daily_streams?: number | string | null;
   captured_at?: string | null;
+  spotify_track_uri?: string | null;
 };
 
 export type SpotifyChartsImportResult = {
@@ -70,9 +71,7 @@ function normalizeString(value: string | null | undefined) {
 
 function normalizeStringArray(value: string[] | string | null | undefined) {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
+    return value.map((item) => item.trim()).filter((item) => item.length > 0);
   }
 
   if (typeof value === "string") {
@@ -134,28 +133,31 @@ function normalizeTimestamp(value: string | null | undefined) {
 }
 
 function dedupeKeyOf(row: {
-  spotify_track_id: string;
+  spotify_track_id: string | null;
   country: string;
   chart_name: string;
   chart_date: string;
+  rank_position: number;
 }) {
   return [
     row.country,
     row.chart_name,
     row.chart_date,
-    row.spotify_track_id,
+    row.spotify_track_id ?? `rank:${row.rank_position}`,
   ].join("::");
 }
 
 function validateRow(
   row: SpotifyChartImportRow,
   index: number,
-): {
-  entry: SpotifyChartEntryInput;
-  snapshot: SupabaseStreamSnapshotInput;
-} | {
-  error: string;
-} {
+):
+  | {
+      entry: SpotifyChartEntryInput;
+      snapshot: SupabaseStreamSnapshotInput | null;
+    }
+  | {
+      error: string;
+    } {
   const spotifyTrackId = normalizeString(row.spotify_track_id);
   const trackName = normalizeString(row.track_name);
   const artistName = normalizeString(row.artist_name);
@@ -166,36 +168,34 @@ function validateRow(
   const rankPosition = normalizeNumber(row.rank_position);
   const dailyStreams = normalizeNumber(row.daily_streams);
 
-  if (!spotifyTrackId) {
-    return { error: `Row ${index + 1}: missing spotify_track_id.` };
-  }
-
   if (!trackName) {
-    return { error: `Row ${index + 1}: missing track_name for ${spotifyTrackId}.` };
+    return { error: `Row ${index + 1}: missing track_name.` };
   }
 
   if (!artistName) {
-    return { error: `Row ${index + 1}: missing artist_name for ${spotifyTrackId}.` };
-  }
-
-  if (!spotifyUrl) {
-    return { error: `Row ${index + 1}: missing spotify_url for ${spotifyTrackId}.` };
+    return { error: `Row ${index + 1}: missing artist_name.` };
   }
 
   if (!country) {
-    return { error: `Row ${index + 1}: missing country for ${spotifyTrackId}.` };
+    return {
+      error: `Row ${index + 1}: missing country for ${spotifyTrackId}.`,
+    };
   }
 
   if (!chartDate) {
-    return { error: `Row ${index + 1}: invalid chart_date for ${spotifyTrackId}.` };
+    return {
+      error: `Row ${index + 1}: invalid chart_date for ${spotifyTrackId}.`,
+    };
   }
 
   if (!rankPosition || rankPosition <= 0) {
-    return { error: `Row ${index + 1}: invalid rank_position for ${spotifyTrackId}.` };
+    return {
+      error: `Row ${index + 1}: invalid rank_position for ${spotifyTrackId}.`,
+    };
   }
 
-  if (dailyStreams === null || dailyStreams < 0) {
-    return { error: `Row ${index + 1}: invalid daily_streams for ${spotifyTrackId}.` };
+  if (dailyStreams !== null && dailyStreams < 0) {
+    return { error: `Row ${index + 1}: invalid daily_streams.` };
   }
 
   const artistIds = normalizeStringArray(row.artist_ids);
@@ -224,26 +224,38 @@ function validateRow(
       rank_position: Math.trunc(rankPosition),
       previous_rank: previousRank === null ? null : Math.trunc(previousRank),
       movement_type: movementType,
-      daily_streams: Math.trunc(dailyStreams),
+      daily_streams: dailyStreams === null ? null : Math.trunc(dailyStreams),
       captured_at: capturedAt,
+      chart_type: chartName,
+      rank: Math.trunc(rankPosition),
+      artist_names: artistName,
+      spotify_track_uri:
+        normalizeString(row.spotify_track_uri) ??
+        (spotifyTrackId ? `spotify:track:${spotifyTrackId}` : null),
+      streams: dailyStreams === null ? null : Math.trunc(dailyStreams),
+      raw_row: { ...row },
     },
-    snapshot: {
-      spotify_track_id: spotifyTrackId,
-      track_name: trackName,
-      artist_name: artistName,
-      artist_ids: artistIds,
-      album_name: albumName,
-      image_url: imageUrl,
-      spotify_url: spotifyUrl,
-      country,
-      genre,
-      chart_name: chartName,
-      chart_date: chartDate,
-      daily_streams: Math.trunc(dailyStreams),
-      rank_position: Math.trunc(rankPosition),
-      previous_rank: previousRank === null ? null : Math.trunc(previousRank),
-      captured_at: capturedAt,
-    },
+    snapshot:
+      spotifyTrackId && spotifyUrl && dailyStreams !== null
+        ? {
+            spotify_track_id: spotifyTrackId,
+            track_name: trackName,
+            artist_name: artistName,
+            artist_ids: artistIds,
+            album_name: albumName,
+            image_url: imageUrl,
+            spotify_url: spotifyUrl,
+            country,
+            genre,
+            chart_name: chartName,
+            chart_date: chartDate,
+            daily_streams: Math.trunc(dailyStreams),
+            rank_position: Math.trunc(rankPosition),
+            previous_rank:
+              previousRank === null ? null : Math.trunc(previousRank),
+            captured_at: capturedAt,
+          }
+        : null,
   };
 }
 
@@ -297,7 +309,9 @@ export async function importSpotifyChartRows(
 
     seenKeys.add(dedupeKey);
     entryRows.push(validated.entry);
-    snapshotRows.push(validated.snapshot);
+    if (validated.snapshot) {
+      snapshotRows.push(validated.snapshot);
+    }
   });
 
   const validRows = entryRows.length;
@@ -306,20 +320,34 @@ export async function importSpotifyChartRows(
     return {
       insertedCount: 0,
       skippedCount,
-      errors: [...errors, `[debug] parsedRows=${parsedRows} validRows=0 — todas as rows falharam na validação.`],
-      debug: { parsedRows, validRows: 0, entriesSaved: false, snapshotCreated: false, tracksSaved: 0, tracksError: null },
+      errors: [
+        ...errors,
+        `[debug] parsedRows=${parsedRows} validRows=0 — todas as rows falharam na validação.`,
+      ],
+      debug: {
+        parsedRows,
+        validRows: 0,
+        entriesSaved: false,
+        snapshotCreated: false,
+        tracksSaved: 0,
+        tracksError: null,
+      },
     };
   }
 
   // pipeline antiga — compatibilidade apenas, não bloqueia o salvamento principal
   const entriesSaved = await upsertSpotifyChartEntries(entryRows);
   if (!entriesSaved) {
-    errors.push(`[debug] spotify_chart_entries: falha no upsert (não crítico, continuando).`);
+    errors.push(
+      `[debug] spotify_chart_entries: falha no upsert (não crítico, continuando).`,
+    );
   }
 
   const snapshotsSaved = await upsertTrackStreamSnapshots(snapshotRows);
   if (!snapshotsSaved) {
-    errors.push("[debug] track_stream_snapshots: falha no upsert (não crítico).");
+    errors.push(
+      "[debug] track_stream_snapshots: falha no upsert (não crítico).",
+    );
   }
 
   // ── Salvar histórico diário estruturado (chart_snapshots) ──────────────────
@@ -342,6 +370,8 @@ export async function importSpotifyChartRows(
     const snapshot = await upsertChartSnapshot({
       chart_date: first.chart_date,
       country: first.country,
+      chart_type: first.chart_name,
+      source: first.source_type,
       total_tracks: group.length,
     });
 
@@ -369,12 +399,17 @@ export async function importSpotifyChartRows(
       image_url: e.image_url ?? null,
     }));
 
-    const tracksResult = await upsertChartSnapshotTracks(snapshot.id, trackInputs);
+    const tracksResult = await upsertChartSnapshotTracks(
+      snapshot.id,
+      trackInputs,
+    );
     tracksSaved = tracksResult.count;
     tracksError = tracksResult.error;
 
     if (tracksResult.error) {
-      errors.push(`[debug] chart_snapshot_tracks (${first.chart_date}): ${tracksResult.error}`);
+      errors.push(
+        `[debug] chart_snapshot_tracks (${first.chart_date}): ${tracksResult.error}`,
+      );
     }
   }
   // ──────────────────────────────────────────────────────────────────────────
@@ -383,6 +418,13 @@ export async function importSpotifyChartRows(
     insertedCount: entryRows.length,
     skippedCount,
     errors,
-    debug: { parsedRows, validRows, entriesSaved: true, snapshotCreated, tracksSaved, tracksError },
+    debug: {
+      parsedRows,
+      validRows,
+      entriesSaved,
+      snapshotCreated,
+      tracksSaved,
+      tracksError,
+    },
   };
 }

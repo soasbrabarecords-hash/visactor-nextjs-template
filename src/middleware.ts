@@ -10,6 +10,7 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/spotify/auth") ||
     pathname === "/api/import/spotify-charts" ||
+    pathname === "/api/jobs/spotify-charts/ingest" ||
     /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$/.test(pathname)
   );
 }
