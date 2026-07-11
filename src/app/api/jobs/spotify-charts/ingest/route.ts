@@ -21,17 +21,15 @@ export async function GET(request: Request) {
     );
   }
 
-  const results = [];
-
-  for (const chart of getAutomaticCharts()) {
-    results.push(
-      await ingestSpotifyChart(
+  const results = await Promise.all(
+    getAutomaticCharts().map((chart) =>
+      ingestSpotifyChart(
         chart,
         getLatestCandidateDates()[0],
         () => downloadLatestAvailableChart(chart),
       ),
-    );
-  }
+    ),
+  );
 
   return NextResponse.json({
     success: results.every((result) => result.success),

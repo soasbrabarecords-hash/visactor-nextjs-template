@@ -278,15 +278,29 @@ export async function downloadLatestAvailableChart(
   chart: AutomaticChart,
 ): Promise<DownloadedSpotifyChart> {
   const errors: string[] = [];
+  const candidateDates = getLatestCandidateDates();
 
-  for (const chartDate of getLatestCandidateDates()) {
-    try {
-      return await downloadSpotifyChartForDate(chart, chartDate);
-    } catch (error) {
-      errors.push(
-        `${chartDate}: ${error instanceof Error ? error.message : "falha desconhecida"}`,
-      );
+  if (chart.csvUrlTemplate) {
+    for (const chartDate of candidateDates) {
+      try {
+        const official = await downloadOfficialChart(chart, chartDate);
+        if (official) return official;
+      } catch (error) {
+        errors.push(
+          `${chartDate}: ${error instanceof Error ? error.message : "falha oficial"}`,
+        );
+      }
     }
+  }
+
+  try {
+    const kworb = await downloadKworbLatest(chart);
+    if (candidateDates.includes(kworb.chartDate)) return kworb;
+    errors.push(
+      `Kworb disponibiliza ${kworb.chartDate}, fora da janela de hoje, ontem ou anteontem.`,
+    );
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "falha no Kworb");
   }
 
   throw new Error(
