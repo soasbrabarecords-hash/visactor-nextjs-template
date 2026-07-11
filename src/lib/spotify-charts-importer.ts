@@ -282,6 +282,7 @@ async function upsertTrackStreamSnapshots(
 
 export async function importSpotifyChartRows(
   rows: SpotifyChartImportRow[],
+  options: { persistStreamSnapshots?: boolean } = {},
 ): Promise<SpotifyChartsImportResult> {
   const errors: string[] = [];
   const entryRows: SpotifyChartEntryInput[] = [];
@@ -343,8 +344,12 @@ export async function importSpotifyChartRows(
     );
   }
 
-  const snapshotsSaved = await upsertTrackStreamSnapshots(snapshotRows);
-  if (!snapshotsSaved) {
+  const shouldPersistStreamSnapshots =
+    options.persistStreamSnapshots !== false;
+  const snapshotsSaved = shouldPersistStreamSnapshots
+    ? await upsertTrackStreamSnapshots(snapshotRows)
+    : true;
+  if (shouldPersistStreamSnapshots && !snapshotsSaved) {
     errors.push(
       "[debug] track_stream_snapshots: falha no upsert (não crítico).",
     );

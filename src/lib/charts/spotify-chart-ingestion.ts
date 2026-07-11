@@ -50,6 +50,7 @@ export async function ingestSpotifyChart(
       sourceUrl: downloaded.sourceUrl,
       sourceType: downloaded.sourceType,
       enrichSpotifyMetadata: false,
+      persistStreamSnapshots: false,
     });
 
     if (result.rows_count === 0) {

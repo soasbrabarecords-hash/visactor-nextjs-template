@@ -12,6 +12,7 @@ export type SpotifyChartCsvImportInput = {
   sourceType?: string;
   genre?: string;
   enrichSpotifyMetadata?: boolean;
+  persistStreamSnapshots?: boolean;
 };
 
 export type SpotifyChartCsvImportSummary = SpotifyChartsImportResult & {
@@ -31,6 +32,7 @@ export async function importSpotifyChartCsv({
   sourceType,
   genre,
   enrichSpotifyMetadata = false,
+  persistStreamSnapshots = true,
 }: SpotifyChartCsvImportInput): Promise<SpotifyChartCsvImportSummary> {
   const normalizedCountry = country.trim().toUpperCase();
   const normalizedChartType = chartType.trim() || "top-songs";
@@ -53,6 +55,7 @@ export async function importSpotifyChartCsv({
     sourceType,
     genre,
     enrichSpotifyMetadata,
+    persistStreamSnapshots,
   });
 
   return {

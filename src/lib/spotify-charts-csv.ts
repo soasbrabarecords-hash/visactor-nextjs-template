@@ -293,6 +293,7 @@ export async function importSpotifyChartsCsvContent({
   chartType,
   sourceType,
   enrichSpotifyMetadata = true,
+  persistStreamSnapshots = true,
 }: {
   csvText: string;
   country?: string;
@@ -301,6 +302,7 @@ export async function importSpotifyChartsCsvContent({
   chartType?: string;
   sourceType?: string;
   enrichSpotifyMetadata?: boolean;
+  persistStreamSnapshots?: boolean;
 }): Promise<SpotifyChartsImportResult> {
   const parsedRows = parseCsv(csvText);
   const mappedRows = parsedRows.map((record) =>
@@ -316,7 +318,7 @@ export async function importSpotifyChartsCsvContent({
     ? await enrichRowsWithSpotifyMetadata(mappedRows, country ?? "BR")
     : mappedRows;
 
-  return importSpotifyChartRows(enrichedRows);
+  return importSpotifyChartRows(enrichedRows, { persistStreamSnapshots });
 }
 
 export async function importSpotifyChartsCsvFromUrl({
