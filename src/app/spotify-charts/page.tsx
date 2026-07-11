@@ -1,5 +1,4 @@
 import Container from "@/components/container";
-import PageIntro from "@/components/page-intro";
 import ModuleGuard from "@/components/workspace/module-guard";
 import {
   getSnapshotDates,
@@ -17,7 +16,7 @@ type Props = {
 
 export default async function SpotifyChartsPage({ searchParams }: Props) {
   const params = await searchParams;
-  const country = params.country ?? "BR";
+  const country = params.country?.toUpperCase() === "GLOBAL" ? "GLOBAL" : "BR";
 
   const [dates, latestAutomaticRun, canBackfill] = await Promise.all([
     getSnapshotDates(country),
@@ -34,14 +33,8 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
 
   return (
     <ModuleGuard moduleKey="playlist_os">
-      <div>
-        <PageIntro
-          eyebrow="Curadoria / Radar Music"
-          title="Spotify Charts — Histórico"
-          description="Historico visual do Top 200 Brasil com snapshots diarios para leitura de movimento, comparacao e acao rapida."
-        />
-
-        <Container className="py-8">
+      <div className="overflow-hidden">
+        <Container className="py-3">
           <SpotifyChartsClient
             initialDates={dates}
             initialDate={selectedDate}

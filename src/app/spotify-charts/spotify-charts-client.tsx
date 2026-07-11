@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useTransition } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -174,6 +180,7 @@ export default function SpotifyChartsClient({
     text: string;
   } | null>(null);
   const [loadingDate, setLoadingDate] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(
     (initialDate ?? initialDates[0] ?? new Date().toISOString().slice(0, 10))
       .slice(0, 7),
@@ -184,6 +191,20 @@ export default function SpotifyChartsClient({
   const [backfilling, setBackfilling] = useState(false);
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setDates(initialDates);
+    setSelectedDate(initialDate);
+    setSnapshot(initialSnapshot);
+    setVisibleMonth(
+      (initialDate ??
+        initialDates[0] ??
+        new Date().toISOString().slice(0, 10)
+      ).slice(0, 7),
+    );
+    setCalendarOpen(false);
+    setLoadingDate(false);
+  }, [country, initialDate, initialDates, initialSnapshot]);
 
   async function handleFile(file: File) {
     setUploading(true);
@@ -239,6 +260,7 @@ export default function SpotifyChartsClient({
     setLoadingDate(true);
     setSelectedDate(date);
     setVisibleMonth(date.slice(0, 7));
+    setCalendarOpen(false);
 
     try {
       const res = await fetch(
@@ -351,13 +373,22 @@ export default function SpotifyChartsClient({
     [tracks],
   );
 
+  function changeCountry(nextCountry: string) {
+    if (nextCountry === country) return;
+    setLoadingDate(true);
+    setCalendarOpen(false);
+    router.replace(`/spotify-charts?country=${nextCountry}`);
+  }
+
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-[30px] border border-border bg-[linear-gradient(135deg,rgba(8,12,20,0.98),rgba(11,33,28,0.96),rgba(22,101,52,0.26))] p-5 shadow-[0_28px_90px_-42px_rgba(22,163,74,0.35)]">
+    <div className="flex h-[calc(100dvh-140px)] min-h-0 flex-col gap-3 overflow-hidden">
+      <section className="shrink-0 overflow-hidden rounded-[24px] border border-border bg-[linear-gradient(135deg,rgba(8,12,20,0.98),rgba(11,33,28,0.96),rgba(22,101,52,0.26))] p-4">
         <div className="grid gap-5 laptop:grid-cols-[1.18fr_0.82fr]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone="green">Spotify Charts BR</StatusBadge>
+              <StatusBadge tone="green">
+                Spotify Charts {country === "GLOBAL" ? "Global" : "Brasil"}
+              </StatusBadge>
               {selectedDate ? (
                 <StatusBadge tone="slate">
                   {formatDate(selectedDate)}
@@ -368,16 +399,16 @@ export default function SpotifyChartsClient({
               ) : null}
             </div>
 
-            <h2 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-white laptop:text-4xl">
+            <h2 className="hidden">
               Historico diario do Top 200 com leitura rapida de subida, queda e
               novas entradas.
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70">
+            <p className="hidden">
               Importa o CSV do Spotify Charts, salva snapshots diarios e deixa a
               comparacao pronta para curadoria e decisao rapida.
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -392,7 +423,7 @@ export default function SpotifyChartsClient({
                 type="button"
                 disabled={uploading}
                 onClick={() => fileInputRef.current?.click()}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-medium text-slate-950 transition hover:bg-white/90 disabled:opacity-60"
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-slate-950 transition hover:bg-white/90 disabled:opacity-60"
               >
                 {uploading ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -401,7 +432,7 @@ export default function SpotifyChartsClient({
                 )}
                 {uploading ? "Importando..." : "Importar CSV"}
               </button>
-              <div className="inline-flex h-11 items-center rounded-full border border-white/10 bg-white/5 px-4 text-sm text-white/70">
+              <div className="inline-flex h-9 items-center rounded-full border border-white/10 bg-white/5 px-4 text-xs text-white/70">
                 {uploadMsg ? (
                   <span
                     className={
@@ -415,7 +446,7 @@ export default function SpotifyChartsClient({
                 )}
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/65">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
               <StatusBadge
                 tone={
                   latestAutomaticRun?.status === "success"
@@ -447,7 +478,7 @@ export default function SpotifyChartsClient({
             </div>
           </div>
 
-          <div className="grid gap-3 tablet:grid-cols-3 laptop:grid-cols-1">
+          <div className="hidden">
             <article className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-white">
               <div className="text-xs uppercase tracking-[0.18em] text-white/45">
                 Snapshot
@@ -487,19 +518,31 @@ export default function SpotifyChartsClient({
       </section>
 
       {hasHistory ? (
-        <section className="rounded-[28px] border border-border bg-card/60 p-4 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                <CalendarDays className="h-3.5 w-3.5" />
-                Calendario de snapshots
+        <section className="relative z-20 shrink-0 rounded-[20px] border border-border bg-card/80 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={country}
+                onChange={(event) => changeCountry(event.target.value)}
+                aria-label="Pais do chart"
+                className="h-9 rounded-full border border-border bg-background px-3 text-sm font-medium"
+              >
+                <option value="BR">Brasil</option>
+                <option value="GLOBAL">Global</option>
+              </select>
+              <StatusBadge tone="slate">Top Songs</StatusBadge>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCalendarOpen((open) => !open)}
+                  aria-expanded={calendarOpen}
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                >
+                  <CalendarDays size={15} />
+                  {selectedDate ? formatDate(selectedDate) : "Selecionar data"}
+                </button>
               </div>
-              <h3 className="mt-2 text-xl font-semibold">
-                {country} · Top Songs · {selectedDate ? formatDate(selectedDate) : "Sem data"}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {tracks.length} faixas no snapshot selecionado
-              </p>
+              <StatusBadge tone="green">{tracks.length} faixas</StatusBadge>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -521,7 +564,8 @@ export default function SpotifyChartsClient({
             </div>
           </div>
 
-          <div className="mt-5 max-w-xl rounded-[24px] border border-border bg-background/50 p-4">
+          {calendarOpen ? (
+          <div className="absolute left-3 top-14 z-50 w-[min(360px,calc(100vw-2rem))] rounded-[20px] border border-border bg-background p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
@@ -581,6 +625,7 @@ export default function SpotifyChartsClient({
               <StatusBadge tone="blue">{dates.length} dias</StatusBadge>
             </div>
           </div>
+          ) : null}
         </section>
       ) : (
         <section className="rounded-[28px] border border-dashed border-border px-6 py-20 text-center">
@@ -594,7 +639,7 @@ export default function SpotifyChartsClient({
       )}
 
       {canBackfill ? (
-        <section className="rounded-[28px] border border-border bg-card/60 p-5">
+        <section className="hidden">
           <div className="flex items-start gap-3">
             <div className="rounded-2xl bg-emerald-400/10 p-2.5 text-emerald-300">
               <Database size={18} />
@@ -669,21 +714,21 @@ export default function SpotifyChartsClient({
       ) : null}
 
       {hasHistory && selectedDate ? (
-        <section className="overflow-hidden rounded-[30px] border border-border bg-card/60 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.9)]">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-4">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-border bg-card/60">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
             <div className="flex items-center gap-4">
               <div
-                className="h-16 w-16 rounded-[20px] border border-border bg-muted"
+                className="h-10 w-10 rounded-xl border border-border bg-muted"
                 style={coverStyle(topTrack?.image_url ?? null)}
               />
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   Top 200
                 </div>
-                <h3 className="mt-1 text-xl font-semibold">
+                <h3 className="text-base font-semibold">
                   {selectedDate ? formatDate(selectedDate) : "Sem data"}
                 </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {prevDate
                     ? `Comparando com ${formatDate(prevDate)}`
                     : "Primeiro snapshot sem comparacao disponivel"}
@@ -706,9 +751,9 @@ export default function SpotifyChartsClient({
               <Loader2 size={22} className="animate-spin" />
             </div>
           ) : tracks.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="min-h-0 flex-1 overflow-auto">
               <table className="min-w-[980px] w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-card">
                   <tr className="border-b border-border bg-muted/20 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                     <th className="px-4 py-3 text-center">#</th>
                     <th className="px-4 py-3 text-center">Mov.</th>
@@ -802,7 +847,7 @@ export default function SpotifyChartsClient({
       ) : null}
 
       {tracks.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
+        <div className="hidden">
           <span className="font-medium">Legenda</span>
           <span className="flex items-center gap-1 text-emerald-400">
             <ArrowUp size={12} />
