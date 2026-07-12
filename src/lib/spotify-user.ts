@@ -77,6 +77,10 @@ type SpotifyPlaylistTracksResponse = {
   total?: number;
 };
 
+type SpotifySeveralTracksResponse = {
+  tracks?: Array<SpotifyPlaylistTrackItem["track"]>;
+};
+
 type SpotifyPlaylistTrackItem = {
   item?: SpotifyPlaylistTrackItem["track"];
   track?: {
@@ -1293,6 +1297,59 @@ export async function fetchSpotifyAccountPlaylists({
       refreshedToken: null,
     };
   }
+}
+
+export async function fetchSpotifyTrackCoverUrls(trackIds: string[]) {
+  const uniqueTrackIds = Array.from(
+    new Set(
+      trackIds
+        .map((trackId) => trackId.trim())
+        .filter((trackId) => /^[A-Za-z0-9]{22}$/.test(trackId)),
+    ),
+  );
+
+  if (uniqueTrackIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data } = await withSpotifyToken(async (accessToken) => {
+    const covers = new Map<string, string>();
+
+    for (let index = 0; index < uniqueTrackIds.length; index += 50) {
+      const chunk = uniqueTrackIds.slice(index, index + 50);
+      const searchParams = new URLSearchParams({ ids: chunk.join(",") });
+      const response = await fetch(
+        `https://api.spotify.com/v1/tracks?${searchParams.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await getSpotifyErrorMessage(
+            response,
+            `Spotify track covers error ${response.status}`,
+          ),
+        );
+      }
+
+      const payload = (await response.json()) as SpotifySeveralTracksResponse;
+
+      for (const track of payload.tracks ?? []) {
+        const imageUrl = track?.album?.images?.[0]?.url?.trim();
+
+        if (track?.id && imageUrl) {
+          covers.set(track.id, imageUrl);
+        }
+      }
+    }
+
+    return covers;
+  });
+
+  return data;
 }
 
 export async function fetchSpotifyConnectionStatus(): Promise<{

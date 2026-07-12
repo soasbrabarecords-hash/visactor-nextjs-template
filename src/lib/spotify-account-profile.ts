@@ -34,6 +34,18 @@ export type SpotifyAccountProfile = {
   trackPlaylistNamesById: Map<string, string[]>;
   artistPlaylistCountByName: Map<string, number>;
   genreTrackCountByType: Map<TrackGenre, number>;
+  trackMetadataById: Map<
+    string,
+    {
+      name: string;
+      artists: string;
+      albumName: string;
+      imageUrl: string | null;
+      durationLabel: string;
+      popularity: number;
+      spotifyUrl: string;
+    }
+  >;
   playlistTargets: SpotifyAccountPlaylistTarget[];
 };
 
@@ -171,6 +183,8 @@ function mapEditablePlaylistsToProfile(playlists: SpotifyEditablePlaylist[]) {
   const trackPlaylistNamesById = new Map<string, string[]>();
   const artistPlaylistCountByName = new Map<string, number>();
   const genreTrackCountByType = new Map<TrackGenre, number>();
+  const trackMetadataById: SpotifyAccountProfile["trackMetadataById"] =
+    new Map();
   const playlistTargets: SpotifyAccountPlaylistTarget[] = [];
 
   for (const playlist of playlists) {
@@ -184,6 +198,25 @@ function mapEditablePlaylistsToProfile(playlists: SpotifyEditablePlaylist[]) {
       }
 
       playlistTrackIds.add(track.id);
+      const existingMetadata = trackMetadataById.get(track.id);
+
+      if (!existingMetadata) {
+        trackMetadataById.set(track.id, {
+          name: track.name,
+          artists: track.artists,
+          albumName: track.albumName,
+          imageUrl: track.imageUrl,
+          durationLabel: track.durationLabel,
+          popularity: track.popularity,
+          spotifyUrl: track.spotifyUrl,
+        });
+      } else if (!existingMetadata.imageUrl && track.imageUrl) {
+        trackMetadataById.set(track.id, {
+          ...existingMetadata,
+          imageUrl: track.imageUrl,
+        });
+      }
+
       const trackPlaylists = trackPlaylistNamesById.get(track.id) ?? [];
 
       if (!trackPlaylists.includes(playlist.name)) {
@@ -264,6 +297,7 @@ function mapEditablePlaylistsToProfile(playlists: SpotifyEditablePlaylist[]) {
     trackPlaylistNamesById,
     artistPlaylistCountByName,
     genreTrackCountByType,
+    trackMetadataById,
     playlistTargets,
   } satisfies SpotifyAccountProfile;
 }

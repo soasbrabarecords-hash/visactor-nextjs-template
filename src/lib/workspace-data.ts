@@ -2,9 +2,8 @@ import "server-only";
 
 import { subDays } from "date-fns";
 import {
-  getSnapshotByDate,
   getSnapshotDates,
-  getSnapshotTracks,
+  getSnapshotTracksByDates,
   getSnapshotWithComparison,
   type ChartSnapshotTrack,
 } from "@/lib/chart-snapshots";
@@ -294,6 +293,31 @@ async function buildDashboardAccountProfile(): Promise<DashboardAccountProfile |
   }
 
   return buildSpotifyAccountProfile(result.playlists);
+}
+
+function buildAccountProfileTrackInsights(
+  accountProfile: DashboardAccountProfile | null,
+): TrackInsight[] {
+  if (!accountProfile) {
+    return [];
+  }
+
+  return [...accountProfile.trackMetadataById.entries()].map(
+    ([trackId, track]) => ({
+      id: trackId,
+      name: track.name,
+      artists: track.artists,
+      artistIds: [],
+      albumName: track.albumName,
+      popularity: track.popularity,
+      playlistsCount:
+        accountProfile.trackPlaylistNamesById.get(trackId)?.length ?? 0,
+      durationLabel: track.durationLabel,
+      explicit: false,
+      spotifyUrl: track.spotifyUrl,
+      coverUrl: track.imageUrl,
+    }),
+  );
 }
 
 function formatCount(value: number) {
@@ -1550,26 +1574,18 @@ async function buildDashboardSnapshotRadarRows({
     };
   }
 
-  const dailySnapshot = await getSnapshotWithComparison(latestDate, country);
   const weeklyDate = buildWeeklyComparisonDate(dates);
-  const weeklySnapshot =
-    weeklyDate && weeklyDate !== latestDate
-      ? await getSnapshotByDate(weeklyDate, country)
-      : null;
-  const weeklyTracks = weeklySnapshot
-    ? await getSnapshotTracks(weeklySnapshot.id)
-    : [];
   const recentDates = dates.slice(0, 7);
-  const recentSnapshots = await Promise.all(
-    recentDates.map(async (date) => {
-      const snapshot = await getSnapshotByDate(date, country);
-
-      if (!snapshot) {
-        return [] as ChartSnapshotTrack[];
-      }
-
-      return getSnapshotTracks(snapshot.id);
-    }),
+  const datesToLoad = weeklyDate
+    ? Array.from(new Set([...recentDates, weeklyDate]))
+    : recentDates;
+  const [dailySnapshot, tracksByDate] = await Promise.all([
+    getSnapshotWithComparison(latestDate, country),
+    getSnapshotTracksByDates(datesToLoad, country),
+  ]);
+  const weeklyTracks = weeklyDate ? tracksByDate.get(weeklyDate) ?? [] : [];
+  const recentSnapshots = recentDates.map(
+    (date) => tracksByDate.get(date) ?? [],
   );
 
   const weeklyByTrackKey = new Map<string, ChartSnapshotTrack>();
@@ -2553,14 +2569,13 @@ export async function getCurationPageData(): Promise<CurationPageData> {
 }
 
 export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceData> {
-  const [chartsData, accountProfile] = await Promise.all([
-    getChartsData(),
-    buildDashboardAccountProfile(),
-  ]);
+  const accountProfile = await buildDashboardAccountProfile();
+  const accountTracks = buildAccountProfileTrackInsights(accountProfile);
+  const dominantArtists = accountProfile?.dominantArtists ?? [];
   const snapshotRadar = await buildDashboardSnapshotRadarRows({
     country: "BR",
-    playlistTracks: chartsData.tracks,
-    dominantArtists: chartsData.artistDistribution.map((artist) => artist.type),
+    playlistTracks: accountTracks,
+    dominantArtists,
     accountProfile,
   });
   const radarRows = snapshotRadar.rows;
@@ -2697,8 +2712,8 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
 
   const curationRows = buildCurationRows(
     radarRows,
-    chartsData.tracks,
-    chartsData.artistDistribution.map((artist) => artist.type),
+    accountTracks,
+    dominantArtists,
     accountProfile,
   );
   const addNowQueue = curationRows

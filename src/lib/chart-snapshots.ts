@@ -1,6 +1,6 @@
 import "server-only";
 
-import { fetchSpotifyTracksByIds } from "@/lib/spotify";
+import { fetchSpotifyTrackCoverUrls } from "@/lib/spotify-user";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -416,6 +416,69 @@ export async function getSnapshotTracks(
   }
 }
 
+export async function getSnapshotTracksByDates(
+  chartDates: string[],
+  country = "BR",
+) {
+  const uniqueDates = Array.from(new Set(chartDates.filter(Boolean)));
+  const tracksByDate = new Map<string, ChartSnapshotTrack[]>();
+
+  if (uniqueDates.length === 0) {
+    return tracksByDate;
+  }
+
+  const supabase = await createClient();
+  const { data: snapshots, error: snapshotsError } = await supabase
+    .from("chart_snapshots")
+    .select("id,chart_date")
+    .eq("country", country)
+    .in("chart_date", uniqueDates);
+
+  if (snapshotsError || !snapshots || snapshots.length === 0) {
+    return tracksByDate;
+  }
+
+  const dateBySnapshotId = new Map(
+    snapshots.map((snapshot) => [snapshot.id, snapshot.chart_date] as const),
+  );
+  const tracks: ChartSnapshotTrack[] = [];
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data: page, error: tracksError } = await supabase
+      .from("chart_snapshot_tracks")
+      .select("*")
+      .in("snapshot_id", [...dateBySnapshotId.keys()])
+      .order("chart_date", { ascending: false })
+      .order("position", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (tracksError) {
+      return tracksByDate;
+    }
+
+    tracks.push(...((page ?? []) as ChartSnapshotTrack[]));
+
+    if (!page || page.length < pageSize) {
+      break;
+    }
+  }
+
+  for (const track of tracks) {
+    const chartDate = dateBySnapshotId.get(track.snapshot_id);
+
+    if (!chartDate) {
+      continue;
+    }
+
+    const dateTracks = tracksByDate.get(chartDate) ?? [];
+    dateTracks.push(track);
+    tracksByDate.set(chartDate, dateTracks);
+  }
+
+  return tracksByDate;
+}
+
 // ── Get snapshot with movement comparison ─────────────────────────────────────
 //
 // Compares current date's tracks against the previous available snapshot.
@@ -482,23 +545,54 @@ export async function getSnapshotWithComparison(
       );
 
       if (missingImageTrackIds.length > 0) {
-        const spotifyMarket =
-          country.trim().toUpperCase() === "GLOBAL"
-            ? "US"
-            : country.trim().toUpperCase();
-        const spotifyTracks = await fetchSpotifyTracksByIds(
+        const connectedAccountCovers = await fetchSpotifyTrackCoverUrls(
           missingImageTrackIds,
-          spotifyMarket,
         ).catch((error) => {
           process.stderr.write(
-            `Failed to recover chart cover images from Spotify: ${error instanceof Error ? error.message : "unknown error"}\n`,
+            `Failed to recover chart covers with connected Spotify account: ${error instanceof Error ? error.message : "unknown error"}\n`,
           );
-          return [];
+          return new Map<string, string>();
         });
 
-        for (const track of spotifyTracks) {
-          if (track.coverUrl) {
-            imageUrlMap.set(track.id, track.coverUrl);
+        for (const [trackId, imageUrl] of connectedAccountCovers) {
+          imageUrlMap.set(trackId, imageUrl);
+        }
+
+        if (connectedAccountCovers.size > 0) {
+          const admin = createAdminClient();
+          const recoveredRows = rawTracks
+            .filter(
+              (track) =>
+                !track.image_url &&
+                track.spotify_track_id &&
+                connectedAccountCovers.has(track.spotify_track_id),
+            )
+            .map((track) => ({
+              snapshot_id: track.snapshot_id,
+              chart_date: track.chart_date,
+              position: track.position,
+              previous_position: track.previous_position,
+              spotify_track_id: track.spotify_track_id,
+              track_name: track.track_name,
+              artist_name: track.artist_name,
+              streams: track.streams,
+              kworb_streams_24h: track.kworb_streams_24h,
+              genre: track.genre,
+              image_url: connectedAccountCovers.get(
+                track.spotify_track_id as string,
+              ),
+            }));
+
+          if (admin && recoveredRows.length > 0) {
+            const { error: persistCoverError } = await admin
+              .from("chart_snapshot_tracks")
+              .upsert(recoveredRows, { onConflict: "snapshot_id,position" });
+
+            if (persistCoverError) {
+              process.stderr.write(
+                `Failed to persist recovered chart covers: ${persistCoverError.message}\n`,
+              );
+            }
           }
         }
       }
