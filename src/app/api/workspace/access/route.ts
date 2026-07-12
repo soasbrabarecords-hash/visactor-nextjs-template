@@ -1,16 +1,18 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ACCESS_ADMIN_EMAIL,
+  ACCESS_ADMIN_USER_ID,
   ACTIVE_WORKSPACE_COOKIE,
-  normalizeModuleKey,
-  selectCurrentWorkspace,
   type ModuleRole,
   type WorkspaceModuleAccess,
   type WorkspaceModuleRole,
   type WorkspaceRole,
   type WorkspaceSummary,
+  normalizeModuleKey,
+  selectCurrentWorkspace,
 } from "@/lib/workspace-access";
 
 export const runtime = "nodejs";
@@ -19,7 +21,9 @@ export const dynamic = "force-dynamic";
 const NO_WORKSPACE_MESSAGE =
   "Nenhum workspace vinculado. Peça acesso a um administrador.";
 
-function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole {
+function normalizeWorkspaceRole(
+  role: string | null | undefined,
+): WorkspaceRole {
   if (role === "owner" || role === "admin" || role === "viewer") {
     return role;
   }
@@ -27,7 +31,36 @@ function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole 
   return "member";
 }
 
-function emptyWorkspaceAccess(error: string | null, currentUserEmail: string | null = null) {
+function getUserProfile(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const metadata = user.user_metadata ?? {};
+  const name = [metadata.display_name, metadata.full_name, metadata.name].find(
+    (value): value is string =>
+      typeof value === "string" && Boolean(value.trim()),
+  );
+  const avatarUrl = [metadata.avatar_url, metadata.picture].find(
+    (value): value is string =>
+      typeof value === "string" && /^https?:\/\//i.test(value.trim()),
+  );
+
+  return {
+    currentUserEmail: user.email ?? null,
+    currentUserName: name?.trim() ?? null,
+    currentUserAvatarUrl: avatarUrl?.trim() ?? null,
+  };
+}
+
+function emptyWorkspaceAccess(
+  error: string | null,
+  profile: ReturnType<typeof getUserProfile> & { isGlobalAdmin: boolean } = {
+    currentUserEmail: null,
+    currentUserName: null,
+    currentUserAvatarUrl: null,
+    isGlobalAdmin: false,
+  },
+) {
   return {
     currentWorkspace: null,
     modules: [],
@@ -36,7 +69,7 @@ function emptyWorkspaceAccess(error: string | null, currentUserEmail: string | n
     isLoading: false,
     error,
     userWorkspaces: [],
-    currentUserEmail,
+    ...profile,
   };
 }
 
@@ -59,6 +92,12 @@ export async function GET() {
         data: emptyWorkspaceAccess(null),
       });
     }
+
+    const userProfile = getUserProfile(user);
+    const isGlobalAdmin =
+      user.id === ACCESS_ADMIN_USER_ID ||
+      user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+    const accessProfile = { ...userProfile, isGlobalAdmin };
 
     const { data: accessRows, error: accessError } = await dataClient
       .from("workspace_users")
@@ -87,10 +126,12 @@ export async function GET() {
         throw membershipError;
       }
 
-      workspaceAccessRows = ((membershipRows ?? []) as Array<{
-        workspace_id: string;
-        role: string | null;
-      }>).map((row) => ({
+      workspaceAccessRows = (
+        (membershipRows ?? []) as Array<{
+          workspace_id: string;
+          role: string | null;
+        }>
+      ).map((row) => ({
         workspace_id: row.workspace_id,
         role: normalizeWorkspaceRole(row.role),
       }));
@@ -99,7 +140,7 @@ export async function GET() {
     if (workspaceAccessRows.length === 0) {
       return NextResponse.json({
         success: true,
-        data: emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, user.email ?? null),
+        data: emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, accessProfile),
       });
     }
 
@@ -117,13 +158,15 @@ export async function GET() {
 
     const workspaces = workspaceAccessRows
       .map((accessRow) => {
-        const workspace = ((workspaceRows ?? []) as Array<{
-          id: string;
-          name: string;
-          slug: string;
-          type: string | null;
-          status: string | null;
-        }>).find((row) => row.id === accessRow.workspace_id);
+        const workspace = (
+          (workspaceRows ?? []) as Array<{
+            id: string;
+            name: string;
+            slug: string;
+            type: string | null;
+            status: string | null;
+          }>
+        ).find((row) => row.id === accessRow.workspace_id);
 
         if (!workspace) {
           return null;
@@ -152,7 +195,7 @@ export async function GET() {
       return NextResponse.json({
         success: true,
         data: {
-          ...emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, user.email ?? null),
+          ...emptyWorkspaceAccess(NO_WORKSPACE_MESSAGE, accessProfile),
           userWorkspaces: workspaces,
         },
       });
@@ -181,10 +224,12 @@ export async function GET() {
       throw rolesError;
     }
 
-    const modules = ((moduleRows ?? []) as Array<{
-      module_key: string;
-      is_enabled: boolean | null;
-    }>)
+    const modules = (
+      (moduleRows ?? []) as Array<{
+        module_key: string;
+        is_enabled: boolean | null;
+      }>
+    )
       .map((row): WorkspaceModuleAccess | null => {
         const moduleKey = normalizeModuleKey(row.module_key);
         return moduleKey
@@ -196,10 +241,12 @@ export async function GET() {
       })
       .filter(Boolean) as WorkspaceModuleAccess[];
 
-    const moduleRoles = ((roleRows ?? []) as Array<{
-      module_key: string;
-      role: string;
-    }>)
+    const moduleRoles = (
+      (roleRows ?? []) as Array<{
+        module_key: string;
+        role: string;
+      }>
+    )
       .map((row): WorkspaceModuleRole | null => {
         const moduleKey = normalizeModuleKey(row.module_key);
         return moduleKey
@@ -221,12 +268,14 @@ export async function GET() {
         isLoading: false,
         error: null,
         userWorkspaces: workspaces,
-        currentUserEmail: user.email ?? null,
+        ...accessProfile,
       },
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Permissões indisponíveis no momento.";
+      error instanceof Error
+        ? error.message
+        : "Permissões indisponíveis no momento.";
 
     return NextResponse.json(
       {

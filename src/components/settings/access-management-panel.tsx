@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness,
   CheckCircle2,
@@ -13,20 +11,22 @@ import {
   Trash2,
   UsersRound,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/workspace/status-badge";
+import { cn } from "@/lib/utils";
 import {
   MODULE_KEYS,
   MODULE_LABELS,
   MODULE_ROLE_OPTIONS,
+  type ModuleKey,
   WORKSPACE_ROLE_OPTIONS,
   WORKSPACE_STATUS_OPTIONS,
   WORKSPACE_TYPE_OPTIONS,
-  type ModuleKey,
 } from "@/lib/workspace-access";
-import { cn } from "@/lib/utils";
 
 type AccessWorkspace = {
   id: string;
@@ -88,16 +88,30 @@ type AccessApiResponse = {
   } | null;
 };
 
-type AccessTab = "overview" | "workspaces" | "users" | "modules" | "permissions";
+type AccessTab =
+  "overview" | "workspaces" | "users" | "modules" | "permissions";
 
 const tabs: Array<{ key: AccessTab; label: string; href: string }> = [
   { key: "overview", label: "Resumo", href: "/settings/access" },
-  { key: "workspaces", label: "Workspaces", href: "/settings/access/workspaces" },
+  {
+    key: "workspaces",
+    label: "Workspaces",
+    href: "/settings/access/workspaces",
+  },
   { key: "users", label: "Usuários", href: "/settings/access/users" },
   { key: "modules", label: "Módulos", href: "/settings/access/modules" },
-  { key: "permissions", label: "Permissões", href: "/settings/access/permissions" },
+  {
+    key: "permissions",
+    label: "Permissões",
+    href: "/settings/access/permissions",
+  },
 ];
-const WORKSPACE_USER_STATUS_OPTIONS = ["active", "pending", "inactive", "removed"] as const;
+const WORKSPACE_USER_STATUS_OPTIONS = [
+  "active",
+  "pending",
+  "inactive",
+  "removed",
+] as const;
 const EMPTY_USER_FORM = {
   workspaceId: "",
   userId: "",
@@ -164,14 +178,14 @@ function StatCard({
       <div className="mt-5 text-3xl font-semibold tracking-[-0.04em]">
         {value}
       </div>
-      <p className="mt-1 text-sm text-white/52">{label}</p>
+      <p className="text-white/52 mt-1 text-sm">{label}</p>
     </article>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-white/12 bg-white/[0.025] p-6 text-center text-sm text-white/52">
+    <div className="border-white/12 text-white/52 rounded-[22px] border border-dashed bg-white/[0.025] p-6 text-center text-sm">
       {text}
     </div>
   );
@@ -202,9 +216,9 @@ export default function AccessManagementPanel({
   const [userForm, setUserForm] = useState({
     ...EMPTY_USER_FORM,
   });
-  const [editingWorkspaceUserId, setEditingWorkspaceUserId] = useState<string | null>(
-    null,
-  );
+  const [editingWorkspaceUserId, setEditingWorkspaceUserId] = useState<
+    string | null
+  >(null);
   const [moduleWorkspaceId, setModuleWorkspaceId] = useState("");
   const [moduleDraft, setModuleDraft] = useState<Record<ModuleKey, boolean>>({
     playlist_os: true,
@@ -213,7 +227,9 @@ export default function AccessManagementPanel({
   });
   const [permissionWorkspaceId, setPermissionWorkspaceId] = useState("");
   const [permissionUserId, setPermissionUserId] = useState("");
-  const [permissionDraft, setPermissionDraft] = useState<Record<ModuleKey, string>>({
+  const [permissionDraft, setPermissionDraft] = useState<
+    Record<ModuleKey, string>
+  >({
     playlist_os: "viewer",
     label_os: "viewer",
     artist_os: "viewer",
@@ -424,19 +440,57 @@ export default function AccessManagementPanel({
     return (
       <Container className="py-6">
         <section className="rounded-[34px] border border-amber-400/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(15,23,42,0.94))] p-8 text-white">
-          <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300/12 text-amber-100 ring-1 ring-inset ring-amber-200/15">
+          <div className="bg-amber-300/12 mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-amber-100 ring-1 ring-inset ring-amber-200/15">
             <LockKeyhole className="h-5 w-5" />
           </div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">
             Acesso negado
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-white/64">
-            {error || "Você não tem permissão para gerenciar acessos deste workspace."}
+          <p className="text-white/64 mt-3 max-w-xl text-sm leading-6">
+            {error ||
+              "Você não tem permissão para gerenciar acessos deste workspace."}
           </p>
         </section>
       </Container>
     );
   }
+
+  if (
+    !isLoading &&
+    data &&
+    !data.isGlobalAdmin &&
+    initialTab === "workspaces"
+  ) {
+    return (
+      <Container className="py-6">
+        <section className="rounded-[28px] border border-white/10 bg-slate-950 p-8 text-white">
+          <LockKeyhole className="h-5 w-5 text-white/50" />
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight">
+            Administração global restrita
+          </h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/60">
+            Criação e edição de workspaces está disponível somente para o
+            administrador global. Você continua podendo gerenciar a equipe do
+            seu workspace.
+          </p>
+          <Link
+            href="/settings/access/users"
+            className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950"
+          >
+            Gerenciar equipe
+          </Link>
+        </section>
+      </Container>
+    );
+  }
+
+  const visibleTabs = data?.isGlobalAdmin
+    ? tabs
+    : tabs
+        .filter((tab) => tab.key !== "workspaces")
+        .map((tab) =>
+          tab.key === "users" ? { ...tab, label: "Equipe" } : tab,
+        );
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_26%),radial-gradient(circle_at_90%_0%,rgba(16,185,129,0.10),transparent_26%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
@@ -445,26 +499,30 @@ export default function AccessManagementPanel({
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="blue">Configurações</StatusBadge>
             <StatusBadge tone={data?.isGlobalAdmin ? "green" : "yellow"}>
-              {data?.isGlobalAdmin ? "Admin global" : "Owner/Admin"}
+              {data?.isGlobalAdmin ? "Admin global" : "Equipe do workspace"}
             </StatusBadge>
           </div>
           <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
             <div>
               <h1 className="text-3xl font-semibold tracking-[-0.04em] tablet:text-5xl">
-                Gestão de Acessos
+                {data?.isGlobalAdmin
+                  ? "Administração global"
+                  : "Equipe do workspace"}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/58">
-                Controle workspaces, usuários, módulos e roles por OS de forma manual.
+              <p className="text-white/58 mt-3 max-w-2xl text-sm leading-6">
+                {data?.isGlobalAdmin
+                  ? "Crie workspaces e controle usuários, módulos e permissões."
+                  : "Gerencie usuários, módulos e permissões apenas do workspace atual."}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/62">
+            <div className="text-white/62 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
               Admin: {data?.currentUserEmail ?? "sessão atual"}
             </div>
           </div>
         </section>
 
         <nav className="mt-4 flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <Link
               key={tab.key}
               href={tab.href}
@@ -472,7 +530,7 @@ export default function AccessManagementPanel({
                 "rounded-full border px-4 py-2 text-sm font-semibold transition",
                 tab.key === initialTab
                   ? "border-white/80 bg-white text-slate-950"
-                  : "border-white/10 bg-white/[0.04] text-white/62 hover:border-white/20 hover:text-white",
+                  : "text-white/62 border-white/10 bg-white/[0.04] hover:border-white/20 hover:text-white",
               )}
             >
               {tab.label}
@@ -488,7 +546,7 @@ export default function AccessManagementPanel({
         {createdCredential ? (
           <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-50">
             <div className="font-semibold">Conta criada no Auth</div>
-            <div className="mt-2 grid gap-1 text-white/72">
+            <div className="text-white/72 mt-2 grid gap-1">
               <span>E-mail: {createdCredential.email}</span>
               <span>User ID: {createdCredential.userId}</span>
               <span>
@@ -546,7 +604,9 @@ export default function AccessManagementPanel({
                     action: "upsert_workspace",
                     workspace: workspaceForm,
                   },
-                  workspaceForm.id ? "Workspace atualizado." : "Workspace criado.",
+                  workspaceForm.id
+                    ? "Workspace atualizado."
+                    : "Workspace criado.",
                 );
               }}
             >
@@ -588,7 +648,10 @@ export default function AccessManagementPanel({
                     <SelectField
                       value={workspaceForm.type}
                       onChange={(value) =>
-                        setWorkspaceForm((current) => ({ ...current, type: value }))
+                        setWorkspaceForm((current) => ({
+                          ...current,
+                          type: value,
+                        }))
                       }
                     >
                       {WORKSPACE_TYPE_OPTIONS.map((type) => (
@@ -603,7 +666,10 @@ export default function AccessManagementPanel({
                     <SelectField
                       value={workspaceForm.status}
                       onChange={(value) =>
-                        setWorkspaceForm((current) => ({ ...current, status: value }))
+                        setWorkspaceForm((current) => ({
+                          ...current,
+                          status: value,
+                        }))
                       }
                     >
                       {WORKSPACE_STATUS_OPTIONS.map((status) => (
@@ -616,7 +682,10 @@ export default function AccessManagementPanel({
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
-                <Button disabled={isSaving} className="rounded-full bg-white text-slate-950 hover:bg-white/90">
+                <Button
+                  disabled={isSaving}
+                  className="rounded-full bg-white text-slate-950 hover:bg-white/90"
+                >
                   <Save className="h-4 w-4" />
                   Salvar
                 </Button>
@@ -662,13 +731,21 @@ export default function AccessManagementPanel({
                     >
                       <div>
                         <div className="font-semibold">{workspace.name}</div>
-                        <div className="mt-1 text-xs text-white/45">{workspace.slug}</div>
+                        <div className="mt-1 text-xs text-white/45">
+                          {workspace.slug}
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <StatusBadge tone={workspace.status === "active" ? "green" : "yellow"}>
+                        <StatusBadge
+                          tone={
+                            workspace.status === "active" ? "green" : "yellow"
+                          }
+                        >
                           {workspace.status}
                         </StatusBadge>
-                        <StatusBadge tone="blue">{workspace.type ?? "sem tipo"}</StatusBadge>
+                        <StatusBadge tone="blue">
+                          {workspace.type ?? "sem tipo"}
+                        </StatusBadge>
                       </div>
                     </button>
                   ))}
@@ -702,7 +779,9 @@ export default function AccessManagementPanel({
               }}
             >
               <div className="text-lg font-semibold">
-                {editingWorkspaceUserId ? "Editar usuário" : "Adicionar usuário"}
+                {editingWorkspaceUserId
+                  ? "Editar usuário"
+                  : "Adicionar usuário"}
               </div>
               <p className="mt-1 text-sm text-white/50">
                 {editingWorkspaceUserId
@@ -715,7 +794,10 @@ export default function AccessManagementPanel({
                   <SelectField
                     value={userForm.workspaceId}
                     onChange={(value) =>
-                      setUserForm((current) => ({ ...current, workspaceId: value }))
+                      setUserForm((current) => ({
+                        ...current,
+                        workspaceId: value,
+                      }))
                     }
                   >
                     {data?.workspaces.map((workspace) => (
@@ -730,7 +812,10 @@ export default function AccessManagementPanel({
                   <Input
                     value={userForm.email}
                     onChange={(event) =>
-                      setUserForm((current) => ({ ...current, email: event.target.value }))
+                      setUserForm((current) => ({
+                        ...current,
+                        email: event.target.value,
+                      }))
                     }
                     className="mt-1 rounded-2xl border-white/10 bg-slate-950/70 text-white"
                     placeholder="usuario@email.com"
@@ -741,7 +826,10 @@ export default function AccessManagementPanel({
                   <Input
                     value={userForm.userId}
                     onChange={(event) =>
-                      setUserForm((current) => ({ ...current, userId: event.target.value }))
+                      setUserForm((current) => ({
+                        ...current,
+                        userId: event.target.value,
+                      }))
                     }
                     className="mt-1 rounded-2xl border-white/10 bg-slate-950/70 text-white"
                     placeholder="uuid do auth.users"
@@ -760,7 +848,7 @@ export default function AccessManagementPanel({
                     className="mt-1 rounded-2xl border-white/10 bg-slate-950/70 text-white"
                     placeholder="opcional, geramos se ficar vazio"
                   />
-                  <p className="mt-1 text-xs text-white/38">
+                  <p className="text-white/38 mt-1 text-xs">
                     {editingWorkspaceUserId
                       ? "Ignorada no modo edição."
                       : "Usada somente quando o e-mail ainda não existe no Auth."}
@@ -787,7 +875,10 @@ export default function AccessManagementPanel({
                     <SelectField
                       value={userForm.status}
                       onChange={(value) =>
-                        setUserForm((current) => ({ ...current, status: value }))
+                        setUserForm((current) => ({
+                          ...current,
+                          status: value,
+                        }))
                       }
                     >
                       {WORKSPACE_USER_STATUS_OPTIONS.map((status) => (
@@ -800,8 +891,13 @@ export default function AccessManagementPanel({
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button disabled={isSaving} className="rounded-full bg-white text-slate-950 hover:bg-white/90">
-                  {editingWorkspaceUserId ? "Atualizar usuário" : "Salvar usuário"}
+                <Button
+                  disabled={isSaving}
+                  className="rounded-full bg-white text-slate-950 hover:bg-white/90"
+                >
+                  {editingWorkspaceUserId
+                    ? "Atualizar usuário"
+                    : "Salvar usuário"}
                 </Button>
                 {editingWorkspaceUserId ? (
                   <Button
@@ -831,15 +927,19 @@ export default function AccessManagementPanel({
                         <div className="truncate font-semibold">
                           {user.email ?? user.userId}
                         </div>
-                        <div className="mt-1 truncate text-xs text-white/42">
+                        <div className="text-white/42 mt-1 truncate text-xs">
                           {user.userId}
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge tone={user.role === "owner" ? "green" : "blue"}>
+                        <StatusBadge
+                          tone={user.role === "owner" ? "green" : "blue"}
+                        >
                           {user.role}
                         </StatusBadge>
-                        <StatusBadge tone={user.status === "active" ? "green" : "yellow"}>
+                        <StatusBadge
+                          tone={user.status === "active" ? "green" : "yellow"}
+                        >
                           {user.status}
                         </StatusBadge>
                         <Button
@@ -886,13 +986,18 @@ export default function AccessManagementPanel({
           <section className="mt-5 rounded-[28px] border border-white/10 bg-white/[0.04] p-5 text-white">
             <div className="grid gap-4 laptop:grid-cols-[320px_minmax(0,1fr)]">
               <div>
-                <div className="text-lg font-semibold">Módulos por workspace</div>
+                <div className="text-lg font-semibold">
+                  Módulos por workspace
+                </div>
                 <p className="mt-1 text-sm text-white/50">
                   Ative somente os OS disponíveis para o workspace selecionado.
                 </p>
                 <div className="mt-4">
                   <FieldLabel>Workspace</FieldLabel>
-                  <SelectField value={moduleWorkspaceId} onChange={setModuleWorkspaceId}>
+                  <SelectField
+                    value={moduleWorkspaceId}
+                    onChange={setModuleWorkspaceId}
+                  >
                     {data?.workspaces.map((workspace) => (
                       <option key={workspace.id} value={workspace.id}>
                         {workspace.name}
@@ -915,8 +1020,12 @@ export default function AccessManagementPanel({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold">{MODULE_LABELS[moduleKey]}</div>
-                        <div className="mt-1 text-xs text-white/45">{moduleKey}</div>
+                        <div className="font-semibold">
+                          {MODULE_LABELS[moduleKey]}
+                        </div>
+                        <div className="mt-1 text-xs text-white/45">
+                          {moduleKey}
+                        </div>
                       </div>
                       <input
                         type="checkbox"
@@ -984,7 +1093,10 @@ export default function AccessManagementPanel({
               </div>
               <div>
                 <FieldLabel>Usuário</FieldLabel>
-                <SelectField value={permissionUserId} onChange={setPermissionUserId}>
+                <SelectField
+                  value={permissionUserId}
+                  onChange={setPermissionUserId}
+                >
                   {permissionWorkspaceUsers.map((user) => (
                     <option key={user.id} value={user.userId}>
                       {user.email ?? user.userId}
@@ -1001,7 +1113,9 @@ export default function AccessManagementPanel({
                     key={moduleKey}
                     className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4"
                   >
-                    <div className="font-semibold">{MODULE_LABELS[moduleKey]}</div>
+                    <div className="font-semibold">
+                      {MODULE_LABELS[moduleKey]}
+                    </div>
                     <div className="mt-3">
                       <FieldLabel>Role no módulo</FieldLabel>
                       <SelectField

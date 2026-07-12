@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
-import { navigations, type Navigation as NavigationItem } from "@/config/site";
+import { useState } from "react";
+import { type Navigation as NavigationItem, navigations } from "@/config/site";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { cn } from "@/lib/utils";
 import User from "./user";
@@ -20,7 +20,9 @@ export default function Navigation() {
     }
 
     if (href === "/playlist-os") {
-      return pathname === "/playlist-os" || pathname.startsWith("/playlist-os/");
+      return (
+        pathname === "/playlist-os" || pathname.startsWith("/playlist-os/")
+      );
     }
 
     if (href === "/radar-music") {
@@ -43,7 +45,9 @@ export default function Navigation() {
     }
 
     if (href === "/playlists-ia") {
-      return pathname === "/playlists-ia" || pathname.startsWith("/playlists-ia/");
+      return (
+        pathname === "/playlists-ia" || pathname.startsWith("/playlists-ia/")
+      );
     }
 
     if (href === "/novidades") {
@@ -59,29 +63,42 @@ export default function Navigation() {
     }
 
     if (href === "/spotify-charts") {
-      return pathname === "/spotify-charts" || pathname.startsWith("/spotify-charts/");
+      return (
+        pathname === "/spotify-charts" ||
+        pathname.startsWith("/spotify-charts/")
+      );
     }
 
     if (href === "/tiktok-charts") {
-      return pathname === "/tiktok-charts" || pathname.startsWith("/tiktok-charts/");
+      return (
+        pathname === "/tiktok-charts" || pathname.startsWith("/tiktok-charts/")
+      );
     }
 
     if (href === "/configuracoes") {
-      return pathname === "/configuracoes" || pathname.startsWith("/configuracoes/");
+      return (
+        pathname === "/configuracoes" || pathname.startsWith("/configuracoes/")
+      );
     }
 
     return pathname === href;
   }
 
   function isNavigationActive(navigation: NavigationItem) {
-    return isActive(navigation.href) || Boolean(navigation.children?.some((child) => isActive(child.href)));
+    return (
+      isActive(navigation.href) ||
+      Boolean(navigation.children?.some((child) => isActive(child.href)))
+    );
   }
 
   function isGroupOpen(navigation: NavigationItem) {
     return openGroups[navigation.name] ?? isNavigationActive(navigation);
   }
 
-  function renderLinkItem(navigation: NavigationItem, variant: "root" | "child" = "root") {
+  function renderLinkItem(
+    navigation: NavigationItem,
+    variant: "root" | "child" = "root",
+  ) {
     const Icon = navigation.icon;
     const active = isActive(navigation.href);
 
@@ -90,13 +107,11 @@ export default function Navigation() {
         key={navigation.name}
         href={navigation.href}
         className={cn(
-          "group relative flex items-center overflow-hidden rounded-2xl border transition-all duration-300 ease-out",
-          "before:absolute before:inset-0 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.92),rgba(255,255,255,0.42)_36%,rgba(255,255,255,0.12)_72%)] before:opacity-0 before:transition-opacity before:duration-300 dark:before:bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),rgba(255,255,255,0.08)_38%,rgba(255,255,255,0.02)_74%)]",
-          "after:absolute after:inset-x-4 after:top-0 after:h-px after:bg-white/75 after:opacity-0 after:transition-opacity after:duration-300 dark:after:bg-white/35",
-          "hover:-translate-y-0.5 hover:border-white/70 hover:bg-white/55 hover:shadow-[0_12px_30px_rgba(15,23,42,0.10)] hover:backdrop-blur-xl hover:before:opacity-100 hover:after:opacity-100 dark:hover:border-white/12 dark:hover:bg-white/[0.075] dark:hover:shadow-[0_14px_34px_rgba(0,0,0,0.28)]",
+          "group relative flex items-center overflow-hidden rounded-xl border transition-colors duration-200",
+          "hover:border-border hover:bg-accent/65",
           variant === "root" ? "px-3 py-2.5" : "px-3 py-2",
           active
-            ? "border-white/80 bg-white/70 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/12 dark:bg-white/[0.09] dark:shadow-[0_16px_38px_rgba(0,0,0,0.32)]"
+            ? "border-border bg-accent text-accent-foreground"
             : "border-transparent bg-transparent",
         )}
       >
@@ -148,11 +163,10 @@ export default function Navigation() {
             }))
           }
           className={cn(
-            "group relative flex w-full items-center overflow-hidden rounded-2xl border px-3 py-2.5 text-left transition-all duration-300 ease-out",
-            "before:absolute before:inset-0 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.92),rgba(255,255,255,0.42)_36%,rgba(255,255,255,0.12)_72%)] before:opacity-0 before:transition-opacity before:duration-300 dark:before:bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.18),rgba(255,255,255,0.08)_38%,rgba(255,255,255,0.02)_74%)]",
-            "hover:-translate-y-0.5 hover:border-white/70 hover:bg-white/55 hover:shadow-[0_12px_30px_rgba(15,23,42,0.10)] hover:backdrop-blur-xl hover:before:opacity-100 dark:hover:border-white/12 dark:hover:bg-white/[0.075] dark:hover:shadow-[0_14px_34px_rgba(0,0,0,0.28)]",
+            "group relative flex w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors duration-200",
+            "hover:border-border hover:bg-accent/65",
             active
-              ? "border-white/80 bg-white/70 shadow-[0_14px_34px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/12 dark:bg-white/[0.09] dark:shadow-[0_16px_38px_rgba(0,0,0,0.32)]"
+              ? "border-border bg-accent text-accent-foreground"
               : "border-transparent bg-transparent",
           )}
         >
@@ -188,8 +202,13 @@ export default function Navigation() {
         </button>
 
         {open ? (
-          <div id={groupId} className="ml-4 grid gap-1 border-l border-border/70 pl-2.5">
-            {navigation.children?.map((child) => renderLinkItem(child, "child"))}
+          <div
+            id={groupId}
+            className="ml-4 grid gap-1 border-l border-border/70 pl-2.5"
+          >
+            {navigation.children?.map((child) =>
+              renderLinkItem(child, "child"),
+            )}
           </div>
         ) : null}
       </div>
@@ -206,11 +225,11 @@ export default function Navigation() {
 
   return (
     <div className="flex flex-grow flex-col">
-      <nav className="flex flex-grow flex-col gap-y-1.5 p-3">
+      <nav className="flex flex-grow flex-col gap-y-1 overflow-y-auto px-3 py-2">
         {navigations.filter(isNavigationVisible).map(renderNavigationItem)}
       </nav>
 
-      <div className="border-t border-border px-3 py-3">
+      <div className="border-t border-border/70 px-3 py-3">
         <User />
       </div>
     </div>

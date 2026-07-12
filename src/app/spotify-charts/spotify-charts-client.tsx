@@ -639,7 +639,7 @@ export default function SpotifyChartsClient({
       )}
 
       {canBackfill ? (
-        <section className="shrink-0 rounded-[20px] border border-border bg-card/80 p-4">
+        <section className="hidden">
           <div className="flex items-start gap-3">
             <div className="rounded-2xl bg-emerald-400/10 p-2.5 text-emerald-300">
               <Database size={18} />

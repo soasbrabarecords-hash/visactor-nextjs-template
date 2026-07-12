@@ -1,37 +1,41 @@
 "use client";
 
 import {
+  type ReactNode,
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from "react";
 import {
-  canAccessModule as canAccessModuleFromSnapshot,
-  canManageModule as canManageModuleFromSnapshot,
   type ModuleKey,
   type WorkspaceAccessSnapshot,
   type WorkspaceSummary,
+  canAccessModule as canAccessModuleFromSnapshot,
+  canManageModule as canManageModuleFromSnapshot,
 } from "@/lib/workspace-access";
 
 type WorkspaceAccessContextValue = WorkspaceAccessSnapshot & {
   isLoading: boolean;
   error: string | null;
   currentUserEmail: string | null;
+  currentUserName: string | null;
+  currentUserAvatarUrl: string | null;
+  isGlobalAdmin: boolean;
   userWorkspaces: WorkspaceSummary[];
   canAccessModule: (moduleKey: ModuleKey) => boolean;
   canManageModule: (moduleKey: ModuleKey) => boolean;
   refreshWorkspaceAccess: () => Promise<void>;
 };
 
-const WorkspaceAccessContext = createContext<WorkspaceAccessContextValue | null>(
-  null,
-);
+const WorkspaceAccessContext =
+  createContext<WorkspaceAccessContextValue | null>(null);
 
-function buildBlockedState(error: string | null = null): WorkspaceAccessContextValue {
+function buildBlockedState(
+  error: string | null = null,
+): WorkspaceAccessContextValue {
   const snapshot: WorkspaceAccessSnapshot = {
     currentWorkspace: null,
     modules: [],
@@ -44,9 +48,14 @@ function buildBlockedState(error: string | null = null): WorkspaceAccessContextV
     isLoading: false,
     error,
     currentUserEmail: null,
+    currentUserName: null,
+    currentUserAvatarUrl: null,
+    isGlobalAdmin: false,
     userWorkspaces: [],
-    canAccessModule: (moduleKey) => canAccessModuleFromSnapshot(moduleKey, snapshot),
-    canManageModule: (moduleKey) => canManageModuleFromSnapshot(moduleKey, snapshot),
+    canAccessModule: (moduleKey) =>
+      canAccessModuleFromSnapshot(moduleKey, snapshot),
+    canManageModule: (moduleKey) =>
+      canManageModuleFromSnapshot(moduleKey, snapshot),
     refreshWorkspaceAccess: async () => {},
   };
 }
@@ -90,6 +99,9 @@ export function WorkspaceAccessProvider({ children }: { children: ReactNode }) {
     isLoading: true,
     error: null,
     currentUserEmail: null,
+    currentUserName: null,
+    currentUserAvatarUrl: null,
+    isGlobalAdmin: false,
     userWorkspaces: [],
   });
 

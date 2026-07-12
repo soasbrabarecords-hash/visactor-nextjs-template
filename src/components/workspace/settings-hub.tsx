@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   ArrowUpRight,
   Bot,
@@ -8,14 +7,15 @@ import {
   Music2,
   SlidersHorizontal,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import Container from "@/components/container";
+import AccountProfileForm from "@/components/settings/account-profile-form";
 import StatusBadge from "@/components/workspace/status-badge";
 import WorkspaceOpenAIIntegrationForm from "@/components/workspace/workspace-openai-integration-form";
 import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-form";
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
 import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
 import type { WorkspaceContext } from "@/lib/workspaces";
-import { canUseGlobalSpotifyApp } from "@/lib/workspace-access";
 
 const REQUIRED_SPOTIFY_SCOPES = [
   "playlist-read-private",
@@ -32,6 +32,11 @@ type SettingsHubProps = {
   openaiReady: boolean;
   workspace: WorkspaceContext | null;
   spotifyRedirectUri: string;
+  account: {
+    displayName: string;
+    avatarUrl: string;
+    email: string | null;
+  };
 };
 
 function getInitials(name: string) {
@@ -164,7 +169,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-white shadow-[0_18px_56px_-42px_rgba(15,23,42,0.95)]">
+    <section className="mt-5 rounded-[22px] border border-white/10 bg-[#0f1115] p-4 text-white">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
@@ -185,19 +190,17 @@ export default function SettingsHub({
   openaiReady,
   workspace,
   spotifyRedirectUri,
+  account,
 }: SettingsHubProps) {
   const connectHref = "/api/spotify/auth/login?next=/configuracoes";
   const disconnectHref = "/api/spotify/auth/logout?next=/configuracoes";
-  const allowGlobalSpotifyApp = canUseGlobalSpotifyApp(workspace?.workspace);
   const storedIntegrationMode =
     workspace?.spotifyIntegration.appMode ?? "global_app";
-  const integrationMode = allowGlobalSpotifyApp
-    ? storedIntegrationMode
-    : "workspace_app";
+  const integrationMode = storedIntegrationMode;
   const spotifyModeLabel =
     integrationMode === "workspace_app"
       ? "App do workspace"
-      : "App global";
+      : "Migração pendente";
   const workspaceName = workspace?.workspace.name ?? "Acesso pendente";
   const defaultMarket = workspace?.settings.defaultMarket ?? "BR";
   const releaseWindowDays = workspace?.settings.releaseWindowDays ?? 21;
@@ -220,7 +223,8 @@ export default function SettingsHub({
   const missingSpotifyScopes = REQUIRED_SPOTIFY_SCOPES.filter(
     (scope) => !grantedSpotifyScopes.has(scope),
   );
-  const spotifyTokenExpiresAt = workspace?.spotifyIntegration.tokenExpiresAt ?? null;
+  const spotifyTokenExpiresAt =
+    workspace?.spotifyIntegration.tokenExpiresAt ?? null;
   const openaiMode = workspace?.openaiIntegration.appMode ?? "global_app";
   const openaiModeLabel =
     openaiMode === "workspace_app" ? "Chave do workspace" : "Chave global";
@@ -234,9 +238,9 @@ export default function SettingsHub({
     openaiMode === "workspace_app" ? hasOpenAIWorkspaceKey : openaiReady;
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_22%),radial-gradient(circle_at_right,rgba(16,185,129,0.08),transparent_24%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#080a0e]">
       <Container className="py-5">
-        <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(3,7,18,0.96))] p-5 text-white shadow-[0_24px_80px_-42px_rgba(15,23,42,0.95)] laptop:p-6">
+        <section className="rounded-[24px] border border-white/10 bg-[#0f1115] p-5 text-white laptop:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="blue">Settings</StatusBadge>
             <StatusBadge tone={spotify.connected ? "green" : "yellow"}>
@@ -255,9 +259,7 @@ export default function SettingsHub({
               <h2 className="text-2xl font-semibold tracking-tight text-white">
                 Configuracoes do workspace
               </h2>
-              <p className="mt-1.5 text-sm text-white/60">
-                {workspaceName}
-              </p>
+              <p className="mt-1.5 text-sm text-white/60">{workspaceName}</p>
               <p className="mt-2 text-sm text-white/45">
                 Ajuste regras da curadoria e a integracao logo abaixo.
               </p>
@@ -278,7 +280,9 @@ export default function SettingsHub({
                   aria-disabled={!workspace}
                 >
                   <Music2 className="h-4 w-4" />
-                  {spotify.connected ? "Reconectar Spotify" : "Conectar Spotify"}
+                  {spotify.connected
+                    ? "Reconectar Spotify"
+                    : "Conectar Spotify"}
                 </a>
 
                 {spotify.connected ? (
@@ -307,7 +311,9 @@ export default function SettingsHub({
                   spotify.account.imageUrl ? (
                     <div
                       className="h-14 w-14 rounded-2xl bg-cover bg-center"
-                      style={{ backgroundImage: `url(${spotify.account.imageUrl})` }}
+                      style={{
+                        backgroundImage: `url(${spotify.account.imageUrl})`,
+                      }}
                       aria-label={spotify.account.displayName}
                       role="img"
                     />
@@ -327,11 +333,13 @@ export default function SettingsHub({
                     Spotify
                   </div>
                   <div className="truncate text-base font-semibold text-white">
-                    {spotify.connected ? spotify.account.displayName : "Nao conectado"}
+                    {spotify.connected
+                      ? spotify.account.displayName
+                      : "Nao conectado"}
                   </div>
                   <div className="truncate text-xs text-white/50">
                     {spotify.connected
-                      ? spotify.account.email ?? spotify.account.id
+                      ? (spotify.account.email ?? spotify.account.id)
                       : "Conecte para liberar curadoria"}
                   </div>
                 </div>
@@ -350,6 +358,18 @@ export default function SettingsHub({
             </aside>
           </div>
         </section>
+
+        <SectionCard
+          eyebrow="Conta"
+          title="Perfil e avatar"
+          badge={<StatusBadge tone="slate">Pessoal</StatusBadge>}
+        >
+          <AccountProfileForm
+            initialDisplayName={account.displayName}
+            initialAvatarUrl={account.avatarUrl}
+            email={account.email}
+          />
+        </SectionCard>
 
         <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MiniCard
@@ -375,7 +395,7 @@ export default function SettingsHub({
                 ? spotifySessionSaved
                   ? "Sessao salva no workspace."
                   : "Reconecte para salvar token."
-                : "Fallback seguro ativo."
+                : "Conexão legada preservada."
             }
             tone={
               integrationMode === "workspace_app" && spotifySessionSaved
@@ -437,11 +457,9 @@ export default function SettingsHub({
               }
             >
               <WorkspaceSpotifyIntegrationForm
-                initialAppMode={integrationMode}
                 initialAppClientId={integrationClientId}
                 hasAppClientSecret={hasIntegrationSecret}
                 spotifyRedirectUri={spotifyRedirectUri}
-                allowGlobalApp={allowGlobalSpotifyApp}
               />
               <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -450,7 +468,8 @@ export default function SettingsHub({
                       Diagnostico seguro
                     </div>
                     <p className="mt-1 text-sm text-white/55">
-                      Status salvo neste workspace. Segredos nunca aparecem aqui.
+                      Status salvo neste workspace. Segredos nunca aparecem
+                      aqui.
                     </p>
                   </div>
                   <StatusBadge
@@ -523,7 +542,9 @@ export default function SettingsHub({
                         ? "OK"
                         : `${missingSpotifyScopes.length} faltando`
                     }
-                    tone={missingSpotifyScopes.length === 0 ? "green" : "yellow"}
+                    tone={
+                      missingSpotifyScopes.length === 0 ? "green" : "yellow"
+                    }
                   />
                   <HealthItem
                     label="Workspace"
@@ -533,8 +554,8 @@ export default function SettingsHub({
                 </div>
                 {missingSpotifyScopes.length > 0 ? (
                   <p className="mt-3 text-xs leading-5 text-amber-100/80">
-                    Escopos faltando: {missingSpotifyScopes.join(", ")}. Clique em
-                    Reconectar Spotify para autorizar novamente.
+                    Escopos faltando: {missingSpotifyScopes.join(", ")}. Clique
+                    em Reconectar Spotify para autorizar novamente.
                   </p>
                 ) : null}
               </div>

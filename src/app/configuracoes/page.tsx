@@ -1,15 +1,35 @@
 import { TopNav } from "@/components/nav";
 import SettingsHub from "@/components/workspace/settings-hub";
-import { fetchSpotifyConnectionStatus, getSpotifyRedirectUri } from "@/lib/spotify-user";
+import {
+  fetchSpotifyConnectionStatus,
+  getSpotifyRedirectUri,
+} from "@/lib/spotify-user";
+import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
-  const [{ result: spotify }, workspace] = await Promise.all([
-    fetchSpotifyConnectionStatus(),
-    getCurrentWorkspaceContext().catch(() => null),
-  ]);
+  const supabase = await createClient();
+  const [{ result: spotify }, workspace, { data: userData }] =
+    await Promise.all([
+      fetchSpotifyConnectionStatus(),
+      getCurrentWorkspaceContext().catch(() => null),
+      supabase.auth.getUser(),
+    ]);
+  const metadata = userData.user?.user_metadata ?? {};
+  const displayName = [
+    metadata.display_name,
+    metadata.full_name,
+    metadata.name,
+  ].find(
+    (value): value is string =>
+      typeof value === "string" && Boolean(value.trim()),
+  );
+  const avatarUrl = [metadata.avatar_url, metadata.picture].find(
+    (value): value is string =>
+      typeof value === "string" && /^https?:\/\//i.test(value.trim()),
+  );
   const spotifyAppReady = Boolean(
     workspace?.spotifyIntegration.appMode === "workspace_app"
       ? workspace.spotifyIntegration.appClientId &&
@@ -31,6 +51,11 @@ export default async function ConfiguracoesPage() {
         openaiReady={openaiReady}
         workspace={workspace}
         spotifyRedirectUri={spotifyRedirectUri}
+        account={{
+          displayName: displayName?.trim() ?? "",
+          avatarUrl: avatarUrl?.trim() ?? "",
+          email: userData.user?.email ?? null,
+        }}
       />
     </>
   );
