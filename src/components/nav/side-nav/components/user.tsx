@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Settings2,
   ShieldCheck,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -268,7 +269,19 @@ export default function User() {
             >
               <Link href="/settings/access">
                 <ShieldCheck className="mr-2.5 h-4 w-4 text-muted-foreground" />
-                {isGlobalAdmin ? "Administração global" : "Equipe do workspace"}
+                Gestão de acessos
+              </Link>
+            </DropdownMenuItem>
+          ) : null}
+
+          {isGlobalAdmin ? (
+            <DropdownMenuItem
+              asChild
+              className="rounded-xl px-3 py-2.5 focus:bg-accent"
+            >
+              <Link href="/settings/admin">
+                <UserPlus className="mr-2.5 h-4 w-4 text-muted-foreground" />
+                Administração global
               </Link>
             </DropdownMenuItem>
           ) : null}

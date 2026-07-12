@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACCESS_ADMIN_EMAIL,
-  ACCESS_ADMIN_USER_ID,
   ACTIVE_WORKSPACE_COOKIE,
   type ModuleRole,
   type WorkspaceModuleAccess,
@@ -94,9 +93,7 @@ export async function GET() {
     }
 
     const userProfile = getUserProfile(user);
-    const isGlobalAdmin =
-      user.id === ACCESS_ADMIN_USER_ID ||
-      user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+    const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
     const accessProfile = { ...userProfile, isGlobalAdmin };
 
     const { data: accessRows, error: accessError } = await dataClient

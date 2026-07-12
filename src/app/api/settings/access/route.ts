@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   AccessAdminError,
-  createInternalAccount,
   getAccessAdminData,
   removeAccessWorkspaceUser,
   updateAccessModuleRoles,
@@ -39,15 +38,6 @@ type AccessActionBody = {
     userId?: string | null;
     roles?: Array<{ moduleKey?: string; role?: string }>;
   };
-  account?: {
-    displayName?: string | null;
-    email?: string | null;
-    temporaryPassword?: string | null;
-    workspaceName?: string | null;
-    workspaceSlug?: string | null;
-    workspaceType?: string | null;
-    enabledModules?: string[] | null;
-  };
 };
 
 function errorResponse(error: unknown) {
@@ -82,14 +72,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AccessActionBody;
-    let mutation:
-      | Awaited<ReturnType<typeof upsertAccessWorkspaceUser>>
-      | Awaited<ReturnType<typeof createInternalAccount>>
-      | null = null;
+    let mutation: Awaited<ReturnType<typeof upsertAccessWorkspaceUser>> | null =
+      null;
 
-    if (body.action === "create_account") {
-      mutation = await createInternalAccount(body.account ?? {});
-    } else if (body.action === "upsert_workspace") {
+    if (body.action === "upsert_workspace") {
       await upsertAccessWorkspace(body.workspace ?? {});
     } else if (body.action === "upsert_workspace_user") {
       mutation = await upsertAccessWorkspaceUser(body.workspaceUser ?? {});

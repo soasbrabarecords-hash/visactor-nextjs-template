@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACCESS_ADMIN_EMAIL,
-  ACCESS_ADMIN_USER_ID,
   MODULE_KEYS,
   MODULE_ROLE_OPTIONS,
   type ModuleKey,
@@ -168,9 +167,7 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
     throw new AccessAdminError("Sessão indisponível.", 401);
   }
 
-  const isGlobalAdmin =
-    user.id === ACCESS_ADMIN_USER_ID ||
-    user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+  const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
 
   const { data: workspaceUsers } = await dataClient
     .from("workspace_users")
@@ -593,53 +590,10 @@ export async function upsertAccessWorkspace(input: {
     return;
   }
 
-  if (!context.isGlobalAdmin) {
-    throw new AccessAdminError(
-      "Somente o administrador global pode criar workspaces.",
-      403,
-    );
-  }
-
-  const workspaceId = crypto.randomUUID();
-  const { error } = await context.dataClient.from("workspaces").insert({
-    id: workspaceId,
-    ...payload,
-    owner_user_id: context.user.id,
-  });
-
-  if (error) {
-    throw new AccessAdminError(error.message);
-  }
-
-  await context.dataClient.from("workspace_users").upsert(
-    {
-      workspace_id: workspaceId,
-      user_id: context.user.id,
-      role: "owner",
-      status: "active",
-    },
-    { onConflict: "workspace_id,user_id" },
+  throw new AccessAdminError(
+    "Novos workspaces são criados junto com a conta na Administração global.",
+    403,
   );
-
-  await context.dataClient.from("workspace_memberships").upsert(
-    {
-      workspace_id: workspaceId,
-      user_id: context.user.id,
-      role: "owner",
-    },
-    { onConflict: "workspace_id,user_id" },
-  );
-
-  await context.dataClient.from("workspace_modules").upsert(
-    MODULE_KEYS.map((moduleKey) => ({
-      workspace_id: workspaceId,
-      module_key: moduleKey,
-      is_enabled: false,
-    })),
-    { onConflict: "workspace_id,module_key" },
-  );
-
-  await ensureWorkspaceDefaults(context.dataClient, workspaceId);
 }
 
 export async function createInternalAccount(input: {
