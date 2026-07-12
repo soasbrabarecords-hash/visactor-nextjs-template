@@ -49,7 +49,7 @@ export async function ingestSpotifyChart(
       chartDate: downloaded.chartDate,
       sourceUrl: downloaded.sourceUrl,
       sourceType: downloaded.sourceType,
-      enrichSpotifyMetadata: false,
+      enrichSpotifyMetadata: true,
       persistStreamSnapshots: false,
     });
 

@@ -250,7 +250,14 @@ async function enrichRowsWithSpotifyMetadata(
   }
 
   try {
-    const spotifyTracks = await fetchSpotifyTracksByIds(trackIds, market);
+    const normalizedMarket = market.trim().toUpperCase();
+    const spotifyMarket = /^[A-Z]{2}$/.test(normalizedMarket)
+      ? normalizedMarket
+      : "US";
+    const spotifyTracks = await fetchSpotifyTracksByIds(
+      trackIds,
+      spotifyMarket,
+    );
     const tracksById = buildTrackRecordMap(spotifyTracks);
 
     return rows.map((row) => {

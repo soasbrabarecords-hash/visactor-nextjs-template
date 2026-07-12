@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fetchSpotifyTracksByIds } from "@/lib/spotify";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -473,6 +474,32 @@ export async function getSnapshotWithComparison(
           !imageUrlMap.has(row.spotify_track_id)
         ) {
           imageUrlMap.set(row.spotify_track_id, row.image_url);
+        }
+      }
+
+      const missingImageTrackIds = Array.from(
+        new Set(trackIds.filter((trackId) => !imageUrlMap.has(trackId))),
+      );
+
+      if (missingImageTrackIds.length > 0) {
+        const spotifyMarket =
+          country.trim().toUpperCase() === "GLOBAL"
+            ? "US"
+            : country.trim().toUpperCase();
+        const spotifyTracks = await fetchSpotifyTracksByIds(
+          missingImageTrackIds,
+          spotifyMarket,
+        ).catch((error) => {
+          process.stderr.write(
+            `Failed to recover chart cover images from Spotify: ${error instanceof Error ? error.message : "unknown error"}\n`,
+          );
+          return [];
+        });
+
+        for (const track of spotifyTracks) {
+          if (track.coverUrl) {
+            imageUrlMap.set(track.id, track.coverUrl);
+          }
         }
       }
     }
