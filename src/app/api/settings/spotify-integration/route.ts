@@ -5,7 +5,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Body = {
-  appMode?: unknown;
   appClientId?: unknown;
   appClientSecret?: unknown;
 };
@@ -13,15 +12,13 @@ type Body = {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Body;
-    const appMode =
-      body.appMode === "workspace_app" ? "workspace_app" : "global_app";
     const appClientId =
       typeof body.appClientId === "string" ? body.appClientId : null;
     const appClientSecret =
       typeof body.appClientSecret === "string" ? body.appClientSecret : null;
 
     const workspace = await updateCurrentWorkspaceSpotifyIntegration({
-      appMode,
+      appMode: "workspace_app",
       appClientId,
       appClientSecret,
     });

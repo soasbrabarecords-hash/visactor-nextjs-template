@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   Loader2,
   LogOut,
+  RefreshCw,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
@@ -103,15 +104,23 @@ export default function User() {
   const accountName =
     workspaceAccess.currentUserName ?? workspaceAccess.currentUserEmail;
 
-  async function handleSignOut() {
+  async function endSession(destination: string) {
     setIsSigningOut(true);
 
     const supabase = createClient();
     await supabase.auth.signOut();
 
-    router.replace("/login");
+    router.replace(destination);
     router.refresh();
     setIsSigningOut(false);
+  }
+
+  async function handleSignOut() {
+    await endSession("/login");
+  }
+
+  async function handleSwitchAccount() {
+    await endSession("/login?switch=1");
   }
 
   async function handleSwitchWorkspace(workspaceId: string) {
@@ -265,6 +274,18 @@ export default function User() {
           ) : null}
 
           <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              void handleSwitchAccount();
+            }}
+            disabled={isSigningOut}
+            className="rounded-xl px-3 py-2.5 focus:bg-accent"
+          >
+            <RefreshCw className="mr-2.5 h-4 w-4 text-muted-foreground" />
+            Entrar com outra conta
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
             asChild
             className="rounded-xl px-3 py-2.5 focus:bg-accent"
           >
@@ -280,7 +301,7 @@ export default function User() {
               void handleSignOut();
             }}
             disabled={isSigningOut}
-            className="focus:bg-red-500/12 rounded-2xl px-3 py-2.5 text-red-100 focus:text-red-50"
+            className="rounded-xl px-3 py-2.5 text-destructive focus:bg-destructive/10 focus:text-destructive"
           >
             {isSigningOut ? (
               <Loader2 className="mr-2.5 h-4 w-4 animate-spin" />

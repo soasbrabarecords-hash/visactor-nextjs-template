@@ -31,11 +31,8 @@ export default async function ConfiguracoesPage() {
       typeof value === "string" && /^https?:\/\//i.test(value.trim()),
   );
   const spotifyAppReady = Boolean(
-    workspace?.spotifyIntegration.appMode === "workspace_app"
-      ? workspace.spotifyIntegration.appClientId &&
-          workspace.spotifyIntegration.hasAppClientSecret
-      : process.env.SPOTIFY_CLIENT_ID?.trim() &&
-          process.env.SPOTIFY_CLIENT_SECRET?.trim(),
+    workspace?.spotifyIntegration.appClientId &&
+    workspace.spotifyIntegration.hasAppClientSecret,
   );
   const openaiReady = Boolean(process.env.OPENAI_API_KEY?.trim());
   const spotifyRedirectUri = getSpotifyRedirectUri(

@@ -1,5 +1,4 @@
 import "server-only";
-
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -8,14 +7,13 @@ import {
   ACCESS_ADMIN_USER_ID,
   MODULE_KEYS,
   MODULE_ROLE_OPTIONS,
+  type ModuleKey,
+  type ModuleRole,
   WORKSPACE_ROLE_OPTIONS,
   WORKSPACE_STATUS_OPTIONS,
   WORKSPACE_TYPE_OPTIONS,
-  canUseGlobalSpotifyApp,
-  normalizeModuleKey,
-  type ModuleKey,
-  type ModuleRole,
   type WorkspaceRole,
+  normalizeModuleKey,
 } from "@/lib/workspace-access";
 
 type AccessDbClient = SupabaseClient;
@@ -83,6 +81,12 @@ export type AccessWorkspaceUserMutationResult = {
   temporaryPassword: string | null;
 };
 
+export type InternalAccountMutationResult =
+  AccessWorkspaceUserMutationResult & {
+    workspaceId: string;
+    workspaceName: string;
+  };
+
 export class AccessAdminError extends Error {
   status: number;
 
@@ -109,7 +113,9 @@ function asWorkspaceRole(value: unknown): WorkspaceRole {
 }
 
 function asWorkspaceStatus(value: unknown) {
-  return WORKSPACE_STATUS_OPTIONS.includes(value as (typeof WORKSPACE_STATUS_OPTIONS)[number])
+  return WORKSPACE_STATUS_OPTIONS.includes(
+    value as (typeof WORKSPACE_STATUS_OPTIONS)[number],
+  )
     ? (value as (typeof WORKSPACE_STATUS_OPTIONS)[number])
     : "active";
 }
@@ -132,7 +138,9 @@ function asWorkspaceType(value: unknown) {
     return null;
   }
 
-  return WORKSPACE_TYPE_OPTIONS.includes(value as (typeof WORKSPACE_TYPE_OPTIONS)[number])
+  return WORKSPACE_TYPE_OPTIONS.includes(
+    value as (typeof WORKSPACE_TYPE_OPTIONS)[number],
+  )
     ? value
     : null;
 }
@@ -161,7 +169,7 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
   }
 
   const isGlobalAdmin =
-    user.id === ACCESS_ADMIN_USER_ID &&
+    user.id === ACCESS_ADMIN_USER_ID ||
     user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
 
   const { data: workspaceUsers } = await dataClient
@@ -175,18 +183,22 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
     .select("workspace_id, role")
     .eq("user_id", user.id);
 
-  const workspaceUserIds = ((workspaceUsers ?? []) as Array<{
-    workspace_id: string;
-    role: string | null;
-    status: string | null;
-  }>)
+  const workspaceUserIds = (
+    (workspaceUsers ?? []) as Array<{
+      workspace_id: string;
+      role: string | null;
+      status: string | null;
+    }>
+  )
     .filter((row) => row.role === "owner" || row.role === "admin")
     .map((row) => row.workspace_id);
 
-  const membershipIds = ((memberships ?? []) as Array<{
-    workspace_id: string;
-    role: string | null;
-  }>)
+  const membershipIds = (
+    (memberships ?? []) as Array<{
+      workspace_id: string;
+      role: string | null;
+    }>
+  )
     .filter((row) => row.role === "owner" || row.role === "admin")
     .map((row) => row.workspace_id);
 
@@ -194,7 +206,7 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
     new Set([...workspaceUserIds, ...membershipIds]),
   );
 
-  if (!isGlobalAdmin) {
+  if (!isGlobalAdmin && manageableWorkspaceIds.length === 0) {
     throw new AccessAdminError(
       "Você não tem permissão para gerenciar acessos deste workspace.",
       403,
@@ -241,7 +253,10 @@ async function resolveUserIdByEmail(
   }
 
   const users = await listAuthUsers(adminClient);
-  return users.find((user) => user.email?.toLowerCase() === normalizedEmail)?.id ?? null;
+  return (
+    users.find((user) => user.email?.toLowerCase() === normalizedEmail)?.id ??
+    null
+  );
 }
 
 function generateTemporaryPassword() {
@@ -252,10 +267,12 @@ async function resolveOrCreateAuthUserByEmail({
   adminClient,
   email,
   temporaryPassword,
+  displayName,
 }: {
   adminClient: AccessDbClient | null;
   email: string;
   temporaryPassword?: string | null;
+  displayName?: string | null;
 }): Promise<AccessWorkspaceUserMutationResult | null> {
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -269,7 +286,10 @@ async function resolveOrCreateAuthUserByEmail({
     );
   }
 
-  const existingUserId = await resolveUserIdByEmail(adminClient, normalizedEmail);
+  const existingUserId = await resolveUserIdByEmail(
+    adminClient,
+    normalizedEmail,
+  );
 
   if (existingUserId) {
     return {
@@ -283,7 +303,9 @@ async function resolveOrCreateAuthUserByEmail({
   const password = temporaryPassword?.trim() || generateTemporaryPassword();
 
   if (password.length < 8) {
-    throw new AccessAdminError("A senha temporária precisa ter pelo menos 8 caracteres.");
+    throw new AccessAdminError(
+      "A senha temporária precisa ter pelo menos 8 caracteres.",
+    );
   }
 
   const { data, error } = await adminClient.auth.admin.createUser({
@@ -292,6 +314,7 @@ async function resolveOrCreateAuthUserByEmail({
     email_confirm: true,
     user_metadata: {
       created_from: "so_as_braba_access_management",
+      ...(displayName?.trim() ? { full_name: displayName.trim() } : {}),
     },
   });
 
@@ -342,13 +365,15 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     throw new AccessAdminError(workspacesError.message);
   }
 
-  const workspaces = ((workspaceRows ?? []) as Array<{
-    id: string;
-    name: string;
-    slug: string;
-    type: string | null;
-    status: string | null;
-  }>).map((row) => ({
+  const workspaces = (
+    (workspaceRows ?? []) as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      type: string | null;
+      status: string | null;
+    }>
+  ).map((row) => ({
     id: row.id,
     name: row.name,
     slug: row.slug,
@@ -409,13 +434,15 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     throw new AccessAdminError(rolesError.message);
   }
 
-  const workspaceUsers = ((userRows ?? []) as Array<{
-    id: string;
-    workspace_id: string;
-    user_id: string;
-    role: string | null;
-    status: string | null;
-  }>).map((row) => ({
+  const workspaceUsers = (
+    (userRows ?? []) as Array<{
+      id: string;
+      workspace_id: string;
+      user_id: string;
+      role: string | null;
+      status: string | null;
+    }>
+  ).map((row) => ({
     id: row.id,
     workspaceId: row.workspace_id,
     userId: row.user_id,
@@ -424,12 +451,14 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     status: row.status ?? "active",
   }));
 
-  const workspaceModules = ((moduleRows ?? []) as Array<{
-    id: string;
-    workspace_id: string;
-    module_key: string;
-    is_enabled: boolean | null;
-  }>)
+  const workspaceModules = (
+    (moduleRows ?? []) as Array<{
+      id: string;
+      workspace_id: string;
+      module_key: string;
+      is_enabled: boolean | null;
+    }>
+  )
     .map((row): AccessWorkspaceModule | null => {
       const moduleKey = normalizeModuleKey(row.module_key);
 
@@ -444,13 +473,15 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     })
     .filter(Boolean) as AccessWorkspaceModule[];
 
-  const moduleRoles = ((roleRows ?? []) as Array<{
-    id: string;
-    workspace_id: string;
-    user_id: string;
-    module_key: string;
-    role: string;
-  }>)
+  const moduleRoles = (
+    (roleRows ?? []) as Array<{
+      id: string;
+      workspace_id: string;
+      user_id: string;
+      module_key: string;
+      role: string;
+    }>
+  )
     .map((row): AccessModuleRole | null => {
       const moduleKey = normalizeModuleKey(row.module_key);
 
@@ -475,9 +506,13 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     workspaceModules,
     moduleRoles,
     stats: {
-      activeWorkspaces: workspaces.filter((workspace) => workspace.status === "active").length,
+      activeWorkspaces: workspaces.filter(
+        (workspace) => workspace.status === "active",
+      ).length,
       linkedUsers: workspaceUsers.length,
-      enabledModules: workspaceModules.filter((moduleItem) => moduleItem.isEnabled).length,
+      enabledModules: workspaceModules.filter(
+        (moduleItem) => moduleItem.isEnabled,
+      ).length,
       configuredPermissions: moduleRoles.length,
     },
   };
@@ -486,12 +521,7 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
 async function ensureWorkspaceDefaults(
   client: AccessDbClient,
   workspaceId: string,
-  workspaceSlug: string,
 ) {
-  const spotifyAppMode = canUseGlobalSpotifyApp({ slug: workspaceSlug })
-    ? "global_app"
-    : "workspace_app";
-
   await Promise.all([
     client.from("workspace_settings").upsert(
       {
@@ -503,7 +533,7 @@ async function ensureWorkspaceDefaults(
       {
         workspace_id: workspaceId,
         provider: "spotify",
-        app_mode: spotifyAppMode,
+        app_mode: "workspace_app",
         connection_status: "not_connected",
       },
       { onConflict: "workspace_id,provider", ignoreDuplicates: true },
@@ -563,6 +593,13 @@ export async function upsertAccessWorkspace(input: {
     return;
   }
 
+  if (!context.isGlobalAdmin) {
+    throw new AccessAdminError(
+      "Somente o administrador global pode criar workspaces.",
+      403,
+    );
+  }
+
   const workspaceId = crypto.randomUUID();
   const { error } = await context.dataClient.from("workspaces").insert({
     id: workspaceId,
@@ -602,7 +639,138 @@ export async function upsertAccessWorkspace(input: {
     { onConflict: "workspace_id,module_key" },
   );
 
-  await ensureWorkspaceDefaults(context.dataClient, workspaceId, slug);
+  await ensureWorkspaceDefaults(context.dataClient, workspaceId);
+}
+
+export async function createInternalAccount(input: {
+  displayName?: string | null;
+  email?: string | null;
+  temporaryPassword?: string | null;
+  workspaceName?: string | null;
+  workspaceSlug?: string | null;
+  workspaceType?: string | null;
+  enabledModules?: string[] | null;
+}): Promise<InternalAccountMutationResult> {
+  const context = await getCurrentAdminContext();
+
+  if (!context.isGlobalAdmin) {
+    throw new AccessAdminError(
+      "Somente o administrador global pode criar novas contas.",
+      403,
+    );
+  }
+
+  const displayName = input.displayName?.trim();
+  const workspaceName = input.workspaceName?.trim();
+  const email = input.email?.trim().toLowerCase();
+
+  if (!displayName || !workspaceName || !email) {
+    throw new AccessAdminError(
+      "Nome, e-mail e nome do workspace são obrigatórios.",
+    );
+  }
+
+  const workspaceSlug = slugify(input.workspaceSlug?.trim() || workspaceName);
+
+  if (!workspaceSlug) {
+    throw new AccessAdminError("Informe um slug válido para o workspace.");
+  }
+
+  const { data: existingWorkspace, error: workspaceLookupError } =
+    await context.dataClient
+      .from("workspaces")
+      .select("id")
+      .eq("slug", workspaceSlug)
+      .maybeSingle();
+
+  if (workspaceLookupError) {
+    throw new AccessAdminError(workspaceLookupError.message);
+  }
+
+  if (existingWorkspace) {
+    throw new AccessAdminError("Este slug já está em uso por outro workspace.");
+  }
+
+  const authUser = await resolveOrCreateAuthUserByEmail({
+    adminClient: context.adminClient,
+    email,
+    temporaryPassword: input.temporaryPassword,
+    displayName,
+  });
+
+  if (!authUser) {
+    throw new AccessAdminError("Não foi possível criar a conta de acesso.");
+  }
+
+  const workspaceId = crypto.randomUUID();
+  const enabledModules = new Set(
+    (input.enabledModules ?? [])
+      .map((moduleKey) => normalizeModuleKey(moduleKey))
+      .filter(Boolean) as ModuleKey[],
+  );
+  const { error: workspaceError } = await context.dataClient
+    .from("workspaces")
+    .insert({
+      id: workspaceId,
+      name: workspaceName,
+      slug: workspaceSlug,
+      type: asWorkspaceType(input.workspaceType),
+      status: "active",
+      owner_user_id: authUser.userId,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (workspaceError) {
+    throw new AccessAdminError(workspaceError.message);
+  }
+
+  const [
+    { error: userError },
+    { error: membershipError },
+    { error: modulesError },
+  ] = await Promise.all([
+    context.dataClient.from("workspace_users").upsert(
+      {
+        workspace_id: workspaceId,
+        user_id: authUser.userId,
+        role: "owner",
+        status: "active",
+      },
+      { onConflict: "workspace_id,user_id" },
+    ),
+    context.dataClient.from("workspace_memberships").upsert(
+      {
+        workspace_id: workspaceId,
+        user_id: authUser.userId,
+        role: "owner",
+      },
+      { onConflict: "workspace_id,user_id" },
+    ),
+    context.dataClient.from("workspace_modules").upsert(
+      MODULE_KEYS.map((moduleKey) => ({
+        workspace_id: workspaceId,
+        module_key: moduleKey,
+        is_enabled: enabledModules.has(moduleKey),
+      })),
+      { onConflict: "workspace_id,module_key" },
+    ),
+  ]);
+
+  const setupError = userError ?? membershipError ?? modulesError;
+
+  if (setupError) {
+    throw new AccessAdminError(
+      `A conta foi criada, mas a configuração do workspace falhou: ${setupError.message}`,
+    );
+  }
+
+  await ensureWorkspaceDefaults(context.dataClient, workspaceId);
+
+  return {
+    ...authUser,
+    workspaceId,
+    workspaceName,
+  };
 }
 
 export async function upsertAccessWorkspaceUser(input: {
@@ -738,11 +906,11 @@ export async function updateAccessWorkspaceModules(input: {
         : null;
     })
     .filter(Boolean) as Array<{
-      workspace_id: string;
-      module_key: ModuleKey;
-      is_enabled: boolean;
-      updated_at: string;
-    }>;
+    workspace_id: string;
+    module_key: ModuleKey;
+    is_enabled: boolean;
+    updated_at: string;
+  }>;
 
   if (modules.length === 0) {
     throw new AccessAdminError("Selecione ao menos um módulo.");
@@ -784,11 +952,12 @@ export async function updateAccessModuleRoles(input: {
 
   ensureWorkspaceAllowed(context, workspaceId);
 
-  const { data: activeModuleRows, error: modulesError } = await context.dataClient
-    .from("workspace_modules")
-    .select("module_key, is_enabled")
-    .eq("workspace_id", workspaceId)
-    .eq("is_enabled", true);
+  const { data: activeModuleRows, error: modulesError } =
+    await context.dataClient
+      .from("workspace_modules")
+      .select("module_key, is_enabled")
+      .eq("workspace_id", workspaceId)
+      .eq("is_enabled", true);
 
   if (modulesError) {
     throw new AccessAdminError(modulesError.message);
@@ -825,12 +994,12 @@ export async function updateAccessModuleRoles(input: {
       };
     })
     .filter(Boolean) as Array<{
-      workspace_id: string;
-      user_id: string;
-      module_key: ModuleKey;
-      role: ModuleRole;
-      updated_at: string;
-    }>;
+    workspace_id: string;
+    user_id: string;
+    module_key: ModuleKey;
+    role: ModuleRole;
+    updated_at: string;
+  }>;
 
   if (roles.length === 0) {
     throw new AccessAdminError("Nenhuma permissão selecionada.");

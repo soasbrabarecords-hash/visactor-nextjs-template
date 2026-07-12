@@ -9,6 +9,7 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  UserPlus,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -85,14 +86,21 @@ type AccessApiResponse = {
     userId: string;
     email: string | null;
     temporaryPassword: string | null;
+    workspaceId?: string;
+    workspaceName?: string;
   } | null;
 };
 
 type AccessTab =
-  "overview" | "workspaces" | "users" | "modules" | "permissions";
+  "overview" | "accounts" | "workspaces" | "users" | "modules" | "permissions";
 
 const tabs: Array<{ key: AccessTab; label: string; href: string }> = [
   { key: "overview", label: "Resumo", href: "/settings/access" },
+  {
+    key: "accounts",
+    label: "Criar conta",
+    href: "/settings/access/accounts",
+  },
   {
     key: "workspaces",
     label: "Workspaces",
@@ -120,6 +128,14 @@ const EMPTY_USER_FORM = {
   role: "member",
   status: "active",
 };
+const EMPTY_ACCOUNT_FORM = {
+  displayName: "",
+  email: "",
+  temporaryPassword: "",
+  workspaceName: "",
+  workspaceSlug: "",
+  workspaceType: "client",
+};
 
 function getWorkspaceName(data: AccessAdminData | null, workspaceId: string) {
   return (
@@ -130,7 +146,7 @@ function getWorkspaceName(data: AccessAdminData | null, workspaceId: string) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+    <label className="text-xs font-medium text-muted-foreground">
       {children}
     </label>
   );
@@ -149,7 +165,7 @@ function SelectField({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm text-white outline-none transition focus:border-white/25"
+      className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:ring-2 focus:ring-ring/30"
     >
       {children}
     </select>
@@ -168,24 +184,24 @@ function StatCard({
   tone: "green" | "blue" | "yellow" | "slate";
 }) {
   return (
-    <article className="rounded-[26px] border border-white/10 bg-white/[0.045] p-4 text-white shadow-[0_22px_70px_-54px_rgba(0,0,0,0.85)]">
+    <article className="rounded-2xl border border-border bg-card p-4 text-foreground shadow-sm">
       <div className="flex items-center justify-between">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-foreground">
           {icon}
         </span>
         <StatusBadge tone={tone}>{label}</StatusBadge>
       </div>
-      <div className="mt-5 text-3xl font-semibold tracking-[-0.04em]">
+      <div className="mt-4 text-2xl font-semibold tracking-[-0.04em]">
         {value}
       </div>
-      <p className="text-white/52 mt-1 text-sm">{label}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
     </article>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="border-white/12 text-white/52 rounded-[22px] border border-dashed bg-white/[0.025] p-6 text-center text-sm">
+    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
       {text}
     </div>
   );
@@ -205,7 +221,16 @@ export default function AccessManagementPanel({
     email: string;
     userId: string;
     temporaryPassword: string;
+    workspaceName?: string;
   } | null>(null);
+  const [accountForm, setAccountForm] = useState(EMPTY_ACCOUNT_FORM);
+  const [accountModules, setAccountModules] = useState<
+    Record<ModuleKey, boolean>
+  >({
+    playlist_os: true,
+    label_os: false,
+    artist_os: false,
+  });
   const [workspaceForm, setWorkspaceForm] = useState({
     id: "",
     name: "",
@@ -282,6 +307,7 @@ export default function AccessManagementPanel({
           email: payload.mutation.email,
           userId: payload.mutation.userId,
           temporaryPassword: payload.mutation.temporaryPassword,
+          workspaceName: payload.mutation.workspaceName,
         });
       }
       return true;
@@ -459,7 +485,7 @@ export default function AccessManagementPanel({
     !isLoading &&
     data &&
     !data.isGlobalAdmin &&
-    initialTab === "workspaces"
+    (initialTab === "workspaces" || initialTab === "accounts")
   ) {
     return (
       <Container className="py-6">
@@ -469,9 +495,9 @@ export default function AccessManagementPanel({
             Administração global restrita
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-white/60">
-            Criação e edição de workspaces está disponível somente para o
-            administrador global. Você continua podendo gerenciar a equipe do
-            seu workspace.
+            Criação de contas e edição de workspaces estão disponíveis somente
+            para o administrador global. Você continua podendo gerenciar a
+            equipe do seu workspace.
           </p>
           <Link
             href="/settings/access/users"
@@ -487,15 +513,15 @@ export default function AccessManagementPanel({
   const visibleTabs = data?.isGlobalAdmin
     ? tabs
     : tabs
-        .filter((tab) => tab.key !== "workspaces")
+        .filter((tab) => tab.key !== "workspaces" && tab.key !== "accounts")
         .map((tab) =>
           tab.key === "users" ? { ...tab, label: "Equipe" } : tab,
         );
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_26%),radial-gradient(circle_at_90%_0%,rgba(16,185,129,0.10),transparent_26%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
-      <Container className="py-6">
-        <section className="rounded-[34px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.94),rgba(3,7,18,0.96))] p-6 text-white shadow-[0_30px_100px_-70px_rgba(14,165,233,0.55)]">
+    <div className="min-h-[calc(100dvh-4rem)] bg-background">
+      <Container className="max-w-6xl py-5">
+        <section className="border-b border-border/70 pb-5 text-foreground">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge tone="blue">Configurações</StatusBadge>
             <StatusBadge tone={data?.isGlobalAdmin ? "green" : "yellow"}>
@@ -504,18 +530,18 @@ export default function AccessManagementPanel({
           </div>
           <div className="mt-4 flex flex-wrap items-end justify-between gap-5">
             <div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] tablet:text-5xl">
+              <h1 className="text-2xl font-semibold tracking-[-0.035em]">
                 {data?.isGlobalAdmin
                   ? "Administração global"
                   : "Equipe do workspace"}
               </h1>
-              <p className="text-white/58 mt-3 max-w-2xl text-sm leading-6">
+              <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
                 {data?.isGlobalAdmin
                   ? "Crie workspaces e controle usuários, módulos e permissões."
                   : "Gerencie usuários, módulos e permissões apenas do workspace atual."}
               </p>
             </div>
-            <div className="text-white/62 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+            <div className="rounded-full border border-border bg-card px-3.5 py-2 text-xs text-muted-foreground shadow-sm">
               Admin: {data?.currentUserEmail ?? "sessão atual"}
             </div>
           </div>
@@ -527,10 +553,10 @@ export default function AccessManagementPanel({
               key={tab.key}
               href={tab.href}
               className={cn(
-                "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                "rounded-full border px-3.5 py-2 text-sm font-medium transition",
                 tab.key === initialTab
-                  ? "border-white/80 bg-white text-slate-950"
-                  : "text-white/62 border-white/10 bg-white/[0.04] hover:border-white/20 hover:text-white",
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
               )}
             >
               {tab.label}
@@ -539,19 +565,22 @@ export default function AccessManagementPanel({
         </nav>
 
         {success ? (
-          <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">
+          <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
             {success}
           </div>
         ) : null}
         {createdCredential ? (
-          <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-50">
+          <div className="mt-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-foreground">
             <div className="font-semibold">Conta criada no Auth</div>
-            <div className="text-white/72 mt-2 grid gap-1">
+            <div className="mt-2 grid gap-1 text-muted-foreground">
               <span>E-mail: {createdCredential.email}</span>
               <span>User ID: {createdCredential.userId}</span>
+              {createdCredential.workspaceName ? (
+                <span>Workspace: {createdCredential.workspaceName}</span>
+              ) : null}
               <span>
                 Senha temporária:{" "}
-                <code className="rounded-lg bg-white/10 px-2 py-1 text-white">
+                <code className="rounded-md bg-muted px-2 py-1 text-foreground">
                   {createdCredential.temporaryPassword}
                 </code>
               </span>
@@ -559,7 +588,7 @@ export default function AccessManagementPanel({
           </div>
         ) : null}
         {error ? (
-          <div className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+          <div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
@@ -590,6 +619,196 @@ export default function AccessManagementPanel({
               value={data?.stats.configuredPermissions ?? 0}
               tone="slate"
             />
+          </section>
+        ) : null}
+
+        {initialTab === "accounts" && data?.isGlobalAdmin ? (
+          <section className="mt-5 overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-sm">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                <UserPlus className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold">Nova conta interna</h2>
+                <p className="text-xs text-muted-foreground">
+                  Cria o login, o workspace próprio e os módulos iniciais.
+                </p>
+              </div>
+            </div>
+            <form
+              className="p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void runAction(
+                  {
+                    action: "create_account",
+                    account: {
+                      ...accountForm,
+                      enabledModules: MODULE_KEYS.filter(
+                        (moduleKey) => accountModules[moduleKey],
+                      ),
+                    },
+                  },
+                  "Conta e workspace criados.",
+                ).then((saved) => {
+                  if (saved) {
+                    setAccountForm(EMPTY_ACCOUNT_FORM);
+                  }
+                });
+              }}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Nome do usuário
+                  </span>
+                  <Input
+                    required
+                    value={accountForm.displayName}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        displayName: event.target.value,
+                      }))
+                    }
+                    placeholder="Nome completo"
+                    className="h-10 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    E-mail de acesso
+                  </span>
+                  <Input
+                    required
+                    type="email"
+                    value={accountForm.email}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        email: event.target.value,
+                      }))
+                    }
+                    placeholder="usuario@empresa.com"
+                    className="h-10 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Senha temporária
+                  </span>
+                  <Input
+                    type="password"
+                    minLength={8}
+                    value={accountForm.temporaryPassword}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        temporaryPassword: event.target.value,
+                      }))
+                    }
+                    placeholder="Gerada automaticamente se vazio"
+                    className="h-10 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Nome do workspace
+                  </span>
+                  <Input
+                    required
+                    value={accountForm.workspaceName}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        workspaceName: event.target.value,
+                      }))
+                    }
+                    placeholder="Empresa ou projeto"
+                    className="h-10 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Slug opcional
+                  </span>
+                  <Input
+                    value={accountForm.workspaceSlug}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        workspaceSlug: event.target.value,
+                      }))
+                    }
+                    placeholder="gerado-pelo-nome"
+                    className="h-10 rounded-xl"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Tipo
+                  </span>
+                  <select
+                    value={accountForm.workspaceType}
+                    onChange={(event) =>
+                      setAccountForm((current) => ({
+                        ...current,
+                        workspaceType: event.target.value,
+                      }))
+                    }
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                  >
+                    {WORKSPACE_TYPE_OPTIONS.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <fieldset className="mt-5">
+                <legend className="text-xs font-medium text-muted-foreground">
+                  Módulos iniciais
+                </legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {MODULE_KEYS.map((moduleKey) => (
+                    <label
+                      key={moduleKey}
+                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={accountModules[moduleKey]}
+                        onChange={(event) =>
+                          setAccountModules((current) => ({
+                            ...current,
+                            [moduleKey]: event.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded"
+                      />
+                      {MODULE_LABELS[moduleKey]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground">
+                  Não cria cadastro público nem expõe este fluxo na tela
+                  inicial.
+                </p>
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="rounded-full px-5"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {isSaving ? "Criando..." : "Criar conta"}
+                </Button>
+              </div>
+            </form>
           </section>
         ) : null}
 
