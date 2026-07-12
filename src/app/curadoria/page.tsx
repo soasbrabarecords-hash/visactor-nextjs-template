@@ -11,7 +11,7 @@ export default async function CuradoriaPage() {
 
   return (
     <ModuleGuard moduleKey="playlist_os">
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.06),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_82%_4%,rgba(125,211,252,0.22),transparent_34%)] bg-[#eef5f8] text-slate-950">
         <TopNav title="Curadoria" />
 
         <SpotifyAccountPlaylistsPanel />

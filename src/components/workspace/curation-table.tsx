@@ -243,7 +243,7 @@ function MovementBadge({ row }: { row: DecisionTrack }) {
   const Icon = movement.icon;
 
   return (
-    <StatusBadge tone={movement.tone} className="min-w-[64px] justify-center px-2 py-0.5 text-[10px]">
+    <StatusBadge tone={movement.tone} className="min-w-[54px] justify-center px-2 py-0.5 text-[9px]">
       <Icon className="mr-1 h-3 w-3" />
       {movement.value}
     </StatusBadge>
@@ -408,68 +408,68 @@ export default function CurationTable({
   }
 
   return (
-    <Container className="border-b border-border/70 py-8">
-      <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,14,28,0.96),rgba(5,10,22,0.98))] shadow-[0_24px_120px_rgba(0,0,0,0.38)]">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_50%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_42%)]" />
+    <Container className="pb-8 pt-2 tablet:pt-3">
+      <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(8,13,24,0.96)] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.85)] backdrop-blur-xl">
+        <div className="absolute inset-x-0 top-0 h-px bg-white/25" />
 
-        <div className="relative border-b border-white/10 px-5 py-5 tablet:px-7 tablet:py-6">
-          <div className="space-y-5">
-            <div className="flex flex-col gap-4 laptop:flex-row laptop:items-end laptop:justify-between">
-              <div className="space-y-3">
+        <div className="relative border-b border-white/[0.08] px-4 py-4 tablet:px-6 tablet:py-5">
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 laptop:flex-row laptop:items-end laptop:justify-between">
+              <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge tone="green">Curadoria ativa</StatusBadge>
-                  <StatusBadge tone="slate">Top 200 Brasil</StatusBadge>
-                  <StatusBadge tone="blue">{formatCount(addNowCount)} para adicionar</StatusBadge>
+                  <StatusBadge tone="green" className="px-2 py-0.5 text-[9px]">Curadoria ativa</StatusBadge>
+                  <StatusBadge tone="slate" className="px-2 py-0.5 text-[9px]">Top 200 Brasil</StatusBadge>
+                  <StatusBadge tone="blue" className="px-2 py-0.5 text-[9px]">{formatCount(addNowCount)} para adicionar</StatusBadge>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-xs uppercase tracking-[0.22em] text-white/45">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/38">
                     Mesa de acao
                   </div>
-                  <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-white tablet:text-[2rem]">
+                  <h2 className="max-w-2xl text-xl font-semibold tracking-[-0.03em] text-white tablet:text-[1.65rem]">
                     Musicas quentes para entrar hoje.
                   </h2>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 tablet:max-w-[420px]">
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-300/80">
+              <div className="grid grid-cols-3 gap-1.5 tablet:max-w-[330px]">
+                <div className="rounded-xl border border-emerald-400/15 bg-white/[0.035] px-3 py-2">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-emerald-300/65">
                     Entrar
                   </div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{addNowCount}</div>
+                  <div className="mt-0.5 text-lg font-semibold text-white">{addNowCount}</div>
                 </div>
-                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/8 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-sky-300/80">
+                <div className="rounded-xl border border-sky-400/15 bg-white/[0.035] px-3 py-2">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-sky-300/65">
                     Top 20
                   </div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{top20Count}</div>
+                  <div className="mt-0.5 text-lg font-semibold text-white">{top20Count}</div>
                 </div>
-                <div className="rounded-2xl border border-violet-500/20 bg-violet-500/8 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-violet-300/80">
+                <div className="rounded-xl border border-violet-400/15 bg-white/[0.035] px-3 py-2">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-violet-300/65">
                     Discovery
                   </div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{discoveryCount}</div>
+                  <div className="mt-0.5 text-lg font-semibold text-white">{discoveryCount}</div>
                 </div>
               </div>
             </div>
 
             {topDecision ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/42">
+                  <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/36">
                     Destaques para adicionar rapido
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       onClick={() => window.location.reload()}
-                      className="h-9 rounded-full bg-emerald-500 px-4 text-black hover:bg-emerald-400"
+                      className="h-8 rounded-full bg-emerald-400 px-3 text-xs text-slate-950 shadow-none hover:bg-emerald-300"
                     >
                       <RefreshCw className="h-4 w-4" />
                       Atualizar
                     </Button>
-                    <Button asChild variant="outline" className="h-9 rounded-full border-white/15 bg-white/5 px-4 text-white hover:bg-white/10">
+                    <Button asChild variant="outline" className="h-8 rounded-full border-white/10 bg-white/[0.04] px-3 text-xs text-white shadow-none hover:bg-white/[0.08]">
                       <Link href={topDecision.spotifyUrl} target="_blank" rel="noreferrer">
                         <ArrowUpRight className="h-4 w-4" />
                         Abrir
@@ -478,44 +478,45 @@ export default function CurationTable({
                   </div>
                 </div>
 
-                <div className="-mx-1 overflow-x-auto pb-2">
-                  <div className="flex min-w-max gap-3 px-1">
-                    {topActionableTracks.map((track, index) => (
+                <div className="-mx-1 overflow-x-auto pb-1.5">
+                  <div className="flex min-w-max gap-2.5 px-1">
+                    {topActionableTracks.map((track) => (
                       <div
                         key={track.trackId}
-                        className={cn(
-                          "relative overflow-hidden rounded-[24px] border border-white/10 bg-black/30 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
-                          index === 0 ? "h-[248px] w-[340px]" : "h-[248px] w-[220px]",
-                        )}
+                        className="w-[190px] overflow-hidden rounded-[18px] border border-white/[0.09] bg-white/[0.035] shadow-[0_18px_42px_-30px_rgba(0,0,0,0.9)] tablet:w-[210px]"
                       >
-                        <div className="absolute inset-0 opacity-85" style={coverStyle(track.coverUrl)} />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,10,20,0.12),rgba(5,10,20,0.9))]" />
-                        <div className="relative flex h-full flex-col justify-between p-3">
-                          <div className="flex items-start justify-between gap-2">
+                        <div className="relative aspect-[16/10] overflow-hidden bg-white/[0.04]" style={coverStyle(track.coverUrl)}>
+                          {!track.coverUrl ? (
+                            <div className="flex h-full items-center justify-center text-white/16">
+                              <Music2 className="h-8 w-8" />
+                            </div>
+                          ) : null}
+                          <div className="absolute inset-0 bg-black/10" />
+                          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
                             <MovementBadge row={track} />
-                            <StatusBadge tone="green" className="px-2 py-0.5 text-[10px]">
+                            <StatusBadge tone="green" className="px-2 py-0.5 text-[9px]">
                               {track.decisionScore}
                             </StatusBadge>
                           </div>
+                        </div>
 
-                          <div className="space-y-2">
-                            <div className="space-y-1">
-                              <div className="line-clamp-2 text-lg font-semibold leading-tight text-white">
+                        <div className="space-y-2 p-3">
+                          <div className="space-y-0.5">
+                              <div className="line-clamp-1 text-sm font-semibold leading-tight text-white">
                                 {track.name}
                               </div>
-                              <div className="truncate text-sm text-white/72">{track.artists}</div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/78">
+                              <div className="truncate text-[11px] text-white/48">{track.artists}</div>
+                          </div>
+                            <div className="flex min-w-0 items-center gap-1.5 text-[9px] text-white/58">
                               {track.suggestedPlaylistName ? (
-                                <span className="rounded-full border border-white/12 bg-black/25 px-2.5 py-1">
+                                <span className="max-w-[92px] truncate rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1">
                                   {track.suggestedPlaylistName}
                                 </span>
                               ) : null}
-                              <span className="rounded-full border border-white/12 bg-black/25 px-2.5 py-1">
+                              <span className="max-w-[100px] truncate rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1">
                                 {getDecisionLabel(track)}
                               </span>
                             </div>
-                          </div>
                         </div>
                       </div>
                     ))}
@@ -523,38 +524,38 @@ export default function CurationTable({
                 </div>
               </div>
             ) : (
-              <div className="flex min-h-[220px] items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-black/20 px-6 text-center text-sm text-white/50">
+              <div className="flex min-h-[150px] items-center justify-center rounded-[18px] border border-dashed border-white/10 bg-white/[0.025] px-6 text-center text-sm text-white/50">
                 Nenhuma faixa disponível para destacar agora.
               </div>
             )}
           </div>
         </div>
 
-        <div className="relative px-5 py-5 tablet:px-7 tablet:py-6">
+        <div className="relative px-4 py-4 tablet:px-6 tablet:py-5">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+              <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/35">
                 Lista operacional
               </div>
-              <h3 className="mt-2 text-xl font-semibold text-white">Faixas prontas para decidir</h3>
-              <p className="mt-1 max-w-3xl text-sm text-white/55">
+              <h3 className="mt-1.5 text-lg font-semibold tracking-[-0.02em] text-white">Faixas prontas para decidir</h3>
+              <p className="mt-0.5 max-w-3xl text-xs text-white/45">
                 Leitura contínua do Top 200 com ação rápida para a playlist mais compatível da conta.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-white/45">
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-white/38">
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1">
                 Spotify Charts BR
               </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1">
                 Snapshot diario
               </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+              <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2.5 py-1">
                 Add direto na playlist
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-black/25 backdrop-blur-sm">
+          <div className="overflow-x-auto rounded-[18px] border border-white/[0.08] bg-black/15 backdrop-blur-sm">
             <table className="w-full divide-y divide-white/10 text-left table-fixed">
           <colgroup>
             <col className="w-[60px]" />
@@ -565,15 +566,15 @@ export default function CurationTable({
             <col className="w-[90px]" />
             <col className="w-[160px]" />
           </colgroup>
-          <thead className="bg-white/[0.03]">
-            <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              <th className="px-3 py-3">Rank</th>
-              <th className="px-3 py-3">Mov.</th>
-              <th className="px-3 py-3">Musica</th>
-              <th className="px-3 py-3">Streams</th>
-              <th className="px-3 py-3">Playlist sugerida</th>
-              <th className="px-3 py-3">Gênero</th>
-              <th className="px-3 py-3">Acao</th>
+          <thead className="bg-white/[0.025]">
+            <tr className="text-[9px] uppercase tracking-[0.16em] text-white/34">
+              <th className="px-3 py-2.5">Rank</th>
+              <th className="px-3 py-2.5">Mov.</th>
+              <th className="px-3 py-2.5">Musica</th>
+              <th className="px-3 py-2.5">Streams</th>
+              <th className="px-3 py-2.5">Playlist sugerida</th>
+              <th className="px-3 py-2.5">Gênero</th>
+              <th className="px-3 py-2.5">Acao</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -608,36 +609,38 @@ export default function CurationTable({
                   : null;
 
                 return (
-                  <tr key={row.trackId} className="hover:bg-white/[0.03]">
-                    <td className="px-3 py-3 align-middle">
-                      <div className="text-lg font-bold text-white tabular-nums whitespace-nowrap">
+                  <tr key={row.trackId} className="transition-colors hover:bg-white/[0.025]">
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="whitespace-nowrap text-sm font-semibold tabular-nums text-white">
                         #{row.streamRank ?? index + 1}
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-middle">
+                    <td className="px-3 py-2.5 align-middle">
                       <MovementBadge row={row} />
                     </td>
-                    <td className="px-3 py-3 align-middle">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="flex min-w-0 items-center gap-2.5">
                         <div
-                          className="h-10 w-10 shrink-0 rounded-lg border border-border bg-muted"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.04] text-white/16 shadow-sm"
                           style={coverStyle(row.coverUrl)}
-                        />
+                        >
+                          {!row.coverUrl ? <Music2 className="h-4 w-4" /> : null}
+                        </div>
                         <div className="min-w-0">
-                          <div className="truncate font-semibold text-sm leading-tight">{row.name}</div>
-                          <div className="truncate text-xs text-muted-foreground mt-0.5">
+                          <div className="truncate text-xs font-semibold leading-tight text-white">{row.name}</div>
+                          <div className="mt-1 truncate text-[10px] text-white/38">
                             {row.artists}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-middle whitespace-nowrap">
-                      <div className="text-sm font-semibold tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-2.5 align-middle">
+                      <div className="text-xs font-semibold tabular-nums text-white/88">
                         {formatCount(row.dailyStreams)}
                       </div>
                       <div
                         className={cn(
-                          "text-xs",
+                            "text-[10px]",
                           row.streamGrowthPercent === null
                             ? "text-muted-foreground"
                             : row.streamGrowthPercent > 0
@@ -652,16 +655,16 @@ export default function CurationTable({
                           : `${row.streamGrowthPercent >= 0 ? "+" : ""}${row.streamGrowthPercent.toFixed(1)}%`}
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-middle">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="flex min-w-0 items-center gap-2">
                         {selectedPlaylist?.imageUrl ? (
                           <div
-                            className="h-8 w-8 shrink-0 rounded-md border border-border bg-muted"
+                            className="h-8 w-8 shrink-0 rounded-lg border border-white/[0.08] bg-white/[0.04]"
                             style={coverStyle(selectedPlaylist.imageUrl)}
                           />
                         ) : (
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted">
-                            <Music2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04]">
+                            <Music2 className="h-3.5 w-3.5 text-white/22" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
@@ -673,7 +676,7 @@ export default function CurationTable({
                                 [row.trackId]: event.target.value,
                               }))
                             }
-                            className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-semibold text-white outline-none transition focus:border-white/20"
+                            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-[10px] font-medium text-white/80 outline-none transition focus:border-white/20"
                           >
                             {suggestion.options.map((option, optionIndex) => (
                               <option
@@ -691,7 +694,7 @@ export default function CurationTable({
                               </option>
                             ) : null}
                           </select>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="mt-0.5 text-[9px] text-white/32">
                             {selectedPlaylist
                               ? `${formatCount(selectedPlaylist.tracksTotal)} tracks${
                                   selectedOption && selectedOption.score > 0
@@ -703,7 +706,7 @@ export default function CurationTable({
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-middle">
+                    <td className="px-3 py-2.5 align-middle">
                       {suggestion.style === "unknown" ? (
                         <span className="text-sm text-muted-foreground">—</span>
                       ) : (
@@ -747,7 +750,7 @@ export default function CurationTable({
                         </StatusBadge>
                       )}
                     </td>
-                    <td className="px-3 py-3 align-middle">
+                    <td className="px-3 py-2.5 align-middle">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                         {isAddedToSelectedPlaylist ? (
                           <StatusBadge tone="green">Adicionada</StatusBadge>

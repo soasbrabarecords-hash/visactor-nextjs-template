@@ -218,29 +218,21 @@ export default function SpotifyAccountPlaylistsPanel() {
       )}
 
       {/* ── HERO: Spotify profile style ── */}
-      <div
-        className="relative overflow-hidden"
-        style={{ minHeight: "340px" }}
-      >
+      <div className="relative min-h-[250px] overflow-hidden border-b border-white/10 bg-[#11131a] tablet:min-h-[230px]">
         {/* Blurred cover mosaic background */}
         {heroCover ? (
           <div
             className="absolute inset-0"
             style={{
               backgroundImage: `url(${heroCover})`,
-              backgroundPosition: "center top",
+              backgroundPosition: "center 35%",
               backgroundSize: "cover",
-              filter: "blur(80px) brightness(0.2) saturate(1.5)",
-              transform: "scale(1.15)",
+              filter: "blur(72px) brightness(0.22) saturate(1.15)",
+              transform: "scale(1.1)",
             }}
           />
         ) : (
-          <div
-            className="absolute inset-0"
-            style={{
-              background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-            }}
-          />
+          <div className="absolute inset-0 bg-[#151722]" />
         )}
 
         {/* Gradient overlay — sempre presente */}
@@ -248,85 +240,54 @@ export default function SpotifyAccountPlaylistsPanel() {
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.82) 100%)",
+              "linear-gradient(120deg, rgba(8,10,16,0.76) 0%, rgba(8,10,16,0.58) 46%, rgba(8,10,16,0.88) 100%)",
           }}
         />
 
         {/* Profile content — alinhado ao fundo como Spotify */}
-        <div
-          className="relative z-10 flex flex-col justify-end px-8 pb-10 pt-16 laptop:px-14"
-          style={{ minHeight: "340px" }}
-        >
-          <div className="flex flex-col gap-5 laptop:flex-row laptop:items-end">
+        <div className="relative z-10 flex min-h-[250px] flex-col justify-center px-5 py-6 tablet:min-h-[230px] tablet:px-8 laptop:px-12">
+          <div className="flex flex-col gap-5 tablet:flex-row tablet:items-center">
 
             {/* Avatar circular grande */}
             <div className="shrink-0">
-              <div
-                className="flex items-center justify-center rounded-full bg-muted"
-                style={{
-                  width: 148,
-                  height: 148,
-                  boxShadow: "0 12px 48px rgba(0,0,0,0.7)",
-                  border: "3px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <User style={{ width: 72, height: 72, opacity: 0.45, color: "white" }} />
+              <div className="flex h-[76px] w-[76px] items-center justify-center rounded-full border border-white/15 bg-white/[0.08] shadow-[0_16px_45px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md tablet:h-[104px] tablet:w-[104px]">
+                <User className="h-9 w-9 text-white/35 tablet:h-12 tablet:w-12" />
               </div>
             </div>
 
             {/* Info: label + nome + metadata */}
-            <div className="flex-1 min-w-0" style={{ color: "white" }}>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.7, marginBottom: 6 }}>
+            <div className="min-w-0 flex-1 text-white">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/48">
                 Perfil
               </p>
-              <h1
-                style={{
-                  fontWeight: 900,
-                  lineHeight: 1,
-                  letterSpacing: "-0.02em",
-                  fontSize: "clamp(2.8rem, 7vw, 5rem)",
-                  marginBottom: 12,
-                }}
-              >
+              <h1 className="mb-2 truncate text-[2.25rem] font-semibold leading-none tracking-[-0.045em] tablet:text-[3.25rem]">
                 {ownerName}
               </h1>
               {data?.connected ? (
-                <p style={{ fontSize: 14, opacity: 0.75, display: "flex", gap: 6, flexWrap: "wrap" as const, alignItems: "center" }}>
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-white/55">
                   <strong>{formatCount(publicPlaylists.length)}</strong> playlists públicas
-                  <span style={{ opacity: 0.4 }}>·</span>
+                  <span className="text-white/25">·</span>
                   <strong>—</strong> seguidores
-                  <span style={{ opacity: 0.4 }}>·</span>
+                  <span className="text-white/25">·</span>
                   <strong>—</strong> seguindo
                 </p>
               ) : (
-                <p style={{ fontSize: 14, opacity: 0.6 }}>
+                <p className="text-xs text-white/50">
                   Conecte o Spotify para ver suas playlists aqui.
                 </p>
               )}
             </div>
 
             {/* Botões de ação */}
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" style={{ color: "rgba(255,255,255,0.5)" }} />}
+            <div className="flex shrink-0 flex-wrap items-center gap-2 tablet:ml-auto tablet:justify-end">
+              {isPending && <Loader2 className="h-4 w-4 animate-spin text-white/50" />}
               {data?.connected ? (
                 <>
                   <button
                     onClick={() => setShowCreate(true)}
-                    style={{
-                      background: "white",
-                      color: "black",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      padding: "8px 20px",
-                      borderRadius: 999,
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/70 bg-white px-3.5 text-xs font-semibold text-slate-950 shadow-[0_8px_24px_-14px_rgba(255,255,255,0.9)] transition hover:bg-white/90"
                   >
-                    <Plus style={{ width: 14, height: 14 }} />
+                    <Plus className="h-3.5 w-3.5" />
                     Nova playlist
                   </button>
                   <button
@@ -335,40 +296,16 @@ export default function SpotifyAccountPlaylistsPanel() {
                       loadPlaylists(true);
                     }}
                     disabled={isPending}
-                    style={{
-                      background: "rgba(255,255,255,0.1)",
-                      color: "white",
-                      fontWeight: 600,
-                      fontSize: 13,
-                      padding: "8px 16px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(255,255,255,0.2)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.07] px-3 text-xs font-medium text-white/78 backdrop-blur-md transition hover:bg-white/[0.12] hover:text-white disabled:opacity-50"
                   >
-                    <RefreshCw style={{ width: 13, height: 13 }} />
+                    <RefreshCw className="h-3.5 w-3.5" />
                     Atualizar
                   </button>
                   <a
                     href="/api/spotify/auth/logout"
-                    style={{
-                      background: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.7)",
-                      fontWeight: 600,
-                      fontSize: 13,
-                      padding: "8px 16px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      textDecoration: "none",
-                    }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-black/10 px-3 text-xs font-medium text-white/48 backdrop-blur-md transition hover:bg-white/[0.08] hover:text-white/80"
                   >
-                    <LogOut style={{ width: 13, height: 13 }} />
+                    <LogOut className="h-3.5 w-3.5" />
                     Desconectar
                   </a>
                 </>
@@ -397,33 +334,26 @@ export default function SpotifyAccountPlaylistsPanel() {
             </div>
           </div>
 
-          {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+          {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
           {data && !data.connected && (
-            <p style={{ marginTop: 10, fontSize: 13, color: "rgba(255,255,255,0.45)" }}>{data.message}</p>
+            <p className="mt-2.5 text-xs text-white/45">{data.message}</p>
           )}
         </div>
       </div>
 
       {/* ── Gradient fade — hero para fundo da página ── */}
-      <div
-        style={{
-          height: 40,
-          marginTop: -1,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 100%)",
-          pointerEvents: "none",
-        }}
-      />
+      <div className="pointer-events-none h-3 border-t border-white/5 bg-black/[0.03]" />
 
       {/* ── Seção: Playlists públicas ── */}
-      <div className="px-8 pb-8 pt-4 laptop:px-14">
+      <div className="px-5 pb-4 pt-3 tablet:px-8 laptop:px-12">
         {/* Header da seção */}
-        <div className="mb-6 flex items-baseline justify-between">
+        <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
               {data?.connected ? "Playlists públicas" : "Playlists"}
             </h2>
             {data?.connected && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-[11px] text-slate-500">
                 {formatCount(playlists.length)} playlists · somente as criadas por esta conta
               </p>
             )}
@@ -431,7 +361,7 @@ export default function SpotifyAccountPlaylistsPanel() {
           {data?.connected && (
             <Link
               href="#"
-              className="text-sm font-semibold text-muted-foreground hover:text-foreground"
+              className="rounded-full border border-slate-200/80 bg-white/65 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-slate-900"
               onClick={(e) => { e.preventDefault(); }}
             >
               Ver todas
@@ -442,39 +372,35 @@ export default function SpotifyAccountPlaylistsPanel() {
         {playlists.length > 0 ? (
           /* Scroll horizontal de cards estilo Spotify */
           <div
-            className="flex gap-5 overflow-x-auto pb-4"
+            className="flex gap-3 overflow-x-auto pb-3"
             style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.15) transparent" }}
           >
             {playlists.map((playlist) => (
               <Link
                 key={playlist.id}
                 href={`/curadoria/playlists/${playlist.id}`}
-                className="group shrink-0 cursor-pointer"
-                style={{ width: 185 }}
+                className="group w-[138px] shrink-0 cursor-pointer tablet:w-[152px]"
               >
                 {/* Capa grande */}
                 <div
-                  className="rounded-xl bg-muted transition-transform duration-200 group-hover:scale-[1.03]"
+                  className="aspect-square w-full rounded-[18px] border border-white/75 bg-white/55 shadow-[0_16px_36px_-24px_rgba(15,23,42,0.65)] transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_20px_38px_-22px_rgba(15,23,42,0.72)]"
                   style={{
-                    width: 185,
-                    height: 185,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
                     ...coverStyle(playlist.imageUrl),
                   }}
                 >
                   {!playlist.imageUrl && (
                     <div className="flex h-full items-center justify-center">
-                      <Music2 className="text-muted-foreground/25" style={{ width: 56, height: 56 }} />
+                      <Music2 className="h-8 w-8 text-slate-300" />
                     </div>
                   )}
                 </div>
 
                 {/* Info abaixo da capa */}
-                <div className="mt-3 space-y-0.5 px-0.5">
-                  <p className="truncate text-sm font-semibold leading-snug">
+                <div className="mt-2 space-y-0.5 px-0.5">
+                  <p className="truncate text-xs font-semibold leading-snug text-slate-900">
                     {playlist.name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] text-slate-500">
                     {formatCount(playlist.tracksTotal)} faixas
                     {playlist.isCollaborative && " · Colaborativa"}
                     {!playlist.isPublic && !playlist.isCollaborative && " · Privada"}
@@ -482,9 +408,9 @@ export default function SpotifyAccountPlaylistsPanel() {
                 </div>
 
                 {/* Botão Editar — aparece no hover */}
-                <div className="mt-2 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="mt-1.5 flex gap-1.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                   <div
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1.5 text-xs font-semibold text-primary"
+                    className="inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white/75 px-1.5 text-[10px] font-medium text-slate-700 backdrop-blur-md"
                   >
                     <Pencil style={{ width: 11, height: 11 }} />
                     Editar playlist
@@ -494,7 +420,7 @@ export default function SpotifyAccountPlaylistsPanel() {
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white/75 text-slate-400 backdrop-blur-md hover:text-slate-900"
                   >
                     <ExternalLink style={{ width: 11, height: 11 }} />
                   </a>
