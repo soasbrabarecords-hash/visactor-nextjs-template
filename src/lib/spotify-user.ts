@@ -3,6 +3,7 @@ import "server-only";
 import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 import {
   clearCurrentWorkspaceSpotifyConnection,
   getEffectiveSpotifyCredentials,
@@ -77,8 +78,16 @@ type SpotifyPlaylistTracksResponse = {
   total?: number;
 };
 
-type SpotifySeveralTracksResponse = {
-  tracks?: Array<SpotifyPlaylistTrackItem["track"]>;
+type SpotifyOfficialChartResponse = {
+  entries?: Array<{
+    chartEntryData?: {
+      currentRank?: number;
+    };
+    trackMetadata?: {
+      trackUri?: string;
+      displayImageUri?: string;
+    };
+  }>;
 };
 
 type SpotifyPlaylistTrackItem = {
@@ -1299,7 +1308,18 @@ export async function fetchSpotifyAccountPlaylists({
   }
 }
 
-export async function fetchSpotifyTrackCoverUrls(trackIds: string[]) {
+export async function fetchSpotifyTrackCoverUrls(
+  trackIds: string[],
+  {
+    country = "BR",
+    chartDate = "latest",
+    trackIdsByRank,
+  }: {
+    country?: string;
+    chartDate?: string;
+    trackIdsByRank?: ReadonlyMap<number, string>;
+  } = {},
+) {
   const uniqueTrackIds = Array.from(
     new Set(
       trackIds
@@ -1312,44 +1332,70 @@ export async function fetchSpotifyTrackCoverUrls(trackIds: string[]) {
     return new Map<string, string>();
   }
 
-  const { data } = await withSpotifyToken(async (accessToken) => {
+  const allowedTrackIds = new Set(uniqueTrackIds);
+  const normalizedCountry = country.trim().toUpperCase();
+  const chartAlias =
+    normalizedCountry === "GLOBAL"
+      ? "regional-global-daily"
+      : `regional-${normalizedCountry.toLowerCase()}-daily`;
+  const chartCovers = await withSpotifyToken(async (accessToken) => {
+    const response = await fetch(
+      `https://charts-spotify-com-service.spotify.com/auth/v0/charts/${encodeURIComponent(chartAlias)}/${encodeURIComponent(chartDate)}`,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Spotify Charts covers error ${response.status}`);
+    }
+
+    const payload = (await response.json()) as SpotifyOfficialChartResponse;
     const covers = new Map<string, string>();
 
-    for (let index = 0; index < uniqueTrackIds.length; index += 50) {
-      const chunk = uniqueTrackIds.slice(index, index + 50);
-      const searchParams = new URLSearchParams({ ids: chunk.join(",") });
-      const response = await fetch(
-        `https://api.spotify.com/v1/tracks?${searchParams.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          cache: "no-store",
-        },
-      );
+    for (const entry of payload.entries ?? []) {
+      const officialTrackId = entry.trackMetadata?.trackUri?.split(":").at(-1);
+      const snapshotTrackId = entry.chartEntryData?.currentRank
+        ? trackIdsByRank?.get(entry.chartEntryData.currentRank)
+        : null;
+      const trackId =
+        officialTrackId && allowedTrackIds.has(officialTrackId)
+          ? officialTrackId
+          : snapshotTrackId;
+      const imageUrl = entry.trackMetadata?.displayImageUri?.trim();
 
-      if (!response.ok) {
-        throw new Error(
-          await getSpotifyErrorMessage(
-            response,
-            `Spotify track covers error ${response.status}`,
-          ),
-        );
-      }
-
-      const payload = (await response.json()) as SpotifySeveralTracksResponse;
-
-      for (const track of payload.tracks ?? []) {
-        const imageUrl = track?.album?.images?.[0]?.url?.trim();
-
-        if (track?.id && imageUrl) {
-          covers.set(track.id, imageUrl);
-        }
+      if (trackId && imageUrl && allowedTrackIds.has(trackId)) {
+        covers.set(trackId, imageUrl);
       }
     }
 
     return covers;
-  });
+  })
+    .then(({ data }) => data)
+    .catch((error) => {
+      process.stderr.write(
+        `Failed to load official Spotify Charts covers: ${error instanceof Error ? error.message : "unknown error"}\n`,
+      );
+      return new Map<string, string>();
+    });
 
-  return data;
+  const missingTrackIds = uniqueTrackIds.filter(
+    (trackId) => !chartCovers.has(trackId),
+  );
+
+  if (missingTrackIds.length > 0) {
+    const fallbackCovers = await fetchSpotifyOEmbedCoverUrls(missingTrackIds);
+
+    for (const [trackId, imageUrl] of fallbackCovers) {
+      chartCovers.set(trackId, imageUrl);
+    }
+  }
+
+  return chartCovers;
 }
 
 export async function fetchSpotifyConnectionStatus(): Promise<{

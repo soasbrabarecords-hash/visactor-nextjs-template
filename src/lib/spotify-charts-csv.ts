@@ -4,6 +4,7 @@ import {
   fetchSpotifyTracksByIds,
   type SpotifyTrackRecord,
 } from "@/lib/spotify";
+import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 import {
   importSpotifyChartRows,
   type SpotifyChartImportRow,
@@ -249,6 +250,8 @@ async function enrichRowsWithSpotifyMetadata(
     return rows;
   }
 
+  let enrichedRows = rows;
+
   try {
     const normalizedMarket = market.trim().toUpperCase();
     const spotifyMarket = /^[A-Z]{2}$/.test(normalizedMarket)
@@ -260,7 +263,7 @@ async function enrichRowsWithSpotifyMetadata(
     );
     const tracksById = buildTrackRecordMap(spotifyTracks);
 
-    return rows.map((row) => {
+    enrichedRows = rows.map((row) => {
       const trackId = row.spotify_track_id?.trim() ?? "";
       const spotifyTrack = tracksById.get(trackId);
 
@@ -289,8 +292,24 @@ async function enrichRowsWithSpotifyMetadata(
     process.stderr.write(
       `Failed to enrich spotify chart rows with Spotify metadata: ${message}\n`,
     );
-    return rows;
   }
+
+  const missingCoverTrackIds = enrichedRows
+    .filter((row) => !row.image_url)
+    .map((row) => row.spotify_track_id?.trim() ?? "")
+    .filter((trackId) => trackId.length > 0);
+  const fallbackCovers = await fetchSpotifyOEmbedCoverUrls(
+    missingCoverTrackIds,
+  ).catch(() => new Map<string, string>());
+
+  return enrichedRows.map((row) => {
+    const trackId = row.spotify_track_id?.trim() ?? "";
+
+    return {
+      ...row,
+      image_url: row.image_url ?? fallbackCovers.get(trackId) ?? null,
+    };
+  });
 }
 
 export async function importSpotifyChartsCsvContent({

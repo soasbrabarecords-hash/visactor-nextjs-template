@@ -523,6 +523,12 @@ export async function getSnapshotWithComparison(
 
     const imageUrlMap = new Map<string, string>();
     if (trackIds.length > 0) {
+      for (const track of rawTracks) {
+        if (track.spotify_track_id && track.image_url) {
+          imageUrlMap.set(track.spotify_track_id, track.image_url);
+        }
+      }
+
       const { data: entryRows } = await supabase
         .from("spotify_chart_entries")
         .select("spotify_track_id,image_url")
@@ -545,27 +551,38 @@ export async function getSnapshotWithComparison(
       );
 
       if (missingImageTrackIds.length > 0) {
-        const connectedAccountCovers = await fetchSpotifyTrackCoverUrls(
+        const recoveredCovers = await fetchSpotifyTrackCoverUrls(
           missingImageTrackIds,
+          {
+            country,
+            chartDate,
+            trackIdsByRank: new Map(
+              rawTracks.flatMap((track) =>
+                track.spotify_track_id
+                  ? [[track.position, track.spotify_track_id] as const]
+                  : [],
+              ),
+            ),
+          },
         ).catch((error) => {
           process.stderr.write(
-            `Failed to recover chart covers with connected Spotify account: ${error instanceof Error ? error.message : "unknown error"}\n`,
+            `Failed to recover Spotify Charts covers: ${error instanceof Error ? error.message : "unknown error"}\n`,
           );
           return new Map<string, string>();
         });
 
-        for (const [trackId, imageUrl] of connectedAccountCovers) {
+        for (const [trackId, imageUrl] of recoveredCovers) {
           imageUrlMap.set(trackId, imageUrl);
         }
 
-        if (connectedAccountCovers.size > 0) {
+        if (recoveredCovers.size > 0) {
           const admin = createAdminClient();
           const recoveredRows = rawTracks
             .filter(
               (track) =>
                 !track.image_url &&
                 track.spotify_track_id &&
-                connectedAccountCovers.has(track.spotify_track_id),
+                recoveredCovers.has(track.spotify_track_id),
             )
             .map((track) => ({
               snapshot_id: track.snapshot_id,
@@ -578,7 +595,7 @@ export async function getSnapshotWithComparison(
               streams: track.streams,
               kworb_streams_24h: track.kworb_streams_24h,
               genre: track.genre,
-              image_url: connectedAccountCovers.get(
+              image_url: recoveredCovers.get(
                 track.spotify_track_id as string,
               ),
             }));
