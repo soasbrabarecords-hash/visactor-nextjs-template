@@ -13,10 +13,12 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{
     next?: string | string[];
+    mode?: string | string[];
   }>;
 }) {
   const params = await searchParams;
   const nextPath = getSearchParamValue(params.next);
+  const isAddingAccount = getSearchParamValue(params.mode) === "add";
 
-  return <LoginForm nextPath={nextPath} />;
+  return <LoginForm nextPath={nextPath} isAddingAccount={isAddingAccount} />;
 }

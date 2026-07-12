@@ -1,5 +1,5 @@
+import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
 
 function isPublicRoute(pathname: string) {
   return (
@@ -19,6 +19,8 @@ function isPublicRoute(pathname: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
+  const isAddingAccount =
+    isLoginRoute && request.nextUrl.searchParams.get("mode") === "add";
 
   if (isPublicRoute(pathname) && !isLoginRoute) {
     return NextResponse.next({
@@ -59,7 +61,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (isLoginRoute && user) {
+  if (isLoginRoute && user && !isAddingAccount) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

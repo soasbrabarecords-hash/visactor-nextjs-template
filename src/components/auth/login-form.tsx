@@ -1,7 +1,7 @@
 "use client";
 
-import { LockKeyhole, Music4 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowLeft, LockKeyhole, Music4 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,13 @@ import { createClient } from "@/lib/supabase/client";
 const FRIENDLY_AUTH_ERROR =
   "Não foi possível entrar. Confira seu e-mail e senha e tente novamente.";
 
-export default function LoginForm({ nextPath }: { nextPath?: string }) {
-  const router = useRouter();
+export default function LoginForm({
+  nextPath,
+  isAddingAccount = false,
+}: {
+  nextPath?: string;
+  isAddingAccount?: boolean;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,10 +33,26 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
       password,
     });
 
-    setIsSubmitting(false);
-
     if (error) {
+      setIsSubmitting(false);
       setErrorMessage(error.message || FRIENDLY_AUTH_ERROR);
+      return;
+    }
+
+    const saveResponse = await fetch("/api/auth/accounts", {
+      method: "POST",
+    });
+    const savePayload = (await saveResponse.json().catch(() => null)) as {
+      success?: boolean;
+      message?: string;
+    } | null;
+
+    if (!saveResponse.ok || !savePayload?.success) {
+      setIsSubmitting(false);
+      setErrorMessage(
+        savePayload?.message ??
+          "A conta entrou, mas não foi possível mantê-la conectada.",
+      );
       return;
     }
 
@@ -40,8 +61,7 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
         ? nextPath
         : "/dashboard";
 
-    router.push(destination);
-    router.refresh();
+    window.location.assign(destination);
   }
 
   return (
@@ -53,10 +73,12 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
             <Music4 className="h-5 w-5" />
           </div>
           <h1 className="text-2xl font-semibold tracking-[-0.035em] text-foreground">
-            Music Business OS
+            {isAddingAccount ? "Adicionar conta" : "Music Business OS"}
           </h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Acesso interno à sua operação musical.
+            {isAddingAccount
+              ? "Entre na conta que deseja manter conectada."
+              : "Acesso interno à sua operação musical."}
           </p>
         </div>
 
@@ -104,9 +126,25 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
             type="submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Entrando..." : "Entrar"}
+            {isSubmitting
+              ? isAddingAccount
+                ? "Adicionando..."
+                : "Entrando..."
+              : isAddingAccount
+                ? "Adicionar conta"
+                : "Entrar"}
           </Button>
         </form>
+
+        {isAddingAccount ? (
+          <Link
+            href="/dashboard"
+            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-xl text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar sem adicionar
+          </Link>
+        ) : null}
 
         <div className="mt-5 flex items-center justify-center gap-2 border-t border-border/70 pt-4 text-xs text-muted-foreground">
           <LockKeyhole className="h-3.5 w-3.5" />
