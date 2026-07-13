@@ -154,13 +154,15 @@ export async function upsertChartSnapshot(
 
   const country = input.country ?? "BR";
   const chartDate = input.chart_date;
+  const chartType = input.chart_type ?? "top_200_daily";
 
-  // 1. Check if a snapshot already exists for this date + country
+  // 1. Check if a snapshot already exists for this date + country + type
   const { data: existing } = await supabase
     .from("chart_snapshots")
     .select("*")
     .eq("chart_date", chartDate)
     .eq("country", country)
+    .eq("chart_type", chartType)
     .maybeSingle();
 
   if (existing) {
@@ -171,7 +173,7 @@ export async function upsertChartSnapshot(
         total_tracks: input.total_tracks,
         imported_at: new Date().toISOString(),
         source: input.source ?? existing.source ?? "spotify_charts_csv",
-        chart_type: input.chart_type ?? existing.chart_type ?? "top_200_daily",
+        chart_type: chartType,
         original_filename: input.original_filename ?? existing.original_filename ?? null,
       })
       .eq("id", existing.id)
@@ -194,7 +196,7 @@ export async function upsertChartSnapshot(
       chart_date: chartDate,
       source: input.source ?? "spotify_charts_csv",
       country,
-      chart_type: input.chart_type ?? "top_200_daily",
+      chart_type: chartType,
       original_filename: input.original_filename ?? null,
       total_tracks: input.total_tracks,
       imported_at: new Date().toISOString(),
@@ -300,9 +302,9 @@ export async function getSnapshotDates(country = "BR"): Promise<string[]> {
   const supabase = await createClient();
   const request = (async () => {
     const { data, error } = await supabase
-      .from("chart_snapshots")
+      .from("spotify_chart_complete_snapshots")
       .select("chart_date")
-      .eq("country", country)
+      .eq("country", cacheKey)
       .order("chart_date", { ascending: false });
 
     if (error) {

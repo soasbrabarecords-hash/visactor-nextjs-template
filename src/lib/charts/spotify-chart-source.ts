@@ -1,12 +1,14 @@
 import "server-only";
+import { CURRENT_AUTOMATIC_SPOTIFY_CHART_REGIONS } from "@/lib/charts/spotify-chart-region-catalog";
 
 export type SpotifyChartSourceType = "spotify_official" | "kworb";
 
 export type AutomaticChart = {
   chartType: string;
   country: string;
+  metadataMarket: string;
   csvUrlTemplate: string | null;
-  fallbackUrl: string;
+  fallbackUrl: string | null;
 };
 
 export type DownloadedSpotifyChart = {
@@ -16,23 +18,130 @@ export type DownloadedSpotifyChart = {
   sourceType: SpotifyChartSourceType;
 };
 
+type HistoricalSourceConfig = {
+  regionId: string;
+  sourceKey: string;
+  environmentVariable: string;
+  fallbackUrl: string | null;
+  metadataMarket: string;
+  requiresCityValidation: boolean;
+};
+
+// Keep this separate from CURRENT_AUTOMATIC_SPOTIFY_CHART_REGIONS. The daily
+// 10h cron must remain BR + Global even after city backfills are enabled.
+const historicalSourceConfigs = [
+  {
+    regionId: "BR",
+    sourceKey: "br",
+    environmentVariable: "SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE",
+    fallbackUrl: "https://kworb.net/spotify/country/br_daily.html",
+    metadataMarket: "BR",
+    requiresCityValidation: false,
+  },
+  {
+    regionId: "GLOBAL",
+    sourceKey: "global",
+    environmentVariable: "SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE",
+    fallbackUrl: "https://kworb.net/spotify/country/global_daily.html",
+    metadataMarket: "US",
+    requiresCityValidation: false,
+  },
+  {
+    regionId: "BR-SP-SAO-PAULO",
+    sourceKey: "br-sao-paulo",
+    environmentVariable: "SPOTIFY_CHARTS_BR_SAO_PAULO_CSV_URL_TEMPLATE",
+    fallbackUrl: null,
+    metadataMarket: "BR",
+    requiresCityValidation: true,
+  },
+  {
+    regionId: "BR-RJ-RIO-DE-JANEIRO",
+    sourceKey: "br-rio-de-janeiro",
+    environmentVariable: "SPOTIFY_CHARTS_BR_RIO_DE_JANEIRO_CSV_URL_TEMPLATE",
+    fallbackUrl: null,
+    metadataMarket: "BR",
+    requiresCityValidation: true,
+  },
+  {
+    regionId: "BR-RS-PORTO-ALEGRE",
+    sourceKey: "br-porto-alegre",
+    environmentVariable: "SPOTIFY_CHARTS_BR_PORTO_ALEGRE_CSV_URL_TEMPLATE",
+    fallbackUrl: null,
+    metadataMarket: "BR",
+    requiresCityValidation: true,
+  },
+] as const satisfies readonly HistoricalSourceConfig[];
+
+function readHistoricalTemplate(environmentVariable: string) {
+  return process.env[environmentVariable]?.trim() || null;
+}
+
+function isCityBackfillValidated() {
+  return process.env.SPOTIFY_CHARTS_CITY_BACKFILL_VALIDATED === "1";
+}
+
+function getHistoricalSourceConfig(regionId: string) {
+  const normalizedRegionId = regionId.trim().toUpperCase();
+  return (
+    historicalSourceConfigs.find(
+      (source) => source.regionId === normalizedRegionId,
+    ) ?? null
+  );
+}
+
+function mapHistoricalChart(source: HistoricalSourceConfig): AutomaticChart {
+  return {
+    chartType: "top-songs",
+    country: source.regionId,
+    metadataMarket: source.metadataMarket,
+    csvUrlTemplate: readHistoricalTemplate(source.environmentVariable),
+    fallbackUrl: source.fallbackUrl,
+  };
+}
+
 export function getAutomaticCharts(): AutomaticChart[] {
-  return [
-    {
-      chartType: "top-songs",
-      country: "BR",
-      csvUrlTemplate:
-        process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE?.trim() || null,
-      fallbackUrl: "https://kworb.net/spotify/country/br_daily.html",
-    },
-    {
-      chartType: "top-songs",
-      country: "GLOBAL",
-      csvUrlTemplate:
-        process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE?.trim() || null,
-      fallbackUrl: "https://kworb.net/spotify/country/global_daily.html",
-    },
-  ];
+  return CURRENT_AUTOMATIC_SPOTIFY_CHART_REGIONS.map((region) => {
+    const source = getHistoricalSourceConfig(region.regionKey);
+
+    if (!source) {
+      throw new Error(`Fonte automatica ausente para ${region.regionKey}.`);
+    }
+
+    return mapHistoricalChart(source);
+  });
+}
+
+export function getHistoricalSpotifyChartSourceReadiness(
+  regionIds: readonly string[] = historicalSourceConfigs.map(
+    (source) => source.regionId,
+  ),
+) {
+  return regionIds.map((regionId) => {
+    const source = getHistoricalSourceConfig(regionId);
+    const template = source
+      ? readHistoricalTemplate(source.environmentVariable)
+      : null;
+    const hasHistoricalTemplate = Boolean(template?.includes("{date}"));
+    const citySourceValidated =
+      !source?.requiresCityValidation || isCityBackfillValidated();
+    const supportsHistoricalDates =
+      hasHistoricalTemplate && citySourceValidated;
+
+    return {
+      regionId: regionId.trim().toUpperCase(),
+      supportsHistoricalDates,
+      requiredEnvironmentVariable: source?.environmentVariable ?? null,
+      reason: !source
+        ? "historical_region_not_configured"
+        : source.requiresCityValidation && !citySourceValidated
+          ? "historical_city_source_not_validated"
+          : supportsHistoricalDates
+            ? null
+            : template
+              ? "template_missing_date_placeholder"
+              : "historical_csv_template_not_configured",
+    };
+  });
 }
 
 export function getAutomaticChart(country: string, chartType: string) {
@@ -46,6 +155,29 @@ export function getAutomaticChart(country: string, chartType: string) {
         chart.chartType === normalizedChartType,
     ) ?? null
   );
+}
+
+export function getBackfillChart(country: string, chartType: string) {
+  const normalizedCountry = country.trim().toUpperCase();
+  const normalizedChartType = chartType.trim().toLowerCase();
+  const source = getHistoricalSourceConfig(normalizedCountry);
+
+  if (!source || normalizedChartType !== "top-songs") return null;
+
+  const readiness = getHistoricalSpotifyChartSourceReadiness([
+    normalizedCountry,
+  ])[0];
+  if (!readiness?.supportsHistoricalDates && source.requiresCityValidation) {
+    return null;
+  }
+
+  const chart = mapHistoricalChart(source);
+  if (!chart.csvUrlTemplate && !chart.fallbackUrl) return null;
+  return chart;
+}
+
+export function getBackfillChartRegionKeys() {
+  return historicalSourceConfigs.map((source) => source.regionId);
 }
 
 function formatUtcDate(date: Date) {
@@ -226,6 +358,12 @@ async function downloadOfficialChart(
 async function downloadKworbLatest(
   chart: AutomaticChart,
 ): Promise<DownloadedSpotifyChart> {
+  if (!chart.fallbackUrl) {
+    throw new Error(
+      `Fallback mais recente indisponivel para ${chart.country}.`,
+    );
+  }
+
   const response = await fetch(chart.fallbackUrl, {
     cache: "no-store",
     headers: {
@@ -260,11 +398,13 @@ export async function downloadSpotifyChartForDate(
   }
 
   try {
-    const kworb = await downloadKworbLatest(chart);
-    if (kworb.chartDate === chartDate) return kworb;
-    errors.push(
-      `Kworb disponibiliza ${kworb.chartDate}, nao a data solicitada ${chartDate}.`,
-    );
+    if (chart.fallbackUrl) {
+      const kworb = await downloadKworbLatest(chart);
+      if (kworb.chartDate === chartDate) return kworb;
+      errors.push(
+        `Kworb disponibiliza ${kworb.chartDate}, nao a data solicitada ${chartDate}.`,
+      );
+    }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : "falha no Kworb");
   }
@@ -294,11 +434,13 @@ export async function downloadLatestAvailableChart(
   }
 
   try {
-    const kworb = await downloadKworbLatest(chart);
-    if (candidateDates.includes(kworb.chartDate)) return kworb;
-    errors.push(
-      `Kworb disponibiliza ${kworb.chartDate}, fora da janela de hoje, ontem ou anteontem.`,
-    );
+    if (chart.fallbackUrl) {
+      const kworb = await downloadKworbLatest(chart);
+      if (candidateDates.includes(kworb.chartDate)) return kworb;
+      errors.push(
+        `Kworb disponibiliza ${kworb.chartDate}, fora da janela de hoje, ontem ou anteontem.`,
+      );
+    }
   } catch (error) {
     errors.push(error instanceof Error ? error.message : "falha no Kworb");
   }

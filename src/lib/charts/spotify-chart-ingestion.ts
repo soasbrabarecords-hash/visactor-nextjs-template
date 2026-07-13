@@ -1,5 +1,4 @@
 import "server-only";
-
 import { importSpotifyChartCsv } from "@/lib/charts/import-spotify-chart-csv";
 import {
   finishSpotifyChartRun,
@@ -46,6 +45,7 @@ export async function ingestSpotifyChart(
       csvText: downloaded.csvText,
       chartType: chart.chartType,
       country: chart.country,
+      metadataMarket: chart.metadataMarket,
       chartDate: downloaded.chartDate,
       sourceUrl: downloaded.sourceUrl,
       sourceType: downloaded.sourceType,

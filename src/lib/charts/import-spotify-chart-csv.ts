@@ -1,5 +1,4 @@
 import "server-only";
-
 import { importSpotifyChartsCsvContent } from "@/lib/spotify-charts-csv";
 import type { SpotifyChartsImportResult } from "@/lib/spotify-charts-importer";
 
@@ -7,6 +6,7 @@ export type SpotifyChartCsvImportInput = {
   csvText: string;
   chartType: string;
   country: string;
+  metadataMarket?: string;
   chartDate: string;
   sourceUrl?: string;
   sourceType?: string;
@@ -27,6 +27,7 @@ export async function importSpotifyChartCsv({
   csvText,
   chartType,
   country,
+  metadataMarket,
   chartDate,
   sourceUrl,
   sourceType,
@@ -51,6 +52,7 @@ export async function importSpotifyChartCsv({
     csvText,
     chartType: normalizedChartType,
     country: normalizedCountry,
+    metadataMarket,
     chartDate: date,
     sourceType,
     genre,

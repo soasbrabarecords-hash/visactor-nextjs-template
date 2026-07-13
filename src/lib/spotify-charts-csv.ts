@@ -315,6 +315,7 @@ async function enrichRowsWithSpotifyMetadata(
 export async function importSpotifyChartsCsvContent({
   csvText,
   country,
+  metadataMarket,
   genre,
   chartDate,
   chartType,
@@ -324,6 +325,7 @@ export async function importSpotifyChartsCsvContent({
 }: {
   csvText: string;
   country?: string;
+  metadataMarket?: string;
   genre?: string;
   chartDate?: string;
   chartType?: string;
@@ -342,7 +344,10 @@ export async function importSpotifyChartsCsvContent({
     }),
   );
   const enrichedRows = enrichSpotifyMetadata
-    ? await enrichRowsWithSpotifyMetadata(mappedRows, country ?? "BR")
+    ? await enrichRowsWithSpotifyMetadata(
+        mappedRows,
+        metadataMarket ?? country ?? "BR",
+      )
     : mappedRows;
 
   return importSpotifyChartRows(enrichedRows, { persistStreamSnapshots });

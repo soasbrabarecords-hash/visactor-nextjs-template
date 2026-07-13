@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:spotify-backfill": "node --experimental-strip-types --experimental-test-module-mocks --loader ./tests/support/ts-alias-loader.mjs --test --test-concurrency=1 tests/spotify-chart-backfill-*.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.1",

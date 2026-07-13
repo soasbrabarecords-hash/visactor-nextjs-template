@@ -1,9 +1,9 @@
 import "server-only";
-
 import { ingestSpotifyChart } from "@/lib/charts/spotify-chart-ingestion";
 import {
   downloadSpotifyChartForDate,
-  getAutomaticChart,
+  getBackfillChart,
+  getBackfillChartRegionKeys,
 } from "@/lib/charts/spotify-chart-source";
 
 export const MAX_SPOTIFY_CHART_BACKFILL_DAYS = 7;
@@ -51,10 +51,12 @@ export async function backfillSpotifyCharts(input: {
 }) {
   const country = input.country.trim().toUpperCase();
   const chartType = input.chartType.trim().toLowerCase();
-  const chart = getAutomaticChart(country, chartType);
+  const chart = getBackfillChart(country, chartType);
 
   if (!chart) {
-    throw new Error("Chart nao configurado. Use BR/GLOBAL e top-songs.");
+    throw new Error(
+      `Chart de backfill nao configurado. Regioes conhecidas: ${getBackfillChartRegionKeys().join("/")}.`,
+    );
   }
 
   const dates = enumerateDates(input.startDate, input.endDate);
@@ -71,10 +73,7 @@ export async function backfillSpotifyCharts(input: {
   return {
     success: results.filter((result) => result.success).length,
     failed: results.filter((result) => !result.success).length,
-    rows_count: results.reduce(
-      (total, result) => total + result.rowsCount,
-      0,
-    ),
+    rows_count: results.reduce((total, result) => total + result.rowsCount, 0),
     imported_dates: results
       .filter((result) => result.success)
       .map((result) => result.chartDate),
