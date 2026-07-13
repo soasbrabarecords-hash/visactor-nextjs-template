@@ -807,11 +807,6 @@ export default function PlaylistEditor({
   );
   const isIntelligenceEnriching = chartLoading || tracks.some((track) => track.streamsLoading);
   async function handleApplySuggestedOrder() {
-    if (pendingReorder) {
-      setError("Salve ou cancele a ordem manual antes de aplicar a sugestao da IA.");
-      return false;
-    }
-
     const trackByKey = new Map(
       tracks.map((track, index) => [`${track.id}:${index}`, track]),
     );
@@ -835,13 +830,28 @@ export default function PlaylistEditor({
         intelligence={intelligence}
         isEnriching={isIntelligenceEnriching}
         isApplyingOrder={saving}
-        applyDisabledReason={
-          pendingReorder
-            ? "Salve ou cancele a ordem manual antes."
-            : undefined
-        }
         onApplySuggestedOrder={handleApplySuggestedOrder}
       />
+
+      {/* Ações da ordenação manual — o skin posiciona este bloco no topo do editor. */}
+      <div data-playlist-order-actions className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {pendingReorder ? (
+            <>
+              <span className="text-xs font-medium text-yellow-500">
+                Ordem alterada — ainda não salva
+              </span>
+              <Button type="button" size="sm" variant="outline" onClick={handleCancelReorder} disabled={saving}>
+                <X className="h-3.5 w-3.5" /> Cancelar
+              </Button>
+              <Button type="button" size="sm" onClick={() => void handleConfirmReorder()} disabled={saving}>
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                Salvar nova ordem
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
 
       {/* Guia curto de seleção e estado atual */}
       <div className="grid gap-2 border-y border-border/70 py-2.5 text-xs text-muted-foreground tablet:grid-cols-[1fr_auto] tablet:items-center">
@@ -1106,33 +1116,6 @@ export default function PlaylistEditor({
         />
       </div>
 
-      {pendingReorder ? (
-        <div className="fixed bottom-4 left-4 right-4 z-[70] flex justify-center tablet:left-auto tablet:right-6 tablet:w-[560px]">
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-2.5 pl-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
-          >
-            <div className="min-w-0">
-              <p className={`truncate text-sm font-semibold ${error ? "text-red-300" : "text-white"}`}>
-                {error ? "Não foi possível salvar" : "Nova ordem pronta"}
-              </p>
-              <p className={`truncate text-[11px] ${error ? "text-red-200/75" : "text-white/60"}`}>
-                {error ?? "Revise a lista e confirme para atualizar o Spotify."}
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button type="button" size="sm" variant="ghost" onClick={handleCancelReorder} disabled={saving} className="rounded-xl text-white/72 hover:bg-white/10 hover:text-white">
-                <X className="h-3.5 w-3.5" /> Cancelar
-              </Button>
-              <Button type="button" size="sm" onClick={() => void handleConfirmReorder()} disabled={saving} className="rounded-xl bg-white text-slate-950 hover:bg-white/90">
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                Confirmar nova ordem
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

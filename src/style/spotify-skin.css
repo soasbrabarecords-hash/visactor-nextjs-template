@@ -585,7 +585,7 @@
 
 /* ── Barra de controles do PlaylistEditor (selecionadas / save / cancel) ── */
 /* Move pra junto do Play (absolute também), na mesma linha à direita ───── */
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+.spotify-skin [data-playlist-order-actions] {
   position: relative !important;
   margin-top: 0 !important;
   padding-left: 96px !important;  /* deixa espaço pro Play que está absoluto */
@@ -725,7 +725,7 @@
 }
 
 /* Se a barra estiver vazia (sem save/cancel), some completamente */
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between:not(:has(button)) {
+.spotify-skin [data-playlist-order-actions]:not(:has(button)) {
   display: none !important;
 }
 
@@ -903,30 +903,30 @@
 /* O botão default tem variant primary. Vamos identificar pela cor inline
    ou pelo conteúdo (texto "Salvar ordem"). Como é um <Button> shadcn,
    filtro pelo SVG Save dentro dele */
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button:not([class*="outline"]) {
+.spotify-skin [data-playlist-order-actions] button:not([class*="outline"]) {
   background-color: var(--sp-green) !important;
   color: #000 !important;
   font-weight: 700 !important;
   border: 0 !important;
 }
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button:not([class*="outline"]):hover {
+.spotify-skin [data-playlist-order-actions] button:not([class*="outline"]):hover {
   background-color: var(--sp-green-hover) !important;
   transform: scale(1.04);
 }
 
 /* Botão "Cancelar" outline — mantém pill mas estilo Spotify */
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"] {
+.spotify-skin [data-playlist-order-actions] button[class*="outline"] {
   background-color: transparent !important;
   border: 1px solid var(--sp-divider) !important;
   color: var(--sp-text) !important;
 }
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"]:hover {
+.spotify-skin [data-playlist-order-actions] button[class*="outline"]:hover {
   border-color: var(--sp-text) !important;
   background-color: var(--sp-tint) !important;
 }
 
 /* "Ordem alterada — não salvo" texto: branco discreto */
-.spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between span.text-yellow-500 {
+.spotify-skin [data-playlist-order-actions] span.text-yellow-500 {
   color: var(--sp-text-muted) !important;
   font-size: 12px !important;
   font-weight: 400 !important;
@@ -944,7 +944,7 @@
     align-items: stretch !important;
     padding: 12px 16px !important;
   }
-  .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between {
+  .spotify-skin [data-playlist-order-actions] {
     position: static !important;
     top: auto !important;
     right: auto !important;
