@@ -1147,7 +1147,7 @@ export default function PlaylistEditor({
                 size="sm"
                 onClick={() => void handleConfirmReorder()}
                 disabled={saving}
-                className="rounded-xl bg-white text-slate-950 hover:bg-white/90"
+                className="rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-500 focus-visible:ring-blue-400 disabled:bg-blue-600/60 disabled:text-white/70"
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                 Confirmar nova ordem
