@@ -431,8 +431,8 @@ export default function CurationTable({
 
   return (
     <Container className="pb-8 pt-2 tablet:pt-3">
-      <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[rgba(8,13,24,0.96)] shadow-[0_28px_90px_-42px_rgba(15,23,42,0.85)] backdrop-blur-xl">
-        <div className="absolute inset-x-0 top-0 h-px bg-white/25" />
+      <div className="relative overflow-hidden rounded-[26px] border border-border bg-card shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950">
+        <div className="absolute inset-x-0 top-0 h-px bg-border dark:bg-slate-700" />
 
         <div className="relative border-b border-white/[0.08] px-4 py-4 tablet:px-6 tablet:py-5">
           <div className="space-y-4">
@@ -456,19 +456,19 @@ export default function CurationTable({
 
               <div className="grid grid-cols-3 gap-1.5 tablet:max-w-[330px]">
                 <div className="rounded-xl border border-emerald-400/15 bg-white/[0.035] px-3 py-2">
-                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-emerald-300/65">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300/65">
                     Entrar
                   </div>
                   <div className="mt-0.5 text-lg font-semibold text-white">{addNowCount}</div>
                 </div>
                 <div className="rounded-xl border border-sky-400/15 bg-white/[0.035] px-3 py-2">
-                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-sky-300/65">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300/65">
                     Top 20
                   </div>
                   <div className="mt-0.5 text-lg font-semibold text-white">{top20Count}</div>
                 </div>
                 <div className="rounded-xl border border-violet-400/15 bg-white/[0.035] px-3 py-2">
-                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-violet-300/65">
+                  <div className="text-[8px] font-medium uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300/65">
                     Discovery
                   </div>
                   <div className="mt-0.5 text-lg font-semibold text-white">{discoveryCount}</div>
@@ -513,7 +513,7 @@ export default function CurationTable({
                               <Music2 className="h-8 w-8" />
                             </div>
                           ) : null}
-                          <div className="absolute inset-0 bg-black/10" />
+                          <div className="absolute inset-0 bg-slate-950/10" />
                           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2">
                             <MovementBadge row={track} />
                             <StatusBadge tone="green" className="px-2 py-0.5 text-[9px]">
@@ -666,9 +666,9 @@ export default function CurationTable({
                           row.streamGrowthPercent === null
                             ? "text-muted-foreground"
                             : row.streamGrowthPercent > 0
-                              ? "text-emerald-400"
+                              ? "text-emerald-600 dark:text-emerald-400"
                               : row.streamGrowthPercent < 0
-                                ? "text-red-400"
+                                ? "text-red-600 dark:text-red-400"
                                 : "text-white/45",
                         )}
                       >
@@ -747,13 +747,13 @@ export default function CurationTable({
                           }
                           className={
                             suggestion.style === "funk"
-                              ? "!border-orange-500/30 !bg-orange-500/10 !text-orange-400"
+                              ? "!border-orange-500/30 !bg-orange-500/10 !text-orange-600 dark:!text-orange-400"
                               : suggestion.style === "piseiro"
-                              ? "!border-lime-500/30 !bg-lime-500/10 !text-lime-400"
+                              ? "!border-lime-500/30 !bg-lime-500/10 !text-lime-700 dark:!text-lime-400"
                               : suggestion.style === "reggae"
-                              ? "!border-teal-500/30 !bg-teal-500/10 !text-teal-400"
+                              ? "!border-teal-500/30 !bg-teal-500/10 !text-teal-700 dark:!text-teal-400"
                               : suggestion.style === "rock"
-                              ? "!border-red-500/30 !bg-red-500/10 !text-red-400"
+                              ? "!border-red-500/30 !bg-red-500/10 !text-red-600 dark:!text-red-400"
                               : undefined
                           }
                         >

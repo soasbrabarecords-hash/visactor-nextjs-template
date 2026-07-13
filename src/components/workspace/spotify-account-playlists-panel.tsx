@@ -243,31 +243,24 @@ export default function SpotifyAccountPlaylistsPanel() {
       )}
 
       {/* ── HERO: Spotify profile style ── */}
-      <div className="relative min-h-[250px] overflow-hidden border-b border-white/10 bg-[#11131a] tablet:min-h-[230px]">
+      <div className="relative min-h-[250px] overflow-hidden border-b border-border bg-card tablet:min-h-[230px] dark:border-white/10 dark:bg-[rgb(17,19,26)]">
         {/* Blurred cover mosaic background */}
         {heroCover ? (
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 opacity-[0.14] blur-[72px] brightness-110 saturate-125 dark:opacity-100 dark:brightness-[0.22] dark:saturate-[1.15]"
             style={{
               backgroundImage: `url(${heroCover})`,
               backgroundPosition: "center 35%",
               backgroundSize: "cover",
-              filter: "blur(72px) brightness(0.22) saturate(1.15)",
               transform: "scale(1.1)",
             }}
           />
         ) : (
-          <div className="absolute inset-0 bg-[#151722]" />
+          <div className="absolute inset-0 bg-muted dark:bg-[rgb(21,23,34)]" />
         )}
 
-        {/* Gradient overlay — sempre presente */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(120deg, rgba(8,10,16,0.76) 0%, rgba(8,10,16,0.58) 46%, rgba(8,10,16,0.88) 100%)",
-          }}
-        />
+        {/* Gradient overlay — claro no light e profundo no dark */}
+        <div className="absolute inset-0 bg-card/90 dark:bg-[linear-gradient(120deg,rgba(8,10,16,0.76)_0%,rgba(8,10,16,0.58)_46%,rgba(8,10,16,0.88)_100%)]" />
 
         {/* Profile content — alinhado ao fundo como Spotify */}
         <div className="relative z-10 flex min-h-[250px] flex-col justify-center px-5 py-6 tablet:min-h-[230px] tablet:px-8 laptop:px-12">
@@ -362,7 +355,7 @@ export default function SpotifyAccountPlaylistsPanel() {
             </div>
           </div>
 
-          {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+          {error && <p className="mt-3 text-xs text-red-600 dark:text-red-300">{error}</p>}
           {scopedData && !scopedData.connected && (
             <p className="mt-2.5 text-xs text-white/45">{scopedData.message}</p>
           )}
@@ -370,7 +363,7 @@ export default function SpotifyAccountPlaylistsPanel() {
       </div>
 
       {/* ── Gradient fade — hero para fundo da página ── */}
-      <div className="pointer-events-none h-3 border-t border-white/5 bg-black/[0.03]" />
+      <div className="pointer-events-none h-3 border-t border-border bg-muted/40 dark:border-white/5 dark:bg-[rgba(0,0,0,0.03)]" />
 
       {/* ── Seção: Playlists públicas ── */}
       <div className="px-5 pb-4 pt-3 tablet:px-8 laptop:px-12">

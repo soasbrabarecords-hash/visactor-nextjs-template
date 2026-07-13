@@ -203,7 +203,7 @@ export default async function DashboardPage() {
 
   return (
     <ModuleGuard moduleKey="playlist_os">
-      <TopNav title="Visão geral" />
+      <TopNav title="Playlist OS" />
       <div className="relative min-h-[calc(100dvh-4rem)] overflow-hidden bg-[#08090c]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_18%_0%,rgba(37,99,235,0.12),transparent_40%),radial-gradient(circle_at_82%_4%,rgba(16,185,129,0.07),transparent_34%)]" />
 

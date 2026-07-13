@@ -7,7 +7,7 @@ export default function PlaylistAnalysisLayout({
 }) {
   return (
     <>
-      <TopNav title="Analise da Playlist" />
+      <TopNav title="Playlist OS" />
       <main>{children}</main>
     </>
   );

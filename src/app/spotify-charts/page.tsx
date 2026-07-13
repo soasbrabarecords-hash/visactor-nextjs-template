@@ -1,4 +1,5 @@
 import Container from "@/components/container";
+import { TopNav } from "@/components/nav";
 import ModuleGuard from "@/components/workspace/module-guard";
 import {
   getSnapshotDates,
@@ -34,6 +35,7 @@ export default async function SpotifyChartsPage({ searchParams }: Props) {
   return (
     <ModuleGuard moduleKey="playlist_os">
       <div className="overflow-hidden">
+        <TopNav title="Playlist OS" />
         <Container className="py-3">
           <SpotifyChartsClient
             initialDates={dates}

@@ -38,7 +38,7 @@ export default async function RadarMusicPage({
   return (
     <ModuleGuard moduleKey="playlist_os">
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.08),transparent_18%),linear-gradient(180deg,#040816_0%,#030712_100%)]">
-      <TopNav title="Radar Music" />
+      <TopNav title="Playlist OS" />
 
       <RadarMusicActionBoard
         queues={data.decisionQueues}

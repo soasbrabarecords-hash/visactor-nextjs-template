@@ -31,7 +31,7 @@ export default async function PlaylistsAnalyticsPage() {
   return (
     <ModuleGuard moduleKey="playlist_os">
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.10),transparent_26%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.12),transparent_28%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--background)))]">
-      <TopNav title="Playlists Analytics" />
+      <TopNav title="Playlist OS" />
       <Container className="border-b border-border py-6">
         <section className="relative overflow-hidden rounded-[36px] border border-white/70 bg-white/[0.72] p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_28px_110px_rgba(0,0,0,0.35)] tablet:p-7">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.95),transparent_34%),radial-gradient(circle_at_80%_18%,rgba(56,189,248,0.18),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.28),rgba(255,255,255,0.04))] dark:bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.16),transparent_34%),radial-gradient(circle_at_80%_18%,rgba(56,189,248,0.12),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))]" />

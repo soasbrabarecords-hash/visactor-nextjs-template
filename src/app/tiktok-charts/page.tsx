@@ -1,4 +1,5 @@
 import PageIntro from "@/components/page-intro";
+import { TopNav } from "@/components/nav";
 import ModuleGuard from "@/components/workspace/module-guard";
 import TikTokChartsTable from "@/components/workspace/tiktok-charts-table";
 import { fetchTikTokPublicChart } from "@/lib/tiktok-public-charts";
@@ -11,6 +12,7 @@ export default async function TikTokChartsPage() {
   return (
     <ModuleGuard moduleKey="playlist_os">
       <div>
+        <TopNav title="Playlist OS" />
         <PageIntro
           eyebrow="Curadoria / Radar Music"
           title="TikTok Charts — Brasil"

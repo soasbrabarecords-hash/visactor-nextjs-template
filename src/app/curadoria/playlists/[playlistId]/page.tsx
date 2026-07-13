@@ -23,7 +23,7 @@ export default async function SpotifyPlaylistEditorPage({
   if (!result.connected) {
     return (
       <div>
-        <TopNav title="Editar playlist" />
+        <TopNav title="Playlist OS" />
         <PageIntro
           eyebrow="Spotify"
           title="Playlist indisponivel"
@@ -60,7 +60,7 @@ export default async function SpotifyPlaylistEditorPage({
 
   return (
     <div className="spotify-skin">
-      <TopNav title="Editar playlist" />
+      <TopNav title="Playlist OS" />
 
       {/* Header estilo Spotify com edição inline de capa, nome e descrição */}
       <PlaylistHeader
