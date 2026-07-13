@@ -1,5 +1,4 @@
 import {
-  Activity,
   ArrowUpRight,
   BarChart3,
   ChevronRight,
@@ -19,9 +18,7 @@ import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-ad
 import StatusBadge from "@/components/workspace/status-badge";
 import { getDashboardWorkspaceData } from "@/lib/workspace-data";
 import type {
-  DashboardEditorialSpotlight,
   DecisionTrack,
-  RadarMusicRow,
   StatusTone,
   WorkspaceMetric,
 } from "@/types/workspace";
@@ -64,35 +61,6 @@ function queueAccentClasses(tone: StatusTone) {
   };
 
   return classes[tone];
-}
-
-function spotlightGlow(tone: StatusTone) {
-  const classes: Record<StatusTone, string> = {
-    green: "from-emerald-400/10",
-    red: "from-rose-400/10",
-    blue: "from-sky-400/10",
-    purple: "from-violet-400/10",
-    yellow: "from-amber-400/10",
-    slate: "from-white/[0.06]",
-  };
-
-  return classes[tone];
-}
-
-function movementLabel(row: RadarMusicRow) {
-  if (row.previousRank === null || row.rankChange === null) {
-    return "NEW";
-  }
-
-  if (row.previousRank > row.rank) {
-    return `+${row.previousRank - row.rank}`;
-  }
-
-  if (row.previousRank < row.rank) {
-    return `-${row.rank - row.previousRank}`;
-  }
-
-  return "0";
 }
 
 function QueueColumn({
@@ -196,11 +164,11 @@ function QueueColumn({
 
 function MetricBar({ metrics }: { metrics: WorkspaceMetric[] }) {
   return (
-    <div className="grid border-t border-white/[0.07] sm:grid-cols-2 xl:grid-cols-4">
-      {metrics.slice(0, 4).map((metric, index) => (
+    <div className="grid border-t border-white/[0.07] sm:grid-cols-3">
+      {metrics.map((metric, index) => (
         <article
           key={metric.title}
-          className={`px-5 py-4 ${index > 0 ? "sm:border-l sm:border-white/[0.07]" : ""} ${index === 2 ? "sm:border-l-0 xl:border-l" : ""}`}
+          className={`px-5 py-4 ${index > 0 ? "sm:border-l sm:border-white/[0.07]" : ""}`}
         >
           <div className="flex items-center gap-2 text-[11px] font-medium text-white/45">
             <span
@@ -220,168 +188,18 @@ function MetricBar({ metrics }: { metrics: WorkspaceMetric[] }) {
   );
 }
 
-function EditorialList({
-  spotlights,
-}: {
-  spotlights: DashboardEditorialSpotlight[];
-}) {
-  if (spotlights.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="border-t border-white/[0.07] px-4 py-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-white">
-            Destaques editoriais
-          </h3>
-          <p className="mt-0.5 text-[11px] text-white/40">
-            Contexto para a próxima decisão
-          </p>
-        </div>
-        <Sparkles className="h-4 w-4 text-white/35" />
-      </div>
-
-      <div className="space-y-2">
-        {spotlights.slice(0, 2).map((spotlight) => (
-          <article
-            key={`${spotlight.title}-${spotlight.trackName}`}
-            className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${spotlightGlow(spotlight.tone)} to-white/[0.025] p-3.5 ring-1 ring-inset ring-white/[0.07]`}
-          >
-            <div className="relative flex items-start gap-3">
-              <div
-                className="h-11 w-11 shrink-0 rounded-xl bg-white/[0.05] ring-1 ring-inset ring-white/10"
-                style={coverStyle(spotlight.coverUrl)}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="text-white/38 text-[9px] font-medium uppercase tracking-[0.14em]">
-                  {spotlight.title}
-                </div>
-                <h4 className="mt-1 truncate text-[13px] font-semibold text-white">
-                  {spotlight.trackName}
-                </h4>
-                <p className="truncate text-[11px] text-white/45">
-                  {spotlight.artists}
-                </p>
-              </div>
-            </div>
-
-            <div className="relative mt-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <StatusBadge
-                  tone={spotlight.tone}
-                  className="border-0 px-2 py-0.5 text-[9px] tracking-[0.1em]"
-                >
-                  {spotlight.badge}
-                </StatusBadge>
-                <p className="mt-1.5 truncate text-[10px] text-white/45">
-                  {spotlight.stats[0] ?? spotlight.summary}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <SpotifyPlaylistAddButton
-                  spotifyTrackId={spotlight.spotifyTrackId}
-                  suggestedPlaylistName={spotlight.suggestedPlaylistName}
-                  compact
-                  className="h-8 w-8 rounded-full border-white/[0.08] bg-white/[0.05] px-0 text-white shadow-none hover:bg-white/10"
-                />
-                <Link
-                  href={spotlight.spotifyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Abrir ${spotlight.trackName} no Spotify`}
-                  className="text-white/42 inline-flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-white/[0.07] hover:text-white"
-                >
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SignalRail({
-  rows,
-  spotlights,
-}: {
-  rows: RadarMusicRow[];
-  spotlights: DashboardEditorialSpotlight[];
-}) {
-  return (
-    <aside className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-white/[0.035] shadow-[0_24px_80px_-48px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-white/35">
-              <Activity className="h-3.5 w-3.5 text-sky-400" />
-              Ao vivo
-            </div>
-            <h2 className="mt-1.5 text-base font-semibold text-white">
-              Radar quente
-            </h2>
-            <p className="text-white/42 mt-0.5 text-[11px]">
-              O que está ganhando atenção agora
-            </p>
-          </div>
-          <Link
-            href="/radar-music"
-            className="inline-flex h-8 items-center gap-1 rounded-full bg-white/[0.055] px-3 text-[11px] font-medium text-white/60 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/10 hover:text-white"
-          >
-            Ver radar
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="mt-4">
-          {rows.slice(0, 4).map((row, index) => (
-            <article
-              key={row.trackId}
-              className={`grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-2.5 py-2.5 ${index > 0 ? "border-t border-white/[0.06]" : ""}`}
-            >
-              <div className="text-center">
-                <div className="text-[15px] font-semibold leading-none text-white">
-                  {row.rank}
-                </div>
-                <div className="mt-1 text-[9px] font-medium text-white/35">
-                  {movementLabel(row)}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[12px] font-medium text-white">
-                  {row.name}
-                </div>
-                <div className="text-white/42 truncate text-[10px]">
-                  {row.artists}
-                </div>
-              </div>
-              <Link
-                href={row.spotifyUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Abrir ${row.name} no Spotify`}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/35 transition hover:bg-white/[0.07] hover:text-white"
-              >
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <EditorialList spotlights={spotlights} />
-    </aside>
-  );
-}
-
 export default async function DashboardPage() {
   const data = await getDashboardWorkspaceData();
   const heroTrack = data.primaryAction.track;
-  const hotSummary =
-    data.heroInsight.supportingPoints[1] ?? "Sem pico forte agora";
+  const decisionMetrics = [
+    data.metrics[0],
+    data.metrics[2],
+    data.metrics[4],
+  ].filter((metric): metric is WorkspaceMetric => Boolean(metric));
+  const withoutHero = (tracks: DecisionTrack[]) =>
+    heroTrack
+      ? tracks.filter((track) => track.trackId !== heroTrack.trackId)
+      : tracks;
 
   return (
     <ModuleGuard moduleKey="playlist_os">
@@ -390,43 +208,40 @@ export default async function DashboardPage() {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_18%_0%,rgba(37,99,235,0.12),transparent_40%),radial-gradient(circle_at_82%_4%,rgba(16,185,129,0.07),transparent_34%)]" />
 
         <Container className="relative py-6 tablet:py-8">
-          <header className="flex flex-col justify-between gap-5 pb-6 text-white lg:flex-row lg:items-end">
-            <div className="max-w-2xl">
-              <div className="text-white/38 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em]">
-                <Sparkles className="h-3.5 w-3.5 text-sky-400" />
-                Playlist intelligence
-                <span className="h-1 w-1 rounded-full bg-white/20" />
-                <span className="text-white/48 normal-case tracking-normal">
-                  {hotSummary}
-                </span>
+          <div className="mx-auto max-w-6xl">
+            <header className="flex flex-col justify-between gap-5 pb-6 text-white lg:flex-row lg:items-end">
+              <div className="max-w-2xl">
+                <div className="text-white/38 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em]">
+                  <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+                  Mesa executiva
+                </div>
+                <h1 className="mt-3 text-[2rem] font-semibold tracking-[-0.045em] tablet:text-[2.65rem] tablet:leading-[1.08]">
+                  Decida o próximo movimento.
+                </h1>
+                <p className="text-white/48 mt-2 max-w-xl text-sm leading-6 tablet:text-[15px]">
+                  Uma prioridade principal e a fila do que entra, observa ou
+                  sai.
+                </p>
               </div>
-              <h1 className="mt-3 text-[2rem] font-semibold tracking-[-0.045em] tablet:text-[2.65rem] tablet:leading-[1.08]">
-                Sua operação, em ordem de prioridade.
-              </h1>
-              <p className="text-white/48 mt-2 max-w-xl text-sm leading-6 tablet:text-[15px]">
-                Uma visão única do que adicionar, acompanhar e revisar hoje.
-              </p>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href={data.hero.secondaryCtaHref ?? "/radar-music"}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-white/[0.05] px-4 text-sm font-medium text-white/65 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/10 hover:text-white"
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                Explorar radar
-              </Link>
-              <Link
-                href={data.hero.primaryCtaHref ?? "/curadoria"}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_12px_36px_-14px_rgba(37,99,235,0.9)] transition hover:brightness-110"
-              >
-                Abrir curadoria
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </header>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={data.hero.secondaryCtaHref ?? "/radar-music"}
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-white/[0.05] px-4 text-sm font-medium text-white/65 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/10 hover:text-white"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Radar Music
+                </Link>
+                <Link
+                  href={data.hero.primaryCtaHref ?? "/curadoria"}
+                  className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_12px_36px_-14px_rgba(37,99,235,0.9)] transition hover:brightness-110"
+                >
+                  Abrir curadoria
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </header>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <main className="min-w-0 space-y-4">
               <section className="overflow-hidden rounded-[28px] border border-white/[0.085] bg-white/[0.04] shadow-[0_32px_100px_-56px_rgba(0,0,0,0.95)] backdrop-blur-xl">
                 <div className="relative p-5 tablet:p-6">
@@ -435,7 +250,7 @@ export default async function DashboardPage() {
                   <div className="relative flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-sky-300/75">
                       <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.8)]" />
-                      Faça isso primeiro
+                      Próxima melhor ação
                     </div>
                     <div className="flex flex-wrap justify-end gap-1.5">
                       <StatusBadge
@@ -507,7 +322,7 @@ export default async function DashboardPage() {
                   </div>
                 </div>
 
-                <MetricBar metrics={data.metrics} />
+                <MetricBar metrics={decisionMetrics} />
               </section>
 
               <section className="rounded-[26px] border border-white/[0.08] bg-white/[0.03] px-4 pb-1 pt-4 shadow-[0_24px_80px_-52px_rgba(0,0,0,0.9)] backdrop-blur-xl">
@@ -531,7 +346,7 @@ export default async function DashboardPage() {
                     description="Ação recomendada"
                     tone="green"
                     icon={<Flame className="h-3.5 w-3.5" />}
-                    tracks={data.addNow}
+                    tracks={withoutHero(data.addNow)}
                     emptyLabel="Nenhuma faixa urgente para adicionar."
                   />
                   <QueueColumn
@@ -539,7 +354,7 @@ export default async function DashboardPage() {
                     description="Sinais em formação"
                     tone="yellow"
                     icon={<Eye className="h-3.5 w-3.5" />}
-                    tracks={data.observe}
+                    tracks={withoutHero(data.observe)}
                     emptyLabel="Nenhuma observação forte agora."
                   />
                   <QueueColumn
@@ -547,17 +362,12 @@ export default async function DashboardPage() {
                     description="Perda de tração"
                     tone="red"
                     icon={<Trash2 className="h-3.5 w-3.5" />}
-                    tracks={data.removeOrTest}
+                    tracks={withoutHero(data.removeOrTest)}
                     emptyLabel="Nada pedindo revisão imediata."
                   />
                 </div>
               </section>
             </main>
-
-            <SignalRail
-              rows={data.topRadarRows}
-              spotlights={data.editorialSpotlights}
-            />
           </div>
         </Container>
       </div>

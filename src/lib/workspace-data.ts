@@ -43,7 +43,6 @@ import type {
 } from "@/types/music-charts";
 import type {
   CurationPageData,
-  DashboardEditorialSpotlight,
   DashboardWorkspaceData,
   DecisionTrack,
   HeroInsight,
@@ -1910,232 +1909,6 @@ function buildDecisionSummary(track: DecisionTrack) {
   return `${track.name} combina score ${track.decisionScore}, ${track.chartDeltaLabel.toLowerCase()} e ${track.fitLabel.toLowerCase()}; ${track.accountFitContext.toLowerCase()}, entao ${baseLabel} virou sinal forte para hoje.`;
 }
 
-function buildDashboardEditorialSpotlights({
-  addNowQueue,
-  observeQueue,
-  removeQueue,
-  radarRows,
-}: {
-  addNowQueue: DecisionTrack[];
-  observeQueue: DecisionTrack[];
-  removeQueue: DecisionTrack[];
-  radarRows: RadarMusicRow[];
-}): DashboardEditorialSpotlight[] {
-  const decisionByTrackId = new Map(
-    [...addNowQueue, ...observeQueue, ...removeQueue].map((track) => [track.trackId, track]),
-  );
-  const topDecisionTrack =
-    addNowQueue[0] ??
-    observeQueue[0] ??
-    [...decisionByTrackId.values()].sort(compareDecisionPriority)[0] ??
-    null;
-  const weeklyAnchor = [...decisionByTrackId.values()]
-    .filter((track) => track.recurring)
-    .sort(compareDecisionPriority)[0] ?? topDecisionTrack;
-  const biggestRise = [...radarRows]
-    .filter((row) => (row.rankChange ?? 0) > 0)
-    .sort((left, right) => (right.rankChange ?? 0) - (left.rankChange ?? 0))[0];
-  const breakoutTrack = [...radarRows]
-    .filter(
-      (row) =>
-        !row.alreadyInPlaylists &&
-        (row.movement.type === "new" ||
-          row.movement.type === "reentry" ||
-          row.lowSaturation),
-    )
-    .sort((left, right) => {
-      const leftDecisionScore = decisionByTrackId.get(left.trackId)?.decisionScore ?? 0;
-      const rightDecisionScore = decisionByTrackId.get(right.trackId)?.decisionScore ?? 0;
-
-      if (rightDecisionScore !== leftDecisionScore) {
-        return rightDecisionScore - leftDecisionScore;
-      }
-
-      return right.opportunityScore - left.opportunityScore;
-    })[0];
-  const dropAlertDecision = removeQueue[0] ?? null;
-  const dropAlertRadar = dropAlertDecision
-    ? null
-    : [...radarRows]
-        .filter(
-          (row) =>
-            row.alreadyInPlaylists &&
-            row.movement.type === "down" &&
-            (row.rankChange ?? 0) < 0,
-        )
-        .sort((left, right) => (left.rankChange ?? 0) - (right.rankChange ?? 0))[0] ??
-      null;
-
-  const editorialSpotlights: Array<DashboardEditorialSpotlight | null> = [
-    topDecisionTrack
-      ? {
-          title: "Melhor musica do dia",
-          badge:
-            topDecisionTrack.recommendedAction === "add"
-              ? "Entrar agora"
-              : "Observacao forte",
-          tone: buildDashboardTone(topDecisionTrack),
-          trackId: topDecisionTrack.trackId,
-          spotifyTrackId: topDecisionTrack.spotifyTrackId,
-          trackName: topDecisionTrack.name,
-          artists: topDecisionTrack.artists,
-          summary: buildDecisionSummary(topDecisionTrack),
-          stats: [
-            `Score ${topDecisionTrack.decisionScore}`,
-            topDecisionTrack.chartDeltaLabel,
-            topDecisionTrack.fitLabel,
-            topDecisionTrack.accountFitContext,
-          ],
-          coverUrl: topDecisionTrack.coverUrl,
-          spotifyUrl: topDecisionTrack.spotifyUrl,
-          suggestedPlaylistName: topDecisionTrack.suggestedPlaylistName,
-        }
-      : null,
-    weeklyAnchor
-      ? {
-          title: "Melhor da semana",
-          badge: weeklyAnchor.recurring ? "Consistencia" : "Radar ativo",
-          tone: weeklyAnchor.recurring ? "blue" : buildDashboardTone(weeklyAnchor),
-          trackId: weeklyAnchor.trackId,
-          spotifyTrackId: weeklyAnchor.spotifyTrackId,
-          trackName: weeklyAnchor.name,
-          artists: weeklyAnchor.artists,
-          summary: weeklyAnchor.recurring
-            ? `${weeklyAnchor.name} sustentou leitura forte no radar, manteve score ${weeklyAnchor.decisionScore} e virou referencia para segurar na playlist alem do hype do dia.`
-            : `${weeklyAnchor.name} ainda esta formando historico semanal, mas ja mostra sinais fortes o suficiente para entrar no monitoramento principal.`,
-          stats: [
-            weeklyAnchor.recurring ? "Recorrente no radar" : "Historico em formacao",
-            `Score ${weeklyAnchor.decisionScore}`,
-            weeklyAnchor.fitLabel,
-            weeklyAnchor.suggestedPlaylistName
-              ? `Boa para ${weeklyAnchor.suggestedPlaylistName}`
-              : weeklyAnchor.position_change === null
-                ? "Sem comparativo"
-                : `${formatSignedValue(weeklyAnchor.position_change)} no chart`,
-          ],
-          coverUrl: weeklyAnchor.coverUrl,
-          spotifyUrl: weeklyAnchor.spotifyUrl,
-          suggestedPlaylistName: weeklyAnchor.suggestedPlaylistName,
-        }
-      : null,
-    biggestRise
-      ? {
-          title: "Maior subida",
-          badge: "Acelerando",
-          tone: "green",
-          trackId: biggestRise.trackId,
-          spotifyTrackId:
-            decisionByTrackId.get(biggestRise.trackId)?.spotifyTrackId ??
-            extractTrackIdFromSpotifyUrl(biggestRise.spotifyUrl),
-          trackName: biggestRise.name,
-          artists: biggestRise.artists,
-          summary: `${biggestRise.name} foi a faixa que mais ganhou terreno no top 200, com ${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes. ${decisionByTrackId.get(biggestRise.trackId)?.alreadyInPlaylists ? "Vale revisar se ela ja esta bem posicionada na base." : "Boa candidata para teste rapido nas playlists com fit."}`,
-          stats: [
-            `#${biggestRise.rank}`,
-            `${formatSignedValue(biggestRise.rankChange ?? 0)} posicoes`,
-            decisionByTrackId.get(biggestRise.trackId)?.fitLabel ?? biggestRise.fitLabel,
-            decisionByTrackId.get(biggestRise.trackId)?.accountFitContext ??
-              (biggestRise.dailyStreams === null
-                ? "Sem streams"
-                : formatStreamsValue(biggestRise.dailyStreams)),
-          ],
-          coverUrl: biggestRise.coverUrl,
-          spotifyUrl: biggestRise.spotifyUrl,
-          suggestedPlaylistName:
-            decisionByTrackId.get(biggestRise.trackId)?.suggestedPlaylistName ?? null,
-        }
-      : null,
-    breakoutTrack
-      ? {
-          title: "Aposta nova",
-          badge:
-            breakoutTrack.movement.type === "new" ||
-            breakoutTrack.movement.type === "reentry"
-              ? breakoutTrack.movement.label
-              : "Baixa saturacao",
-          tone:
-            breakoutTrack.movement.type === "new" ||
-            breakoutTrack.movement.type === "reentry"
-              ? "purple"
-              : "yellow",
-          trackId: breakoutTrack.trackId,
-          spotifyTrackId:
-            decisionByTrackId.get(breakoutTrack.trackId)?.spotifyTrackId ??
-            extractTrackIdFromSpotifyUrl(breakoutTrack.spotifyUrl),
-          trackName: breakoutTrack.name,
-          artists: breakoutTrack.artists,
-          summary: `${breakoutTrack.name} abre uma janela boa de discovery porque ainda esta fora da tua base, tem ${breakoutTrack.fitLabel.toLowerCase()} e ${decisionByTrackId.get(breakoutTrack.trackId)?.accountFitContext.toLowerCase() ?? "chega com espaco editorial para teste"}.`,
-          stats: [
-            decisionByTrackId.get(breakoutTrack.trackId)
-              ? `Score ${decisionByTrackId.get(breakoutTrack.trackId)?.decisionScore}`
-              : `Radar ${breakoutTrack.opportunityScore}`,
-            breakoutTrack.lowSaturation ? "Baixa saturacao" : breakoutTrack.movement.label,
-            decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName
-              ? `Boa para ${decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName}`
-              : breakoutTrack.rankChange === null
-                ? "Sem comparativo"
-                : `${formatSignedValue(breakoutTrack.rankChange)} no chart`,
-            `#${breakoutTrack.rank}`,
-          ],
-          coverUrl: breakoutTrack.coverUrl,
-          spotifyUrl: breakoutTrack.spotifyUrl,
-          suggestedPlaylistName:
-            decisionByTrackId.get(breakoutTrack.trackId)?.suggestedPlaylistName ?? null,
-        }
-      : null,
-    dropAlertDecision
-      ? {
-          title: "Alerta de queda",
-          badge: "Revisar base",
-          tone: "red",
-          trackId: dropAlertDecision.trackId,
-          spotifyTrackId: dropAlertDecision.spotifyTrackId,
-          trackName: dropAlertDecision.name,
-          artists: dropAlertDecision.artists,
-          summary: `${dropAlertDecision.name} perdeu tracao e ja pede teste de troca ou limpeza, principalmente se estiver ocupando espaco nobre na playlist.`,
-          stats: [
-            `Score ${dropAlertDecision.decisionScore}`,
-            dropAlertDecision.chartDeltaLabel,
-            dropAlertDecision.fitLabel,
-            dropAlertDecision.accountFitContext,
-          ],
-          coverUrl: dropAlertDecision.coverUrl,
-          spotifyUrl: dropAlertDecision.spotifyUrl,
-          suggestedPlaylistName: dropAlertDecision.suggestedPlaylistName,
-        }
-      : dropAlertRadar
-        ? {
-            title: "Alerta de queda",
-            badge: "Revisar base",
-            tone: "red",
-            trackId: dropAlertRadar.trackId,
-            spotifyTrackId:
-              decisionByTrackId.get(dropAlertRadar.trackId)?.spotifyTrackId ??
-              extractTrackIdFromSpotifyUrl(dropAlertRadar.spotifyUrl),
-            trackName: dropAlertRadar.name,
-            artists: dropAlertRadar.artists,
-            summary: `${dropAlertRadar.name} foi a queda mais sensivel entre as faixas que ja estao na base e merece reavaliacao editorial.`,
-            stats: [
-              `#${dropAlertRadar.rank}`,
-              `${formatSignedValue(dropAlertRadar.rankChange ?? 0)} no chart`,
-              dropAlertRadar.fitLabel,
-              dropAlertRadar.dailyStreams === null
-                ? "Sem streams"
-                : formatStreamsValue(dropAlertRadar.dailyStreams),
-            ],
-            coverUrl: dropAlertRadar.coverUrl,
-            spotifyUrl: dropAlertRadar.spotifyUrl,
-            suggestedPlaylistName:
-              decisionByTrackId.get(dropAlertRadar.trackId)?.suggestedPlaylistName ?? null,
-          }
-        : null,
-  ];
-
-  return editorialSpotlights.filter(
-    (spotlight): spotlight is DashboardEditorialSpotlight => spotlight !== null,
-  );
-}
-
 export async function getRadarMusicPageData({
   country,
   genre,
@@ -2607,12 +2380,6 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     const addNowFallback = addNowQueueFallback.slice(0, 2);
     const observeFallback = observeQueueFallback.slice(0, 2);
     const removeFallback = removeQueueFallback.slice(0, 2);
-    const editorialSpotlightsFallback = buildDashboardEditorialSpotlights({
-      addNowQueue: addNowQueueFallback,
-      observeQueue: observeQueueFallback,
-      removeQueue: removeQueueFallback,
-      radarRows: radarMusic.rows,
-    });
     const primaryTrackFallback = addNowFallback[0] ?? observeFallback[0] ?? null;
 
     return {
@@ -2704,11 +2471,9 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
           tone: "blue",
         },
       ],
-      editorialSpotlights: editorialSpotlightsFallback,
       addNow: addNowFallback,
       observe: observeFallback,
       removeOrTest: removeFallback,
-      topRadarRows: radarMusic.rows.slice(0, 4),
     };
   }
 
@@ -2736,12 +2501,6 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
   const accountBaseMatches = curationRows.filter(
     (row) => row.accountPlaylistCount > 0,
   ).length;
-  const editorialSpotlights = buildDashboardEditorialSpotlights({
-    addNowQueue,
-    observeQueue,
-    removeQueue,
-    radarRows,
-  });
   const primaryTrack = addNow[0] ?? observe[0] ?? null;
 
   return {
@@ -2839,10 +2598,8 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
         tone: "blue",
       },
     ],
-    editorialSpotlights,
     addNow,
     observe,
     removeOrTest,
-    topRadarRows: radarRows.slice(0, 4),
   };
 }
