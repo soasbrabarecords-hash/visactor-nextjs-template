@@ -23,35 +23,72 @@ const TYPE_COLOR: Record<string, string> = {
   composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
 };
 
-export default async function EntitiesPage() {
+type Props = {
+  searchParams: Promise<{ view?: string }>;
+};
+
+export default async function EntitiesPage({ searchParams }: Props) {
   const entities = await getLabelEntities();
+  const { view = "all" } = await searchParams;
+  const filteredEntities = entities.filter((entity) => {
+    if (view === "artists") {
+      return entity.type === "artist" || entity.roles.includes("artist");
+    }
+    if (view === "people") return entity.entity_kind === "person";
+    if (view === "companies") return entity.entity_kind === "company";
+    return true;
+  });
 
   return (
     <div>
       <PageIntro
         eyebrow="Label OS"
-        title="Entidades"
-        description="Cadastro juridico e operacional para gravadoras, selos, editoras, managers e parceiros da operacao."
+        title="Pessoas e Entidades"
+        description="Uma base única para artistas, compositores, intérpretes, produtores, selos, gravadoras, editoras e parceiros."
         action={
           <Link
             href="/label-os/entities/new"
             className="flex items-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300"
           >
             <Plus size={15} />
-            Nova Entidade
+            Novo participante
           </Link>
         }
       />
 
       <Container className="py-8">
-        {entities.length === 0 ? (
+        <div className="mb-5 flex flex-wrap gap-2">
+          {[
+            { value: "all", label: "Todos" },
+            { value: "artists", label: "Artistas" },
+            { value: "people", label: "Pessoas" },
+            { value: "companies", label: "Empresas" },
+          ].map((item) => (
+            <Link
+              key={item.value}
+              href={
+                item.value === "all"
+                  ? "/label-os/entities"
+                  : `/label-os/entities?view=${item.value}`
+              }
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                view === item.value
+                  ? "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200"
+                  : "border-border bg-background text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        {filteredEntities.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-            Nenhuma entidade cadastrada ainda.{" "}
+            Nenhuma pessoa ou entidade encontrada neste filtro.{" "}
             <Link
               href="/label-os/entities/new"
               className="underline underline-offset-2"
             >
-              Cadastrar primeira entidade
+              Cadastrar participante
             </Link>
           </div>
         ) : (
@@ -81,7 +118,7 @@ export default async function EntitiesPage() {
                 </tr>
               </thead>
               <tbody>
-                {entities.map((entity) => (
+                {filteredEntities.map((entity) => (
                   <tr
                     key={entity.id}
                     className="border-b border-border last:border-0 hover:bg-slate-50 dark:hover:bg-slate-900"

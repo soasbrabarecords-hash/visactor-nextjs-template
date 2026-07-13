@@ -121,7 +121,10 @@ export default async function TrackDetailPage({ params }: Props) {
   const obraPreview =
     compositions.length > 0
       ? compositions.map((item) => ({
-          name: item.entity_display_name ?? item.entity_name ?? "Compositor",
+          name:
+            item.entity_name && item.entity_display_name
+              ? `${item.entity_name} (${item.entity_display_name})`
+              : item.entity_name ?? item.entity_display_name ?? "Compositor",
           percentage: item.percentage,
         }))
       : participants

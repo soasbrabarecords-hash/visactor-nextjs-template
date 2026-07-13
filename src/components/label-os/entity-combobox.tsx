@@ -25,13 +25,29 @@ type Props = {
   onChange: (entity: LabelEntity | null) => void;
   placeholder?: string;
   required?: boolean;
+  roles?: EntityFunction[];
+  excludeIds?: string[];
+  nameMode?: "public" | "legal";
 };
+
+function entityName(entity: LabelEntity, mode: Props["nameMode"]) {
+  const publicName = entity.display_name?.trim();
+  if (mode === "legal") {
+    return publicName && publicName.toLocaleLowerCase("pt-BR") !== entity.name.toLocaleLowerCase("pt-BR")
+      ? `${entity.name} (${publicName})`
+      : entity.name;
+  }
+  return publicName || entity.name;
+}
 
 export default function EntityCombobox({
   value,
   onChange,
   placeholder = "Buscar gravadora, selo, editora ou parceiro...",
   required = false,
+  roles = [],
+  excludeIds = [],
+  nameMode = "public",
 }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<LabelEntity[]>([]);
@@ -39,6 +55,8 @@ export default function EntityCombobox({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rolesKey = roles.join(",");
+  const excludeIdsKey = excludeIds.join(",");
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -60,11 +78,16 @@ export default function EntityCombobox({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/label-os/entities/search?q=${encodeURIComponent(query.trim())}`,
-        );
+        const params = new URLSearchParams({ q: query.trim() });
+        if (rolesKey) params.set("roles", rolesKey);
+        const res = await fetch(`/api/label-os/entities/search?${params.toString()}`);
         const data = (await res.json()) as LabelEntity[];
-        setResults(Array.isArray(data) ? data : []);
+        const excluded = new Set(excludeIdsKey ? excludeIdsKey.split(",") : []);
+        setResults(
+          Array.isArray(data)
+            ? data.filter((entity) => !excluded.has(entity.id))
+            : [],
+        );
         setOpen(true);
       } catch {
         setResults([]);
@@ -72,7 +95,7 @@ export default function EntityCombobox({
         setLoading(false);
       }
     }, 250);
-  }, [query]);
+  }, [excludeIdsKey, query, rolesKey]);
 
   const handleSelect = (entity: LabelEntity) => {
     onChange(entity);
@@ -95,7 +118,7 @@ export default function EntityCombobox({
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-medium">
-                {value.display_name ?? value.name}
+                {entityName(value, nameMode)}
               </span>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[value.type] ?? TYPE_COLOR.other}`}
@@ -151,7 +174,7 @@ export default function EntityCombobox({
                 rel="noopener noreferrer"
                 className="text-xs text-blue-600 underline underline-offset-2 dark:text-blue-400"
               >
-                + Criar nova entidade
+                + Criar nova pessoa ou entidade
               </a>
             </div>
           ) : null}
@@ -165,7 +188,7 @@ export default function EntityCombobox({
               >
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate font-medium">
-                    {entity.display_name ?? entity.name}
+                    {entityName(entity, nameMode)}
                   </span>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[entity.type] ?? TYPE_COLOR.other}`}
@@ -173,6 +196,14 @@ export default function EntityCombobox({
                     {ENTITY_TYPE_LABELS[entity.type] ?? entity.type}
                   </span>
                 </div>
+                {entity.display_name &&
+                entity.display_name.toLocaleLowerCase("pt-BR") !==
+                  entity.name.toLocaleLowerCase("pt-BR") &&
+                nameMode !== "legal" ? (
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {entity.name}
+                  </div>
+                ) : null}
                 {entity.roles?.length ? (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {entity.roles.slice(0, 2).map((role) => (

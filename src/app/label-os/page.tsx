@@ -565,7 +565,7 @@ export default async function LabelOsPage() {
                     icon={Music2}
                   />
                   <ActionTile
-                    href="/label-os/artists/new"
+                    href="/label-os/entities/new"
                     label="Adicionar artista"
                     description="Subir artista novo para o roster com links e contato."
                     icon={Users2}
@@ -590,7 +590,7 @@ export default async function LabelOsPage() {
                     </h2>
                   </div>
                   <Link
-                    href="/label-os/artists"
+                    href="/label-os/entities?view=artists"
                     className="text-white/64 text-sm font-medium transition hover:text-white"
                   >
                     Abrir artistas
@@ -602,7 +602,7 @@ export default async function LabelOsPage() {
                     latestArtists.map((artist) => (
                       <Link
                         key={artist.id}
-                        href={`/label-os/artists/${artist.id}/edit`}
+                        href={`/label-os/entities/${artist.id}/edit`}
                         className="hover:border-white/18 group flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.05]"
                       >
                         <div className="min-w-0">

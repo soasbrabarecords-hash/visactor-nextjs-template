@@ -4,11 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   TrackComposition,
   TrackCompositionInput,
+  TrackCompositionUpdate,
   TrackMasterSplit,
   TrackMasterSplitInput,
+  TrackMasterSplitUpdate,
   TrackRoyaltySplit,
   TrackRoyaltySplitInput,
 } from "./label-splits-types";
+import type { EntityFunction, EntityType } from "@/lib/label-os-taxonomy";
 
 function isMissingTableOrRelationError(
   error: { message?: string; code?: string } | null | undefined,
@@ -20,6 +23,73 @@ function isMissingTableOrRelationError(
     error?.message?.includes("relation") ||
     error?.message?.includes("schema cache"),
   );
+}
+
+function validatePercentage(percentage: number | undefined) {
+  if (percentage === undefined) return;
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    throw new Error("O percentual precisa estar entre 0 e 100.");
+  }
+}
+
+async function requireCompatibleEntity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string,
+  entityId: string,
+  roles: EntityFunction[],
+  categories: EntityType[],
+) {
+  const { data, error } = await supabase
+    .from("label_entities")
+    .select("id,roles,type")
+    .eq("id", entityId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error || !data) {
+    throw new Error("A pessoa ou entidade selecionada não pertence ao workspace ativo.");
+  }
+  const entityRoles = Array.isArray(data.roles) ? data.roles : [];
+  if (
+    !roles.some((role) => entityRoles.includes(role)) &&
+    !categories.includes(data.type as EntityType)
+  ) {
+    throw new Error(
+      "A categoria ou as funções deste cadastro não são compatíveis com esta linha.",
+    );
+  }
+}
+
+function splitWriteError(error: { message: string; code?: string }) {
+  if (error.code === "23505") {
+    throw new Error("Esta pessoa ou entidade já foi adicionada com a mesma função.");
+  }
+  throw error;
+}
+
+function masterCompatibility(groupType: TrackMasterSplitInput["group_type"]) {
+  return {
+    interpreter: {
+      roles: ["interpreter", "artist"] as EntityFunction[],
+      categories: ["artist"] as EntityType[],
+    },
+    phonographic_producer: {
+      roles: [
+        "phonographic_producer",
+        "label",
+        "record_company",
+      ] as EntityFunction[],
+      categories: ["label", "imprint", "company", "producer"] as EntityType[],
+    },
+    musician: {
+      roles: [
+        "musician",
+        "interpreter",
+        "artist",
+        "music_producer",
+      ] as EntityFunction[],
+      categories: ["artist", "producer"] as EntityType[],
+    },
+  }[groupType];
 }
 
 // ── Obra / Composições ────────────────────────────────────────────────────────
@@ -70,23 +140,55 @@ export async function addTrackComposition(
 ): Promise<TrackComposition> {
   const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
+  validatePercentage(input.percentage);
+  await requireCompatibleEntity(
+    supabase,
+    workspaceId,
+    input.entity_id,
+    ["composer"],
+    ["composer"],
+  );
   const { data, error } = await supabase
     .from("label_track_compositions")
     .insert({ ...input, workspace_id: workspaceId })
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) splitWriteError(error);
   return data as TrackComposition;
 }
 
-export async function deleteTrackComposition(id: string): Promise<void> {
+export async function updateTrackComposition(
+  trackId: string,
+  id: string,
+  input: TrackCompositionUpdate,
+): Promise<TrackComposition> {
+  const workspaceId = await requireLabelWorkspaceId();
+  const supabase = await createClient();
+  validatePercentage(input.percentage);
+  const { data, error } = await supabase
+    .from("label_track_compositions")
+    .update(input)
+    .eq("id", id)
+    .eq("track_id", trackId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error) splitWriteError(error);
+  return data as TrackComposition;
+}
+
+export async function deleteTrackComposition(
+  trackId: string,
+  id: string,
+): Promise<void> {
   const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { error } = await supabase
     .from("label_track_compositions")
     .delete()
     .eq("id", id)
+    .eq("track_id", trackId)
     .eq("workspace_id", workspaceId);
   if (error) throw error;
 }
@@ -140,23 +242,78 @@ export async function addTrackMasterSplit(
 ): Promise<TrackMasterSplit> {
   const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
+  validatePercentage(input.percentage);
+  const compatibility = masterCompatibility(input.group_type);
+  await requireCompatibleEntity(
+    supabase,
+    workspaceId,
+    input.entity_id,
+    compatibility.roles,
+    compatibility.categories,
+  );
   const { data, error } = await supabase
     .from("label_track_master_splits")
     .insert({ ...input, workspace_id: workspaceId })
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) splitWriteError(error);
   return data as TrackMasterSplit;
 }
 
-export async function deleteTrackMasterSplit(id: string): Promise<void> {
+export async function updateTrackMasterSplit(
+  trackId: string,
+  id: string,
+  input: TrackMasterSplitUpdate,
+): Promise<TrackMasterSplit> {
+  const workspaceId = await requireLabelWorkspaceId();
+  const supabase = await createClient();
+  validatePercentage(input.percentage);
+  if (input.group_type) {
+    const { data: existing, error: existingError } = await supabase
+      .from("label_track_master_splits")
+      .select("entity_id,group_type")
+      .eq("id", id)
+      .eq("track_id", trackId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (existingError || !existing) {
+      throw new Error("Participação do fonograma não encontrada.");
+    }
+    if (existing.group_type !== input.group_type) {
+      const compatibility = masterCompatibility(input.group_type);
+      await requireCompatibleEntity(
+        supabase,
+        workspaceId,
+        existing.entity_id,
+        compatibility.roles,
+        compatibility.categories,
+      );
+    }
+  }
+  const { data, error } = await supabase
+    .from("label_track_master_splits")
+    .update(input)
+    .eq("id", id)
+    .eq("track_id", trackId)
+    .eq("workspace_id", workspaceId)
+    .select()
+    .single();
+  if (error) splitWriteError(error);
+  return data as TrackMasterSplit;
+}
+
+export async function deleteTrackMasterSplit(
+  trackId: string,
+  id: string,
+): Promise<void> {
   const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { error } = await supabase
     .from("label_track_master_splits")
     .delete()
     .eq("id", id)
+    .eq("track_id", trackId)
     .eq("workspace_id", workspaceId);
   if (error) throw error;
 }

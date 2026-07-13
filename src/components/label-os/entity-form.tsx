@@ -1,20 +1,45 @@
 "use client";
 
-import { BadgeCheck, Building2, FileText, Orbit } from "lucide-react";
+import {
+  BadgeCheck,
+  Building2,
+  FileText,
+  Landmark,
+  Orbit,
+  UserRound,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
+import EntityCombobox from "@/components/label-os/entity-combobox";
 import RoleChipSelector from "@/components/label-os/role-chip-selector";
-import { ENTITY_TYPES } from "@/lib/label-entities-types";
+import type { LabelEntity } from "@/lib/label-entities-types";
 import {
+  ENTITY_FUNCTION_LABELS,
   ENTITY_FUNCTION_OPTIONS,
+  ENTITY_KIND_LABELS,
+  ENTITY_KIND_OPTIONS,
   ENTITY_TYPE_LABELS,
-  type EntityCategory,
+  ENTITY_TYPE_OPTIONS,
   type EntityFunction,
+  type EntityKind,
+  type EntityType,
 } from "@/lib/label-os-taxonomy";
 
 const INPUT_CLASS =
   "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";
+
+const CATEGORY_COLOR: Record<string, string> = {
+  artist: "border-purple-300/20 bg-purple-300/12 text-purple-100",
+  producer: "border-orange-300/20 bg-orange-300/12 text-orange-100",
+  composer: "border-yellow-300/20 bg-yellow-300/12 text-yellow-100",
+  label: "border-blue-300/20 bg-blue-300/12 text-blue-100",
+  imprint: "border-violet-300/20 bg-violet-300/12 text-violet-100",
+  publisher: "border-emerald-300/20 bg-emerald-300/12 text-emerald-100",
+  manager: "border-pink-300/20 bg-pink-300/12 text-pink-100",
+  company: "border-slate-300/20 bg-slate-300/12 text-slate-100",
+  other: "border-white/10 bg-white/[0.06] text-white/72",
+};
 
 type FieldProps = {
   label: string;
@@ -22,6 +47,8 @@ type FieldProps = {
   type?: string;
   placeholder?: string;
   required?: boolean;
+  defaultValue?: string;
+  rows?: number;
 };
 
 function Field({
@@ -30,6 +57,8 @@ function Field({
   type = "text",
   placeholder,
   required,
+  defaultValue,
+  rows = 4,
 }: FieldProps) {
   return (
     <div className="flex flex-col gap-2">
@@ -42,7 +71,8 @@ function Field({
           id={name}
           name={name}
           placeholder={placeholder}
-          rows={4}
+          defaultValue={defaultValue ?? ""}
+          rows={rows}
           className={INPUT_CLASS}
         />
       ) : (
@@ -52,6 +82,7 @@ function Field({
           type={type}
           placeholder={placeholder}
           required={required}
+          defaultValue={defaultValue ?? ""}
           className={INPUT_CLASS}
         />
       )}
@@ -78,7 +109,7 @@ function Section({
         </div>
         <div>
           <div className="text-base font-semibold text-white">{title}</div>
-          <div className="text-white/54 mt-1 text-sm">{description}</div>
+          <div className="mt-1 text-sm text-white/54">{description}</div>
         </div>
       </div>
       {children}
@@ -86,248 +117,254 @@ function Section({
   );
 }
 
-export default function EntityForm() {
+export default function EntityForm({
+  entity,
+  initialPublisher = null,
+}: {
+  entity?: LabelEntity;
+  initialPublisher?: LabelEntity | null;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [type, setType] = useState<EntityCategory>("label");
-  const [roles, setRoles] = useState<EntityFunction[]>([]);
+  const [kind, setKind] = useState<EntityKind>(
+    entity?.entity_kind ?? "person",
+  );
+  const [category, setCategory] = useState<EntityType>(
+    entity?.type ?? "artist",
+  );
+  const [roles, setRoles] = useState<EntityFunction[]>(entity?.roles ?? []);
+  const [publisher, setPublisher] = useState<LabelEntity | null>(
+    initialPublisher,
+  );
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (roles.length === 0) {
+      setError("Selecione pelo menos uma função exercida no catálogo.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
-
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(event.currentTarget);
     const body = {
-      name: formData.get("name") as string,
-      display_name: (formData.get("display_name") as string) || null,
-      type,
+      name: String(formData.get("name") ?? "").trim(),
+      display_name: String(formData.get("display_name") ?? "").trim() || null,
+      type: category,
+      entity_kind: kind,
       roles,
-      email: (formData.get("email") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      instagram: (formData.get("instagram") as string) || null,
-      spotify_url: (formData.get("spotify_url") as string) || null,
-      apple_music_url: (formData.get("apple_music_url") as string) || null,
-      youtube_url: (formData.get("youtube_url") as string) || null,
-      document: (formData.get("document") as string) || null,
-      birth_date: null,
-      ipi_cae: (formData.get("ipi_cae") as string) || null,
-      rights_society: (formData.get("rights_society") as string) || null,
-      publisher_name: (formData.get("publisher_name") as string) || null,
-      payment_data_complete: formData.get("payment_data_complete") === "on",
-      notes: (formData.get("notes") as string) || null,
+      email: String(formData.get("email") ?? "").trim() || null,
+      phone: String(formData.get("phone") ?? "").trim() || null,
+      instagram: String(formData.get("instagram") ?? "").trim() || null,
+      spotify_url: String(formData.get("spotify_url") ?? "").trim() || null,
+      spotify_artist_id:
+        String(formData.get("spotify_artist_id") ?? "").trim() || null,
+      apple_music_url:
+        String(formData.get("apple_music_url") ?? "").trim() || null,
+      youtube_url: String(formData.get("youtube_url") ?? "").trim() || null,
+      document: String(formData.get("document") ?? "").trim() || null,
+      birth_date: String(formData.get("birth_date") ?? "").trim() || null,
+      ipi_cae: String(formData.get("ipi_cae") ?? "").trim() || null,
+      rights_society:
+        String(formData.get("rights_society") ?? "").trim() || null,
+      publisher_name: publisher?.display_name ?? publisher?.name ?? null,
+      publisher_entity_id: publisher?.id ?? null,
+      payment_data_complete:
+        formData.get("payment_data_complete") === "on",
+      pix_key: String(formData.get("pix_key") ?? "").trim() || null,
+      bank_details:
+        String(formData.get("bank_details") ?? "").trim() || null,
+      notes: String(formData.get("notes") ?? "").trim() || null,
     };
 
     try {
-      const res = await fetch("/api/label-os/entities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const json = (await res.json()) as { error?: string };
-        throw new Error(json.error ?? "Erro ao salvar entidade.");
+      const response = await fetch(
+        entity ? `/api/label-os/entities/${entity.id}` : "/api/label-os/entities",
+        {
+          method: entity ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? "Erro ao salvar participante.");
       }
-
       router.push("/label-os/entities");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Erro desconhecido.",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
         <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="border-sky-400/18 rounded-full border bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100">
-              {ENTITY_TYPE_LABELS[type]}
+            <span
+              className={`rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] ${CATEGORY_COLOR[category] ?? CATEGORY_COLOR.other}`}
+            >
+              {ENTITY_TYPE_LABELS[category]}
+            </span>
+            <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100">
+              {ENTITY_KIND_LABELS[kind]}
             </span>
             {roles.map((role) => (
               <span
                 key={role}
-                className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/70"
+                className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-white/70"
               >
-                {role.replaceAll("_", " ")}
+                {ENTITY_FUNCTION_LABELS[role]}
               </span>
             ))}
           </div>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-            Cadastro juridico e operacional da distribuidora.
+            {entity ? "Atualizar participante." : "Uma identidade, várias funções."}
           </h2>
-          <p className="text-white/56 mt-2 max-w-2xl text-sm leading-6">
-            Separe gravadora, selo, editora e manager como categorias principais
-            e marque funcoes extras como produtor fonografico quando fizer
-            sentido.
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/56">
+            Pessoas e empresas são cadastradas uma única vez e reutilizadas na
+            obra, no fonograma, nos royalties e nos contratos.
           </p>
         </div>
 
         <div className="space-y-5 p-6">
           {error ? (
-            <div className="border-rose-300/18 rounded-2xl border bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
+            <div role="alert" className="rounded-2xl border border-rose-300/20 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
               {error}
             </div>
           ) : null}
 
           <Section
-            icon={Building2}
-            title="Categoria da entidade"
-            description="Defina o lugar principal dessa empresa ou parceiro dentro da cadeia de distribuicao."
+            icon={kind === "person" ? UserRound : Building2}
+            title="Identidade e funções"
+            description="A categoria identifica o cadastro visualmente; as funções controlam onde ele pode ser usado."
           >
-            <div className="space-y-5">
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <label
-                  className="text-sm font-medium text-white"
-                  htmlFor="type"
-                >
-                  Categoria principal
+                <label className="text-sm font-medium text-white" htmlFor="entity-kind">
+                  Tipo jurídico
                 </label>
                 <select
-                  id="type"
-                  name="type"
-                  value={type}
-                  onChange={(e) => setType(e.target.value as EntityCategory)}
+                  id="entity-kind"
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value as EntityKind)}
                   className={INPUT_CLASS}
                 >
-                  {ENTITY_TYPES.map((option) => (
-                    <option
-                      key={option.value}
-                      value={option.value}
-                      className="bg-slate-950 text-white"
-                    >
+                  {ENTITY_KIND_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
                       {option.label}
                     </option>
                   ))}
                 </select>
               </div>
-
-              <RoleChipSelector
-                label="Funcoes adicionais"
-                hint="Use para marcar papeis extras que nao mudam a categoria principal, como produtor fonografico."
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-white" htmlFor="entity-category">
+                  Categoria
+                </label>
+                <select
+                  id="entity-category"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value as EntityType)}
+                  className={INPUT_CLASS}
+                >
+                  {ENTITY_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <RoleChipSelector
+                label="Funções exercidas no catálogo"
+                hint="Selecione todas as funções. Os campos da track usam esta lista para mostrar apenas participantes compatíveis."
                 options={ENTITY_FUNCTION_OPTIONS}
                 value={roles}
-                onChange={(nextValue) =>
-                  setRoles(nextValue as EntityFunction[])
-                }
-              />
+                onChange={(value) => setRoles(value as EntityFunction[])}
+                />
+              </div>
             </div>
           </Section>
 
           <Section
             icon={BadgeCheck}
             title="Dados de cadastro"
-            description="Razao social, nome de exibicao e dados de contato para operar contratos, splits e catalogo."
+            description="Nome legal para documentos e nome artístico ou fantasia para créditos e operação."
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label="Razao social / nome legal"
-                name="name"
-                required
-                placeholder="Nome da empresa ou representante"
-              />
-              <Field
-                label="Nome fantasia"
-                name="display_name"
-                placeholder="Como aparece no sistema e nos creditos"
-              />
-              <Field
-                label="Email"
-                name="email"
-                type="email"
-                placeholder="contato@empresa.com"
-              />
-              <Field
-                label="Telefone"
-                name="phone"
-                placeholder="+55 11 99999-9999"
-              />
-              <Field
-                label="Documento"
-                name="document"
-                placeholder="CNPJ ou CPF"
-              />
-              <Field label="Instagram" name="instagram" placeholder="@perfil" />
-              <Field
-                label="IPI / CAE"
-                name="ipi_cae"
-                placeholder="Identificador autoral"
-              />
-              <Field
-                label="Associação autoral"
-                name="rights_society"
-                placeholder="Abramus, UBC..."
-              />
-              <Field
-                label="Editora"
-                name="publisher_name"
-                placeholder="Se houver"
-              />
-              <label className="text-white/72 flex min-h-12 items-center gap-3 self-end rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm">
-                <input
-                  type="checkbox"
-                  name="payment_data_complete"
-                  className="h-4 w-4 rounded border-white/20 bg-white/5"
+              <Field label={kind === "person" ? "Nome legal" : "Razão social"} name="name" required placeholder="Identidade legal" defaultValue={entity?.name} />
+              <Field label={kind === "person" ? "Nome artístico" : "Nome fantasia"} name="display_name" placeholder="Nome público ou de crédito" defaultValue={entity?.display_name ?? ""} />
+              <Field label="CPF / CNPJ" name="document" placeholder="Documento sem duplicar cadastros" defaultValue={entity?.document ?? ""} />
+              {kind === "person" ? <Field label="Data de nascimento" name="birth_date" type="date" defaultValue={entity?.birth_date ?? ""} /> : null}
+              <Field label="Email" name="email" type="email" placeholder="contato@exemplo.com" defaultValue={entity?.email ?? ""} />
+              <Field label="Telefone" name="phone" placeholder="+55 11 99999-9999" defaultValue={entity?.phone ?? ""} />
+              <Field label="Instagram" name="instagram" placeholder="@perfil" defaultValue={entity?.instagram ?? ""} />
+              <Field label="IPI / CAE" name="ipi_cae" placeholder="Identificador autoral" defaultValue={entity?.ipi_cae ?? ""} />
+              <Field label="Associação autoral" name="rights_society" placeholder="Abramus, UBC..." defaultValue={entity?.rights_society ?? ""} />
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <label className="text-sm font-medium text-white">Editora vinculada</label>
+                <EntityCombobox
+                  value={publisher}
+                  onChange={setPublisher}
+                  roles={["publisher"]}
+                  excludeIds={entity ? [entity.id] : []}
+                  placeholder="Buscar entidade com função Editora..."
                 />
-                Dados de pagamento conferidos
-              </label>
+              </div>
             </div>
           </Section>
 
           <Section
             icon={Orbit}
-            title="Links e presenca publica"
-            description="Atalhos para perfis, catálogos ou páginas oficiais quando a operação precisar conferir presença digital."
+            title="Presença pública"
+            description="Identificadores e links para conferir rapidamente o perfil certo."
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label="Spotify URL"
-                name="spotify_url"
-                placeholder="https://open.spotify.com/..."
-              />
-              <Field
-                label="Apple Music URL"
-                name="apple_music_url"
-                placeholder="https://music.apple.com/..."
-              />
-              <Field
-                label="YouTube URL"
-                name="youtube_url"
-                placeholder="https://youtube.com/@perfil"
-              />
+              <Field label="Spotify Artist ID" name="spotify_artist_id" placeholder="ID do artista no Spotify" defaultValue={entity?.spotify_artist_id ?? ""} />
+              <Field label="Spotify URL" name="spotify_url" placeholder="https://open.spotify.com/artist/..." defaultValue={entity?.spotify_url ?? ""} />
+              <Field label="Apple Music URL" name="apple_music_url" placeholder="https://music.apple.com/..." defaultValue={entity?.apple_music_url ?? ""} />
+              <Field label="YouTube URL" name="youtube_url" placeholder="https://youtube.com/@perfil" defaultValue={entity?.youtube_url ?? ""} />
+            </div>
+          </Section>
+
+          <Section
+            icon={Landmark}
+            title="Pagamento"
+            description="Dados internos para repasses. Essas informações não entram automaticamente no PDF do contrato."
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Chave Pix" name="pix_key" placeholder="CPF, CNPJ, email, telefone ou chave" defaultValue={entity?.pix_key ?? ""} />
+              <label className="flex min-h-12 items-center gap-3 self-end rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/72">
+                <input type="checkbox" name="payment_data_complete" defaultChecked={entity?.payment_data_complete ?? false} className="h-4 w-4 rounded border-white/20 bg-white/5" />
+                Dados de pagamento conferidos
+              </label>
+              <div className="sm:col-span-2">
+                <Field label="Dados bancários" name="bank_details" type="textarea" rows={3} placeholder="Banco, agência, conta, titular e observações de pagamento" defaultValue={entity?.bank_details ?? ""} />
+              </div>
             </div>
           </Section>
 
           <Section
             icon={FileText}
-            title="Observacoes internas"
-            description="Use para contexto contratual, observacoes operacionais e detalhes que o time precisa lembrar."
+            title="Observações internas"
+            description="Contexto contratual e operacional para a equipe."
           >
-            <Field
-              label="Notas"
-              name="notes"
-              type="textarea"
-              placeholder="Observacoes de contrato, distribuicao, repasse, relacionamento..."
-            />
+            <Field label="Notas" name="notes" type="textarea" placeholder="Observações, pendências e detalhes importantes..." defaultValue={entity?.notes ?? ""} />
           </Section>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60"
-            >
-              {loading ? "Salvando..." : "Salvar entidade"}
+            <button type="submit" disabled={loading} className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60">
+              {loading ? "Salvando..." : entity ? "Salvar alterações" : "Salvar participante"}
             </button>
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
-            >
+            <button type="button" onClick={() => router.back()} className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white">
               Cancelar
             </button>
           </div>

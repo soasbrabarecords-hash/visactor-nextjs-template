@@ -38,6 +38,28 @@ function groupByTrack<T extends { track_id: string }>(rows: T[]) {
   return grouped;
 }
 
+function entityAsArtist(entity: LabelEntity): LabelArtist {
+  return {
+    id: entity.id,
+    workspace_id: entity.workspace_id,
+    name: entity.name,
+    artist_name: entity.display_name,
+    roles: entity.roles.filter((role) =>
+      ["artist", "interpreter", "composer", "music_producer"].includes(role),
+    ) as LabelArtist["roles"],
+    email: entity.email,
+    phone: entity.phone,
+    instagram: entity.instagram,
+    spotify_url: entity.spotify_url,
+    apple_music_url: entity.apple_music_url,
+    youtube_url: entity.youtube_url,
+    document: entity.document,
+    birth_date: entity.birth_date,
+    notes: entity.notes,
+    created_at: entity.created_at,
+  };
+}
+
 function buildBundle(
   track: LabelTrack,
   participants: TrackParticipant[],
@@ -125,7 +147,6 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     masterResult,
     royaltiesResult,
     entitiesResult,
-    artistsResult,
     readinessResult,
     tasksResult,
     contractsResult,
@@ -136,7 +157,6 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     masterQuery,
     royaltiesQuery,
     supabase.from("label_entities").select("*").eq("workspace_id", workspaceId),
-    supabase.from("label_artists").select("*").eq("workspace_id", workspaceId),
     readinessQuery,
     tasksQuery,
     contractsQuery,
@@ -148,7 +168,6 @@ async function getWorkspaceReadinessRows(trackId?: string) {
   throwQueryError("getLabelReadiness master", masterResult.error);
   throwQueryError("getLabelReadiness royalties", royaltiesResult.error);
   throwQueryError("getLabelReadiness entities", entitiesResult.error);
-  throwQueryError("getLabelReadiness artists", artistsResult.error);
   throwQueryError("getLabelReadiness manual", readinessResult.error);
   throwQueryError("getLabelReadiness tasks", tasksResult.error);
   throwQueryError("getLabelReadiness contracts", contractsResult.error);
@@ -160,7 +179,12 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     masterSplits: (masterResult.data ?? []) as TrackMasterSplit[],
     royaltySplits: (royaltiesResult.data ?? []) as TrackRoyaltySplit[],
     entities: (entitiesResult.data ?? []) as LabelEntity[],
-    artists: (artistsResult.data ?? []) as LabelArtist[],
+    artists: ((entitiesResult.data ?? []) as LabelEntity[])
+      .filter(
+        (entity) =>
+          entity.type === "artist" || entity.roles?.includes("artist"),
+      )
+      .map(entityAsArtist),
     readiness: (readinessResult.data ?? []) as LabelTrackReadiness[],
     tasks: (tasksResult.data ?? []) as LabelTrackTask[],
     contracts: (contractsResult.data ?? []) as Array<
@@ -215,6 +239,11 @@ export async function getTrackReadinessBundle(
   const artistsById = new Map(
     rows.artists.map((artist) => [artist.id, artist]),
   );
+  rows.entities.forEach((entity) => {
+    if (entity.legacy_artist_id) {
+      artistsById.set(entity.legacy_artist_id, entityAsArtist(entity));
+    }
+  });
   const entitiesById = new Map(
     rows.entities.map((entity) => [entity.id, entity]),
   );

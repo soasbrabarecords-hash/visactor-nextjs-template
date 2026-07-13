@@ -37,6 +37,16 @@ function formatPercentage(value: number | null | undefined) {
   })}%`;
 }
 
+function partyIdentity(party: ContractSnapshotParty) {
+  const legalName = party.legalName || party.name;
+  const publicName = party.name?.trim();
+  return publicName &&
+    publicName.toLocaleLowerCase("pt-BR") !==
+      legalName.toLocaleLowerCase("pt-BR")
+    ? `${legalName} (${publicName})`
+    : legalName;
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "Não informada";
   const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -188,7 +198,7 @@ class ContractWriter {
         party.recoupable ? "valor sujeito a recoup" : null,
       ].filter(Boolean);
       this.text(
-        `${index + 1}. ${party.legalName || party.name} (${details.join("; ") || "qualificação não informada"}).`,
+        `${index + 1}. ${partyIdentity(party)} (${details.join("; ") || "qualificação não informada"}).`,
         { indent: 12 },
       );
     });
@@ -325,7 +335,7 @@ export async function generateLabelContractPdf(
   parties.forEach((party) => {
     writer.gap(20);
     writer.rule();
-    writer.text(printable(party.legalName || party.name), {
+    writer.text(printable(partyIdentity(party)), {
       size: 9,
       bold: true,
     });

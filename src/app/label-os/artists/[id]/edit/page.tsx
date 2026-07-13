@@ -1,10 +1,5 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import Container from "@/components/container";
-import PageIntro from "@/components/page-intro";
-import ArtistEditForm from "@/components/label-os/artist-edit-form";
-import { getLabelArtistById } from "@/lib/label-os";
+import { notFound, redirect } from "next/navigation";
+import { getLabelEntityByLegacyArtistId } from "@/lib/label-entities";
 
 export const dynamic = "force-dynamic";
 
@@ -12,35 +7,8 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function EditArtistPage({ params }: Props) {
   const { id } = await params;
-  const artist = await getLabelArtistById(id);
+  const entity = await getLabelEntityByLegacyArtistId(id);
 
-  if (!artist) notFound();
-
-  return (
-    <div>
-      <div className="border-b border-border bg-slate-50 dark:bg-slate-900">
-        <Container className="py-4">
-          <Link
-            href="/label-os/artists"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft size={14} />
-            Voltar para Artistas
-          </Link>
-        </Container>
-      </div>
-
-      <PageIntro
-        eyebrow="Label OS / Artistas"
-        title={`Editar: ${artist.artist_name ?? artist.name}`}
-        description="Atualize perfil, contato e funcoes do artista dentro do catalogo."
-      />
-
-      <Container className="py-8">
-        <div className="max-w-5xl">
-          <ArtistEditForm artist={artist} />
-        </div>
-      </Container>
-    </div>
-  );
+  if (!entity) notFound();
+  redirect(`/label-os/entities/${entity.id}/edit`);
 }

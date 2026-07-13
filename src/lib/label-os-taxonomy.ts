@@ -29,8 +29,24 @@ export type LegacyEntityCategory =
 
 export type EntityType = EntityCategory | LegacyEntityCategory;
 
+export const ENTITY_TYPE_OPTIONS = [
+  ...LEGACY_ENTITY_CATEGORY_OPTIONS,
+  ...ENTITY_CATEGORY_OPTIONS,
+] as const;
+
 export const ENTITY_FUNCTION_OPTIONS = [
+  { value: "artist", label: "Artista" },
+  { value: "interpreter", label: "Intérprete" },
+  { value: "composer", label: "Compositor" },
+  { value: "music_producer", label: "Produtor musical" },
   { value: "phonographic_producer", label: "Produtor fonografico" },
+  { value: "musician", label: "Músico" },
+  { value: "label", label: "Selo" },
+  { value: "record_company", label: "Gravadora" },
+  { value: "publisher", label: "Editora" },
+  { value: "manager", label: "Manager" },
+  { value: "company", label: "Empresa" },
+  { value: "partner", label: "Parceiro" },
   { value: "distribution", label: "Distribuicao" },
   { value: "publishing_admin", label: "Admin editorial" },
   { value: "management_office", label: "Escritorio artistico" },
@@ -59,8 +75,31 @@ export const ARTIST_ROLE_LABELS: Record<ArtistRole, string> = {
 };
 
 export const ENTITY_FUNCTION_LABELS: Record<EntityFunction, string> = {
+  artist: "Artista",
+  interpreter: "Intérprete",
+  composer: "Compositor",
+  music_producer: "Produtor musical",
   phonographic_producer: "Produtor fonografico",
+  musician: "Músico",
+  label: "Selo",
+  record_company: "Gravadora",
+  publisher: "Editora",
+  manager: "Manager",
+  company: "Empresa",
+  partner: "Parceiro",
   distribution: "Distribuicao",
   publishing_admin: "Admin editorial",
   management_office: "Escritorio artistico",
+};
+
+export const ENTITY_KIND_OPTIONS = [
+  { value: "person", label: "Pessoa física" },
+  { value: "company", label: "Pessoa jurídica" },
+] as const;
+
+export type EntityKind = (typeof ENTITY_KIND_OPTIONS)[number]["value"];
+
+export const ENTITY_KIND_LABELS: Record<EntityKind, string> = {
+  person: "Pessoa física",
+  company: "Pessoa jurídica",
 };

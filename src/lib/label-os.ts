@@ -1,5 +1,18 @@
 import "server-only";
-import type { ArtistRole } from "@/lib/label-os-taxonomy";
+import {
+  ARTIST_ROLE_OPTIONS,
+  type ArtistRole,
+} from "@/lib/label-os-taxonomy";
+import {
+  createLabelEntity,
+  getLabelEntities,
+  getLabelEntityByLegacyArtistId,
+  updateLabelEntity,
+} from "@/lib/label-entities";
+import type {
+  LabelEntity,
+  LabelEntityInput,
+} from "@/lib/label-entities-types";
 import type {
   LabelArtist,
   LabelArtistInput,
@@ -33,11 +46,6 @@ function isMissingRelationError(
   );
 }
 
-function requiresArtistRolesPersistence(roles?: ArtistRole[]) {
-  if (!Array.isArray(roles) || roles.length === 0) return false;
-  return !(roles.length === 1 && roles[0] === "artist");
-}
-
 export type {
   LabelArtist,
   LabelArtistInput,
@@ -50,137 +58,97 @@ export type {
 
 // ─── Artists ──────────────────────────────────────────────
 
-export async function getLabelArtists(): Promise<LabelArtist[]> {
-  const workspaceId = await requireLabelWorkspaceId();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("label_artists")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+const ARTIST_ROLES = new Set<string>(
+  ARTIST_ROLE_OPTIONS.map((option) => option.value),
+);
 
-  if (error) throw new Error(`getLabelArtists: ${error.message}`);
-  return ((data ?? []) as LabelArtist[]).map((artist) => ({
-    ...artist,
-    roles:
-      Array.isArray(artist.roles) && artist.roles.length > 0
-        ? artist.roles
-        : ["artist"],
-  }));
+function entityAsArtist(entity: LabelEntity): LabelArtist {
+  const roles = entity.roles.filter((role): role is ArtistRole =>
+    ARTIST_ROLES.has(role),
+  );
+  return {
+    id: entity.id,
+    workspace_id: entity.workspace_id,
+    name: entity.name,
+    artist_name: entity.display_name,
+    roles: roles.length ? roles : ["artist"],
+    email: entity.email,
+    phone: entity.phone,
+    instagram: entity.instagram,
+    spotify_url: entity.spotify_url,
+    apple_music_url: entity.apple_music_url,
+    youtube_url: entity.youtube_url,
+    document: entity.document,
+    birth_date: entity.birth_date,
+    notes: entity.notes,
+    created_at: entity.created_at,
+  };
+}
+
+export async function getLabelArtists(): Promise<LabelArtist[]> {
+  const entities = await getLabelEntities({ roles: ["artist"] });
+  return entities.map(entityAsArtist);
 }
 
 export async function getLabelArtistById(
   id: string,
 ): Promise<LabelArtist | null> {
-  const workspaceId = await requireLabelWorkspaceId();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("label_artists")
-    .select("*")
-    .eq("id", id)
-    .eq("workspace_id", workspaceId)
-    .single();
-
-  if (error) return null;
-  return {
-    ...(data as LabelArtist),
-    roles:
-      Array.isArray((data as LabelArtist).roles) &&
-      (data as LabelArtist).roles.length > 0
-        ? (data as LabelArtist).roles
-        : ["artist"],
-  };
+  const entity = await getLabelEntityByLegacyArtistId(id);
+  return entity ? entityAsArtist(entity) : null;
 }
 
 export async function updateLabelArtist(
   id: string,
   input: Partial<LabelArtistInput>,
 ): Promise<LabelArtist> {
-  const workspaceId = await requireLabelWorkspaceId();
-  const supabase = await createClient();
-  let { data, error } = await supabase
-    .from("label_artists")
-    .update(input)
-    .eq("id", id)
-    .eq("workspace_id", workspaceId)
-    .select()
-    .single();
-
-  if (isMissingColumnError(error, "roles")) {
-    if (requiresArtistRolesPersistence(input.roles)) {
-      throw new Error(
-        "Seu banco ainda nao tem a coluna roles em label_artists. Rode a migration 20260502_add_roles_to_label_os.sql no Supabase para salvar compositor, interprete e produtor musical.",
-      );
-    }
-
-    const { roles: _roles, ...fallbackInput } = input;
-
-    const retry = await supabase
-      .from("label_artists")
-      .update(fallbackInput)
-      .eq("id", id)
-      .eq("workspace_id", workspaceId)
-      .select()
-      .single();
-
-    data = retry.data;
-    error = retry.error;
-  }
-
-  if (error) throw new Error(`updateLabelArtist: ${error.message}`);
-  return {
-    ...(data as LabelArtist),
-    roles:
-      Array.isArray((data as LabelArtist).roles) &&
-      (data as LabelArtist).roles.length > 0
-        ? (data as LabelArtist).roles
-        : input.roles?.length
-          ? input.roles
-          : ["artist"],
-  };
+  const current = await getLabelEntityByLegacyArtistId(id);
+  if (!current) throw new Error("Artista não encontrado na base unificada.");
+  const payload: Partial<LabelEntityInput> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.artist_name !== undefined) payload.display_name = input.artist_name;
+  if (input.roles !== undefined) payload.roles = input.roles;
+  if (input.email !== undefined) payload.email = input.email;
+  if (input.phone !== undefined) payload.phone = input.phone;
+  if (input.instagram !== undefined) payload.instagram = input.instagram;
+  if (input.spotify_url !== undefined) payload.spotify_url = input.spotify_url;
+  if (input.apple_music_url !== undefined) payload.apple_music_url = input.apple_music_url;
+  if (input.youtube_url !== undefined) payload.youtube_url = input.youtube_url;
+  if (input.document !== undefined) payload.document = input.document;
+  if (input.birth_date !== undefined) payload.birth_date = input.birth_date;
+  if (input.notes !== undefined) payload.notes = input.notes;
+  const updated = await updateLabelEntity(current.id, payload);
+  return entityAsArtist(updated);
 }
 
 export async function createLabelArtist(
   input: LabelArtistInput,
 ): Promise<LabelArtist> {
-  const workspaceId = await requireLabelWorkspaceId();
-  const supabase = await createClient();
-  let { data, error } = await supabase
-    .from("label_artists")
-    .insert({ ...input, workspace_id: workspaceId })
-    .select()
-    .single();
-
-  if (isMissingColumnError(error, "roles")) {
-    if (requiresArtistRolesPersistence(input.roles)) {
-      throw new Error(
-        "Seu banco ainda nao tem a coluna roles em label_artists. Rode a migration 20260502_add_roles_to_label_os.sql no Supabase para salvar compositor, interprete e produtor musical.",
-      );
-    }
-
-    const { roles: _roles, ...fallbackInput } = input;
-
-    const retry = await supabase
-      .from("label_artists")
-      .insert({ ...fallbackInput, workspace_id: workspaceId })
-      .select()
-      .single();
-
-    data = retry.data;
-    error = retry.error;
-  }
-
-  if (error) throw new Error(`createLabelArtist: ${error.message}`);
-  return {
-    ...(data as LabelArtist),
-    roles:
-      Array.isArray((data as LabelArtist).roles) &&
-      (data as LabelArtist).roles.length > 0
-        ? (data as LabelArtist).roles
-        : input.roles?.length
-          ? input.roles
-          : ["artist"],
-  };
+  const entity = await createLabelEntity({
+    name: input.name,
+    display_name: input.artist_name,
+    type: "artist",
+    entity_kind: "person",
+    roles: input.roles?.length ? input.roles : ["artist"],
+    email: input.email,
+    phone: input.phone,
+    instagram: input.instagram,
+    spotify_url: input.spotify_url,
+    spotify_artist_id: null,
+    apple_music_url: input.apple_music_url,
+    youtube_url: input.youtube_url,
+    document: input.document,
+    birth_date: input.birth_date,
+    ipi_cae: null,
+    rights_society: null,
+    publisher_name: null,
+    publisher_entity_id: null,
+    payment_data_complete: false,
+    pix_key: null,
+    bank_details: null,
+    legacy_artist_id: null,
+    notes: input.notes,
+  });
+  return entityAsArtist(entity);
 }
 
 // ─── Tracks ───────────────────────────────────────────────
@@ -419,9 +387,10 @@ export async function getLabelOsStats(): Promise<LabelOsStats> {
       .select("status")
       .eq("workspace_id", workspaceId),
     supabase
-      .from("label_artists")
+      .from("label_entities")
       .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId),
+      .eq("workspace_id", workspaceId)
+      .contains("roles", ["artist"]),
   ]);
 
   const tracks = (tracksRes.data ?? []) as { status: string }[];

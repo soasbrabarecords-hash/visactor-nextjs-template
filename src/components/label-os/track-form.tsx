@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import EntityCombobox from "@/components/label-os/entity-combobox";
 import type { LabelEntity } from "@/lib/label-entities-types";
 import type { LabelArtist } from "@/lib/label-os-types";
+import type { EntityFunction } from "@/lib/label-os-taxonomy";
 import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import {
   formatPercentage,
@@ -343,11 +344,15 @@ function SplitEditor({
   onChange,
   target,
   label,
+  roles = [],
+  nameMode = "public",
 }: {
   rows: SplitRow[];
   onChange: (rows: SplitRow[]) => void;
   target: number;
   label: string;
+  roles?: EntityFunction[];
+  nameMode?: "public" | "legal";
 }) {
   const total = sumPercentages(rows.map((row) => row.pct));
 
@@ -356,14 +361,48 @@ function SplitEditor({
   }
 
   function removeRow(index: number) {
-    onChange(rows.filter((_, currentIndex) => currentIndex !== index));
+    const next = rows.filter((_, currentIndex) => currentIndex !== index);
+    const selectedIndexes = next
+      .map((row, rowIndex) => (row.entity ? rowIndex : -1))
+      .filter((rowIndex) => rowIndex >= 0);
+    const base =
+      selectedIndexes.length > 0
+        ? Math.floor((target * 100) / selectedIndexes.length) / 100
+        : 0;
+    onChange(
+      next.map((row, rowIndex) => {
+        const selectedPosition = selectedIndexes.indexOf(rowIndex);
+        if (selectedPosition < 0) return row;
+        const pct =
+          selectedPosition === selectedIndexes.length - 1
+            ? target - base * (selectedIndexes.length - 1)
+            : base;
+        return { ...row, pct: String(Number(pct.toFixed(2))) };
+      }),
+    );
   }
 
   function updateEntity(index: number, entity: LabelEntity | null) {
+    const next = rows.map((row, currentIndex) =>
+      currentIndex === index ? { ...row, entity } : row,
+    );
+    const selectedIndexes = next
+      .map((row, rowIndex) => (row.entity ? rowIndex : -1))
+      .filter((rowIndex) => rowIndex >= 0);
+    const base =
+      selectedIndexes.length > 0
+        ? Math.floor((target * 100) / selectedIndexes.length) / 100
+        : 0;
     onChange(
-      rows.map((row, currentIndex) =>
-        currentIndex === index ? { ...row, entity } : row,
-      ),
+      next.map((row, rowIndex) => {
+        const selectedPosition = selectedIndexes.indexOf(rowIndex);
+        if (selectedPosition < 0) return row;
+        const pct =
+          selectedPosition === selectedIndexes.length - 1
+            ? target - base * (selectedIndexes.length - 1)
+            : base;
+        return { ...row, pct: String(Number(pct.toFixed(2))) };
+      }),
     );
   }
 
@@ -395,6 +434,8 @@ function SplitEditor({
                 value={row.entity}
                 onChange={(entity) => updateEntity(index, entity)}
                 placeholder="Buscar entidade..."
+                roles={roles}
+                nameMode={nameMode}
               />
             </div>
             <div className="relative w-full sm:w-32">
@@ -617,8 +658,8 @@ export default function TrackForm({ artists }: TrackFormProps) {
       const participants = [
         ...selectedArtists.map((artist) => ({
           track_id: trackId,
-          artist_id: artist.id,
-          entity_id: null,
+          artist_id: null,
+          entity_id: artist.id,
           role: "main_artist",
           royalty_percentage: 0,
           publishing_percentage: 0,
@@ -696,6 +737,70 @@ export default function TrackForm({ artists }: TrackFormProps) {
       );
 
       void participantResponses;
+
+      const professionalSplits = [
+        ...obraRows.map((row) => ({
+          url: `/api/label-os/tracks/${trackId}/compositions`,
+          body: {
+            entity_id: row.entity!.id,
+            role: "compositor",
+            percentage: parsePercentageInput(row.pct),
+          },
+          error: "Erro ao salvar os compositores da obra.",
+        })),
+        ...interpretes.map((row) => ({
+          url: `/api/label-os/tracks/${trackId}/master-splits`,
+          body: {
+            entity_id: row.entity!.id,
+            group_type: "interpreter",
+            role: "intérprete",
+            percentage: parsePercentageInput(row.pct),
+          },
+          error: "Erro ao salvar os intérpretes do fonograma.",
+        })),
+        ...produtores.map((row) => ({
+          url: `/api/label-os/tracks/${trackId}/master-splits`,
+          body: {
+            entity_id: row.entity!.id,
+            group_type: "phonographic_producer",
+            role: "produtor fonográfico",
+            percentage: parsePercentageInput(row.pct),
+          },
+          error: "Erro ao salvar os produtores do fonograma.",
+        })),
+        ...musicos.map((row) => ({
+          url: `/api/label-os/tracks/${trackId}/master-splits`,
+          body: {
+            entity_id: row.entity!.id,
+            group_type: "musician",
+            role: "músico",
+            percentage: parsePercentageInput(row.pct),
+          },
+          error: "Erro ao salvar os músicos do fonograma.",
+        })),
+        ...royaltyRows.map((row) => ({
+          url: `/api/label-os/tracks/${trackId}/royalty-splits`,
+          body: {
+            entity_id: row.entity!.id,
+            role: "participante",
+            percentage: parsePercentageInput(row.pct),
+          },
+          error: "Erro ao salvar a divisão de royalties.",
+        })),
+      ];
+
+      await Promise.all(
+        professionalSplits.map(async (split) => {
+          const response = await fetch(split.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(split.body),
+          });
+          if (!response.ok) {
+            throw new Error(await readApiError(response, split.error));
+          }
+        }),
+      );
 
       router.push(`/label-os/tracks/${trackId}`);
       router.refresh();
@@ -1030,6 +1135,8 @@ export default function TrackForm({ artists }: TrackFormProps) {
               onChange={setObraRows}
               target={100}
               label="Compositores"
+              roles={["composer"]}
+              nameMode="legal"
             />
           </div>
         </Section>
@@ -1072,18 +1179,21 @@ export default function TrackForm({ artists }: TrackFormProps) {
               onChange={setInterpretes}
               target={FONOGRAMA_TARGETS.interpretes}
               label="Intérpretes"
+              roles={["interpreter", "artist"]}
             />
             <SplitEditor
               rows={produtores}
               onChange={setProdutores}
               target={FONOGRAMA_TARGETS.produtores}
               label="Produtores fonográficos"
+              roles={["phonographic_producer", "label", "record_company"]}
             />
             <SplitEditor
               rows={musicos}
               onChange={setMusicos}
               target={FONOGRAMA_TARGETS.musicos}
               label="Músicos"
+              roles={["musician", "interpreter", "artist", "music_producer"]}
             />
           </div>
         </Section>

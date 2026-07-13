@@ -22,6 +22,10 @@ export type TrackCompositionInput = {
   percentage: number;
 };
 
+export type TrackCompositionUpdate = Partial<
+  Pick<TrackCompositionInput, "role" | "percentage">
+>;
+
 // Fonograma group types
 export const MASTER_GROUP_TYPES = [
   { value: "interpreter", label: "Intérprete" },
@@ -52,6 +56,16 @@ export type TrackMasterSplitInput = {
   group_type: MasterGroupType;
   role?: string;
   percentage: number;
+};
+
+export type TrackMasterSplitUpdate = Partial<
+  Pick<TrackMasterSplitInput, "group_type" | "role" | "percentage">
+>;
+
+export const MASTER_GROUP_TARGETS: Record<MasterGroupType, number> = {
+  interpreter: 41.7,
+  phonographic_producer: 41.7,
+  musician: 16.6,
 };
 
 export type TrackRoyaltySplit = {

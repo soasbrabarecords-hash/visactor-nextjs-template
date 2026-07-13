@@ -4,7 +4,6 @@ import {
   BarChart3,
   Bot,
   BriefcaseBusiness,
-  Building2,
   CalendarDays,
   ClipboardCheck,
   Compass,
@@ -82,12 +81,7 @@ export const navigations: Navigation[] = [
       },
       {
         icon: UsersRound,
-        name: "Artistas",
-        href: "/label-os/artists",
-      },
-      {
-        icon: Building2,
-        name: "Entidades",
+        name: "Pessoas e Entidades",
         href: "/label-os/entities",
       },
       {

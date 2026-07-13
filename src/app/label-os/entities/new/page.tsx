@@ -6,9 +6,9 @@ export default function NewEntityPage() {
   return (
     <div>
       <PageIntro
-        eyebrow="Label OS / Entidades"
-        title="Nova Entidade"
-        description="Cadastre gravadora, selo, editora, manager e funcoes extras como produtor fonografico."
+        eyebrow="Label OS / Pessoas e Entidades"
+        title="Novo participante"
+        description="Cadastre uma pessoa ou empresa uma única vez, preservando sua categoria e todas as funções no catálogo."
       />
       <Container className="py-8">
         <div className="max-w-5xl">
