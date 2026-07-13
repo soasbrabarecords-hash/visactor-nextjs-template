@@ -145,7 +145,6 @@ export default function PlaylistIntelligencePanel({
   onApplySuggestedOrder?: () => Promise<boolean>;
 }) {
   const [view, setView] = useState<"summary" | "order">("summary");
-  const [confirmingApply, setConfirmingApply] = useState(false);
   const { summary } = intelligence;
   const hasOrderChanges = summary.orderChangesCount > 0;
   const priority = intelligence.decisions
@@ -165,14 +164,13 @@ export default function PlaylistIntelligencePanel({
     .slice(0, 6);
   const suggestedOrder = [...intelligence.decisions].sort((a, b) => a.suggestedIndex - b.suggestedIndex);
   const canApplyOrder = Boolean(
-    onApplySuggestedOrder && hasOrderChanges && !isEnriching && !isApplyingOrder && !applyDisabledReason,
+    onApplySuggestedOrder && hasOrderChanges && !isApplyingOrder && !applyDisabledReason,
   );
 
-  async function handleConfirmApply() {
+  async function handleApplyOrder() {
     if (!onApplySuggestedOrder || !canApplyOrder) return;
     const success = await onApplySuggestedOrder();
     if (success) {
-      setConfirmingApply(false);
       setView("summary");
     }
   }
@@ -216,36 +214,16 @@ export default function PlaylistIntelligencePanel({
           <Button
             type="button"
             size="sm"
-            onClick={() => {
-              setView("order");
-              setConfirmingApply(true);
-            }}
+            onClick={() => void handleApplyOrder()}
             disabled={!canApplyOrder}
             className="h-8 rounded-full px-3 text-xs"
             title={applyDisabledReason}
           >
             {isApplyingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
-            Aplicar ordem
+            Aplicar ordem sugerida
           </Button>
         </div>
       </header>
-
-      {confirmingApply ? (
-        <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 tablet:flex-row tablet:items-center tablet:justify-between">
-          <p className="text-xs font-medium text-foreground">
-            Confirmar {summary.orderChangesCount} ajustes diretamente no Spotify?
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmingApply(false)} disabled={isApplyingOrder} className="h-8 rounded-full text-xs">
-              Cancelar
-            </Button>
-            <Button type="button" size="sm" onClick={() => void handleConfirmApply()} disabled={!canApplyOrder} className="h-8 rounded-full text-xs">
-              {isApplyingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
-              Confirmar e salvar
-            </Button>
-          </div>
-        </div>
-      ) : null}
 
       {view === "order" && hasOrderChanges ? (
         <div className="mt-3 border-t border-border/70 pt-3">

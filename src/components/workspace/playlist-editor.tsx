@@ -255,6 +255,7 @@ export default function PlaylistEditor({
   const lastPointerY = useRef(0);
   const autoScrollFrame = useRef<number | null>(null);
   const scrollContainer = useRef<HTMLElement | Window | null>(null);
+  const saveRequest = useRef<AbortController | null>(null);
   const ignoreNextClick = useRef(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
@@ -273,6 +274,7 @@ export default function PlaylistEditor({
     if (autoScrollFrame.current !== null) {
       window.cancelAnimationFrame(autoScrollFrame.current);
     }
+    saveRequest.current?.abort();
   }, []);
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
@@ -579,16 +581,45 @@ export default function PlaylistEditor({
   }
 
   async function savePlaylistOrder(nextTracks: TrackWithStreams[]) {
+    if (saveRequest.current) {
+      return false;
+    }
+
     setSaving(true);
     setError(null);
+    const controller = new AbortController();
+    saveRequest.current = controller;
+    const timeoutId = window.setTimeout(() => controller.abort(), 30_000);
+
     try {
       const uris = nextTracks.map((t) => `spotify:track:${t.id}`);
       const res = await fetch(`/api/spotify/playlists/${playlistId}/tracks/reorder-full`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uris, snapshotId }),
+        signal: controller.signal,
       });
-      const data = (await res.json()) as { success?: boolean; snapshotId?: string; message?: string };
+      const responseText = await res.text();
+      const data = (() => {
+        try {
+          return JSON.parse(responseText) as {
+            success?: boolean;
+            snapshotId?: string;
+            message?: string;
+          };
+        } catch {
+          return null;
+        }
+      })();
+
+      if (!data) {
+        throw new Error(
+          res.ok
+            ? "O Spotify respondeu sem confirmar a nova ordem. Tente novamente."
+            : `Falha ao salvar a ordem (${res.status}).`,
+        );
+      }
+
       if (!res.ok || !data.success) throw new Error(data.message ?? "Erro ao salvar ordem.");
       if (data.snapshotId) setSnapshotId(data.snapshotId);
       setTracks([...nextTracks]);
@@ -598,9 +629,19 @@ export default function PlaylistEditor({
       lastClickedIndex.current = null;
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar ordem.");
+      setError(
+        err instanceof DOMException && err.name === "AbortError"
+          ? "O Spotify demorou mais de 30 segundos para responder. Tente novamente."
+          : err instanceof Error
+            ? err.message
+            : "Erro ao salvar ordem.",
+      );
       return false;
     } finally {
+      window.clearTimeout(timeoutId);
+      if (saveRequest.current === controller) {
+        saveRequest.current = null;
+      }
       setSaving(false);
     }
   }
@@ -806,9 +847,7 @@ export default function PlaylistEditor({
         applyDisabledReason={
           pendingReorder
             ? "Salve ou cancele a ordem manual antes."
-            : isIntelligenceEnriching
-              ? "Aguarde os sinais terminarem de carregar."
-              : undefined
+            : undefined
         }
         onApplySuggestedOrder={handleApplySuggestedOrder}
       />
@@ -1083,23 +1122,27 @@ export default function PlaylistEditor({
       </div>
 
       {pendingReorder ? (
-        <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[70] flex justify-center tablet:left-[248px] tablet:justify-end tablet:right-6">
+        <div className="fixed bottom-4 left-4 right-4 z-[70] flex justify-center tablet:left-auto tablet:right-6 tablet:w-[560px]">
           <div
             role="status"
             aria-live="polite"
-            className="pointer-events-auto flex w-full max-w-[560px] items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/92 p-2.5 pl-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.4)] backdrop-blur-2xl"
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-2.5 pl-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
           >
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Nova ordem pronta</p>
-              <p className="truncate text-[11px] text-white/60">Revise a lista e confirme para atualizar o Spotify.</p>
+              <p className={`truncate text-sm font-semibold ${error ? "text-red-300" : "text-white"}`}>
+                {error ? "Não foi possível salvar" : "Nova ordem pronta"}
+              </p>
+              <p className={`truncate text-[11px] ${error ? "text-red-200/75" : "text-white/60"}`}>
+                {error ?? "Revise a lista e confirme para atualizar o Spotify."}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Button size="sm" variant="ghost" onClick={handleCancelReorder} disabled={saving} className="rounded-xl text-white/72 hover:bg-white/10 hover:text-white">
+              <Button type="button" size="sm" variant="ghost" onClick={handleCancelReorder} disabled={saving} className="rounded-xl text-white/72 hover:bg-white/10 hover:text-white">
                 <X className="h-3.5 w-3.5" /> Cancelar
               </Button>
-              <Button size="sm" onClick={() => void handleConfirmReorder()} disabled={saving} className="rounded-xl bg-white text-slate-950 hover:bg-white/90">
+              <Button type="button" size="sm" onClick={() => void handleConfirmReorder()} disabled={saving} className="rounded-xl bg-white text-slate-950 hover:bg-white/90">
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                Confirmar ordem
+                Confirmar nova ordem
               </Button>
             </div>
           </div>

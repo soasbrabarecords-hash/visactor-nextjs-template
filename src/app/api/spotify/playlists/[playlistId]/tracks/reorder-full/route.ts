@@ -30,6 +30,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ playlistId: string }> },
 ) {
+  const startedAt = Date.now();
   const { playlistId } = await params;
   const body = (await request.json()) as ReorderFullBody;
 
@@ -46,12 +47,25 @@ export async function PUT(
     );
   }
 
+  // eslint-disable-next-line no-console -- production trace for Spotify mutations
+  console.info("[spotify:playlist-order] update started", {
+    playlistId,
+    itemCount: uris.length,
+  });
+
   const { result, refreshedToken } = await replacePlaylistTracks(
     playlistId,
     uris,
   );
 
   if (!result.success) {
+    // eslint-disable-next-line no-console -- production trace for Spotify mutations
+    console.error("[spotify:playlist-order] update failed", {
+      playlistId,
+      itemCount: uris.length,
+      durationMs: Date.now() - startedAt,
+      message: result.message,
+    });
     return NextResponse.json(
       {
         success: false,
@@ -60,6 +74,14 @@ export async function PUT(
       { status: getErrorStatus(result.message) },
     );
   }
+
+  // eslint-disable-next-line no-console -- production trace for Spotify mutations
+  console.info("[spotify:playlist-order] update completed", {
+    playlistId,
+    itemCount: uris.length,
+    durationMs: Date.now() - startedAt,
+    hasSnapshotId: Boolean(result.snapshotId),
+  });
 
   const response = NextResponse.json({
     success: true,
