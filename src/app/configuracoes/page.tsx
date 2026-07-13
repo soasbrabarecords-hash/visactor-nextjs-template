@@ -1,9 +1,6 @@
 import { TopNav } from "@/components/nav";
 import SettingsHub from "@/components/workspace/settings-hub";
-import {
-  fetchSpotifyConnectionStatus,
-  getSpotifyRedirectUri,
-} from "@/lib/spotify-user";
+import { getSpotifyRedirectUri } from "@/lib/spotify-user";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceContext } from "@/lib/workspaces";
 
@@ -11,12 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage() {
   const supabase = await createClient();
-  const [{ result: spotify }, workspace, { data: userData }] =
-    await Promise.all([
-      fetchSpotifyConnectionStatus(),
-      getCurrentWorkspaceContext().catch(() => null),
-      supabase.auth.getUser(),
-    ]);
+  const [workspace, { data: userData }] = await Promise.all([
+    getCurrentWorkspaceContext().catch(() => null),
+    supabase.auth.getUser(),
+  ]);
   const metadata = userData.user?.user_metadata ?? {};
   const displayName = [
     metadata.display_name,
@@ -34,6 +29,11 @@ export default async function ConfiguracoesPage() {
     workspace?.spotifyIntegration.appClientId &&
     workspace.spotifyIntegration.hasAppClientSecret,
   );
+  const spotifyConnected = Boolean(
+    workspace?.spotifyIntegration.connectionStatus === "connected" &&
+    (workspace.spotifyIntegration.hasAccessToken ||
+      workspace.spotifyIntegration.hasRefreshToken),
+  );
   const openaiReady = Boolean(process.env.OPENAI_API_KEY?.trim());
   const spotifyRedirectUri = getSpotifyRedirectUri(
     process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://system.soasbraba.com",
@@ -43,7 +43,7 @@ export default async function ConfiguracoesPage() {
     <>
       <TopNav title="Configuracoes" />
       <SettingsHub
-        spotify={spotify}
+        spotifyConnected={spotifyConnected}
         spotifyAppReady={spotifyAppReady}
         openaiReady={openaiReady}
         workspace={workspace}

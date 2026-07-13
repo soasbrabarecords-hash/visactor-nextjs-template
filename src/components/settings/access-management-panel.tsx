@@ -91,6 +91,47 @@ type AccessApiResponse = {
   } | null;
 };
 
+const ACCESS_DATA_CACHE_TTL_MS = 60 * 1000;
+let accessDataCache: { value: AccessAdminData; cachedAt: number } | null = null;
+let accessDataInFlight: Promise<AccessAdminData> | null = null;
+
+async function fetchAccessData(): Promise<AccessAdminData> {
+  if (
+    accessDataCache &&
+    Date.now() - accessDataCache.cachedAt < ACCESS_DATA_CACHE_TTL_MS
+  ) {
+    return accessDataCache.value;
+  }
+
+  if (accessDataInFlight) {
+    return accessDataInFlight;
+  }
+
+  accessDataInFlight = (async () => {
+    const response = await fetch("/api/settings/access", {
+      cache: "no-store",
+    });
+    const payload = (await response.json()) as AccessApiResponse;
+
+    if (!response.ok || !payload.success || !payload.data) {
+      throw new Error(payload.message ?? "Nao foi possivel carregar acessos.");
+    }
+
+    accessDataCache = {
+      value: payload.data,
+      cachedAt: Date.now(),
+    };
+
+    return payload.data;
+  })();
+
+  try {
+    return await accessDataInFlight;
+  } finally {
+    accessDataInFlight = null;
+  }
+}
+
 type AccessTab =
   "overview" | "workspaces" | "users" | "modules" | "permissions";
 
@@ -172,8 +213,10 @@ export default function AccessManagementPanel({
 }: {
   initialTab?: AccessTab;
 }) {
-  const [data, setData] = useState<AccessAdminData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<AccessAdminData | null>(
+    () => accessDataCache?.value ?? null,
+  );
+  const [isLoading, setIsLoading] = useState(() => !accessDataCache);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -213,19 +256,11 @@ export default function AccessManagementPanel({
   });
 
   async function loadAccessData() {
-    setIsLoading(true);
-    setError(null);
-
-    const response = await fetch("/api/settings/access", {
-      cache: "no-store",
-    });
-    const payload = (await response.json()) as AccessApiResponse;
-
-    if (!response.ok || !payload.success || !payload.data) {
-      throw new Error(payload.message ?? "Nao foi possivel carregar acessos.");
+    if (!accessDataCache) {
+      setIsLoading(true);
     }
-
-    setData(payload.data);
+    setError(null);
+    setData(await fetchAccessData());
   }
 
   async function runAction(body: Record<string, unknown>, message: string) {
@@ -248,6 +283,10 @@ export default function AccessManagementPanel({
         throw new Error(payload.message ?? "Nao foi possivel salvar.");
       }
 
+      accessDataCache = {
+        value: payload.data,
+        cachedAt: Date.now(),
+      };
       setData(payload.data);
       setSuccess(message);
       if (

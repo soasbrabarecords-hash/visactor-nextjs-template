@@ -2499,14 +2499,16 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 }
 
 export async function getCurationPageData(): Promise<CurationPageData> {
-  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const [workspace, chartsData] = await Promise.all([
+    getCurrentWorkspaceContext().catch(() => null),
+    getChartsData(),
+  ]);
   const defaultMarket = workspace?.settings.defaultMarket?.trim() || "BR";
   const suggestionScoreThreshold = clamp(
     workspace?.settings.suggestionScoreThreshold ?? 70,
     0,
     100,
   );
-  const chartsData = await getChartsData();
   const dominantArtists = chartsData.artistDistribution.map((artist) => artist.type);
   const snapshotRadar = await buildDashboardSnapshotRadarRows({
     country: defaultMarket,

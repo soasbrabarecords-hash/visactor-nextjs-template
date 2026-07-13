@@ -169,16 +169,17 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
 
   const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
 
-  const { data: workspaceUsers } = await dataClient
-    .from("workspace_users")
-    .select("workspace_id, role, status")
-    .eq("user_id", user.id)
-    .eq("status", "active");
-
-  const { data: memberships } = await dataClient
-    .from("workspace_memberships")
-    .select("workspace_id, role")
-    .eq("user_id", user.id);
+  const [{ data: workspaceUsers }, { data: memberships }] = await Promise.all([
+    dataClient
+      .from("workspace_users")
+      .select("workspace_id, role, status")
+      .eq("user_id", user.id)
+      .eq("status", "active"),
+    dataClient
+      .from("workspace_memberships")
+      .select("workspace_id, role")
+      .eq("user_id", user.id),
+  ]);
 
   const workspaceUserIds = (
     (workspaceUsers ?? []) as Array<{
@@ -344,8 +345,6 @@ function ensureWorkspaceAllowed(context: AdminContext, workspaceId: string) {
 
 export async function getAccessAdminData(): Promise<AccessAdminData> {
   const context = await getCurrentAdminContext();
-  const authUsers = await listAuthUsers(context.adminClient);
-  const emailByUserId = new Map(authUsers.map((user) => [user.id, user.email]));
 
   let workspaceQuery = context.dataClient
     .from("workspaces")
@@ -356,7 +355,12 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
     workspaceQuery = workspaceQuery.in("id", context.manageableWorkspaceIds);
   }
 
-  const { data: workspaceRows, error: workspacesError } = await workspaceQuery;
+  const [authUsers, { data: workspaceRows, error: workspacesError }] =
+    await Promise.all([
+      listAuthUsers(context.adminClient),
+      workspaceQuery,
+    ]);
+  const emailByUserId = new Map(authUsers.map((user) => [user.id, user.email]));
 
   if (workspacesError) {
     throw new AccessAdminError(workspacesError.message);

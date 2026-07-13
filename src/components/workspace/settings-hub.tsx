@@ -7,6 +7,7 @@ import {
   LogOut,
   Music2,
 } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import Container from "@/components/container";
 import AccountProfileForm from "@/components/settings/account-profile-form";
@@ -14,11 +15,10 @@ import StatusBadge from "@/components/workspace/status-badge";
 import WorkspaceOpenAIIntegrationForm from "@/components/workspace/workspace-openai-integration-form";
 import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-form";
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
-import type { SpotifyConnectionStatusResult } from "@/lib/spotify-user";
 import type { WorkspaceContext } from "@/lib/workspaces";
 
 type SettingsHubProps = {
-  spotify: SpotifyConnectionStatusResult;
+  spotifyConnected: boolean;
   spotifyAppReady: boolean;
   openaiReady: boolean;
   workspace: WorkspaceContext | null;
@@ -73,7 +73,7 @@ function SettingsSection({
 }
 
 export default function SettingsHub({
-  spotify,
+  spotifyConnected,
   spotifyAppReady,
   openaiReady,
   workspace,
@@ -110,21 +110,21 @@ export default function SettingsHub({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a
+            <Link
               href="/curadoria"
               className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card px-3.5 text-sm font-medium text-foreground shadow-sm transition hover:bg-accent"
             >
               Abrir curadoria <ArrowUpRight className="h-3.5 w-3.5" />
-            </a>
+            </Link>
             <a
               href="/api/spotify/auth/login?next=/configuracoes"
               aria-disabled={!workspace || !spotifyAppReady}
               className="inline-flex h-9 items-center gap-2 rounded-full bg-foreground px-3.5 text-sm font-medium text-background transition hover:opacity-85 aria-disabled:pointer-events-none aria-disabled:opacity-40"
             >
               <Music2 className="h-3.5 w-3.5" />
-              {spotify.connected ? "Reconectar" : "Conectar Spotify"}
+              {spotifyConnected ? "Reconectar" : "Conectar Spotify"}
             </a>
-            {spotify.connected ? (
+            {spotifyConnected ? (
               <a
                 href="/api/spotify/auth/logout?next=/configuracoes"
                 className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-card px-3.5 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
@@ -183,14 +183,14 @@ export default function SettingsHub({
                   <StatusBadge
                     tone={
                       spotifyAppReady
-                        ? spotify.connected
+                        ? spotifyConnected
                           ? "green"
                           : "blue"
                         : "yellow"
                     }
                   >
                     {spotifyAppReady
-                      ? spotify.connected
+                      ? spotifyConnected
                         ? "Conectado"
                         : "Pronto"
                       : "Configurar"}

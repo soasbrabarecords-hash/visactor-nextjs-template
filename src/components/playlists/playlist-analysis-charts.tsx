@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Container from "@/components/container";
+import { ChartThemeProvider } from "@/components/providers/chart-theme-provider";
 import type { ChannelDatum, ScoreBreakdown } from "@/types/dashboard";
 
 type PlaylistAnalysisChartsProps = {
@@ -62,7 +63,7 @@ export default function PlaylistAnalysisCharts({
   totalTracks,
 }: PlaylistAnalysisChartsProps) {
   return (
-    <>
+    <ChartThemeProvider>
       <Container className="py-4 laptop:col-span-1">
         <TicketByChannels
           data={artistDistribution}
@@ -85,6 +86,6 @@ export default function PlaylistAnalysisCharts({
           }}
         />
       </Container>
-    </>
+    </ChartThemeProvider>
   );
 }

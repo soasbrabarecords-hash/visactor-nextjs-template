@@ -422,16 +422,8 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     role: selectedWorkspace.role,
   };
 
-  if (selectedWorkspace.role === "owner" || selectedWorkspace.role === "admin") {
-    await ensureWorkspaceDefaults(workspace.id, workspace.slug);
-  }
-
-  const [
-    { data: settingsRow, error: settingsError },
-    { data: spotifyIntegrationRow, error: spotifyIntegrationError },
-    { data: openaiIntegrationRow, error: openaiIntegrationError },
-  ] =
-    await Promise.all([
+  const readWorkspaceConfiguration = () =>
+    Promise.all([
       dataClient
         .from("workspace_settings")
         .select(
@@ -457,27 +449,54 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
         .maybeSingle(),
     ]);
 
-  if (settingsError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(settings): ${settingsError.message}`,
-    );
+  let [
+    settingsResult,
+    spotifyIntegrationResult,
+    openaiIntegrationResult,
+  ] = await readWorkspaceConfiguration();
+
+  const assertWorkspaceConfiguration = () => {
+    if (settingsResult.error) {
+      throw new Error(
+        `getCurrentWorkspaceContext(settings): ${settingsResult.error.message}`,
+      );
+    }
+
+    if (spotifyIntegrationResult.error) {
+      throw new Error(
+        `getCurrentWorkspaceContext(spotify): ${spotifyIntegrationResult.error.message}`,
+      );
+    }
+
+    if (openaiIntegrationResult.error) {
+      throw new Error(
+        `getCurrentWorkspaceContext(openai): ${openaiIntegrationResult.error.message}`,
+      );
+    }
+  };
+
+  assertWorkspaceConfiguration();
+
+  const canBootstrapDefaults =
+    selectedWorkspace.role === "owner" || selectedWorkspace.role === "admin";
+  const isConfigurationMissing =
+    !settingsResult.data ||
+    !spotifyIntegrationResult.data ||
+    !openaiIntegrationResult.data;
+
+  if (canBootstrapDefaults && isConfigurationMissing) {
+    await ensureWorkspaceDefaults(workspace.id, workspace.slug);
+    [
+      settingsResult,
+      spotifyIntegrationResult,
+      openaiIntegrationResult,
+    ] = await readWorkspaceConfiguration();
+    assertWorkspaceConfiguration();
   }
 
-  if (spotifyIntegrationError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(spotify): ${spotifyIntegrationError.message}`,
-    );
-  }
-
-  if (openaiIntegrationError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(openai): ${openaiIntegrationError.message}`,
-    );
-  }
-
-  const settings = settingsRow as WorkspaceSettingsRow | null;
-  const spotifyIntegration = spotifyIntegrationRow as WorkspaceIntegrationRow | null;
-  const openaiIntegration = openaiIntegrationRow as WorkspaceIntegrationRow | null;
+  const settings = settingsResult.data as WorkspaceSettingsRow | null;
+  const spotifyIntegration = spotifyIntegrationResult.data as WorkspaceIntegrationRow | null;
+  const openaiIntegration = openaiIntegrationResult.data as WorkspaceIntegrationRow | null;
   const spotifyAppMode = getEffectiveSpotifyAppMode(
     workspace,
     spotifyIntegration?.app_mode,

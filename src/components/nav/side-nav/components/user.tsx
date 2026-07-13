@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,7 +79,8 @@ export default function User() {
   const workspaceAccess = useWorkspaceAccess();
   const workspace = workspaceAccess.currentWorkspace;
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
     null,
   );
@@ -92,10 +93,13 @@ export default function User() {
   const accountName =
     workspaceAccess.currentUserName ?? workspaceAccess.currentUserEmail;
 
-  useEffect(() => {
-    let isMounted = true;
+  async function loadAccounts() {
+    if (hasLoadedAccounts || isLoadingAccounts) {
+      return;
+    }
 
-    async function loadAccounts() {
+    setIsLoadingAccounts(true);
+    try {
       const response = await fetch("/api/auth/accounts", {
         cache: "no-store",
       });
@@ -105,27 +109,24 @@ export default function User() {
         message?: string;
       } | null;
 
-      if (!isMounted) {
-        return;
-      }
-
-      if (response.ok && payload?.success && payload.accounts) {
-        setAccounts(payload.accounts);
-      } else {
-        setMenuError(
+      if (!response.ok || !payload?.success || !payload.accounts) {
+        throw new Error(
           payload?.message ?? "Não foi possível carregar as contas conectadas.",
         );
       }
 
+      setAccounts(payload.accounts);
+      setHasLoadedAccounts(true);
+    } catch (loadError) {
+      setMenuError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Não foi possível carregar as contas conectadas.",
+      );
+    } finally {
       setIsLoadingAccounts(false);
     }
-
-    void loadAccounts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -193,7 +194,13 @@ export default function User() {
 
   return (
     <div className="mb-1">
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          if (open) {
+            void loadAccounts();
+          }
+        }}
+      >
         <DropdownMenuTrigger className="group flex w-full items-center justify-between rounded-2xl border border-transparent px-2.5 py-2 text-left transition hover:border-border hover:bg-accent/70">
           <div className="flex min-w-0 flex-1 items-center">
             <AccountAvatar
