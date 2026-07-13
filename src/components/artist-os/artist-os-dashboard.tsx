@@ -229,7 +229,7 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
         <div className="flex items-start gap-3 rounded-[24px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <div className="text-sm font-semibold">ArtistOS em modo demo</div>
+            <div className="text-sm font-semibold">Business OS em modo demo</div>
             <p className="mt-1 text-sm text-amber-100/70">
               A migration ainda precisa ser aplicada no Supabase para gravar dados reais.
             </p>

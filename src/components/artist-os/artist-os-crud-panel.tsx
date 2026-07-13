@@ -379,7 +379,7 @@ export default function ArtistOsCrudPanel({
         | { rows?: ArtistOsRecord[]; error?: string }
         | null;
 
-      if (!response.ok) throw new Error(payload?.error ?? "Erro ao atualizar ArtistOS.");
+      if (!response.ok) throw new Error(payload?.error ?? "Erro ao atualizar Business OS.");
       setRows(payload?.rows ?? []);
     } catch (reloadError) {
       setError(reloadError instanceof Error ? reloadError.message : "Erro ao atualizar.");
@@ -501,7 +501,7 @@ export default function ArtistOsCrudPanel({
           <div className="mx-4 mt-4 flex items-start gap-3 rounded-[22px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12 tablet:mx-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm font-medium leading-5">
-              {initialError ?? "Migration do ArtistOS pendente. A lista pode exibir dados demo."}
+              {initialError ?? "Migration do Business OS pendente. A lista pode exibir dados demo."}
             </p>
           </div>
         ) : null}

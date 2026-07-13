@@ -1,12 +1,21 @@
 import {
+  BadgeDollarSign,
+  BarChart3,
+  Building2,
+  CalendarDays,
+  ClipboardCheck,
   Compass,
+  FileSignature,
   ListMusic,
   Library,
   BarChart2,
   Bot,
   BriefcaseBusiness,
   Flame,
+  Megaphone,
+  Music2,
   Settings2,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/workspace-access";
@@ -69,12 +78,86 @@ export const navigations: Navigation[] = [
     name: "Label OS",
     href: "/label-os",
     moduleKey: "label_os",
+    children: [
+      {
+        icon: BarChart2,
+        name: "Visão geral",
+        href: "/label-os",
+      },
+      {
+        icon: Music2,
+        name: "Catálogo",
+        href: "/label-os/tracks",
+      },
+      {
+        icon: UsersRound,
+        name: "Artistas",
+        href: "/label-os/artists",
+      },
+      {
+        icon: Building2,
+        name: "Entidades",
+        href: "/label-os/entities",
+      },
+    ],
   },
   {
     icon: BriefcaseBusiness,
-    name: "Artist OS",
+    name: "Business OS",
     href: "/artist-os",
     moduleKey: "artist_os",
+    children: [
+      {
+        icon: BarChart3,
+        name: "Visão geral",
+        href: "/artist-os",
+      },
+      {
+        icon: UsersRound,
+        name: "Artistas",
+        href: "/artist-os/artists",
+      },
+      {
+        icon: CalendarDays,
+        name: "Agenda",
+        href: "/artist-os/shows",
+      },
+      {
+        icon: BriefcaseBusiness,
+        name: "Negociações",
+        href: "/artist-os/deals",
+      },
+      {
+        icon: Megaphone,
+        name: "Publicidade",
+        href: "/artist-os/brand-deals",
+      },
+      {
+        icon: BadgeDollarSign,
+        name: "Financeiro",
+        href: "/artist-os/finance",
+      },
+      {
+        icon: FileSignature,
+        name: "Contratos",
+        href: "/artist-os/contracts",
+      },
+      {
+        icon: ClipboardCheck,
+        name: "Tarefas",
+        href: "/artist-os/tasks",
+      },
+      {
+        icon: BarChart3,
+        name: "Relatórios",
+        href: "/artist-os/reports",
+      },
+      {
+        icon: Settings2,
+        name: "Configurações",
+        href: "/artist-os/settings",
+      },
+    ],
   },
 ];
 

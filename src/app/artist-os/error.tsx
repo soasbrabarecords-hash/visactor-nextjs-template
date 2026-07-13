@@ -16,7 +16,7 @@ export default function ArtistOsError({
         <AlertTriangle className="h-5 w-5" />
       </div>
       <div className="mt-5 text-xs font-medium text-rose-100/62">
-        ArtistOS
+        Business OS
       </div>
       <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-white/95">
         Não conseguimos abrir esta área.

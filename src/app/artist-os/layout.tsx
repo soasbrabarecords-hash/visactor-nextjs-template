@@ -5,7 +5,7 @@ import ModuleGuard from "@/components/workspace/module-guard";
 export default function ArtistOsLayout({ children }: { children: React.ReactNode }) {
   return (
     <ModuleGuard moduleKey="artist_os">
-      <TopNav title="Artist OS" />
+      <TopNav title="Business OS" />
       <ArtistOsShell>{children}</ArtistOsShell>
     </ModuleGuard>
   );

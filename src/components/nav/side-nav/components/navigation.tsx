@@ -100,7 +100,21 @@ export default function Navigation() {
     variant: "root" | "child" = "root",
   ) {
     const Icon = navigation.icon;
-    const active = isActive(navigation.href);
+    const sectionRootChild =
+      variant === "child" &&
+      (navigation.href === "/label-os" || navigation.href === "/artist-os");
+    const nestedLabelSection =
+      variant === "child" &&
+      [
+        "/label-os/tracks",
+        "/label-os/artists",
+        "/label-os/entities",
+      ].includes(navigation.href);
+    const active = sectionRootChild
+      ? pathname === navigation.href
+      : nestedLabelSection
+        ? pathname === navigation.href || pathname.startsWith(`${navigation.href}/`)
+        : isActive(navigation.href);
 
     return (
       <Link

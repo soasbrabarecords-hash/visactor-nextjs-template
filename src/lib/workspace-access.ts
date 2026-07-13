@@ -59,7 +59,7 @@ export const MODULE_ROLE_OPTIONS: Record<ModuleKey, readonly ModuleRole[]> = {
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   playlist_os: "Playlist OS",
   label_os: "Label OS",
-  artist_os: "Artist OS",
+  artist_os: "Business OS",
 };
 
 export type WorkspaceSummary = {

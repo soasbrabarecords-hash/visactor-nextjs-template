@@ -23,7 +23,7 @@ export async function PATCH(
     const config = resource ? getArtistOsResourceConfig(resource) : null;
 
     if (!resource || !config) {
-      return NextResponse.json({ error: "Recurso ArtistOS invalido." }, { status: 404 });
+      return NextResponse.json({ error: "Recurso Business OS invalido." }, { status: 404 });
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -58,7 +58,7 @@ export async function DELETE(
     const resource = parseResource(rawResource);
 
     if (!resource) {
-      return NextResponse.json({ error: "Recurso ArtistOS invalido." }, { status: 404 });
+      return NextResponse.json({ error: "Recurso Business OS invalido." }, { status: 404 });
     }
 
     const result = await deleteArtistOsRecord(resource, id);
@@ -68,4 +68,3 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

@@ -22,7 +22,7 @@ export async function GET(
     const resource = parseResource(rawResource);
 
     if (!resource) {
-      return NextResponse.json({ error: "Recurso ArtistOS invalido." }, { status: 404 });
+      return NextResponse.json({ error: "Recurso Business OS invalido." }, { status: 404 });
     }
 
     const data = await getArtistOsResource(resource);
@@ -43,7 +43,7 @@ export async function POST(
     const config = resource ? getArtistOsResourceConfig(resource) : null;
 
     if (!resource || !config) {
-      return NextResponse.json({ error: "Recurso ArtistOS invalido." }, { status: 404 });
+      return NextResponse.json({ error: "Recurso Business OS invalido." }, { status: 404 });
     }
 
     const body = (await request.json()) as Record<string, unknown>;
@@ -65,4 +65,3 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

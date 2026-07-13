@@ -82,7 +82,7 @@ function ReportsPage() {
           Relatórios
         </div>
         <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
-          ArtistOS — inteligência executiva
+          Business OS — inteligência executiva
         </h2>
         <p className="mt-2 text-sm font-normal leading-6 text-white/56">
           Estrutura inicial para relatórios de shows, caixa, publicidade, tarefas
@@ -139,7 +139,7 @@ function SettingsPage() {
             Configurações
           </div>
           <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
-            ArtistOS pronto para multi-perfis
+            Business OS pronto para multi-perfis
           </h2>
           <p className="mt-2 text-sm font-normal leading-6 text-white/56">
             A base já nasce com workspace, created_by e estrutura para roles:

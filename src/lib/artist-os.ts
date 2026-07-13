@@ -263,7 +263,7 @@ export async function getArtistOsResource(
         rows,
         artists,
         tableReady: false,
-        error: "Tabelas ArtistOS ainda nao aplicadas no Supabase. Exibindo dados demo.",
+        error: "Tabelas do Business OS ainda nao aplicadas no Supabase. Exibindo dados demo.",
       };
     }
 
@@ -305,7 +305,7 @@ export async function createArtistOsRecord(
   input: Record<string, unknown>,
 ) {
   const config = getArtistOsResourceConfig(resource);
-  if (!config) throw new Error("Recurso ArtistOS invalido.");
+  if (!config) throw new Error("Recurso Business OS invalido.");
 
   const supabase = await createClient();
   const workspaceId = await requireWorkspaceId();
@@ -323,7 +323,7 @@ export async function createArtistOsRecord(
     .single();
 
   if (isMissingTableError(error)) {
-    throw new Error("A migration do ArtistOS ainda nao foi aplicada no Supabase.");
+    throw new Error("A migration do Business OS ainda nao foi aplicada no Supabase.");
   }
 
   if (error) throw new Error(`createArtistOsRecord: ${error.message}`);
@@ -336,7 +336,7 @@ export async function updateArtistOsRecord(
   input: Record<string, unknown>,
 ) {
   const config = getArtistOsResourceConfig(resource);
-  if (!config) throw new Error("Recurso ArtistOS invalido.");
+  if (!config) throw new Error("Recurso Business OS invalido.");
 
   const supabase = await createClient();
   const workspaceId = await requireWorkspaceId();
@@ -354,7 +354,7 @@ export async function updateArtistOsRecord(
     .single();
 
   if (isMissingTableError(error)) {
-    throw new Error("A migration do ArtistOS ainda nao foi aplicada no Supabase.");
+    throw new Error("A migration do Business OS ainda nao foi aplicada no Supabase.");
   }
 
   if (error) throw new Error(`updateArtistOsRecord: ${error.message}`);
@@ -363,7 +363,7 @@ export async function updateArtistOsRecord(
 
 export async function deleteArtistOsRecord(resource: ArtistOsResourceKey, id: string) {
   const config = getArtistOsResourceConfig(resource);
-  if (!config) throw new Error("Recurso ArtistOS invalido.");
+  if (!config) throw new Error("Recurso Business OS invalido.");
 
   const supabase = await createClient();
   const workspaceId = await requireWorkspaceId();
@@ -374,7 +374,7 @@ export async function deleteArtistOsRecord(resource: ArtistOsResourceKey, id: st
     .eq("workspace_id", workspaceId);
 
   if (isMissingTableError(error)) {
-    throw new Error("A migration do ArtistOS ainda nao foi aplicada no Supabase.");
+    throw new Error("A migration do Business OS ainda nao foi aplicada no Supabase.");
   }
 
   if (error) throw new Error(`deleteArtistOsRecord: ${error.message}`);

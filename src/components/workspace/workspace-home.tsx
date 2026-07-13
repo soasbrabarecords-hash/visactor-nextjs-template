@@ -38,8 +38,8 @@ const osCards: WorkspaceOsCard[] = [
     tone: "blue",
   },
   {
-    name: "Artist OS",
-    description: "Agenda, shows, publicidade, caixa, contratos e tarefas da carreira artística.",
+    name: "Business OS",
+    description: "Gestão de carreira, agenda, oportunidades, publicidade, caixa, contratos e equipe.",
     href: "/artist-os",
     status: "Gestão em expansão",
     moduleKey: "artist_os",
