@@ -5,6 +5,7 @@ import {
   isLabelStorageBucket,
   validateLabelStorageFile,
 } from "@/lib/label-os-storage";
+import { requireLabelWorkspaceId } from "@/lib/label-os-workspace";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -27,7 +28,10 @@ export async function POST(request: Request) {
     }
 
     if (!body.fileName?.trim()) {
-      return NextResponse.json({ error: "Nome do arquivo nao informado." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Nome do arquivo nao informado." },
+        { status: 400 },
+      );
     }
 
     const validationError = validateLabelStorageFile({
@@ -40,10 +44,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
+    const workspaceId = await requireLabelWorkspaceId();
     const admin = await ensureLabelStorageBucket(bucket);
     const supabase = admin ?? (await createClient());
-    const path = createLabelStoragePath(bucket, body.fileName);
-    const signed = await supabase.storage.from(bucket).createSignedUploadUrl(path);
+    const path = createLabelStoragePath(workspaceId, bucket, body.fileName);
+    const signed = await supabase.storage
+      .from(bucket)
+      .createSignedUploadUrl(path);
 
     if (signed.error) {
       return NextResponse.json(
@@ -57,7 +64,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(path);
+    const { data: publicData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(path);
 
     return NextResponse.json({
       bucket,

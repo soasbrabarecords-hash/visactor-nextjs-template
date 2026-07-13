@@ -2,6 +2,7 @@ import type { ArtistRole } from "@/lib/label-os-taxonomy";
 
 export type LabelArtist = {
   id: string;
+  workspace_id: string;
   name: string;
   artist_name: string | null;
   roles: ArtistRole[];
@@ -17,10 +18,14 @@ export type LabelArtist = {
   created_at: string;
 };
 
-export type LabelArtistInput = Omit<LabelArtist, "id" | "created_at">;
+export type LabelArtistInput = Omit<
+  LabelArtist,
+  "id" | "workspace_id" | "created_at"
+>;
 
 export type LabelTrack = {
   id: string;
+  workspace_id: string;
   title: string;
   version: string | null;
   isrc: string | null;
@@ -40,10 +45,14 @@ export type LabelTrack = {
   created_at: string;
 };
 
-export type LabelTrackInput = Omit<LabelTrack, "id" | "created_at">;
+export type LabelTrackInput = Omit<
+  LabelTrack,
+  "id" | "workspace_id" | "created_at"
+>;
 
 export type TrackParticipant = {
   id: string;
+  workspace_id: string;
   track_id: string;
   artist_id: string | null;
   entity_id: string | null;
@@ -63,7 +72,7 @@ export type TrackParticipant = {
 
 export type TrackParticipantInput = Omit<
   TrackParticipant,
-  "id" | "created_at" | "label_artists" | "label_entities"
+  "id" | "workspace_id" | "created_at" | "label_artists" | "label_entities"
 >;
 
 export type LabelOsStats = {

@@ -3,6 +3,7 @@
 
 export type TrackComposition = {
   id: string;
+  workspace_id: string;
   track_id: string;
   entity_id: string;
   role: string;
@@ -32,6 +33,7 @@ export type MasterGroupType = (typeof MASTER_GROUP_TYPES)[number]["value"];
 
 export type TrackMasterSplit = {
   id: string;
+  workspace_id: string;
   track_id: string;
   entity_id: string;
   group_type: MasterGroupType;
@@ -54,6 +56,7 @@ export type TrackMasterSplitInput = {
 
 export type TrackRoyaltySplit = {
   id: string;
+  workspace_id: string;
   track_id: string;
   entity_id: string;
   role: string | null;

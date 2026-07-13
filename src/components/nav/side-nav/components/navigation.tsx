@@ -105,15 +105,14 @@ export default function Navigation() {
       (navigation.href === "/label-os" || navigation.href === "/artist-os");
     const nestedLabelSection =
       variant === "child" &&
-      [
-        "/label-os/tracks",
-        "/label-os/artists",
-        "/label-os/entities",
-      ].includes(navigation.href);
+      ["/label-os/tracks", "/label-os/artists", "/label-os/entities"].includes(
+        navigation.href,
+      );
     const active = sectionRootChild
       ? pathname === navigation.href
       : nestedLabelSection
-        ? pathname === navigation.href || pathname.startsWith(`${navigation.href}/`)
+        ? pathname === navigation.href ||
+          pathname.startsWith(`${navigation.href}/`)
         : isActive(navigation.href);
 
     return (
@@ -166,16 +165,7 @@ export default function Navigation() {
 
     return (
       <div key={navigation.name} className="space-y-1">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={groupId}
-          onClick={() =>
-            setOpenGroups((current) => ({
-              ...current,
-              [navigation.name]: !(current[navigation.name] ?? active),
-            }))
-          }
+        <div
           className={cn(
             "group relative flex w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors duration-200",
             "hover:border-border hover:bg-accent/65",
@@ -184,36 +174,55 @@ export default function Navigation() {
               : "border-transparent bg-transparent",
           )}
         >
-          <Icon
-            size={19}
-            className={cn(
-              "relative z-10 mr-3 shrink-0 transition-colors duration-300",
-              active
-                ? "text-slate-950 dark:text-white"
-                : "text-slate-700 group-hover:text-slate-950 dark:text-slate-300 dark:group-hover:text-white",
-            )}
-          />
-          <span
-            className={cn(
-              "relative z-10 flex-1 text-[15px] font-medium transition-colors duration-300",
-              active
-                ? "text-slate-950 dark:text-white"
-                : "text-slate-700 group-hover:text-slate-950 dark:text-slate-300 dark:group-hover:text-white",
-            )}
+          <Link
+            href={navigation.href}
+            className="relative z-10 flex min-w-0 flex-1 items-center"
           >
-            {navigation.name}
-          </span>
-          <ChevronDown
-            size={16}
-            className={cn(
-              "relative z-10 transition duration-300",
-              open ? "rotate-180" : "rotate-0",
-              active
-                ? "text-slate-950 dark:text-white"
-                : "text-slate-500 group-hover:text-slate-950 dark:text-slate-400 dark:group-hover:text-white",
-            )}
-          />
-        </button>
+            <Icon
+              size={19}
+              className={cn(
+                "mr-3 shrink-0 transition-colors duration-300",
+                active
+                  ? "text-slate-950 dark:text-white"
+                  : "text-slate-700 group-hover:text-slate-950 dark:text-slate-300 dark:group-hover:text-white",
+              )}
+            />
+            <span
+              className={cn(
+                "truncate text-[15px] font-medium transition-colors duration-300",
+                active
+                  ? "text-slate-950 dark:text-white"
+                  : "text-slate-700 group-hover:text-slate-950 dark:text-slate-300 dark:group-hover:text-white",
+              )}
+            >
+              {navigation.name}
+            </span>
+          </Link>
+          <button
+            type="button"
+            aria-label={`${open ? "Recolher" : "Expandir"} menu ${navigation.name}`}
+            aria-expanded={open}
+            aria-controls={groupId}
+            onClick={() =>
+              setOpenGroups((current) => ({
+                ...current,
+                [navigation.name]: !(current[navigation.name] ?? active),
+              }))
+            }
+            className="relative z-10 -mr-1 ml-1 rounded-lg p-1.5 transition-colors hover:bg-background/70"
+          >
+            <ChevronDown
+              size={16}
+              className={cn(
+                "transition duration-300",
+                open ? "rotate-180" : "rotate-0",
+                active
+                  ? "text-slate-950 dark:text-white"
+                  : "text-slate-500 group-hover:text-slate-950 dark:text-slate-400 dark:group-hover:text-white",
+              )}
+            />
+          </button>
+        </div>
 
         {open ? (
           <div

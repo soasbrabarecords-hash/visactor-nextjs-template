@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -12,6 +11,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type {
   ArtistOsFieldConfig,
@@ -19,7 +19,10 @@ import type {
   ArtistOsResourceKey,
 } from "@/lib/artist-os-config";
 import { artistOsResources } from "@/lib/artist-os-config";
-import type { ArtistOsArtistOption, ArtistOsRecord } from "@/lib/artist-os-types";
+import type {
+  ArtistOsArtistOption,
+  ArtistOsRecord,
+} from "@/lib/artist-os-types";
 import { cn } from "@/lib/utils";
 
 type ArtistOsCrudPanelProps = {
@@ -67,7 +70,10 @@ function getArtistName(artists: ArtistOsArtistOption[], id: unknown) {
   return artists.find((artist) => artist.id === id)?.name ?? "Sem artista";
 }
 
-function getInitialFormState(fields: ArtistOsFieldConfig[], row?: ArtistOsRecord | null): FormState {
+function getInitialFormState(
+  fields: ArtistOsFieldConfig[],
+  row?: ArtistOsRecord | null,
+): FormState {
   return fields.reduce<FormState>((state, field) => {
     const value = row?.[field.key];
 
@@ -107,7 +113,7 @@ function formatCell(
 
   if (type === "status") {
     return (
-      <span className="inline-flex rounded-full bg-white/[0.07] px-2.5 py-1 text-xs font-medium capitalize text-white/70 ring-1 ring-inset ring-white/[0.06]">
+      <span className="inline-flex rounded-full border border-border/70 bg-muted/55 px-2.5 py-1 text-xs font-medium capitalize text-foreground/75">
         {statusLabel(value)}
       </span>
     );
@@ -158,7 +164,7 @@ function FieldInput({
   onChange: (value: string | number | boolean | null) => void;
 }) {
   const baseClass =
-    "w-full rounded-2xl bg-black/24 px-3 py-2.5 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] transition placeholder:text-white/28 focus:ring-white/18";
+    "w-full rounded-xl border border-input bg-background/80 px-3 py-2.5 text-sm font-normal text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/10";
 
   if (field.type === "textarea") {
     return (
@@ -176,12 +182,13 @@ function FieldInput({
     return (
       <button
         type="button"
+        aria-pressed={Boolean(value)}
         onClick={() => onChange(!value)}
         className={cn(
           "inline-flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-medium ring-1 ring-inset transition",
           value
-            ? "bg-emerald-300/12 text-emerald-100 ring-emerald-200/14"
-            : "bg-black/24 text-white/54 ring-white/[0.07]",
+            ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200"
+            : "bg-background/80 text-muted-foreground ring-border",
         )}
       >
         <span>{value ? "Sim" : "Não"}</span>
@@ -195,9 +202,12 @@ function FieldInput({
       field.type === "artist"
         ? [
             { label: "Sem artista", value: "" },
-            ...artists.map((artist) => ({ label: artist.name, value: artist.id })),
+            ...artists.map((artist) => ({
+              label: artist.name,
+              value: artist.id,
+            })),
           ]
-        : field.options ?? [];
+        : (field.options ?? []);
 
     return (
       <select
@@ -206,7 +216,11 @@ function FieldInput({
         className={baseClass}
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-slate-950">
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-background text-foreground"
+          >
             {option.label}
           </option>
         ))}
@@ -219,7 +233,9 @@ function FieldInput({
       type={field.type === "number" ? "number" : field.type}
       value={String(value ?? "")}
       onChange={(event) =>
-        onChange(field.type === "number" ? event.target.value : event.target.value)
+        onChange(
+          field.type === "number" ? event.target.value : event.target.value,
+        )
       }
       placeholder={field.placeholder}
       className={baseClass}
@@ -240,11 +256,11 @@ function FilterControl({
   onChange: (value: string) => void;
 }) {
   const inputClass =
-    "rounded-2xl bg-black/24 px-3 py-2.5 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] transition focus:ring-white/18";
+    "rounded-xl border border-input bg-background/80 px-3 py-2.5 text-sm font-normal text-foreground outline-none transition focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/10";
 
   if (filter.type === "month") {
     return (
-      <label className="grid gap-1 text-xs font-medium text-white/50">
+      <label className="grid gap-1 text-xs font-medium text-muted-foreground">
         {filter.label}
         <input
           type="month"
@@ -259,17 +275,25 @@ function FilterControl({
   const options =
     filter.type === "artist"
       ? artists.map((artist) => ({ label: artist.name, value: artist.id }))
-      : filter.options ?? [];
+      : (filter.options ?? []);
 
   return (
-    <label className="grid gap-1 text-xs font-medium text-white/50">
+    <label className="grid gap-1 text-xs font-medium text-muted-foreground">
       {filter.label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
-        <option value="" className="bg-slate-950">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={inputClass}
+      >
+        <option value="" className="bg-background text-foreground">
           Todos
         </option>
         {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-slate-950">
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-background text-foreground"
+          >
             {option.label}
           </option>
         ))}
@@ -280,48 +304,51 @@ function FilterControl({
 
 const resourceTone = {
   artists: {
-    shell: "from-emerald-400/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-emerald-300/12 text-emerald-100 ring-1 ring-inset ring-emerald-200/12",
-    pill: "bg-emerald-300/10 text-emerald-100 ring-1 ring-inset ring-emerald-200/10",
+    shell: "border-emerald-500/15 bg-card/80",
+    icon: "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/15 dark:text-emerald-200",
+    pill: "bg-emerald-500/10 text-emerald-700 ring-1 ring-inset ring-emerald-500/15 dark:text-emerald-200",
     line: "from-emerald-200/0 via-emerald-200/0 to-transparent",
   },
   shows: {
-    shell: "from-sky-400/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-sky-300/12 text-sky-100 ring-1 ring-inset ring-sky-200/12",
-    pill: "bg-sky-300/10 text-sky-100 ring-1 ring-inset ring-sky-200/10",
+    shell: "border-sky-500/15 bg-card/80",
+    icon: "bg-sky-500/10 text-sky-700 ring-1 ring-inset ring-sky-500/15 dark:text-sky-200",
+    pill: "bg-sky-500/10 text-sky-700 ring-1 ring-inset ring-sky-500/15 dark:text-sky-200",
     line: "from-sky-200/0 via-sky-200/0 to-transparent",
   },
   deals: {
-    shell: "from-amber-300/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-amber-300/12 text-amber-100 ring-1 ring-inset ring-amber-200/12",
-    pill: "bg-amber-300/10 text-amber-100 ring-1 ring-inset ring-amber-200/10",
+    shell: "border-amber-500/15 bg-card/80",
+    icon: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/15 dark:text-amber-200",
+    pill: "bg-amber-500/10 text-amber-700 ring-1 ring-inset ring-amber-500/15 dark:text-amber-200",
     line: "from-amber-200/0 via-amber-200/0 to-transparent",
   },
   "brand-deals": {
-    shell: "from-violet-400/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-violet-300/12 text-violet-100 ring-1 ring-inset ring-violet-200/12",
-    pill: "bg-violet-300/10 text-violet-100 ring-1 ring-inset ring-violet-200/10",
+    shell: "border-violet-500/15 bg-card/80",
+    icon: "bg-violet-500/10 text-violet-700 ring-1 ring-inset ring-violet-500/15 dark:text-violet-200",
+    pill: "bg-violet-500/10 text-violet-700 ring-1 ring-inset ring-violet-500/15 dark:text-violet-200",
     line: "from-violet-200/0 via-violet-200/0 to-transparent",
   },
   finance: {
-    shell: "from-cyan-300/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-cyan-300/12 text-cyan-100 ring-1 ring-inset ring-cyan-200/12",
-    pill: "bg-cyan-300/10 text-cyan-100 ring-1 ring-inset ring-cyan-200/10",
+    shell: "border-cyan-500/15 bg-card/80",
+    icon: "bg-cyan-500/10 text-cyan-700 ring-1 ring-inset ring-cyan-500/15 dark:text-cyan-200",
+    pill: "bg-cyan-500/10 text-cyan-700 ring-1 ring-inset ring-cyan-500/15 dark:text-cyan-200",
     line: "from-cyan-200/0 via-cyan-200/0 to-transparent",
   },
   contracts: {
-    shell: "from-slate-300/[0.12] via-slate-950/82 to-slate-950",
-    icon: "bg-white/[0.08] text-white/82 ring-1 ring-inset ring-white/10",
-    pill: "bg-white/[0.07] text-white/76 ring-1 ring-inset ring-white/10",
+    shell: "border-border/70 bg-card/80",
+    icon: "bg-muted text-foreground/80 ring-1 ring-inset ring-border",
+    pill: "bg-muted text-foreground/75 ring-1 ring-inset ring-border",
     line: "from-white/0 via-white/0 to-transparent",
   },
   tasks: {
-    shell: "from-rose-400/[0.18] via-slate-950/80 to-slate-950",
-    icon: "bg-rose-300/12 text-rose-100 ring-1 ring-inset ring-rose-200/12",
-    pill: "bg-rose-300/10 text-rose-100 ring-1 ring-inset ring-rose-200/10",
+    shell: "border-rose-500/15 bg-card/80",
+    icon: "bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/15 dark:text-rose-200",
+    pill: "bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/15 dark:text-rose-200",
     line: "from-rose-200/0 via-rose-200/0 to-transparent",
   },
-} satisfies Record<ArtistOsResourceKey, { shell: string; icon: string; pill: string; line: string }>;
+} satisfies Record<
+  ArtistOsResourceKey,
+  { shell: string; icon: string; pill: string; line: string }
+>;
 
 export default function ArtistOsCrudPanel({
   resourceKey,
@@ -337,7 +364,9 @@ export default function ArtistOsCrudPanel({
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<ArtistOsRecord | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(() => getInitialFormState(config.fields));
+  const [form, setForm] = useState<FormState>(() =>
+    getInitialFormState(config.fields),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isReloading, setIsReloading] = useState(false);
@@ -374,15 +403,23 @@ export default function ArtistOsCrudPanel({
     setError(null);
 
     try {
-      const response = await fetch(`/api/artist-os/${config.key}`, { cache: "no-store" });
-      const payload = (await response.json().catch(() => null)) as
-        | { rows?: ArtistOsRecord[]; error?: string }
-        | null;
+      const response = await fetch(`/api/artist-os/${config.key}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        rows?: ArtistOsRecord[];
+        error?: string;
+      } | null;
 
-      if (!response.ok) throw new Error(payload?.error ?? "Erro ao atualizar Business OS.");
+      if (!response.ok)
+        throw new Error(payload?.error ?? "Erro ao atualizar Business OS.");
       setRows(payload?.rows ?? []);
     } catch (reloadError) {
-      setError(reloadError instanceof Error ? reloadError.message : "Erro ao atualizar.");
+      setError(
+        reloadError instanceof Error
+          ? reloadError.message
+          : "Erro ao atualizar.",
+      );
     } finally {
       setIsReloading(false);
     }
@@ -404,8 +441,7 @@ export default function ArtistOsCrudPanel({
         body: JSON.stringify(form),
       });
       const payload = (await response.json().catch(() => null)) as
-        | (ArtistOsRecord & { error?: string })
-        | null;
+        (ArtistOsRecord & { error?: string }) | null;
 
       if (!response.ok || !payload) {
         throw new Error(payload?.error ?? "Nao foi possivel salvar.");
@@ -421,7 +457,9 @@ export default function ArtistOsCrudPanel({
       setEditing(null);
       setForm(getInitialFormState(config.fields));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Erro ao salvar.");
+      setError(
+        submitError instanceof Error ? submitError.message : "Erro ao salvar.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -438,14 +476,19 @@ export default function ArtistOsCrudPanel({
       const response = await fetch(`/api/artist-os/${config.key}/${row.id}`, {
         method: "DELETE",
       });
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
 
-      if (!response.ok) throw new Error(payload?.error ?? "Nao foi possivel excluir.");
+      if (!response.ok)
+        throw new Error(payload?.error ?? "Nao foi possivel excluir.");
 
       setRows((current) => current.filter((item) => item.id !== row.id));
       setSuccess("Registro excluido.");
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Erro ao excluir.");
+      setError(
+        deleteError instanceof Error ? deleteError.message : "Erro ao excluir.",
+      );
     } finally {
       setIsDeleting(null);
     }
@@ -457,23 +500,33 @@ export default function ArtistOsCrudPanel({
     <div className="space-y-4">
       <section
         className={cn(
-          "relative overflow-hidden rounded-[30px] bg-gradient-to-br shadow-[0_20px_86px_-64px_rgba(0,0,0,0.92)] ring-1 ring-inset ring-white/[0.07]",
+          "relative overflow-hidden rounded-[30px] border shadow-[0_22px_70px_-56px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:shadow-[0_22px_78px_-58px_rgba(0,0,0,0.9)]",
           tone.shell,
         )}
       >
         <div className="flex flex-col gap-4 p-4 tablet:p-5 laptop:flex-row laptop:items-center laptop:justify-between">
           <div className="flex items-start gap-3">
-            <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl", tone.icon)}>
+            <div
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-2xl",
+                tone.icon,
+              )}
+            >
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <div className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium", tone.pill)}>
+              <div
+                className={cn(
+                  "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                  tone.pill,
+                )}
+              >
                 {config.eyebrow}
               </div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-white/95">
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-foreground">
                 {config.title}
               </h2>
-              <p className="mt-1 max-w-3xl text-sm font-normal leading-6 text-white/60">
+              <p className="mt-1 max-w-3xl text-sm font-normal leading-6 text-muted-foreground">
                 {config.description}
               </p>
             </div>
@@ -485,12 +538,20 @@ export default function ArtistOsCrudPanel({
               variant="outline"
               onClick={reloadRows}
               disabled={isReloading}
-              className="rounded-full border-transparent bg-white/[0.07] text-white/78 hover:bg-white/12 hover:text-white"
+              className="rounded-full border-border bg-background/70 text-foreground hover:bg-accent"
             >
-              {isReloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              {isReloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-4 w-4" />
+              )}
               Atualizar
             </Button>
-            <Button type="button" onClick={openCreate} className="rounded-full bg-white font-medium text-slate-950 hover:bg-white/90">
+            <Button
+              type="button"
+              onClick={openCreate}
+              className="rounded-full bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+            >
               <Plus className="h-4 w-4" />
               {config.newLabel}
             </Button>
@@ -498,36 +559,37 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {!tableReady ? (
-          <div className="mx-4 mt-4 flex items-start gap-3 rounded-[22px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12 tablet:mx-5">
+          <div className="mx-4 mt-4 flex items-start gap-3 rounded-[20px] border border-amber-500/20 bg-amber-500/[0.08] p-4 text-amber-800 dark:text-amber-200 tablet:mx-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm font-medium leading-5">
-              {initialError ?? "Migration do Business OS pendente. A lista pode exibir dados demo."}
+              {initialError ??
+                "Migration do Business OS pendente. A lista pode exibir dados demo."}
             </p>
           </div>
         ) : null}
 
         {error ? (
-          <div className="mx-4 mt-4 rounded-[20px] bg-rose-300/[0.08] px-4 py-3 text-sm font-medium text-rose-100 ring-1 ring-inset ring-rose-200/12 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-[20px] border border-rose-500/20 bg-rose-500/[0.08] px-4 py-3 text-sm font-medium text-rose-800 dark:text-rose-200 tablet:mx-5">
             {error}
           </div>
         ) : null}
 
         {success ? (
-          <div className="mx-4 mt-4 rounded-[20px] bg-emerald-300/[0.08] px-4 py-3 text-sm font-medium text-emerald-100 ring-1 ring-inset ring-emerald-200/12 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-[20px] border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-3 text-sm font-medium text-emerald-800 dark:text-emerald-200 tablet:mx-5">
             {success}
           </div>
         ) : null}
 
         <div className="grid gap-3 p-4 tablet:p-5 laptop:grid-cols-[minmax(260px,1fr)_auto] laptop:items-end">
-          <label className="grid gap-1 text-xs font-medium text-white/50">
+          <label className="grid gap-1 text-xs font-medium text-muted-foreground">
             Buscar
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/42" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={`Buscar ${config.singular}...`}
-                className="w-full rounded-2xl bg-black/26 py-2.5 pl-9 pr-3 text-sm font-normal text-white outline-none ring-1 ring-inset ring-white/[0.07] placeholder:text-white/34 focus:ring-white/18"
+                className="w-full rounded-xl border border-input bg-background/80 py-2.5 pl-9 pr-3 text-sm font-normal text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-sky-500/50 focus:ring-2 focus:ring-sky-500/10"
               />
             </div>
           </label>
@@ -548,20 +610,26 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {isFormOpen ? (
-          <form onSubmit={submit} className="mx-4 mb-4 rounded-[26px] bg-slate-950/55 p-4 ring-1 ring-inset ring-white/[0.07] tablet:mx-5 tablet:mb-5">
+          <form
+            onSubmit={submit}
+            className="mx-4 mb-4 rounded-[24px] border border-border/70 bg-background/70 p-4 shadow-sm tablet:mx-5 tablet:mb-5"
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-medium text-white/42">
+                <div className="text-xs font-medium text-muted-foreground">
                   {editing ? "Editar" : "Criar"}
                 </div>
-                <h3 className="text-lg font-semibold text-white/95">
-                  {editing ? String(editing[config.primaryField] ?? config.singular) : config.newLabel}
+                <h3 className="text-lg font-semibold text-foreground">
+                  {editing
+                    ? String(editing[config.primaryField] ?? config.singular)
+                    : config.newLabel}
                 </h3>
               </div>
               <button
                 type="button"
+                aria-label="Fechar formulário"
                 onClick={() => setIsFormOpen(false)}
-                className="rounded-full bg-white/[0.06] p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                className="rounded-full bg-muted p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -572,8 +640,10 @@ export default function ArtistOsCrudPanel({
                 <label
                   key={field.key}
                   className={cn(
-                    "grid gap-1.5 text-xs font-medium text-white/46",
-                    field.span === "full" ? "md:col-span-2 xl:col-span-3" : null,
+                    "grid gap-1.5 text-xs font-medium text-muted-foreground",
+                    field.span === "full"
+                      ? "md:col-span-2 xl:col-span-3"
+                      : null,
                   )}
                 >
                   {field.label}
@@ -588,8 +658,16 @@ export default function ArtistOsCrudPanel({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaving} className="rounded-full bg-white font-medium text-slate-950 hover:bg-white/90">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="rounded-full bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
                 Salvar
               </Button>
               <Button
@@ -597,7 +675,7 @@ export default function ArtistOsCrudPanel({
                 variant="outline"
                 onClick={() => setIsFormOpen(false)}
                 disabled={isSaving}
-                className="rounded-full border-transparent bg-white/[0.06] text-white/76 hover:bg-white/10 hover:text-white"
+                className="rounded-full border-border bg-background/70 text-foreground hover:bg-accent"
               >
                 Cancelar
               </Button>
@@ -605,10 +683,10 @@ export default function ArtistOsCrudPanel({
           </form>
         ) : null}
 
-        <div className="overflow-x-auto bg-slate-950/20">
+        <div className="overflow-x-auto border-t border-border/70 bg-background/25">
           <table className="w-full min-w-[860px] text-left">
             <thead>
-              <tr className="bg-white/[0.035] text-xs font-medium text-white/52">
+              <tr className="bg-muted/45 text-xs font-medium text-muted-foreground">
                 {config.columns.map((column) => (
                   <th key={column.key} className="px-4 py-3">
                     {column.label}
@@ -619,7 +697,10 @@ export default function ArtistOsCrudPanel({
             </thead>
             <tbody>
               {filteredRows.map((row) => (
-                <tr key={row.id} className="border-t border-white/[0.06] text-sm font-normal text-white/78 transition hover:bg-white/[0.05]">
+                <tr
+                  key={row.id}
+                  className="border-t border-border/70 text-sm font-normal text-foreground/80 transition hover:bg-accent/45"
+                >
                   {config.columns.map((column) => (
                     <td key={column.key} className="max-w-[260px] px-4 py-3">
                       <div className="truncate">
@@ -631,18 +712,24 @@ export default function ArtistOsCrudPanel({
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
+                        aria-label={`Editar ${String(row[config.primaryField] ?? config.singular)}`}
                         onClick={() => openEdit(row)}
-                        className="rounded-full bg-white/[0.06] p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                        className="rounded-full bg-muted p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground"
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
                       <button
                         type="button"
+                        aria-label={`Excluir ${String(row[config.primaryField] ?? config.singular)}`}
                         disabled={isDeleting === row.id}
                         onClick={() => void deleteRow(row)}
-                        className="rounded-full bg-rose-300/[0.08] p-2 text-rose-200/60 transition hover:bg-rose-300/12 hover:text-rose-100 disabled:opacity-50"
+                        className="hover:bg-rose-300/12 rounded-full bg-rose-300/[0.08] p-2 text-rose-200/60 transition hover:text-rose-100 disabled:opacity-50"
                       >
-                        {isDeleting === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        {isDeleting === row.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </td>
@@ -653,10 +740,13 @@ export default function ArtistOsCrudPanel({
 
           {filteredRows.length === 0 ? (
             <div className="p-6">
-              <div className="rounded-[24px] bg-black/20 p-8 text-center ring-1 ring-inset ring-white/[0.06]">
-                <div className="text-base font-semibold text-white/90">Nada encontrado</div>
-                <p className="mt-2 text-sm font-normal text-white/48">
-                  Ajuste os filtros ou crie o primeiro registro de {config.singular}.
+              <div className="rounded-[24px] border border-border/70 bg-muted/35 p-8 text-center">
+                <div className="text-base font-semibold text-foreground">
+                  Nada encontrado
+                </div>
+                <p className="mt-2 text-sm font-normal text-muted-foreground">
+                  Ajuste os filtros ou crie o primeiro registro de{" "}
+                  {config.singular}.
                 </p>
               </div>
             </div>

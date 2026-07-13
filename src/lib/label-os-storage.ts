@@ -1,8 +1,8 @@
 import "server-only";
-
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type LabelStorageBucket = "label-audio" | "label-covers" | "label-contracts";
+export type LabelStorageBucket =
+  "label-audio" | "label-covers" | "label-contracts";
 
 type LabelStorageBucketConfig = {
   public: boolean;
@@ -10,7 +10,10 @@ type LabelStorageBucketConfig = {
   allowedMimeTypes: string[];
 };
 
-export const LABEL_STORAGE_BUCKETS: Record<LabelStorageBucket, LabelStorageBucketConfig> = {
+export const LABEL_STORAGE_BUCKETS: Record<
+  LabelStorageBucket,
+  LabelStorageBucketConfig
+> = {
   "label-audio": {
     public: false,
     maxSizeBytes: 250 * 1024 * 1024,
@@ -28,7 +31,9 @@ export const LABEL_STORAGE_BUCKETS: Record<LabelStorageBucket, LabelStorageBucke
   },
 };
 
-export function isLabelStorageBucket(bucket: string | null): bucket is LabelStorageBucket {
+export function isLabelStorageBucket(
+  bucket: string | null,
+): bucket is LabelStorageBucket {
   return Boolean(bucket && bucket in LABEL_STORAGE_BUCKETS);
 }
 
@@ -54,10 +59,19 @@ export function validateLabelStorageFile({
   return null;
 }
 
-export function createLabelStoragePath(bucket: LabelStorageBucket, fileName: string) {
-  const ext = fileName.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+export function createLabelStoragePath(
+  workspaceId: string,
+  bucket: LabelStorageBucket,
+  fileName: string,
+) {
+  const ext =
+    fileName
+      .split(".")
+      .pop()
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, "") || "bin";
   const folder = bucket.replace("label-", "");
-  return `${folder}/${new Date().toISOString().slice(0, 10)}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  return `${workspaceId}/${folder}/${new Date().toISOString().slice(0, 10)}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 }
 
 export async function ensureLabelStorageBucket(bucket: LabelStorageBucket) {
@@ -80,8 +94,13 @@ export async function ensureLabelStorageBucket(bucket: LabelStorageBucket) {
     allowedMimeTypes: config.allowedMimeTypes,
   });
 
-  if (created.error && !created.error.message.toLowerCase().includes("already exists")) {
-    throw new Error(`Nao foi possivel preparar o bucket ${bucket}: ${created.error.message}`);
+  if (
+    created.error &&
+    !created.error.message.toLowerCase().includes("already exists")
+  ) {
+    throw new Error(
+      `Nao foi possivel preparar o bucket ${bucket}: ${created.error.message}`,
+    );
   }
 
   return admin;

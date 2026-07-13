@@ -1,6 +1,4 @@
 import "server-only";
-
-import { createClient } from "@/lib/supabase/server";
 import type { ArtistRole } from "@/lib/label-os-taxonomy";
 import type {
   LabelArtist,
@@ -11,20 +9,27 @@ import type {
   TrackParticipant,
   TrackParticipantInput,
 } from "@/lib/label-os-types";
+import { requireLabelWorkspaceId } from "@/lib/label-os-workspace";
+import { createClient } from "@/lib/supabase/server";
 
-function isMissingColumnError(error: { message?: string } | null | undefined, column: string) {
+function isMissingColumnError(
+  error: { message?: string } | null | undefined,
+  column: string,
+) {
   return Boolean(
     error?.message?.includes(`Could not find the '${column}' column`) ||
-      error?.message?.includes(`column "${column}" does not exist`),
+    error?.message?.includes(`column "${column}" does not exist`),
   );
 }
 
-function isMissingRelationError(error: { message?: string; code?: string } | null | undefined) {
+function isMissingRelationError(
+  error: { message?: string; code?: string } | null | undefined,
+) {
   return Boolean(
     error?.code === "PGRST200" ||
-      error?.code === "PGRST205" ||
-      error?.message?.includes("Could not find a relationship") ||
-      error?.message?.includes("schema cache"),
+    error?.code === "PGRST205" ||
+    error?.message?.includes("Could not find a relationship") ||
+    error?.message?.includes("schema cache"),
   );
 }
 
@@ -46,34 +51,42 @@ export type {
 // ─── Artists ──────────────────────────────────────────────
 
 export async function getLabelArtists(): Promise<LabelArtist[]> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_artists")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getLabelArtists: ${error.message}`);
   return ((data ?? []) as LabelArtist[]).map((artist) => ({
     ...artist,
-    roles: Array.isArray(artist.roles) && artist.roles.length > 0 ? artist.roles : ["artist"],
+    roles:
+      Array.isArray(artist.roles) && artist.roles.length > 0
+        ? artist.roles
+        : ["artist"],
   }));
 }
 
 export async function getLabelArtistById(
   id: string,
 ): Promise<LabelArtist | null> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_artists")
     .select("*")
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) return null;
   return {
     ...(data as LabelArtist),
     roles:
-      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+      Array.isArray((data as LabelArtist).roles) &&
+      (data as LabelArtist).roles.length > 0
         ? (data as LabelArtist).roles
         : ["artist"],
   };
@@ -83,11 +96,13 @@ export async function updateLabelArtist(
   id: string,
   input: Partial<LabelArtistInput>,
 ): Promise<LabelArtist> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   let { data, error } = await supabase
     .from("label_artists")
     .update(input)
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .select()
     .single();
 
@@ -104,6 +119,7 @@ export async function updateLabelArtist(
       .from("label_artists")
       .update(fallbackInput)
       .eq("id", id)
+      .eq("workspace_id", workspaceId)
       .select()
       .single();
 
@@ -115,19 +131,23 @@ export async function updateLabelArtist(
   return {
     ...(data as LabelArtist),
     roles:
-      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+      Array.isArray((data as LabelArtist).roles) &&
+      (data as LabelArtist).roles.length > 0
         ? (data as LabelArtist).roles
-        : (input.roles?.length ? input.roles : ["artist"]),
+        : input.roles?.length
+          ? input.roles
+          : ["artist"],
   };
 }
 
 export async function createLabelArtist(
   input: LabelArtistInput,
 ): Promise<LabelArtist> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   let { data, error } = await supabase
     .from("label_artists")
-    .insert(input)
+    .insert({ ...input, workspace_id: workspaceId })
     .select()
     .single();
 
@@ -142,7 +162,7 @@ export async function createLabelArtist(
 
     const retry = await supabase
       .from("label_artists")
-      .insert(fallbackInput)
+      .insert({ ...fallbackInput, workspace_id: workspaceId })
       .select()
       .single();
 
@@ -154,19 +174,24 @@ export async function createLabelArtist(
   return {
     ...(data as LabelArtist),
     roles:
-      Array.isArray((data as LabelArtist).roles) && (data as LabelArtist).roles.length > 0
+      Array.isArray((data as LabelArtist).roles) &&
+      (data as LabelArtist).roles.length > 0
         ? (data as LabelArtist).roles
-        : (input.roles?.length ? input.roles : ["artist"]),
+        : input.roles?.length
+          ? input.roles
+          : ["artist"],
   };
 }
 
 // ─── Tracks ───────────────────────────────────────────────
 
 export async function getLabelTracks(): Promise<LabelTrack[]> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_tracks")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getLabelTracks: ${error.message}`);
@@ -179,20 +204,26 @@ export async function getLabelTracks(): Promise<LabelTrack[]> {
 export async function getLabelTrackById(
   id: string,
 ): Promise<LabelTrack | null> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_tracks")
     .select("*")
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .single();
 
   if (error) return null;
-  return { ...(data as LabelTrack), subgenre: (data as LabelTrack).subgenre ?? null };
+  return {
+    ...(data as LabelTrack),
+    subgenre: (data as LabelTrack).subgenre ?? null,
+  };
 }
 
 export async function createLabelTrack(
   input: LabelTrackInput,
 ): Promise<LabelTrack> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   let payload: Partial<LabelTrackInput> = { ...input };
   let data: LabelTrack | null = null;
@@ -201,7 +232,7 @@ export async function createLabelTrack(
   for (const optionalColumn of ["subgenre", "lyrics"] as const) {
     const response = await supabase
       .from("label_tracks")
-      .insert(payload)
+      .insert({ ...payload, workspace_id: workspaceId })
       .select()
       .single();
 
@@ -227,6 +258,7 @@ export async function updateLabelTrack(
   id: string,
   input: Partial<LabelTrackInput>,
 ): Promise<LabelTrack> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   let payload: Partial<LabelTrackInput> = { ...input };
   let data: LabelTrack | null = null;
@@ -237,6 +269,7 @@ export async function updateLabelTrack(
       .from("label_tracks")
       .update(payload)
       .eq("id", id)
+      .eq("workspace_id", workspaceId)
       .select()
       .single();
 
@@ -263,38 +296,57 @@ export async function updateLabelTrack(
 export async function getTrackParticipants(
   trackId: string,
 ): Promise<TrackParticipant[]> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_track_participants")
     .select("*")
     .eq("track_id", trackId)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(`getTrackParticipants: ${error.message}`);
 
   const rows = (data ?? []) as TrackParticipant[];
   const artistIds = Array.from(
-    new Set(rows.map((row) => row.artist_id).filter((value): value is string => Boolean(value))),
+    new Set(
+      rows
+        .map((row) => row.artist_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
   );
   const entityIds = Array.from(
-    new Set(rows.map((row) => row.entity_id).filter((value): value is string => Boolean(value))),
+    new Set(
+      rows
+        .map((row) => row.entity_id)
+        .filter((value): value is string => Boolean(value)),
+    ),
   );
 
-  let artistsById = new Map<string, Pick<LabelArtist, "id" | "name" | "artist_name">>();
+  let artistsById = new Map<
+    string,
+    Pick<LabelArtist, "id" | "name" | "artist_name">
+  >();
   if (artistIds.length > 0) {
     const artistsResult = await supabase
       .from("label_artists")
       .select("id, name, artist_name")
+      .eq("workspace_id", workspaceId)
       .in("id", artistIds);
 
     if (artistsResult.error) {
-      throw new Error(`getTrackParticipants artists: ${artistsResult.error.message}`);
+      throw new Error(
+        `getTrackParticipants artists: ${artistsResult.error.message}`,
+      );
     }
 
     artistsById = new Map(
-      ((artistsResult.data ?? []) as Pick<LabelArtist, "id" | "name" | "artist_name">[]).map(
-        (artist) => [artist.id, artist],
-      ),
+      (
+        (artistsResult.data ?? []) as Pick<
+          LabelArtist,
+          "id" | "name" | "artist_name"
+        >[]
+      ).map((artist) => [artist.id, artist]),
     );
   }
 
@@ -306,10 +358,13 @@ export async function getTrackParticipants(
     const entitiesResult = await supabase
       .from("label_entities")
       .select("id, name, display_name, type")
+      .eq("workspace_id", workspaceId)
       .in("id", entityIds);
 
     if (entitiesResult.error && !isMissingRelationError(entitiesResult.error)) {
-      throw new Error(`getTrackParticipants entities: ${entitiesResult.error.message}`);
+      throw new Error(
+        `getTrackParticipants entities: ${entitiesResult.error.message}`,
+      );
     }
 
     entitiesById = new Map(
@@ -334,10 +389,11 @@ export async function getTrackParticipants(
 export async function addTrackParticipant(
   input: TrackParticipantInput,
 ): Promise<TrackParticipant> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("label_track_participants")
-    .insert(input)
+    .insert({ ...input, workspace_id: workspaceId })
     .select()
     .single();
 
@@ -354,11 +410,18 @@ export async function addTrackParticipant(
 // ─── Stats ────────────────────────────────────────────────
 
 export async function getLabelOsStats(): Promise<LabelOsStats> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
 
   const [tracksRes, artistsRes] = await Promise.all([
-    supabase.from("label_tracks").select("status"),
-    supabase.from("label_artists").select("id", { count: "exact", head: true }),
+    supabase
+      .from("label_tracks")
+      .select("status")
+      .eq("workspace_id", workspaceId),
+    supabase
+      .from("label_artists")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId),
   ]);
 
   const tracks = (tracksRes.data ?? []) as { status: string }[];
@@ -379,13 +442,19 @@ export async function uploadLabelFile(
   file: File,
   path: string,
 ): Promise<string> {
+  const workspaceId = await requireLabelWorkspaceId();
   const supabase = await createClient();
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    upsert: true,
-  });
+  const workspacePath = path.startsWith(`${workspaceId}/`)
+    ? path
+    : `${workspaceId}/${path.replace(/^\/+/, "")}`;
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(workspacePath, file, {
+      upsert: true,
+    });
 
   if (error) throw new Error(`uploadLabelFile(${bucket}): ${error.message}`);
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  const { data } = supabase.storage.from(bucket).getPublicUrl(workspacePath);
   return data.publicUrl;
 }

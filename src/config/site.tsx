@@ -1,22 +1,22 @@
 import {
   BadgeDollarSign,
+  BarChart2,
   BarChart3,
+  Bot,
+  BriefcaseBusiness,
   Building2,
   CalendarDays,
   ClipboardCheck,
   Compass,
   FileSignature,
-  ListMusic,
-  Library,
-  BarChart2,
-  Bot,
-  BriefcaseBusiness,
   Flame,
+  Library,
+  ListMusic,
+  type LucideIcon,
   Megaphone,
   Music2,
   Settings2,
   UsersRound,
-  type LucideIcon,
 } from "lucide-react";
 import type { ModuleKey } from "@/lib/workspace-access";
 
@@ -31,7 +31,8 @@ export type Navigation = {
 
 export const siteConfig = {
   title: "Music Business OS",
-  description: "Sistema operacional para selos, artistas, curadoria e gestão musical.",
+  description:
+    "Sistema operacional para selos, artistas, curadoria e gestão musical.",
 };
 
 export const navigations: Navigation[] = [
@@ -41,11 +42,6 @@ export const navigations: Navigation[] = [
     href: "/playlist-os",
     moduleKey: "playlist_os",
     children: [
-      {
-        icon: BarChart2,
-        name: "Visão geral",
-        href: "/playlist-os",
-      },
       {
         icon: Compass,
         name: "Playlists",
@@ -80,11 +76,6 @@ export const navigations: Navigation[] = [
     moduleKey: "label_os",
     children: [
       {
-        icon: BarChart2,
-        name: "Visão geral",
-        href: "/label-os",
-      },
-      {
         icon: Music2,
         name: "Catálogo",
         href: "/label-os/tracks",
@@ -107,11 +98,6 @@ export const navigations: Navigation[] = [
     href: "/artist-os",
     moduleKey: "artist_os",
     children: [
-      {
-        icon: BarChart3,
-        name: "Visão geral",
-        href: "/artist-os",
-      },
       {
         icon: UsersRound,
         name: "Artistas",

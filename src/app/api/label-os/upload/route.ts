@@ -5,6 +5,7 @@ import {
   isLabelStorageBucket,
   validateLabelStorageFile,
 } from "@/lib/label-os-storage";
+import { requireLabelWorkspaceId } from "@/lib/label-os-workspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
     const bucket = formData.get("bucket") as string | null;
 
     if (!file || file.size === 0) {
-      return NextResponse.json({ error: "Arquivo não encontrado." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Arquivo não encontrado." },
+        { status: 400 },
+      );
     }
 
     if (!isLabelStorageBucket(bucket)) {
@@ -35,18 +39,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
+    const workspaceId = await requireLabelWorkspaceId();
     await ensureLabelStorageBucket(bucket);
-    const path = createLabelStoragePath(bucket, file.name);
+    const path = createLabelStoragePath(workspaceId, bucket, file.name);
     const supabase = createAdminClient() ?? (await createClient());
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(path, buffer, {
-        contentType: file.type,
-        upsert: false,
-      });
+    const { error } = await supabase.storage.from(bucket).upload(path, buffer, {
+      contentType: file.type,
+      upsert: false,
+    });
 
     if (error) {
       if (error.message.includes("row-level security policy")) {
@@ -71,7 +74,10 @@ export async function POST(request: Request) {
       .createSignedUrl(path, 60 * 60 * 24 * 30);
 
     if (signed.error) {
-      return NextResponse.json({ error: signed.error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: signed.error.message },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ url: signed.data.signedUrl }, { status: 200 });

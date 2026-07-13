@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   AlertCircle,
@@ -10,6 +9,7 @@ import {
   Megaphone,
   Wallet,
 } from "lucide-react";
+import Link from "next/link";
 import type { ArtistOsDashboardData } from "@/lib/artist-os";
 import type { ArtistOsRecord } from "@/lib/artist-os-types";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,10 @@ function isCurrentMonth(value: unknown) {
   if (!value) return false;
   const date = new Date(String(value));
   const now = new Date();
-  return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  return (
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear()
+  );
 }
 
 function metricCard({
@@ -58,46 +61,46 @@ function metricCard({
 }) {
   const tones = {
     emerald: {
-      card: "bg-[linear-gradient(145deg,rgba(16,185,129,0.24),rgba(15,23,42,0.94)_62%)] text-emerald-50",
-      icon: "bg-emerald-400/14 text-emerald-100 ring-1 ring-inset ring-emerald-200/14",
-      accent: "text-emerald-100",
-      helper: "text-emerald-50/72",
+      card: "border-emerald-500/15 bg-card/80",
+      icon: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+      accent: "text-emerald-700 dark:text-emerald-200",
+      helper: "text-muted-foreground",
     },
     sky: {
-      card: "bg-[linear-gradient(145deg,rgba(14,165,233,0.24),rgba(15,23,42,0.94)_62%)] text-sky-50",
-      icon: "bg-sky-400/14 text-sky-100 ring-1 ring-inset ring-sky-200/14",
-      accent: "text-sky-100",
-      helper: "text-sky-50/72",
+      card: "border-sky-500/15 bg-card/80",
+      icon: "bg-sky-500/10 text-sky-700 dark:text-sky-200",
+      accent: "text-sky-700 dark:text-sky-200",
+      helper: "text-muted-foreground",
     },
     amber: {
-      card: "bg-[linear-gradient(145deg,rgba(245,158,11,0.26),rgba(15,23,42,0.94)_62%)] text-amber-50",
-      icon: "bg-amber-400/14 text-amber-100 ring-1 ring-inset ring-amber-200/14",
-      accent: "text-amber-100",
-      helper: "text-amber-50/74",
+      card: "border-amber-500/15 bg-card/80",
+      icon: "bg-amber-500/10 text-amber-700 dark:text-amber-200",
+      accent: "text-amber-700 dark:text-amber-200",
+      helper: "text-muted-foreground",
     },
     rose: {
-      card: "bg-[linear-gradient(145deg,rgba(244,63,94,0.24),rgba(15,23,42,0.94)_62%)] text-rose-50",
-      icon: "bg-rose-400/14 text-rose-100 ring-1 ring-inset ring-rose-200/14",
-      accent: "text-rose-100",
-      helper: "text-rose-50/72",
+      card: "border-rose-500/15 bg-card/80",
+      icon: "bg-rose-500/10 text-rose-700 dark:text-rose-200",
+      accent: "text-rose-700 dark:text-rose-200",
+      helper: "text-muted-foreground",
     },
     violet: {
-      card: "bg-[linear-gradient(145deg,rgba(139,92,246,0.24),rgba(15,23,42,0.94)_62%)] text-violet-50",
-      icon: "bg-violet-400/14 text-violet-100 ring-1 ring-inset ring-violet-200/14",
-      accent: "text-violet-100",
-      helper: "text-violet-50/72",
+      card: "border-violet-500/15 bg-card/80",
+      icon: "bg-violet-500/10 text-violet-700 dark:text-violet-200",
+      accent: "text-violet-700 dark:text-violet-200",
+      helper: "text-muted-foreground",
     },
     cyan: {
-      card: "bg-[linear-gradient(145deg,rgba(6,182,212,0.24),rgba(15,23,42,0.94)_62%)] text-cyan-50",
-      icon: "bg-cyan-400/14 text-cyan-100 ring-1 ring-inset ring-cyan-200/14",
-      accent: "text-cyan-100",
-      helper: "text-cyan-50/72",
+      card: "border-cyan-500/15 bg-card/80",
+      icon: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-200",
+      accent: "text-cyan-700 dark:text-cyan-200",
+      helper: "text-muted-foreground",
     },
     slate: {
-      card: "bg-[linear-gradient(145deg,rgba(100,116,139,0.18),rgba(15,23,42,0.94)_62%)] text-white",
-      icon: "bg-white/[0.08] text-white/82 ring-1 ring-inset ring-white/10",
-      accent: "text-white/82",
-      helper: "text-white/60",
+      card: "border-border/70 bg-card/80",
+      icon: "bg-muted text-foreground/75",
+      accent: "text-foreground/80",
+      helper: "text-muted-foreground",
     },
   } as const;
   const toneConfig = tones[tone];
@@ -105,24 +108,39 @@ function metricCard({
   return (
     <article
       className={cn(
-        "relative min-h-[140px] overflow-hidden rounded-[28px] p-4 shadow-[0_18px_70px_-56px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07] transition duration-300 hover:-translate-y-0.5 hover:ring-white/12",
+        "relative min-h-[136px] overflow-hidden rounded-[26px] border p-4 shadow-[0_18px_62px_-54px_rgba(15,23,42,0.3)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:shadow-[0_18px_68px_-54px_rgba(0,0,0,0.9)]",
         toneConfig.card,
       )}
     >
       <div className="relative flex items-start justify-between gap-3">
         <div>
-          <div className={cn("text-sm font-medium tracking-[-0.01em]", toneConfig.accent)}>
+          <div
+            className={cn(
+              "text-sm font-medium tracking-[-0.01em]",
+              toneConfig.accent,
+            )}
+          >
             {label}
           </div>
-          <div className="mt-3 text-4xl font-semibold tracking-[-0.055em] text-white">
+          <div className="mt-3 text-4xl font-semibold tracking-[-0.055em] text-foreground">
             {value}
           </div>
         </div>
-        <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl backdrop-blur", toneConfig.icon)}>
+        <div
+          className={cn(
+            "ring-current/10 flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset",
+            toneConfig.icon,
+          )}
+        >
           <Icon className="h-5 w-5" />
         </div>
       </div>
-      <p className={cn("relative mt-4 text-sm font-medium leading-5", toneConfig.helper)}>
+      <p
+        className={cn(
+          "relative mt-4 text-sm font-medium leading-5",
+          toneConfig.helper,
+        )}
+      >
         {helper}
       </p>
     </article>
@@ -145,27 +163,29 @@ function ListCard({
   tone?: "emerald" | "sky" | "amber" | "rose" | "violet" | "cyan" | "slate";
 }) {
   const tones = {
-    emerald: "bg-[linear-gradient(145deg,rgba(16,185,129,0.16),rgba(15,23,42,0.94)_68%)]",
-    sky: "bg-[linear-gradient(145deg,rgba(14,165,233,0.16),rgba(15,23,42,0.94)_68%)]",
-    amber: "bg-[linear-gradient(145deg,rgba(245,158,11,0.17),rgba(15,23,42,0.94)_68%)]",
-    rose: "bg-[linear-gradient(145deg,rgba(244,63,94,0.16),rgba(15,23,42,0.94)_68%)]",
-    violet: "bg-[linear-gradient(145deg,rgba(139,92,246,0.16),rgba(15,23,42,0.94)_68%)]",
-    cyan: "bg-[linear-gradient(145deg,rgba(6,182,212,0.16),rgba(15,23,42,0.94)_68%)]",
-    slate: "bg-[linear-gradient(145deg,rgba(100,116,139,0.12),rgba(15,23,42,0.94)_68%)]",
+    emerald: "border-emerald-500/15 bg-card/80",
+    sky: "border-sky-500/15 bg-card/80",
+    amber: "border-amber-500/15 bg-card/80",
+    rose: "border-rose-500/15 bg-card/80",
+    violet: "border-violet-500/15 bg-card/80",
+    cyan: "border-cyan-500/15 bg-card/80",
+    slate: "border-border/70 bg-card/80",
   } as const;
 
   return (
     <section
       className={cn(
-        "rounded-[28px] p-4 shadow-[0_18px_70px_-58px_rgba(0,0,0,0.88)] ring-1 ring-inset ring-white/[0.07]",
+        "rounded-[26px] border p-4 shadow-[0_18px_62px_-56px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:shadow-[0_18px_68px_-56px_rgba(0,0,0,0.88)]",
         tones[tone],
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold tracking-[-0.02em] text-white/92">{title}</h2>
+        <h2 className="text-base font-semibold tracking-[-0.02em] text-foreground">
+          {title}
+        </h2>
         <Link
           href={href}
-          className="inline-flex items-center gap-1 rounded-full bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-white/64 transition hover:bg-white/[0.11] hover:text-white"
+          className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           Abrir
           <ArrowRight className="h-3.5 w-3.5" />
@@ -173,7 +193,7 @@ function ListCard({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[22px] bg-black/20 p-5 text-sm font-medium text-white/56 ring-1 ring-inset ring-white/[0.06]">
+        <div className="rounded-[20px] border border-border/70 bg-muted/35 p-5 text-sm font-medium text-muted-foreground">
           {empty}
         </div>
       ) : (
@@ -185,35 +205,59 @@ function ListCard({
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[20px] bg-black/20 px-3 py-3 ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.055]">
+    <div className="rounded-[18px] border border-border/60 bg-background/55 px-3 py-3 transition hover:bg-accent/40">
       {children}
     </div>
   );
 }
 
-export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardData }) {
+export default function ArtistOsDashboard({
+  data,
+}: {
+  data: ArtistOsDashboardData;
+}) {
   const confirmedShows = data.shows.filter(
     (show) =>
       isCurrentMonth(show.event_date) &&
-      ["fechado", "sinal_pago", "em_execucao", "realizado", "pago_final"].includes(String(show.status)),
+      [
+        "fechado",
+        "sinal_pago",
+        "em_execucao",
+        "realizado",
+        "pago_final",
+      ].includes(String(show.status)),
   );
   const negotiatingShows = data.shows.filter((show) =>
     ["lead", "proposta_enviada", "negociando"].includes(String(show.status)),
   );
   const brandActive = data.brandDeals.filter((deal) =>
-    ["aprovado", "contrato", "producao", "publicado", "comprovado"].includes(String(deal.status)),
+    ["aprovado", "contrato", "producao", "publicado", "comprovado"].includes(
+      String(deal.status),
+    ),
   );
-  const pendingTasks = data.tasks.filter((task) => !["concluida", "cancelada"].includes(String(task.status)));
-  const urgentTasks = data.tasks.filter((task) => String(task.priority) === "urgente");
-  const openPayments = data.finance.filter((row) => ["previsto", "atrasado"].includes(String(row.status)));
+  const pendingTasks = data.tasks.filter(
+    (task) => !["concluida", "cancelada"].includes(String(task.status)),
+  );
+  const urgentTasks = data.tasks.filter(
+    (task) => String(task.priority) === "urgente",
+  );
+  const openPayments = data.finance.filter((row) =>
+    ["previsto", "atrasado"].includes(String(row.status)),
+  );
   const expectedRevenue = data.finance
-    .filter((row) => row.transaction_type === "entrada" && row.status !== "cancelado")
+    .filter(
+      (row) => row.transaction_type === "entrada" && row.status !== "cancelado",
+    )
     .reduce((sum, row) => sum + toNumber(row.amount), 0);
   const received = data.finance
-    .filter((row) => row.transaction_type === "entrada" && row.status === "recebido")
+    .filter(
+      (row) => row.transaction_type === "entrada" && row.status === "recebido",
+    )
     .reduce((sum, row) => sum + toNumber(row.amount), 0);
   const expenses = data.finance
-    .filter((row) => row.transaction_type === "saida" && row.status !== "cancelado")
+    .filter(
+      (row) => row.transaction_type === "saida" && row.status !== "cancelado",
+    )
     .reduce((sum, row) => sum + toNumber(row.amount), 0);
   const cash = received - expenses;
 
@@ -226,12 +270,15 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
   return (
     <div className="space-y-5">
       {!data.tableReady ? (
-        <div className="flex items-start gap-3 rounded-[24px] bg-amber-300/[0.08] p-4 text-amber-100 ring-1 ring-inset ring-amber-200/12">
+        <div className="flex items-start gap-3 rounded-[22px] border border-amber-500/20 bg-amber-500/[0.08] p-4 text-amber-800 dark:text-amber-200">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <div className="text-sm font-semibold">Business OS em modo demo</div>
-            <p className="mt-1 text-sm text-amber-100/70">
-              A migration ainda precisa ser aplicada no Supabase para gravar dados reais.
+            <div className="text-sm font-semibold">
+              Business OS em modo demo
+            </div>
+            <p className="mt-1 text-sm text-amber-800/75 dark:text-amber-200/75">
+              A migration ainda precisa ser aplicada no Supabase para gravar
+              dados reais.
             </p>
           </div>
         </div>
@@ -291,7 +338,9 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
           label: "Pagamentos abertos",
           value: openPayments.length,
           helper: "Previstos ou atrasados.",
-          tone: openPayments.some((row) => row.status === "atrasado") ? "rose" : "amber",
+          tone: openPayments.some((row) => row.status === "atrasado")
+            ? "rose"
+            : "amber",
           icon: AlertCircle,
         })}
       </section>
@@ -307,12 +356,15 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={show.id}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-white/92">{String(show.event_name ?? "Show")}</div>
-                  <div className="mt-1 text-xs text-white/45">
-                    {String(show.city ?? "Cidade aberta")} · {dateLabel(show.event_date)}
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {String(show.event_name ?? "Show")}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {String(show.city ?? "Cidade aberta")} ·{" "}
+                    {dateLabel(show.event_date)}
                   </div>
                 </div>
-                <div className="rounded-full bg-white/[0.07] px-2 py-1 text-xs font-medium text-white/60">
+                <div className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                   {String(show.status ?? "lead").replaceAll("_", " ")}
                 </div>
               </div>
@@ -330,10 +382,16 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={deal.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-white/92">{String(deal.contact_name ?? "Contato")}</div>
-                  <div className="mt-1 text-xs text-white/45">{String(deal.event_type ?? "Evento")}</div>
+                  <div className="text-sm font-medium text-foreground">
+                    {String(deal.contact_name ?? "Contato")}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {String(deal.event_type ?? "Evento")}
+                  </div>
                 </div>
-                <div className="text-sm font-medium text-white/70">{money(deal.estimated_budget)}</div>
+                <div className="text-sm font-medium text-foreground/75">
+                  {money(deal.estimated_budget)}
+                </div>
               </div>
             </RowShell>
           )}
@@ -349,15 +407,20 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={row.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-white/92">{String(row.description ?? "Movimentação")}</div>
-                  <div className="mt-1 text-xs text-white/45">
-                    {String(row.category ?? "categoria")} · {String(row.status ?? "previsto")}
+                  <div className="text-sm font-medium text-foreground">
+                    {String(row.description ?? "Movimentação")}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {String(row.category ?? "categoria")} ·{" "}
+                    {String(row.status ?? "previsto")}
                   </div>
                 </div>
                 <div
                   className={cn(
                     "text-sm font-semibold",
-                    row.transaction_type === "saida" ? "text-rose-200" : "text-emerald-200",
+                    row.transaction_type === "saida"
+                      ? "text-rose-700 dark:text-rose-300"
+                      : "text-emerald-700 dark:text-emerald-300",
                   )}
                 >
                   {row.transaction_type === "saida" ? "-" : "+"}
@@ -378,12 +441,15 @@ export default function ArtistOsDashboard({ data }: { data: ArtistOsDashboardDat
             <RowShell key={task.id}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-white/92">{String(task.title ?? "Tarefa")}</div>
-                  <div className="mt-1 text-xs text-white/45">
-                    {String(task.assignee ?? "Sem responsável")} · {dateLabel(task.due_at)}
+                  <div className="text-sm font-medium text-foreground">
+                    {String(task.title ?? "Tarefa")}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {String(task.assignee ?? "Sem responsável")} ·{" "}
+                    {dateLabel(task.due_at)}
                   </div>
                 </div>
-                <div className="rounded-full bg-white/[0.07] px-2 py-1 text-xs font-medium text-white/60">
+                <div className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                   {String(task.priority ?? "media")}
                 </div>
               </div>

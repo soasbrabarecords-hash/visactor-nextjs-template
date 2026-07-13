@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -10,11 +8,13 @@ import {
   Settings2,
   UserRoundCog,
 } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import ArtistOsCrudPanel from "@/components/artist-os/artist-os-crud-panel";
 import { getArtistOsResource } from "@/lib/artist-os";
 import {
-  artistOsNavigation,
   type ArtistOsResourceKey,
+  artistOsNavigation,
 } from "@/lib/artist-os-config";
 import { cn } from "@/lib/utils";
 
@@ -44,30 +44,33 @@ function PlaceholderCard({
   tone?: "emerald" | "sky" | "amber" | "rose" | "slate";
 }) {
   const tones = {
-    emerald: "bg-[linear-gradient(145deg,rgba(16,185,129,0.14),rgba(15,23,42,0.94)_66%)] text-emerald-100",
-    sky: "bg-[linear-gradient(145deg,rgba(14,165,233,0.14),rgba(15,23,42,0.94)_66%)] text-sky-100",
-    amber: "bg-[linear-gradient(145deg,rgba(245,158,11,0.15),rgba(15,23,42,0.94)_66%)] text-amber-100",
-    rose: "bg-[linear-gradient(145deg,rgba(244,63,94,0.14),rgba(15,23,42,0.94)_66%)] text-rose-100",
-    slate: "bg-[linear-gradient(145deg,rgba(100,116,139,0.12),rgba(15,23,42,0.94)_66%)] text-white",
+    emerald:
+      "border-emerald-500/15 bg-card/80 text-emerald-700 dark:text-emerald-200",
+    sky: "border-sky-500/15 bg-card/80 text-sky-700 dark:text-sky-200",
+    amber: "border-amber-500/15 bg-card/80 text-amber-700 dark:text-amber-200",
+    rose: "border-rose-500/15 bg-card/80 text-rose-700 dark:text-rose-200",
+    slate: "border-border/70 bg-card/80 text-foreground",
   } as const;
 
   const content = (
     <div
       className={cn(
-        "group rounded-[26px] p-4 ring-1 ring-inset ring-white/[0.07] transition hover:-translate-y-0.5 hover:ring-white/12",
+        "group rounded-[24px] border p-4 shadow-[0_16px_50px_-46px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:shadow-md",
         tones[tone],
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.07] ring-1 ring-inset ring-white/[0.07]">
+        <div className="bg-current/[0.07] ring-current/10 flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset">
           <Icon className="h-5 w-5" />
         </div>
         {href ? (
-          <ArrowRight className="h-4 w-4 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/65" />
+          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
         ) : null}
       </div>
-      <h3 className="mt-4 text-base font-semibold text-white/92">{title}</h3>
-      <p className="mt-1 text-sm font-normal leading-6 text-white/56">{description}</p>
+      <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
+      <p className="mt-1 text-sm font-normal leading-6 text-muted-foreground">
+        {description}
+      </p>
     </div>
   );
 
@@ -76,17 +79,18 @@ function PlaceholderCard({
 
 function ReportsPage() {
   return (
-    <section className="rounded-[30px] bg-[linear-gradient(145deg,rgba(14,165,233,0.10),rgba(15,23,42,0.92)_48%,rgba(2,6,23,0.96))] p-5 shadow-[0_18px_80px_-62px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07]">
+    <section className="rounded-[28px] border border-border/70 bg-card/80 p-5 shadow-[0_18px_68px_-58px_rgba(15,23,42,0.32)] backdrop-blur-xl">
       <div className="max-w-3xl">
-        <div className="text-xs font-medium text-white/44">
+        <div className="text-xs font-medium text-muted-foreground">
           Relatórios
         </div>
-        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
+        <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-foreground">
           Business OS — inteligência executiva
         </h2>
-        <p className="mt-2 text-sm font-normal leading-6 text-white/56">
-          Estrutura inicial para relatórios de shows, caixa, publicidade, tarefas
-          e performance por artista. A geração avançada entra na próxima etapa.
+        <p className="mt-2 text-sm font-normal leading-6 text-muted-foreground">
+          Estrutura inicial para relatórios de shows, caixa, publicidade,
+          tarefas e performance por artista. A geração avançada entra na próxima
+          etapa.
         </p>
       </div>
 
@@ -132,25 +136,25 @@ function ReportsPage() {
 
 function SettingsPage() {
   return (
-    <section className="rounded-[30px] bg-[linear-gradient(145deg,rgba(16,185,129,0.10),rgba(15,23,42,0.92)_48%,rgba(2,6,23,0.96))] p-5 shadow-[0_18px_80px_-62px_rgba(0,0,0,0.9)] ring-1 ring-inset ring-white/[0.07]">
+    <section className="rounded-[28px] border border-border/70 bg-card/80 p-5 shadow-[0_18px_68px_-58px_rgba(15,23,42,0.32)] backdrop-blur-xl">
       <div className="flex flex-col gap-4 laptop:flex-row laptop:items-start laptop:justify-between">
         <div className="max-w-3xl">
-          <div className="text-xs font-medium text-white/44">
+          <div className="text-xs font-medium text-muted-foreground">
             Configurações
           </div>
-          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white/95">
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-foreground">
             Business OS pronto para multi-perfis
           </h2>
-          <p className="mt-2 text-sm font-normal leading-6 text-white/56">
+          <p className="mt-2 text-sm font-normal leading-6 text-muted-foreground">
             A base já nasce com workspace, created_by e estrutura para roles:
             admin, manager, financeiro, artista e equipe. No MVP, a autenticação
             atual do sistema continua controlando o acesso.
           </p>
         </div>
-        <div className="rounded-[24px] bg-emerald-300/[0.08] p-4 text-emerald-100 ring-1 ring-inset ring-emerald-200/12">
+        <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/[0.08] p-4 text-emerald-800 dark:text-emerald-200">
           <Settings2 className="h-5 w-5" />
           <div className="mt-3 text-sm font-semibold">MVP seguro</div>
-          <div className="mt-1 text-xs leading-5 text-emerald-100/70">
+          <div className="mt-1 text-xs leading-5 text-emerald-800/75 dark:text-emerald-200/75">
             Sem mexer em permissões complexas agora.
           </div>
         </div>
@@ -164,7 +168,13 @@ function SettingsPage() {
             description="Configurações específicas serão plugadas aqui em uma próxima fase."
             href={item.href}
             icon={item.icon}
-            tone={item.key === "brand-deals" ? "amber" : item.key === "tasks" ? "rose" : "sky"}
+            tone={
+              item.key === "brand-deals"
+                ? "amber"
+                : item.key === "tasks"
+                  ? "rose"
+                  : "sky"
+            }
           />
         ))}
       </div>
