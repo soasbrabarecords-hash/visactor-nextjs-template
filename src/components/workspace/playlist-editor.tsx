@@ -26,8 +26,14 @@ import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TrackWithStreams = SpotifyEditablePlaylistTrack & {
+  instanceKey: string;
   streams: KworbTrackData | null;
   streamsLoading: boolean;
+};
+
+type DropIndicator = {
+  slot: number;
+  top: number;
 };
 
 type ChartData = {
@@ -87,6 +93,35 @@ function formatDelta(n: number | null, trend: KworbTrackData["trend"]): string {
   if (n === null || trend === null) return "";
   if (trend === "same" || n === 0) return "";
   return `${trend === "up" ? "+" : ""}${formatStreams(n)}`;
+}
+
+function withEditorState(
+  track: SpotifyEditablePlaylistTrack,
+  index: number,
+): TrackWithStreams {
+  return {
+    ...track,
+    instanceKey: `${track.id}:${index}`,
+    streams: null,
+    streamsLoading: true,
+  };
+}
+
+function findVerticalScrollContainer(element: HTMLElement) {
+  let parent = element.parentElement;
+
+  while (parent) {
+    const styles = window.getComputedStyle(parent);
+    const canScroll = /(auto|scroll)/.test(styles.overflowY);
+
+    if (canScroll && parent.scrollHeight > parent.clientHeight) {
+      return parent;
+    }
+
+    parent = parent.parentElement;
+  }
+
+  return window;
 }
 
 // ─── EditableField ────────────────────────────────────────────────────────────
@@ -159,31 +194,17 @@ export function EditableField({
 function reorderWithBlock(
   tracks: TrackWithStreams[],
   selectedSet: Set<number>,
-  _dragFromIndex: number,
-  dropIndex: number,
+  dropSlot: number,
 ): { nextTracks: TrackWithStreams[]; nextSelected: Set<number> } {
-  // Índices selecionados em ordem
   const selIndices = [...selectedSet].sort((a, b) => a - b);
-
-  // Faixas selecionadas (bloco a mover)
   const block = selIndices.map((i) => tracks[i]);
-
-  // Lista sem o bloco
   const rest = tracks.filter((_, i) => !selectedSet.has(i));
-
-  // Abordagem mais simples e correta:
-  // Conta quantos itens não-selecionados existem antes de dropIndex
-  let insertPos = 0;
-  let passed = 0;
-  for (let i = 0; i < tracks.length; i++) {
-    if (passed >= dropIndex) break;
-    if (!selectedSet.has(i)) passed++;
-    insertPos++;
-  }
-  // Se o drop foi para depois do último, insere no fim
-  if (dropIndex >= tracks.length - selIndices.length + 1) {
-    insertPos = rest.length;
-  }
+  const clampedSlot = Math.max(0, Math.min(tracks.length, dropSlot));
+  const insertPos = tracks.reduce(
+    (count, _track, index) =>
+      index < clampedSlot && !selectedSet.has(index) ? count + 1 : count,
+    0,
+  );
 
   const nextTracks = [
     ...rest.slice(0, insertPos),
@@ -212,10 +233,10 @@ export default function PlaylistEditor({
   initialSnapshotId: string;
 }) {
   const [tracks, setTracks] = useState<TrackWithStreams[]>(() =>
-    initialTracks.map((t) => ({ ...t, streams: null, streamsLoading: true })),
+    initialTracks.map(withEditorState),
   );
   const [savedTracks, setSavedTracks] = useState<TrackWithStreams[]>(() =>
-    initialTracks.map((t) => ({ ...t, streams: null, streamsLoading: true })),
+    initialTracks.map(withEditorState),
   );
   const [snapshotId, setSnapshotId] = useState(initialSnapshotId);
 
@@ -226,13 +247,17 @@ export default function PlaylistEditor({
   // Drag state
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
   const draggingFrom = useRef<number | null>(null);
+  const dragSelection = useRef<Set<number>>(new Set());
   const dragStartY = useRef(0);
   const dragStarted = useRef(false);
+  const lastPointerY = useRef(0);
+  const autoScrollFrame = useRef<number | null>(null);
+  const scrollContainer = useRef<HTMLElement | Window | null>(null);
   const ignoreNextClick = useRef(false);
-  const rowHeight = useRef(60);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
-  const [dragTo, setDragTo] = useState<number | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
 
   // Chart snapshot data
   const [chartMap, setChartMap] = useState<Map<string, ChartData>>(new Map());
@@ -243,6 +268,12 @@ export default function PlaylistEditor({
   const [pendingReorder, setPendingReorder] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => () => {
+    if (autoScrollFrame.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrame.current);
+    }
+  }, []);
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -346,49 +377,164 @@ export default function PlaylistEditor({
   }
 
   // ── Drag (pointer events) ─────────────────────────────────────────────────
+  function resolveDropIndicator(clientY: number): DropIndicator | null {
+    const tbody = tbodyRef.current;
+    const wrapper = tableWrapperRef.current;
+
+    if (!tbody || !wrapper) {
+      return null;
+    }
+
+    const rows = tbody.rows;
+    if (rows.length === 0) {
+      return null;
+    }
+
+    let low = 0;
+    let high = rows.length;
+
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      const rect = rows[middle].getBoundingClientRect();
+
+      if (clientY < rect.top + rect.height / 2) {
+        high = middle;
+      } else {
+        low = middle + 1;
+      }
+    }
+
+    const slot = low;
+
+    const lineY =
+      slot < rows.length
+        ? rows[slot].getBoundingClientRect().top
+        : rows[rows.length - 1].getBoundingClientRect().bottom;
+    const wrapperRect = wrapper.getBoundingClientRect();
+
+    return {
+      slot,
+      top: lineY - wrapperRect.top + wrapper.scrollTop,
+    };
+  }
+
+  function updateDropIndicator(clientY: number) {
+    const indicator = resolveDropIndicator(clientY);
+    if (indicator) {
+      setDropIndicator((current) =>
+        current?.slot === indicator.slot && Math.abs(current.top - indicator.top) < 0.5
+          ? current
+          : indicator,
+      );
+    }
+    return indicator;
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollFrame.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrame.current);
+      autoScrollFrame.current = null;
+    }
+  }
+
+  function startAutoScroll() {
+    stopAutoScroll();
+
+    const tick = () => {
+      if (draggingFrom.current === null) {
+        autoScrollFrame.current = null;
+        return;
+      }
+
+      if (!dragStarted.current) {
+        autoScrollFrame.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
+      const container = scrollContainer.current;
+      const pointerY = lastPointerY.current;
+      const viewportTop = container instanceof HTMLElement
+        ? container.getBoundingClientRect().top
+        : 0;
+      const viewportBottom = container instanceof HTMLElement
+        ? container.getBoundingClientRect().bottom
+        : window.innerHeight;
+      const edge = Math.min(112, (viewportBottom - viewportTop) * 0.18);
+      let speed = 0;
+
+      if (pointerY < viewportTop + edge) {
+        speed = -Math.ceil(((viewportTop + edge - pointerY) / edge) * 18);
+      } else if (pointerY > viewportBottom - edge) {
+        speed = Math.ceil(((pointerY - (viewportBottom - edge)) / edge) * 18);
+      }
+
+      if (speed !== 0) {
+        if (container instanceof HTMLElement) {
+          container.scrollTop += speed;
+        } else {
+          window.scrollBy({ top: speed });
+        }
+        updateDropIndicator(pointerY);
+      }
+
+      autoScrollFrame.current = window.requestAnimationFrame(tick);
+    };
+
+    autoScrollFrame.current = window.requestAnimationFrame(tick);
+  }
+
+  function clearDragState() {
+    stopAutoScroll();
+    draggingFrom.current = null;
+    dragSelection.current = new Set();
+    dragStarted.current = false;
+    scrollContainer.current = null;
+    setDragFrom(null);
+    setDropIndicator(null);
+  }
+
   function handlePointerDown(e: React.PointerEvent, index: number) {
     const target = e.target as HTMLElement;
     if (target.closest("a, button, input, textarea")) return;
+    if (e.pointerType === "touch" && !target.closest("[data-grip]")) return;
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
-    // Se Shift segurado: estende range entre âncora e este index AQUI mesmo
-    // (o handleRowClick é cancelado pelo ignoreNextClick depois do drag)
+    let activeSelection: Set<number>;
+
     if (e.shiftKey && lastClickedIndex.current !== null) {
       const from = Math.min(lastClickedIndex.current, index);
       const to = Math.max(lastClickedIndex.current, index);
-      const range = new Set<number>();
-      for (let i = from; i <= to; i++) range.add(i);
-      setSelectedSet(range);
-      // NÃO atualiza lastClickedIndex — âncora permanece
+      activeSelection = new Set<number>();
+      for (let i = from; i <= to; i++) activeSelection.add(i);
+      setSelectedSet(activeSelection);
     } else if (!selectedSet.has(index)) {
-      // Click normal numa linha não selecionada: seleciona só ela
-      setSelectedSet(new Set([index]));
+      activeSelection = new Set([index]);
+      setSelectedSet(activeSelection);
       lastClickedIndex.current = index;
+    } else {
+      activeSelection = new Set(selectedSet);
     }
 
     draggingFrom.current = index;
+    dragSelection.current = activeSelection;
     dragStartY.current = e.clientY;
+    lastPointerY.current = e.clientY;
     dragStarted.current = false;
-
-    if (tbodyRef.current) {
-      const firstRow = tbodyRef.current.querySelector("tr");
-      if (firstRow) rowHeight.current = firstRow.getBoundingClientRect().height;
-    }
-
+    scrollContainer.current = findVerticalScrollContainer(e.currentTarget as HTMLElement);
     setDragFrom(index);
-    setDragTo(null);
+    setDropIndicator(null);
+    startAutoScroll();
   }
 
   function handlePointerMove(e: React.PointerEvent, index: number) {
     if (draggingFrom.current !== index) return;
     e.preventDefault();
+    lastPointerY.current = e.clientY;
     const deltaY = e.clientY - dragStartY.current;
     if (!dragStarted.current && Math.abs(deltaY) < 6) return;
     dragStarted.current = true;
-    const deltaRows = Math.round(deltaY / rowHeight.current);
-    const newIndex = Math.max(0, Math.min(tracks.length - 1, index + deltaRows));
-    setDragTo(newIndex);
+    updateDropIndicator(e.clientY);
   }
 
   function handlePointerUp(e: React.PointerEvent, index: number) {
@@ -397,30 +543,38 @@ export default function PlaylistEditor({
 
     const deltaY = e.clientY - dragStartY.current;
     if (!dragStarted.current && Math.abs(deltaY) < 6) {
-      draggingFrom.current = null;
-      dragStarted.current = false;
-      setDragFrom(null);
-      setDragTo(null);
+      clearDragState();
       return;
     }
 
-    const deltaRows = Math.round(deltaY / rowHeight.current);
-    const newIndex = Math.max(0, Math.min(tracks.length - 1, index + deltaRows));
-
-    draggingFrom.current = null;
-    dragStarted.current = false;
+    const indicator = updateDropIndicator(e.clientY);
+    const activeSelection = new Set(dragSelection.current);
     ignoreNextClick.current = true;
-    setDragFrom(null);
-    setDragTo(null);
 
-    if (newIndex !== index || selectedSet.size > 1) {
-      if (newIndex !== index) {
-        const { nextTracks, nextSelected } = reorderWithBlock(tracks, selectedSet, index, newIndex);
+    if (indicator && activeSelection.size > 0) {
+      const { nextTracks, nextSelected } = reorderWithBlock(
+        tracks,
+        activeSelection,
+        indicator.slot,
+      );
+      const orderChanged = nextTracks.some(
+        (track, trackIndex) => track.instanceKey !== tracks[trackIndex]?.instanceKey,
+      );
+
+      if (orderChanged) {
         setTracks(nextTracks);
         setSelectedSet(nextSelected);
         lastClickedIndex.current = null;
         setPendingReorder(true);
       }
+    }
+
+    clearDragState();
+  }
+
+  function handlePointerCancel(index: number) {
+    if (draggingFrom.current === index) {
+      clearDragState();
     }
   }
 
@@ -579,43 +733,16 @@ export default function PlaylistEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSet, tracks.length]);
 
-  // ── Cálculo visual do drag ────────────────────────────────────────────────
-  // Durante drag, calcula o translateY de cada linha:
-  // - Linhas do bloco arrastado: se movem junto com o ponteiro
-  // - Linhas fora do bloco: se abrem para dar espaço
-  function getTranslateY(index: number): number {
-    if (dragFrom === null || dragTo === null || dragFrom === dragTo) return 0;
-
-    const isInBlock = selectedSet.has(index);
-    const blockSize = selectedSet.size;
-    const delta = dragTo - dragFrom; // quanto moveu em linhas
-
-    if (isInBlock) {
-      // O bloco todo se move: translada pelo delta * rowHeight
-      return delta * rowHeight.current;
-    }
-
-    // Linhas fora do bloco: precisam ceder espaço
-    const selSorted = [...selectedSet].sort((a, b) => a - b);
-    const blockMin = selSorted[0];
-    const blockMax = selSorted[selSorted.length - 1];
-
-    if (delta > 0) {
-      // Bloco movendo pra baixo: linhas entre blockMax+1 e blockMax+delta sobem
-      if (index > blockMax && index <= blockMax + delta) {
-        return -blockSize * rowHeight.current;
-      }
-    } else {
-      // Bloco movendo pra cima: linhas entre blockMin+delta e blockMin-1 descem
-      if (index < blockMin && index >= blockMin + delta) {
-        return blockSize * rowHeight.current;
-      }
-    }
-
-    return 0;
-  }
-
-  const isActivelyDragging = dragFrom !== null && dragTo !== null;
+  const isActivelyDragging = dragFrom !== null && dropIndicator !== null;
+  const dropPosition = dropIndicator
+    ? tracks.reduce(
+        (position, _track, index) =>
+          index < dropIndicator.slot && !dragSelection.current.has(index)
+            ? position + 1
+            : position,
+        1,
+      )
+    : null;
   const intelligence = useMemo(
     () => buildPlaylistIntelligence(
       tracks.map((track, index) => {
@@ -686,45 +813,17 @@ export default function PlaylistEditor({
         onApplySuggestedOrder={handleApplySuggestedOrder}
       />
 
-      {/* Barra de controles — legendas escondem em mobile */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="hidden flex-wrap gap-2 text-xs text-muted-foreground tablet:flex">
-          <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-1.5">
-            <span className="font-mono">Click</span> Selecionar
-          </span>
-          <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-1.5">
-            <span className="font-mono">Shift+Click</span> Selecionar range
-          </span>
-          <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-1.5">
-            <GripVertical className="h-3.5 w-3.5" /> Arrastar bloco
-          </span>
-          <span className="flex items-center gap-1.5 rounded-lg border border-border bg-card/50 px-3 py-1.5">
-            <span className="font-mono">Delete</span> Remover seleção
-          </span>
+      {/* Guia curto de seleção e estado atual */}
+      <div className="grid gap-2 border-y border-border/70 py-2.5 text-xs text-muted-foreground tablet:grid-cols-[1fr_auto] tablet:items-center">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <span><strong className="font-semibold text-foreground">Click</strong> seleciona</span>
+          <span><strong className="font-semibold text-foreground">Shift + click</strong> cria um bloco</span>
+          <span className="inline-flex items-center gap-1"><GripVertical className="h-3.5 w-3.5" /> arraste até a linha azul</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          {selectedSet.size > 0 && !pendingReorder && (
-            <span className="text-xs text-primary font-medium">
-              {selectedSet.size} selecionada{selectedSet.size > 1 ? "s" : ""}
-            </span>
-          )}
-          {pendingReorder ? (
-            <>
-              <span className="text-xs font-medium text-yellow-500">
-                {selectedSet.size > 1 ? `${selectedSet.size} faixas movidas` : "Ordem alterada"} — não salvo
-              </span>
-              <Button size="sm" variant="outline" onClick={handleCancelReorder} disabled={saving}>
-                <X className="h-3.5 w-3.5" /> Cancelar
-              </Button>
-              <Button size="sm" onClick={() => void handleConfirmReorder()} disabled={saving}>
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                Salvar ordem
-              </Button>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">{tracks.length} faixas</span>
-          )}
+        <div className="font-medium tabular-nums text-foreground">
+          {selectedSet.size > 0
+            ? `${selectedSet.size} selecionada${selectedSet.size > 1 ? "s" : ""}`
+            : `${tracks.length} faixas`}
         </div>
       </div>
 
@@ -739,7 +838,22 @@ export default function PlaylistEditor({
         - Coluna "Música" agora inclui capa + título + artistas (estilo Spotify)
         - Colunas secundárias escondem progressivamente em telas menores
       */}
-      <div data-spotify-table-wrapper className="relative overflow-x-auto rounded-2xl border border-border bg-card/60">
+      <div
+        ref={tableWrapperRef}
+        data-spotify-table-wrapper
+        className="relative overflow-x-auto rounded-2xl border border-border bg-card/60"
+      >
+        {isActivelyDragging && dropIndicator ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 z-50 h-[3px] -translate-y-1/2 bg-primary shadow-[0_0_18px_hsl(var(--primary)/0.75)]"
+            style={{ top: dropIndicator.top }}
+          >
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-primary-foreground shadow-lg">
+              Soltar {dragSelection.current.size} faixa{dragSelection.current.size > 1 ? "s" : ""} · posição {dropPosition}
+            </span>
+          </div>
+        ) : null}
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -767,22 +881,19 @@ export default function PlaylistEditor({
             {tracks.length > 0 ? tracks.map((track, index) => {
               const isSelected = selectedSet.has(index);
               const isDraggingThis = dragFrom === index;
-              const isInsertTarget = isActivelyDragging && dragTo === index;
               const isDeleting = deletingIndices.has(index);
-              const translateY = getTranslateY(index);
               const decision = decisionByTrackKey.get(`${track.id}:${index}`);
 
               return (
                 <tr
-                  key={`${track.id}-${index}`}
+                  key={track.instanceKey}
                   onClick={(e) => handleRowClick(e, index)}
                   onPointerDown={(e) => handlePointerDown(e, index)}
                   onPointerMove={(e) => handlePointerMove(e, index)}
                   onPointerUp={(e) => handlePointerUp(e, index)}
+                  onPointerCancel={() => handlePointerCancel(index)}
                   style={{
-                    transform: `translateY(${translateY}px)`,
-                    transition: isActivelyDragging && isSelected ? "none" : "transform 120ms ease",
-                    opacity: isDeleting ? 0.3 : isDraggingThis ? 0.5 : 1,
+                    opacity: isDeleting ? 0.3 : isActivelyDragging && isSelected ? 0.58 : 1,
                     cursor: isDraggingThis && isActivelyDragging ? "grabbing" : "grab",
                     position: "relative",
                     zIndex: isSelected && isActivelyDragging ? 20 : isActivelyDragging ? 1 : "auto",
@@ -794,7 +905,6 @@ export default function PlaylistEditor({
                         ? "bg-primary/15"
                         : "bg-primary/10 hover:bg-muted/15"
                       : "hover:bg-muted/15",
-                    isInsertTarget ? "shadow-[inset_0_2px_0_hsl(var(--primary))]" : "",
                     isDeleting ? "pointer-events-none" : "",
                   ].filter(Boolean).join(" ")}
                 >
@@ -934,7 +1044,7 @@ export default function PlaylistEditor({
                   {/* Grip (movido pro final) */}
                   <td className="h-16 overflow-hidden px-3 py-0 align-middle">
                     <div data-grip="true"
-                      className="flex cursor-grab items-center opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100"
+                      className={`flex cursor-grab touch-none items-center transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-active:opacity-100"}`}
                       title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
                       <GripVertical className="h-4 w-4 pointer-events-none text-muted-foreground/50" />
                     </div>
@@ -971,6 +1081,30 @@ export default function PlaylistEditor({
           stickyRight={[6, 7]}
         />
       </div>
+
+      {pendingReorder ? (
+        <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[70] flex justify-center tablet:left-[248px] tablet:justify-end tablet:right-6">
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-auto flex w-full max-w-[560px] items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/92 p-2.5 pl-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.4)] backdrop-blur-2xl"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">Nova ordem pronta</p>
+              <p className="truncate text-[11px] text-white/60">Revise a lista e confirme para atualizar o Spotify.</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={handleCancelReorder} disabled={saving} className="rounded-xl text-white/72 hover:bg-white/10 hover:text-white">
+                <X className="h-3.5 w-3.5" /> Cancelar
+              </Button>
+              <Button size="sm" onClick={() => void handleConfirmReorder()} disabled={saving} className="rounded-xl bg-white text-slate-950 hover:bg-white/90">
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                Confirmar ordem
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

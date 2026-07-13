@@ -78,6 +78,10 @@ type SpotifyPlaylistTracksResponse = {
   total?: number;
 };
 
+type SpotifySeveralTracksResponse = {
+  tracks?: Array<SpotifyPlaylistTrackItem["track"]>;
+};
+
 type SpotifyOfficialChartResponse = {
   entries?: Array<{
     chartEntryData?: {
@@ -1031,6 +1035,75 @@ async function fetchSpotifyPlaylistTracksWithToken(
   return tracks;
 }
 
+async function hydrateSpotifyTrackPopularityWithToken(
+  accessToken: string,
+  tracks: SpotifyEditablePlaylistTrack[],
+) {
+  const idsToHydrate = Array.from(
+    new Set(
+      tracks
+        .filter((track) => track.popularity === 0)
+        .map((track) => track.id),
+    ),
+  );
+
+  if (idsToHydrate.length === 0) {
+    return tracks;
+  }
+
+  const popularityById = new Map<string, number>();
+  const scope = "spotify:tracks:popularity";
+
+  for (let index = 0; index < idsToHydrate.length; index += 50) {
+    throwIfRateLimited(scope, "Spotify popularity error");
+    const batch = idsToHydrate.slice(index, index + 50);
+    const response = await fetch(
+      `https://api.spotify.com/v1/tracks?ids=${encodeURIComponent(batch.join(","))}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        registerRateLimit(scope, retryAfter);
+        throw new Error(
+          `Spotify popularity error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`,
+        );
+      }
+
+      throw new Error(
+        await getSpotifyErrorMessage(
+          response,
+          `Spotify popularity error ${response.status}: Failed to hydrate track popularity.`,
+        ),
+      );
+    }
+
+    clearRateLimit(scope);
+    const payload = (await response.json()) as SpotifySeveralTracksResponse;
+
+    for (const track of payload.tracks ?? []) {
+      if (track?.id && typeof track.popularity === "number") {
+        popularityById.set(track.id, track.popularity);
+      }
+    }
+  }
+
+  if (popularityById.size === 0) {
+    return tracks;
+  }
+
+  return tracks.map((track) => ({
+    ...track,
+    popularity: popularityById.get(track.id) ?? track.popularity,
+  }));
+}
+
 async function fetchSpotifyPlaylistTrackIdsWithToken(
   accessToken: string,
   playlistId: string,
@@ -1251,6 +1324,13 @@ async function fetchSpotifyEditablePlaylistWithToken(
       }
 
       tracks = embeddedTracks;
+    }
+
+    if (tracks.some((track) => track.popularity === 0)) {
+      tracks = await hydrateSpotifyTrackPopularityWithToken(
+        accessToken,
+        tracks,
+      ).catch(() => tracks);
     }
 
     return setCachedValue(
