@@ -1,8 +1,8 @@
 import "server-only";
-import { getCurrentWorkspaceContext } from "@/lib/workspaces";
+import { getCurrentWorkspaceSelection } from "@/lib/workspaces";
 
 export async function getLabelWorkspaceId(): Promise<string | null> {
-  const context = await getCurrentWorkspaceContext().catch(() => null);
+  const context = await getCurrentWorkspaceSelection().catch(() => null);
   return context?.workspace.id ?? null;
 }
 

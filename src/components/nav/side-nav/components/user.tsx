@@ -22,7 +22,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type ConnectedAccount = {
@@ -133,6 +132,7 @@ export default function User() {
     setMenuError(null);
 
     await fetch("/api/auth/accounts", { method: "DELETE" });
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     await supabase.auth.signOut();
 

@@ -3,7 +3,6 @@
 import { Check, Loader2, UserRound } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
-import { createClient } from "@/lib/supabase/client";
 
 type AccountProfileFormProps = {
   initialDisplayName: string;
@@ -47,6 +46,7 @@ export default function AccountProfileForm({
         return;
       }
 
+      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const { error: updateError } = await supabase.auth.updateUser({
         data: {

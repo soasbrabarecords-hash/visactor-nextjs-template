@@ -2,17 +2,62 @@
 
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { type Navigation as NavigationItem, navigations } from "@/config/site";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { cn } from "@/lib/utils";
 import User from "./user";
 
+const OS_ROOT_HREFS = new Set(["/playlist-os", "/label-os", "/artist-os"]);
+const INTENT_PREFETCH_DELAY_MS = 120;
+
 export default function Navigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const intentPrefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const prefetchedHrefs = useRef(new Set<string>());
   const workspaceAccess = useWorkspaceAccess();
+
+  function cancelIntentPrefetch() {
+    if (intentPrefetchTimer.current) {
+      clearTimeout(intentPrefetchTimer.current);
+      intentPrefetchTimer.current = null;
+    }
+  }
+
+  function prefetchOsRoute(href: string) {
+    if (!OS_ROOT_HREFS.has(href) || prefetchedHrefs.current.has(href)) {
+      return;
+    }
+
+    prefetchedHrefs.current.add(href);
+    router.prefetch(href);
+  }
+
+  function scheduleIntentPrefetch(href: string) {
+    if (!OS_ROOT_HREFS.has(href) || prefetchedHrefs.current.has(href)) {
+      return;
+    }
+
+    cancelIntentPrefetch();
+    intentPrefetchTimer.current = setTimeout(() => {
+      prefetchOsRoute(href);
+      intentPrefetchTimer.current = null;
+    }, INTENT_PREFETCH_DELAY_MS);
+  }
+
+  useEffect(
+    () => () => {
+      if (intentPrefetchTimer.current) {
+        clearTimeout(intentPrefetchTimer.current);
+      }
+    },
+    [],
+  );
 
   function isActive(href: string) {
     if (href === "/dashboard") {
@@ -122,6 +167,9 @@ export default function Navigation() {
       <Link
         key={navigation.name}
         href={navigation.href}
+        onPointerEnter={() => scheduleIntentPrefetch(navigation.href)}
+        onPointerLeave={cancelIntentPrefetch}
+        onFocus={() => prefetchOsRoute(navigation.href)}
         className={cn(
           "group relative flex items-center overflow-hidden rounded-lg transition-colors duration-150",
           "hover:bg-muted/70",
@@ -175,6 +223,9 @@ export default function Navigation() {
         >
           <Link
             href={navigation.href}
+            onPointerEnter={() => scheduleIntentPrefetch(navigation.href)}
+            onPointerLeave={cancelIntentPrefetch}
+            onFocus={() => prefetchOsRoute(navigation.href)}
             className="relative z-10 flex min-w-0 flex-1 items-center"
           >
             <Icon

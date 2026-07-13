@@ -57,17 +57,16 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const isAuthenticated = Boolean(claimsData?.claims?.sub);
 
-  if (isLoginRoute && user && !isAddingAccount) {
+  if (isLoginRoute && isAuthenticated && !isAddingAccount) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  if (!user && !isLoginRoute) {
+  if (!isAuthenticated && !isLoginRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

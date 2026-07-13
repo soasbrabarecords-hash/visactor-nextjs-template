@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspaceContext } from "@/lib/workspaces";
+import { getCurrentWorkspaceSelection } from "@/lib/workspaces";
 import {
   artistOsResources,
   getArtistOsResourceConfig,
@@ -28,6 +28,13 @@ export type ArtistOsDashboardData = {
   contracts: ArtistOsRecord[];
   tasks: ArtistOsRecord[];
 };
+
+type ArtistOsRowsResult = Pick<
+  ArtistOsResourceResult,
+  "rows" | "tableReady" | "error"
+>;
+
+type ArtistOsDbClient = Awaited<ReturnType<typeof createClient>>;
 
 const moneyFields = new Set([
   "default_fee",
@@ -201,8 +208,52 @@ function mockRows(resource: ArtistOsResourceKey): ArtistOsRecord[] {
   return [];
 }
 
+function buildArtistOptions(rows: ArtistOsRecord[]): ArtistOsArtistOption[] {
+  return rows.map((artist) => ({
+    id: artist.id,
+    name: String(artist.stage_name ?? "Artista sem nome"),
+    status: typeof artist.status === "string" ? artist.status : null,
+  }));
+}
+
+async function loadArtistOsRows(
+  resource: ArtistOsResourceKey,
+  supabase: ArtistOsDbClient,
+  workspaceId: string,
+): Promise<ArtistOsRowsResult> {
+  const config = artistOsResources[resource];
+  const { data, error } = await supabase
+    .from(config.table)
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .limit(500);
+
+  if (error) {
+    if (isMissingTableError(error)) {
+      return {
+        rows: mockRows(resource),
+        tableReady: false,
+        error:
+          "Tabelas do Business OS ainda nao aplicadas no Supabase. Exibindo dados demo.",
+      };
+    }
+
+    return {
+      rows: [],
+      tableReady: false,
+      error: error.message,
+    };
+  }
+
+  return {
+    rows: sortRows(resource, (data ?? []) as ArtistOsRecord[]),
+    tableReady: true,
+    error: null,
+  };
+}
+
 async function getWorkspaceId() {
-  const workspace = await getCurrentWorkspaceContext().catch(() => null);
+  const workspace = await getCurrentWorkspaceSelection().catch(() => null);
   return workspace?.workspace.id ?? null;
 }
 
@@ -228,9 +279,10 @@ export async function getArtistOsArtistsOptions(): Promise<ArtistOsArtistOption[
 export async function getArtistOsResource(
   resource: ArtistOsResourceKey,
 ): Promise<ArtistOsResourceResult> {
-  const config = artistOsResources[resource];
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId();
+  const [supabase, workspaceId] = await Promise.all([
+    createClient(),
+    getWorkspaceId(),
+  ]);
 
   if (!workspaceId) {
     return {
@@ -241,54 +293,21 @@ export async function getArtistOsResource(
     };
   }
 
-  const { data, error } = await supabase
-    .from(config.table)
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .limit(500);
-
-  if (error) {
-    if (isMissingTableError(error)) {
-      const rows = mockRows(resource);
-      const artists =
-        resource === "artists"
-          ? rows.map((artist) => ({
-              id: artist.id,
-              name: String(artist.stage_name ?? "Artista Demo"),
-              status: String(artist.status ?? "ativo"),
-            }))
-          : await getArtistOsArtistsOptions().catch(() => []);
-
-      return {
-        rows,
-        artists,
-        tableReady: false,
-        error: "Tabelas do Business OS ainda nao aplicadas no Supabase. Exibindo dados demo.",
-      };
-    }
-
-    return {
-      rows: [],
-      artists: [],
-      tableReady: false,
-      error: error.message,
-    };
-  }
-
-  const artists =
+  const [resourceResult, artistsResult] = await Promise.all([
+    loadArtistOsRows(resource, supabase, workspaceId),
     resource === "artists"
-      ? ((data ?? []) as ArtistOsRecord[]).map((artist) => ({
-          id: artist.id,
-          name: String(artist.stage_name ?? "Artista sem nome"),
-          status: typeof artist.status === "string" ? artist.status : null,
-        }))
-      : await getArtistOsArtistsOptions().catch(() => []);
+      ? Promise.resolve<ArtistOsRowsResult | null>(null)
+      : loadArtistOsRows("artists", supabase, workspaceId),
+  ]);
+  const artists = buildArtistOptions(
+    resource === "artists"
+      ? resourceResult.rows
+      : (artistsResult?.rows ?? []),
+  );
 
   return {
-    rows: sortRows(resource, (data ?? []) as ArtistOsRecord[]),
+    ...resourceResult,
     artists,
-    tableReady: true,
-    error: null,
   };
 }
 
@@ -382,15 +401,34 @@ export async function deleteArtistOsRecord(resource: ArtistOsResourceKey, id: st
 }
 
 export async function getArtistOsDashboardData(): Promise<ArtistOsDashboardData> {
+  const [supabase, workspaceId] = await Promise.all([
+    createClient(),
+    getWorkspaceId(),
+  ]);
+
+  if (!workspaceId) {
+    return {
+      tableReady: false,
+      error: NO_WORKSPACE_MESSAGE,
+      artists: [],
+      shows: [],
+      deals: [],
+      brandDeals: [],
+      finance: [],
+      contracts: [],
+      tasks: [],
+    };
+  }
+
   const [artists, shows, deals, brandDeals, finance, contracts, tasks] =
     await Promise.all([
-      getArtistOsResource("artists"),
-      getArtistOsResource("shows"),
-      getArtistOsResource("deals"),
-      getArtistOsResource("brand-deals"),
-      getArtistOsResource("finance"),
-      getArtistOsResource("contracts"),
-      getArtistOsResource("tasks"),
+      loadArtistOsRows("artists", supabase, workspaceId),
+      loadArtistOsRows("shows", supabase, workspaceId),
+      loadArtistOsRows("deals", supabase, workspaceId),
+      loadArtistOsRows("brand-deals", supabase, workspaceId),
+      loadArtistOsRows("finance", supabase, workspaceId),
+      loadArtistOsRows("contracts", supabase, workspaceId),
+      loadArtistOsRows("tasks", supabase, workspaceId),
     ]);
 
   const results = [artists, shows, deals, brandDeals, finance, contracts, tasks];

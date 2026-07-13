@@ -1,6 +1,7 @@
 import "server-only";
 
 import { subDays } from "date-fns";
+import { cache } from "react";
 import {
   getSnapshotDates,
   getSnapshotTracksByDates,
@@ -284,7 +285,7 @@ function buildAccountSignals({
   };
 }
 
-async function buildDashboardAccountProfile(): Promise<DashboardAccountProfile | null> {
+const buildDashboardAccountProfile = cache(async (): Promise<DashboardAccountProfile | null> => {
   const { result } = await fetchSpotifyAccountPlaylists();
 
   if (!result.connected || result.playlists.length === 0) {
@@ -292,7 +293,7 @@ async function buildDashboardAccountProfile(): Promise<DashboardAccountProfile |
   }
 
   return buildSpotifyAccountProfile(result.playlists);
-}
+});
 
 function buildAccountProfileTrackInsights(
   accountProfile: DashboardAccountProfile | null,
@@ -1550,26 +1551,17 @@ function buildWeeklyComparisonDate(dates: string[]) {
   return dates.find((date) => date <= weeklyTarget) ?? dates[6] ?? dates[dates.length - 1] ?? null;
 }
 
-async function buildDashboardSnapshotRadarRows({
-  country = "BR",
-  playlistTracks,
-  dominantArtists,
-  accountProfile,
-}: {
-  country?: string;
-  playlistTracks: TrackInsight[];
-  dominantArtists: string[];
-  accountProfile?: DashboardAccountProfile | null;
-}) {
+async function loadDashboardSnapshotRadarSource(country: string) {
   const dates = await getSnapshotDates(country);
   const latestDate = dates[0] ?? null;
 
   if (!latestDate) {
     return {
       latestDate: null,
-      previousDate: null,
       weeklyDate: null,
-      rows: [] as RadarMusicRow[],
+      recentDates: [] as string[],
+      dailySnapshot: null,
+      tracksByDate: new Map<string, ChartSnapshotTrack[]>(),
     };
   }
 
@@ -1582,6 +1574,50 @@ async function buildDashboardSnapshotRadarRows({
     getSnapshotWithComparison(latestDate, country),
     getSnapshotTracksByDates(datesToLoad, country),
   ]);
+
+  return {
+    latestDate,
+    weeklyDate,
+    recentDates,
+    dailySnapshot,
+    tracksByDate,
+  };
+}
+
+type DashboardSnapshotRadarSource = Awaited<
+  ReturnType<typeof loadDashboardSnapshotRadarSource>
+>;
+
+async function buildDashboardSnapshotRadarRows({
+  country = "BR",
+  playlistTracks,
+  dominantArtists,
+  accountProfile,
+  source,
+}: {
+  country?: string;
+  playlistTracks: TrackInsight[];
+  dominantArtists: string[];
+  accountProfile?: DashboardAccountProfile | null;
+  source?: Promise<DashboardSnapshotRadarSource>;
+}) {
+  const {
+    latestDate,
+    weeklyDate,
+    recentDates,
+    dailySnapshot,
+    tracksByDate,
+  } = await (source ?? loadDashboardSnapshotRadarSource(country));
+
+  if (!latestDate || !dailySnapshot) {
+    return {
+      latestDate: null,
+      previousDate: null,
+      weeklyDate: null,
+      rows: [] as RadarMusicRow[],
+    };
+  }
+
   const weeklyTracks = weeklyDate ? tracksByDate.get(weeklyDate) ?? [] : [];
   const recentSnapshots = recentDates.map(
     (date) => tracksByDate.get(date) ?? [],
@@ -2272,11 +2308,12 @@ export async function getBasePlaylistsPageData(): Promise<PlaylistBaseData> {
 }
 
 export async function getCurationPageData(): Promise<CurationPageData> {
-  const [workspace, chartsData] = await Promise.all([
-    getCurrentWorkspaceContext().catch(() => null),
-    getChartsData(),
-  ]);
+  const workspacePromise = getCurrentWorkspaceContext().catch(() => null);
+  const chartsDataPromise = getChartsData();
+  const workspace = await workspacePromise;
   const defaultMarket = workspace?.settings.defaultMarket?.trim() || "BR";
+  const snapshotSource = loadDashboardSnapshotRadarSource(defaultMarket);
+  const chartsData = await chartsDataPromise;
   const suggestionScoreThreshold = clamp(
     workspace?.settings.suggestionScoreThreshold ?? 70,
     0,
@@ -2287,6 +2324,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
     country: defaultMarket,
     playlistTracks: chartsData.tracks,
     dominantArtists,
+    source: snapshotSource,
   });
   const rows = buildCurationRows(snapshotRadar.rows, chartsData.tracks, dominantArtists, undefined, {
     suggestionScoreThreshold,
@@ -2344,6 +2382,7 @@ export async function getCurationPageData(): Promise<CurationPageData> {
 }
 
 export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceData> {
+  const snapshotSource = loadDashboardSnapshotRadarSource("BR");
   const accountProfile = await buildDashboardAccountProfile();
   const accountTracks = buildAccountProfileTrackInsights(accountProfile);
   const dominantArtists = accountProfile?.dominantArtists ?? [];
@@ -2352,6 +2391,7 @@ export async function getDashboardWorkspaceData(): Promise<DashboardWorkspaceDat
     playlistTracks: accountTracks,
     dominantArtists,
     accountProfile,
+    source: snapshotSource,
   });
   const radarRows = snapshotRadar.rows;
 

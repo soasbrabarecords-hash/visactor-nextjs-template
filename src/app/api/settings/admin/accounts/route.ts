@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   AccessAdminError,
   createInternalAccount,
-  getAccessAdminData,
+  getGlobalAdminSummary,
 } from "@/lib/access-admin";
 
 export const runtime = "nodejs";
@@ -35,22 +35,11 @@ function errorResponse(error: unknown) {
 
 export async function GET() {
   try {
-    const data = await getAccessAdminData();
-
-    if (!data.isGlobalAdmin) {
-      throw new AccessAdminError(
-        "Administração global disponível somente para contato@soasbraba.com.",
-        403,
-      );
-    }
+    const data = await getGlobalAdminSummary();
 
     return NextResponse.json({
       success: true,
-      data: {
-        currentUserEmail: data.currentUserEmail,
-        totalAccounts: data.workspaces.length,
-        activeAccounts: data.stats.activeWorkspaces,
-      },
+      data,
     });
   } catch (error) {
     return errorResponse(error);

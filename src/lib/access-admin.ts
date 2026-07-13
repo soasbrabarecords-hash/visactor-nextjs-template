@@ -1,5 +1,5 @@
 import "server-only";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -66,12 +66,25 @@ export type AccessAdminData = {
 };
 
 type AdminContext = {
-  user: User;
+  user: {
+    id: string;
+    email: string | null;
+  };
   dataClient: AccessDbClient;
   adminClient: AccessDbClient | null;
   isGlobalAdmin: boolean;
   manageableWorkspaceIds: string[];
 };
+
+type AuthUserSummary = {
+  id: string;
+  email: string | null;
+};
+
+const AUTH_USERS_CACHE_TTL_MS = 60 * 1000;
+let authUsersCache: { value: AuthUserSummary[]; expiresAt: number } | null =
+  null;
+let authUsersInFlight: Promise<AuthUserSummary[]> | null = null;
 
 export type AccessWorkspaceUserMutationResult = {
   createdAuthUser: boolean;
@@ -158,16 +171,30 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
   const supabase = await createClient();
   const adminClient = createAdminClient();
   const dataClient = (adminClient ?? supabase) as AccessDbClient;
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const { data: claimsData, error } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims as
+    | { sub?: string; email?: string }
+    | undefined;
 
-  if (error || !user) {
+  if (error || !claims?.sub) {
     throw new AccessAdminError("Sessão indisponível.", 401);
   }
 
+  const user = {
+    id: claims.sub,
+    email: claims.email ?? null,
+  };
   const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+
+  if (isGlobalAdmin) {
+    return {
+      user,
+      dataClient,
+      adminClient: adminClient as AccessDbClient | null,
+      isGlobalAdmin: true,
+      manageableWorkspaceIds: [],
+    };
+  }
 
   const [{ data: workspaceUsers }, { data: memberships }] = await Promise.all([
     dataClient
@@ -220,24 +247,58 @@ async function getCurrentAdminContext(): Promise<AdminContext> {
   };
 }
 
-async function listAuthUsers(adminClient: AccessDbClient | null) {
+function invalidateAuthUsersCache() {
+  authUsersCache = null;
+}
+
+async function listAuthUsers(
+  adminClient: AccessDbClient | null,
+  { force = false }: { force?: boolean } = {},
+): Promise<AuthUserSummary[]> {
   if (!adminClient) {
     return [];
   }
 
-  const { data, error } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
-
-  if (error) {
-    return [];
+  if (!force && authUsersCache && authUsersCache.expiresAt > Date.now()) {
+    return authUsersCache.value;
   }
 
-  return data.users.map((user) => ({
-    id: user.id,
-    email: user.email ?? null,
-  }));
+  if (!force && authUsersInFlight) {
+    return authUsersInFlight;
+  }
+
+  const request = (async () => {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (error) {
+      return [];
+    }
+
+    const users = data.users.map((user) => ({
+      id: user.id,
+      email: user.email ?? null,
+    }));
+    authUsersCache = {
+      value: users,
+      expiresAt: Date.now() + AUTH_USERS_CACHE_TTL_MS,
+    };
+    return users;
+  })();
+
+  if (!force) {
+    authUsersInFlight = request;
+  }
+
+  try {
+    return await request;
+  } finally {
+    if (!force) {
+      authUsersInFlight = null;
+    }
+  }
 }
 
 async function resolveUserIdByEmail(
@@ -250,7 +311,7 @@ async function resolveUserIdByEmail(
     return null;
   }
 
-  const users = await listAuthUsers(adminClient);
+  const users = await listAuthUsers(adminClient, { force: true });
   return (
     users.find((user) => user.email?.toLowerCase() === normalizedEmail)?.id ??
     null
@@ -321,6 +382,8 @@ async function resolveOrCreateAuthUserByEmail({
       error?.message ?? "Não foi possível criar o usuário no Auth.",
     );
   }
+
+  invalidateAuthUsersCache();
 
   return {
     createdAuthUser: true,
@@ -516,6 +579,41 @@ export async function getAccessAdminData(): Promise<AccessAdminData> {
       ).length,
       configuredPermissions: moduleRoles.length,
     },
+  };
+}
+
+export async function getGlobalAdminSummary() {
+  const context = await getCurrentAdminContext();
+
+  if (!context.isGlobalAdmin) {
+    throw new AccessAdminError(
+      "Administração global disponível somente para contato@soasbraba.com.",
+      403,
+    );
+  }
+
+  const [totalResult, activeResult] = await Promise.all([
+    context.dataClient
+      .from("workspaces")
+      .select("id", { count: "exact", head: true }),
+    context.dataClient
+      .from("workspaces")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active"),
+  ]);
+
+  if (totalResult.error) {
+    throw new AccessAdminError(totalResult.error.message);
+  }
+
+  if (activeResult.error) {
+    throw new AccessAdminError(activeResult.error.message);
+  }
+
+  return {
+    currentUserEmail: context.user.email,
+    totalAccounts: totalResult.count ?? 0,
+    activeAccounts: activeResult.count ?? 0,
   };
 }
 

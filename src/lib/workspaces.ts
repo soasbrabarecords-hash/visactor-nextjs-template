@@ -88,6 +88,11 @@ export type WorkspaceContext = {
   };
 };
 
+export type CurrentWorkspaceSelection = Pick<
+  WorkspaceContext,
+  "workspace" | "membership"
+>;
+
 export type WorkspaceSpotifyIntegrationInput = {
   appMode: "global_app" | "workspace_app";
   appClientId?: string | null;
@@ -301,21 +306,20 @@ async function canManagePlaylistOsWorkspaceSettings(workspace: WorkspaceContext)
   return role ? PLAYLIST_OS_INTEGRATION_MANAGER_ROLES.has(role) : false;
 }
 
-const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
+const getCurrentWorkspaceSelectionUncached = async (): Promise<CurrentWorkspaceSelection | null> => {
   const supabase = await createClient();
   const dataClient = createAdminClient() ?? supabase;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
 
-  if (!user) {
+  if (!userId) {
     return null;
   }
 
   const { data: accessRows, error: accessError } = await dataClient
     .from("workspace_users")
     .select("workspace_id, role, status, created_at")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("status", "active")
     .order("created_at", { ascending: true });
 
@@ -334,7 +338,7 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     const { data: membershipRows, error: membershipError } = await dataClient
       .from("workspace_memberships")
       .select("workspace_id, role, created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
     if (membershipError) {
@@ -417,10 +421,31 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
     return null;
   }
 
-  const membership: WorkspaceMembershipRow = {
-    workspace_id: selectedWorkspace.id,
-    role: selectedWorkspace.role,
+  return {
+    workspace: {
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+    },
+    membership: {
+      role: selectedWorkspace.role,
+    },
   };
+};
+
+export const getCurrentWorkspaceSelection = cache(
+  getCurrentWorkspaceSelectionUncached,
+);
+
+const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
+  const selection = await getCurrentWorkspaceSelection();
+
+  if (!selection) {
+    return null;
+  }
+
+  const dataClient = await getWorkspaceDbClient();
+  const { workspace, membership } = selection;
 
   const readWorkspaceConfiguration = () =>
     Promise.all([
@@ -478,7 +503,7 @@ const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | 
   assertWorkspaceConfiguration();
 
   const canBootstrapDefaults =
-    selectedWorkspace.role === "owner" || selectedWorkspace.role === "admin";
+    membership.role === "owner" || membership.role === "admin";
   const isConfigurationMissing =
     !settingsResult.data ||
     !spotifyIntegrationResult.data ||
@@ -885,24 +910,44 @@ export async function getEffectiveOpenAICredentials(): Promise<EffectiveOpenAICr
 }
 
 export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceSpotifyStoredAuth | null> {
-  const workspace = await getCurrentWorkspaceContext();
+  const workspace = await getCurrentWorkspaceSelection();
 
   if (!workspace) {
     return null;
   }
 
   const supabase = await getWorkspaceDbClient();
-  const { data, error } = await supabase
-    .from("workspace_integrations")
-    .select(
-      "id, workspace_id, app_mode, connection_status, access_token, refresh_token, token_expires_at, provider_account_id, provider_account_label, granted_scopes",
-    )
-    .eq("workspace_id", workspace.workspace.id)
-    .eq("provider", "spotify")
-    .single();
+  const readStoredAuth = () =>
+    supabase
+      .from("workspace_integrations")
+      .select(
+        "id, workspace_id, app_mode, connection_status, access_token, refresh_token, token_expires_at, provider_account_id, provider_account_label, granted_scopes",
+      )
+      .eq("workspace_id", workspace.workspace.id)
+      .eq("provider", "spotify")
+      .maybeSingle();
+
+  let { data, error } = await readStoredAuth();
 
   if (error) {
     throw new Error(`getCurrentWorkspaceSpotifyStoredAuth: ${error.message}`);
+  }
+
+  if (
+    !data &&
+    (workspace.membership.role === "owner" ||
+      workspace.membership.role === "admin")
+  ) {
+    await ensureWorkspaceDefaults(workspace.workspace.id, workspace.workspace.slug);
+    ({ data, error } = await readStoredAuth());
+
+    if (error) {
+      throw new Error(`getCurrentWorkspaceSpotifyStoredAuth: ${error.message}`);
+    }
+  }
+
+  if (!data) {
+    return null;
   }
 
   const row = data as WorkspaceIntegrationRow;

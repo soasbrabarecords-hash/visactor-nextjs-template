@@ -76,30 +76,35 @@ export async function GET() {
   try {
     const supabase = await createClient();
     const dataClient = createAdminClient() ?? supabase;
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: claimsData, error: claimsError } =
+      await supabase.auth.getClaims();
+    const claims = claimsData?.claims as
+      | {
+          sub?: string;
+          email?: string;
+          user_metadata?: Record<string, unknown>;
+        }
+      | undefined;
 
-    if (userError) {
-      throw userError;
+    if (claimsError) {
+      throw claimsError;
     }
 
-    if (!user) {
+    if (!claims?.sub) {
       return NextResponse.json({
         success: true,
         data: emptyWorkspaceAccess(null),
       });
     }
 
-    const userProfile = getUserProfile(user);
-    const isGlobalAdmin = user.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
+    const userProfile = getUserProfile(claims);
+    const isGlobalAdmin = claims.email?.toLowerCase() === ACCESS_ADMIN_EMAIL;
     const accessProfile = { ...userProfile, isGlobalAdmin };
 
     const { data: accessRows, error: accessError } = await dataClient
       .from("workspace_users")
       .select("workspace_id, role, status, created_at")
-      .eq("user_id", user.id)
+      .eq("user_id", claims.sub)
       .eq("status", "active")
       .order("created_at", { ascending: true });
 
@@ -116,7 +121,7 @@ export async function GET() {
       const { data: membershipRows, error: membershipError } = await dataClient
         .from("workspace_memberships")
         .select("workspace_id, role, created_at")
-        .eq("user_id", user.id)
+        .eq("user_id", claims.sub)
         .order("created_at", { ascending: true });
 
       if (membershipError) {
@@ -210,7 +215,7 @@ export async function GET() {
         .from("module_roles")
         .select("module_key, role")
         .eq("workspace_id", currentWorkspace.id)
-        .eq("user_id", user.id),
+        .eq("user_id", claims.sub),
     ]);
 
     if (modulesError) {
