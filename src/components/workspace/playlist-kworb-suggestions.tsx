@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Plus, Check } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 import StatusBadge from "./status-badge";
 import { detectGenre, detectPlaylistGenre, GENRE_LABEL, type TrackGenre } from "@/lib/genre-detection";
 import type { BrDailyEntry, BrDailyResponse } from "@/app/api/kworb/br-daily/route";
@@ -72,6 +73,7 @@ export default function PlaylistKworbSuggestions({
         body: JSON.stringify({ trackUri: `spotify:track:${entry.trackId}` }),
       });
       if (!res.ok) throw new Error("Failed");
+      invalidateSpotifyAccountPlaylistsClientCache();
       setButtonState((s) => ({ ...s, [entry.trackId]: "added" }));
     } catch {
       setButtonState((s) => ({ ...s, [entry.trackId]: "error" }));

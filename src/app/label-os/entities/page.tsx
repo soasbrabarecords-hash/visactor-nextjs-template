@@ -33,8 +33,10 @@ type Props = {
 };
 
 export default async function EntitiesPage({ searchParams }: Props) {
-  const entities = await getLabelEntities();
-  const { view = "all" } = await searchParams;
+  const [entities, { view = "all" }] = await Promise.all([
+    getLabelEntities(),
+    searchParams,
+  ]);
   const filteredEntities = entities.filter((entity) => {
     if (view === "artists") {
       return entity.type === "artist" || entity.roles.includes("artist");

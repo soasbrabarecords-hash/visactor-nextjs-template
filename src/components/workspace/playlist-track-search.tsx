@@ -19,6 +19,7 @@
 
 import { Loader2, Music2, Plus, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 
 type Track = {
   id: string;
@@ -127,6 +128,7 @@ export default function PlaylistTrackSearch({ playlistId, existingTrackIds, onAd
         next.add(track.id);
         return next;
       });
+      invalidateSpotifyAccountPlaylistsClientCache();
       onAdded?.();
     } catch (err) {
       // Falhou — exibe erro inline na linha (simples)

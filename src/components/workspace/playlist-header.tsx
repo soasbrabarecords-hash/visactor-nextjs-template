@@ -5,6 +5,7 @@ import { Camera, ExternalLink, Loader2, Music2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EditableField } from "@/components/workspace/playlist-editor";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -95,6 +96,7 @@ export default function PlaylistHeader({
     });
     const data = (await res.json()) as { success?: boolean; message?: string };
     if (!data.success) throw new Error(data.message ?? "Erro ao salvar.");
+    invalidateSpotifyAccountPlaylistsClientCache();
   }
 
   async function handleSaveName(newName: string) {
@@ -127,6 +129,7 @@ export default function PlaylistHeader({
       });
       const data = (await res.json()) as { success?: boolean; message?: string };
       if (!data.success) throw new Error(data.message ?? "Erro ao atualizar capa.");
+      invalidateSpotifyAccountPlaylistsClientCache();
       setCoverUrl(`data:image/jpeg;base64,${base64}`);
     } catch (err) {
       setCoverError(err instanceof Error ? err.message : "Erro ao atualizar capa.");

@@ -46,16 +46,17 @@ function EditSection({
 
 export default async function EditTrackPage({ params }: Props) {
   const { id } = await params;
-  const track = await getLabelTrackById(id);
-
-  if (!track) notFound();
-
-  const [compositionsResult, masterResult, royaltiesResult] =
+  const [trackResult, compositionsResult, masterResult, royaltiesResult] =
     await Promise.allSettled([
+      getLabelTrackById(id),
       getTrackCompositions(id),
       getTrackMasterSplits(id),
       getTrackRoyaltySplits(id),
     ]);
+  if (trackResult.status === "rejected") throw trackResult.reason;
+  const track = trackResult.value;
+
+  if (!track) notFound();
 
   const compositions =
     compositionsResult.status === "fulfilled" ? compositionsResult.value : [];

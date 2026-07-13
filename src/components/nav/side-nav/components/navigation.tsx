@@ -9,8 +9,21 @@ import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { cn } from "@/lib/utils";
 import User from "./user";
 
-const OS_ROOT_HREFS = new Set(["/playlist-os", "/label-os", "/artist-os"]);
+const PREFETCH_ROUTES = navigations.flatMap((navigation) => [
+  { href: navigation.href, moduleKey: navigation.moduleKey },
+  ...(navigation.children?.map((child) => ({
+    href: child.href,
+    moduleKey: child.moduleKey ?? navigation.moduleKey,
+  })) ?? []),
+]);
+const INTENT_PREFETCH_HREFS = new Set(
+  PREFETCH_ROUTES.map((route) => route.href),
+);
+const MODULE_KEY_BY_PREFETCH_HREF = new Map(
+  PREFETCH_ROUTES.map((route) => [route.href, route.moduleKey] as const),
+);
 const INTENT_PREFETCH_DELAY_MS = 120;
+const INTENT_PREFETCH_TTL_MS = 4 * 60 * 1000;
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -19,7 +32,7 @@ export default function Navigation() {
   const intentPrefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const prefetchedHrefs = useRef(new Set<string>());
+  const prefetchedAtByHref = useRef(new Map<string, number>());
   const workspaceAccess = useWorkspaceAccess();
 
   function cancelIntentPrefetch() {
@@ -29,17 +42,51 @@ export default function Navigation() {
     }
   }
 
+  function wasRecentlyPrefetched(href: string) {
+    const prefetchedAt = prefetchedAtByHref.current.get(href);
+
+    if (!prefetchedAt) {
+      return false;
+    }
+
+    if (Date.now() - prefetchedAt >= INTENT_PREFETCH_TTL_MS) {
+      prefetchedAtByHref.current.delete(href);
+      return false;
+    }
+
+    return true;
+  }
+
+  function canPrefetchRoute(href: string) {
+    if (workspaceAccess.isLoading) {
+      return false;
+    }
+
+    const moduleKey = MODULE_KEY_BY_PREFETCH_HREF.get(href);
+    return !moduleKey || workspaceAccess.canAccessModule(moduleKey);
+  }
+
   function prefetchOsRoute(href: string) {
-    if (!OS_ROOT_HREFS.has(href) || prefetchedHrefs.current.has(href)) {
+    if (
+      !INTENT_PREFETCH_HREFS.has(href) ||
+      !canPrefetchRoute(href) ||
+      pathname === href ||
+      wasRecentlyPrefetched(href)
+    ) {
       return;
     }
 
-    prefetchedHrefs.current.add(href);
+    prefetchedAtByHref.current.set(href, Date.now());
     router.prefetch(href);
   }
 
   function scheduleIntentPrefetch(href: string) {
-    if (!OS_ROOT_HREFS.has(href) || prefetchedHrefs.current.has(href)) {
+    if (
+      !INTENT_PREFETCH_HREFS.has(href) ||
+      !canPrefetchRoute(href) ||
+      pathname === href ||
+      wasRecentlyPrefetched(href)
+    ) {
       return;
     }
 
@@ -167,8 +214,10 @@ export default function Navigation() {
       <Link
         key={navigation.name}
         href={navigation.href}
+        prefetch={false}
         onPointerEnter={() => scheduleIntentPrefetch(navigation.href)}
         onPointerLeave={cancelIntentPrefetch}
+        onPointerDown={() => prefetchOsRoute(navigation.href)}
         onFocus={() => prefetchOsRoute(navigation.href)}
         className={cn(
           "group relative flex items-center overflow-hidden rounded-lg transition-colors duration-150",
@@ -223,8 +272,10 @@ export default function Navigation() {
         >
           <Link
             href={navigation.href}
+            prefetch={false}
             onPointerEnter={() => scheduleIntentPrefetch(navigation.href)}
             onPointerLeave={cancelIntentPrefetch}
+            onPointerDown={() => prefetchOsRoute(navigation.href)}
             onFocus={() => prefetchOsRoute(navigation.href)}
             className="relative z-10 flex min-w-0 flex-1 items-center"
           >

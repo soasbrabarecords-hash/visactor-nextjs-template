@@ -14,7 +14,9 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSpotifyAccountPlaylistsCacheKey } from "@/hooks/use-spotify-account-playlists-cache-key";
 import {
+  getCachedSpotifyAccountPlaylistsClient,
   getSpotifyAccountPlaylistsClient,
   invalidateSpotifyAccountPlaylistsClientCache,
   type SpotifyPlaylistsClientResponse,
@@ -172,32 +174,55 @@ function CreatePlaylistModal({
 // Main panel
 // ---------------------------------------------------------------------------
 export default function SpotifyAccountPlaylistsPanel() {
-  const [data, setData] = useState<SpotifyPlaylistsResponse | null>(null);
+  const cacheKey = useSpotifyAccountPlaylistsCacheKey();
+  const activeCacheKeyRef = useRef(cacheKey);
+  const dataCacheKeyRef = useRef(cacheKey);
+  const [data, setData] = useState<SpotifyPlaylistsResponse | null>(() =>
+    cacheKey ? getCachedSpotifyAccountPlaylistsClient(cacheKey) : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [showCreate, setShowCreate] = useState(false);
 
-  const loadPlaylists = useCallback((force = false) => {
-    startTransition(async () => {
-      setError(null);
-      try {
-        const payload = await getSpotifyAccountPlaylistsClient({ force });
-        setData(payload);
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Nao foi possivel carregar as playlists do Spotify.",
-        );
-      }
-    });
-  }, [startTransition]);
+  const loadPlaylists = useCallback(
+    (force = false) => {
+      if (!cacheKey) return;
+      const requestCacheKey = cacheKey;
+
+      startTransition(async () => {
+        setError(null);
+        try {
+          const payload = await getSpotifyAccountPlaylistsClient({
+            force,
+            cacheKey: requestCacheKey,
+          });
+          if (activeCacheKeyRef.current !== requestCacheKey) return;
+          dataCacheKeyRef.current = requestCacheKey;
+          setData(payload);
+        } catch (requestError) {
+          if (activeCacheKeyRef.current !== requestCacheKey) return;
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Nao foi possivel carregar as playlists do Spotify.",
+          );
+        }
+      });
+    },
+    [cacheKey, startTransition],
+  );
 
   useEffect(() => {
-    loadPlaylists();
-  }, [loadPlaylists]);
+    activeCacheKeyRef.current = cacheKey;
+    if (!cacheKey) return;
 
-  const playlists = data?.connected ? data.playlists : [];
+    dataCacheKeyRef.current = cacheKey;
+    setData(getCachedSpotifyAccountPlaylistsClient(cacheKey));
+    loadPlaylists();
+  }, [cacheKey, loadPlaylists]);
+
+  const scopedData = dataCacheKeyRef.current === cacheKey ? data : null;
+  const playlists = scopedData?.connected ? scopedData.playlists : [];
   const ownerName = playlists[0]?.ownerName ?? "CP no Beat";
   const publicPlaylists = playlists.filter((p) => p.isPublic);
 
@@ -211,7 +236,7 @@ export default function SpotifyAccountPlaylistsPanel() {
         <CreatePlaylistModal
           onClose={() => setShowCreate(false)}
           onCreated={() => {
-            invalidateSpotifyAccountPlaylistsClientCache();
+            invalidateSpotifyAccountPlaylistsClientCache(cacheKey);
             loadPlaylists(true);
           }}
         />
@@ -263,7 +288,7 @@ export default function SpotifyAccountPlaylistsPanel() {
               <h1 className="mb-2 truncate text-[2.25rem] font-semibold leading-none tracking-[-0.045em] tablet:text-[3.25rem]">
                 {ownerName}
               </h1>
-              {data?.connected ? (
+              {scopedData?.connected ? (
                 <p className="flex flex-wrap items-center gap-1.5 text-xs text-white/55">
                   <strong>{formatCount(publicPlaylists.length)}</strong> playlists públicas
                   <span className="text-white/25">·</span>
@@ -281,7 +306,7 @@ export default function SpotifyAccountPlaylistsPanel() {
             {/* Botões de ação */}
             <div className="flex shrink-0 flex-wrap items-center gap-2 tablet:ml-auto tablet:justify-end">
               {isPending && <Loader2 className="h-4 w-4 animate-spin text-white/50" />}
-              {data?.connected ? (
+              {scopedData?.connected ? (
                 <>
                   <button
                     onClick={() => setShowCreate(true)}
@@ -292,7 +317,7 @@ export default function SpotifyAccountPlaylistsPanel() {
                   </button>
                   <button
                     onClick={() => {
-                      invalidateSpotifyAccountPlaylistsClientCache();
+                      invalidateSpotifyAccountPlaylistsClientCache(cacheKey);
                       loadPlaylists(true);
                     }}
                     disabled={isPending}
@@ -303,6 +328,9 @@ export default function SpotifyAccountPlaylistsPanel() {
                   </button>
                   <a
                     href="/api/spotify/auth/logout"
+                    onClick={() =>
+                      invalidateSpotifyAccountPlaylistsClientCache(cacheKey)
+                    }
                     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-white/10 bg-black/10 px-3 text-xs font-medium text-white/48 backdrop-blur-md transition hover:bg-white/[0.08] hover:text-white/80"
                   >
                     <LogOut className="h-3.5 w-3.5" />
@@ -335,8 +363,8 @@ export default function SpotifyAccountPlaylistsPanel() {
           </div>
 
           {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
-          {data && !data.connected && (
-            <p className="mt-2.5 text-xs text-white/45">{data.message}</p>
+          {scopedData && !scopedData.connected && (
+            <p className="mt-2.5 text-xs text-white/45">{scopedData.message}</p>
           )}
         </div>
       </div>
@@ -350,15 +378,15 @@ export default function SpotifyAccountPlaylistsPanel() {
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-              {data?.connected ? "Playlists públicas" : "Playlists"}
+              {scopedData?.connected ? "Playlists públicas" : "Playlists"}
             </h2>
-            {data?.connected && (
+            {scopedData?.connected && (
               <p className="mt-0.5 text-[11px] text-slate-500">
                 {formatCount(playlists.length)} playlists · somente as criadas por esta conta
               </p>
             )}
           </div>
-          {data?.connected && (
+          {scopedData?.connected && (
             <Link
               href="#"
               className="rounded-full border border-slate-200/80 bg-white/65 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur-md transition hover:bg-white hover:text-slate-900"
@@ -434,11 +462,11 @@ export default function SpotifyAccountPlaylistsPanel() {
           >
             <Music2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">
-              {data?.connected
+              {scopedData?.connected
                 ? "Nenhuma playlist encontrada nessa conta."
                 : "Conecte o Spotify para ver suas playlists aqui."}
             </p>
-            {!data?.connected && (
+            {!scopedData?.connected && (
               <a
                 href="/api/spotify/auth/login"
                 className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold text-white"

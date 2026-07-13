@@ -48,6 +48,7 @@ type SpotifyCurrentUserResponse = {
 type SpotifyUserPlaylistObject = {
   id?: string;
   name?: string;
+  snapshot_id?: string;
   description?: string | null;
   public?: boolean | null;
   collaborative?: boolean;
@@ -142,6 +143,7 @@ export type SpotifyEditablePlaylistTrack = {
 
 export type SpotifyEditablePlaylist = SpotifyAccountPlaylist & {
   description: string;
+  snapshotId: string;
   tracks: SpotifyEditablePlaylistTrack[];
 };
 
@@ -1354,6 +1356,7 @@ async function fetchSpotifyEditablePlaylistWithToken(
       {
         ...mappedPlaylist,
         description: playlist.description?.trim() || "",
+        snapshotId: playlist.snapshot_id?.trim() || "",
         tracks,
       },
       EDITABLE_PLAYLIST_CACHE_TTL_MS,
@@ -2366,9 +2369,11 @@ export async function uploadPlaylistCover(
   base64Jpeg: string,
 ): Promise<SpotifyMutationResponse> {
   try {
-    const { refreshedToken } = await withSpotifyToken((token) =>
-      uploadPlaylistCoverStrictWithToken(token, playlistId, base64Jpeg),
-    );
+    const { refreshedToken } = await withSpotifyToken(async (token) => {
+      await uploadPlaylistCoverStrictWithToken(token, playlistId, base64Jpeg);
+      clearSpotifyAccountPlaylistCache(token);
+      clearSpotifyEditablePlaylistCache(token, playlistId);
+    });
     return { result: { success: true }, refreshedToken };
   } catch (error) {
     return {

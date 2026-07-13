@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useSpotifyAccountPlaylistsCacheKey } from "@/hooks/use-spotify-account-playlists-cache-key";
 import {
   getSpotifyAccountPlaylistsClient,
   invalidateSpotifyAccountPlaylistsClientCache,
@@ -57,6 +58,9 @@ export default function SpotifyPlaylistAddButton({
   compact?: boolean;
   className?: string;
 }) {
+  const cacheKey = useSpotifyAccountPlaylistsCacheKey();
+  const activeCacheKeyRef = useRef(cacheKey);
+  const playlistsCacheKeyRef = useRef(cacheKey);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +70,16 @@ export default function SpotifyPlaylistAddButton({
   const [playlistsError, setPlaylistsError] = useState<string | null>(null);
   const [addStates, setAddStates] = useState<Record<string, AddState>>({});
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    activeCacheKeyRef.current = cacheKey;
+    playlistsCacheKeyRef.current = cacheKey;
+    setOpen(false);
+    setPlaylists([]);
+    setLoadingPlaylists(false);
+    setPlaylistsError(null);
+    setAddStates({});
+  }, [cacheKey]);
 
   const updateMenuPosition = useCallback(() => {
     if (!btnRef.current) {
@@ -116,35 +130,49 @@ export default function SpotifyPlaylistAddButton({
   }, [open, updateMenuPosition]);
 
   const fetchPlaylists = useCallback(async () => {
+    if (!cacheKey) return;
+    const requestCacheKey = cacheKey;
+
     setLoadingPlaylists(true);
     setPlaylistsError(null);
 
     try {
-      const data = await getSpotifyAccountPlaylistsClient();
+      const data = await getSpotifyAccountPlaylistsClient({
+        cacheKey: requestCacheKey,
+      });
+      if (activeCacheKeyRef.current !== requestCacheKey) return;
 
       if (!data.connected) {
         setPlaylistsError(data.message ?? "Spotify nao conectado.");
         return;
       }
 
+      playlistsCacheKeyRef.current = requestCacheKey;
       setPlaylists(data.playlists ?? []);
     } catch (error) {
+      if (activeCacheKeyRef.current !== requestCacheKey) return;
       setPlaylistsError(
         error instanceof Error ? error.message : "Erro ao carregar playlists.",
       );
     } finally {
-      setLoadingPlaylists(false);
+      if (activeCacheKeyRef.current === requestCacheKey) {
+        setLoadingPlaylists(false);
+      }
     }
-  }, []);
+  }, [cacheKey]);
 
+  const scopedPlaylists = useMemo(
+    () => (playlistsCacheKeyRef.current === cacheKey ? playlists : []),
+    [cacheKey, playlists],
+  );
   const orderedPlaylists = useMemo(() => {
     if (!suggestedPlaylistName) {
-      return playlists;
+      return scopedPlaylists;
     }
 
     const normalizedSuggested = suggestedPlaylistName.trim().toLowerCase();
 
-    return [...playlists].sort((left, right) => {
+    return [...scopedPlaylists].sort((left, right) => {
       const leftSuggested = left.name.trim().toLowerCase() === normalizedSuggested;
       const rightSuggested = right.name.trim().toLowerCase() === normalizedSuggested;
 
@@ -154,10 +182,10 @@ export default function SpotifyPlaylistAddButton({
 
       return leftSuggested ? -1 : 1;
     });
-  }, [playlists, suggestedPlaylistName]);
+  }, [scopedPlaylists, suggestedPlaylistName]);
 
   function handleWarmup() {
-    if (!spotifyTrackId || playlists.length > 0 || loadingPlaylists) {
+    if (!spotifyTrackId || scopedPlaylists.length > 0 || loadingPlaylists) {
       return;
     }
 
@@ -170,7 +198,7 @@ export default function SpotifyPlaylistAddButton({
     }
 
     setOpen((current) => {
-      if (!current && playlists.length === 0) {
+      if (!current && scopedPlaylists.length === 0) {
         void fetchPlaylists();
       }
 
@@ -223,7 +251,7 @@ export default function SpotifyPlaylistAddButton({
           alreadyExists: data.alreadyExists ?? false,
         },
       }));
-      invalidateSpotifyAccountPlaylistsClientCache();
+      invalidateSpotifyAccountPlaylistsClientCache(cacheKey);
       setTimeout(() => setOpen(false), 1200);
     } catch {
       setAddStates((current) => ({

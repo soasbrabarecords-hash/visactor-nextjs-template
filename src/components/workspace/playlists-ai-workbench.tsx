@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 
 type ChatRole = "assistant" | "user";
 
@@ -995,6 +996,7 @@ export default function PlaylistsAiWorkbench({
           playlistUrl,
         },
       }));
+      invalidateSpotifyAccountPlaylistsClientCache();
     } catch (error) {
       setCreationErrors((current) => ({
         ...current,

@@ -2,7 +2,7 @@
 
 import { detectGenre, type TrackGenre } from "@/lib/genre-detection";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -17,13 +17,19 @@ import {
 } from "lucide-react";
 import Container from "@/components/container";
 import { Button } from "@/components/ui/button";
+import { useSpotifyAccountPlaylistsCacheKey } from "@/hooks/use-spotify-account-playlists-cache-key";
 import {
+  getSpotifyArtistGenresClient,
+  type SpotifyArtistGenresResponse,
+} from "@/lib/spotify-artist-genres-client";
+import {
+  getCachedSpotifyAccountPlaylistsClient,
   getSpotifyAccountPlaylistsClient,
+  invalidateSpotifyAccountPlaylistsClientCache,
   type SpotifyAccountPlaylistClient,
   type SpotifyPlaylistsClientResponse,
 } from "@/lib/spotify-account-playlists-client";
 import type { DecisionTrack } from "@/types/workspace";
-import type { ArtistGenresResponse } from "@/app/api/spotify/artists/genres/route";
 import { cn } from "@/lib/utils";
 import StatusBadge from "./status-badge";
 
@@ -256,8 +262,13 @@ export default function CurationTable({
   rows: DecisionTrack[];
   previousDate: string | null;
 }) {
-  const [artistGenres, setArtistGenres] = useState<ArtistGenresResponse>({});
-  const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(null);
+  const cacheKey = useSpotifyAccountPlaylistsCacheKey();
+  const activeCacheKeyRef = useRef(cacheKey);
+  const playlistsDataCacheKeyRef = useRef(cacheKey);
+  const [artistGenres, setArtistGenres] = useState<SpotifyArtistGenresResponse>({});
+  const [playlistsData, setPlaylistsData] = useState<SpotifyPlaylistsResponse | null>(() =>
+    cacheKey ? getCachedSpotifyAccountPlaylistsClient(cacheKey) : null,
+  );
   const [addedTrackIdsByPlaylist, setAddedTrackIdsByPlaylist] = useState<
     Record<string, string[]>
   >({});
@@ -268,10 +279,20 @@ export default function CurationTable({
   const [, startTransition] = useTransition();
 
   const loadPlaylists = useCallback(() => {
+    if (!cacheKey) return;
+    const requestCacheKey = cacheKey;
+
     startTransition(async () => {
       try {
-        setPlaylistsData(await getSpotifyAccountPlaylistsClient());
+        const nextPlaylists = await getSpotifyAccountPlaylistsClient({
+          cacheKey: requestCacheKey,
+        });
+        if (activeCacheKeyRef.current !== requestCacheKey) return;
+        playlistsDataCacheKeyRef.current = requestCacheKey;
+        setPlaylistsData(nextPlaylists);
       } catch {
+        if (activeCacheKeyRef.current !== requestCacheKey) return;
+        playlistsDataCacheKeyRef.current = requestCacheKey;
         setPlaylistsData({
           connected: false,
           playlists: [],
@@ -279,11 +300,16 @@ export default function CurationTable({
         });
       }
     });
-  }, [startTransition]);
+  }, [cacheKey, startTransition]);
 
   useEffect(() => {
+    activeCacheKeyRef.current = cacheKey;
+    if (!cacheKey) return;
+
+    playlistsDataCacheKeyRef.current = cacheKey;
+    setPlaylistsData(getCachedSpotifyAccountPlaylistsClient(cacheKey));
     loadPlaylists();
-  }, [loadPlaylists]);
+  }, [cacheKey, loadPlaylists]);
 
   // Buscar gêneros reais do Spotify para todos os artistIds únicos das rows
   useEffect(() => {
@@ -292,27 +318,22 @@ export default function CurationTable({
 
     let cancelled = false;
     async function fetchGenres() {
-      const chunkSize = 50;
-      const merged: ArtistGenresResponse = {};
-      for (let i = 0; i < allIds.length; i += chunkSize) {
-        const chunk = allIds.slice(i, i + chunkSize);
-        try {
-          const res = await fetch(`/api/spotify/artists/genres?ids=${chunk.join(",")}`);
-          if (res.ok) {
-            const data = (await res.json()) as ArtistGenresResponse;
-            Object.assign(merged, data);
-          }
-        } catch { /* silencioso — fallback por texto */ }
+      try {
+        const genres = await getSpotifyArtistGenresClient(allIds);
+        if (!cancelled) setArtistGenres(genres);
+      } catch {
+        // silencioso — a curadoria mantém o fallback por texto
       }
-      if (!cancelled) setArtistGenres(merged);
     }
     void fetchGenres();
     return () => { cancelled = true; };
   }, [rows]);
 
+  const scopedPlaylistsData =
+    playlistsDataCacheKeyRef.current === cacheKey ? playlistsData : null;
   const playlists = useMemo(
-    () => (playlistsData?.connected ? playlistsData.playlists : []),
-    [playlistsData],
+    () => (scopedPlaylistsData?.connected ? scopedPlaylistsData.playlists : []),
+    [scopedPlaylistsData],
   );
   const sortedRows = useMemo(
     () =>
@@ -402,6 +423,7 @@ export default function CurationTable({
           [playlist.id]: Array.from(new Set([...currentIds, row.trackId])),
         };
       });
+      invalidateSpotifyAccountPlaylistsClientCache(cacheKey);
     } finally {
       setAddingKey(null);
     }
@@ -788,8 +810,8 @@ export default function CurationTable({
         </div>
       </div>
 
-      {playlistsData && !playlistsData.connected ? (
-        <p className="mt-3 text-sm text-muted-foreground">{playlistsData.message}</p>
+      {scopedPlaylistsData && !scopedPlaylistsData.connected ? (
+        <p className="mt-3 text-sm text-muted-foreground">{scopedPlaylistsData.message}</p>
       ) : null}
     </Container>
   );

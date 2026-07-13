@@ -1,5 +1,4 @@
 import "server-only";
-import { generateLabelContractPdf } from "@/lib/label-contract-pdf";
 import type {
   ContractSnapshotParty,
   LabelContract,
@@ -278,6 +277,7 @@ export async function createLabelContractFromTrack(trackId: string) {
     workspaceId,
     workspaceName: workspace?.workspace.name ?? "Label OS",
   });
+  const { generateLabelContractPdf } = await import("@/lib/label-contract-pdf");
   const pdfBytes = await generateLabelContractPdf(snapshot);
   const pdfPath = `${workspaceId}/contracts/${trackId}/${id}/generated.pdf`;
   const storage =

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import PlaylistIntelligencePanel from "@/components/workspace/playlist-intelligence-panel";
 import ResizableTableOverlay from "@/components/workspace/resizable-table-overlay";
 import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 import { buildPlaylistIntelligence } from "@/lib/playlist-intelligence";
 import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 
@@ -42,6 +43,134 @@ type ChartData = {
   movement: "up" | "down" | "stable" | "new";
   streams: number | null;
 };
+
+type TimedCacheEntry<T> = {
+  value: T;
+  expiresAt: number;
+};
+
+const KWORB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const KWORB_EMPTY_CACHE_TTL_MS = 60 * 60 * 1000;
+const CHART_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_KWORB_CACHE_SIZE = 2_000;
+const kworbCache = new Map<string, TimedCacheEntry<KworbTrackData>>();
+const kworbInFlight = new Map<string, Promise<KworbTrackData>>();
+let chartCache: TimedCacheEntry<Map<string, ChartData>> | null = null;
+let chartInFlight: Promise<Map<string, ChartData>> | null = null;
+
+function getCachedKworbTrack(trackId: string) {
+  const cached = kworbCache.get(trackId);
+
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    kworbCache.delete(trackId);
+    return null;
+  }
+
+  return cached.value;
+}
+
+async function getKworbTrack(trackId: string) {
+  const cached = getCachedKworbTrack(trackId);
+  if (cached) return cached;
+
+  const currentRequest = kworbInFlight.get(trackId);
+  if (currentRequest) return currentRequest;
+
+  const request = (async () => {
+    const response = await fetch(`/api/kworb/track/${trackId}`);
+    if (!response.ok) {
+      throw new Error("Kworb indisponivel.");
+    }
+
+    const data = (await response.json()) as KworbTrackData;
+    const isEmpty = data.dailyStreams === null && data.totalStreams === null;
+    kworbCache.set(trackId, {
+      value: data,
+      expiresAt:
+        Date.now() +
+        (isEmpty ? KWORB_EMPTY_CACHE_TTL_MS : KWORB_CACHE_TTL_MS),
+    });
+    while (kworbCache.size > MAX_KWORB_CACHE_SIZE) {
+      const oldestTrackId = kworbCache.keys().next().value as
+        | string
+        | undefined;
+      if (!oldestTrackId) break;
+      kworbCache.delete(oldestTrackId);
+    }
+    return data;
+  })();
+
+  kworbInFlight.set(trackId, request);
+
+  try {
+    return await request;
+  } finally {
+    if (kworbInFlight.get(trackId) === request) {
+      kworbInFlight.delete(trackId);
+    }
+  }
+}
+
+function getCachedChartMap() {
+  if (!chartCache) return null;
+  if (chartCache.expiresAt <= Date.now()) {
+    chartCache = null;
+    return null;
+  }
+  return chartCache.value;
+}
+
+async function getLatestChartMap() {
+  const cached = getCachedChartMap();
+  if (cached) return cached;
+  if (chartInFlight) return chartInFlight;
+
+  chartInFlight = (async () => {
+    const datesRes = await fetch("/api/charts/snapshot-dates?country=BR");
+    if (!datesRes.ok) return new Map<string, ChartData>();
+
+    const datesData = (await datesRes.json()) as { dates: string[] };
+    const latestDate = datesData.dates?.[0];
+    if (!latestDate) return new Map<string, ChartData>();
+
+    const snapRes = await fetch(`/api/charts/snapshot?date=${latestDate}&country=BR`);
+    if (!snapRes.ok) return new Map<string, ChartData>();
+
+    const snapData = (await snapRes.json()) as {
+      tracks: Array<{
+        spotify_track_id: string | null;
+        position: number;
+        position_change: number | null;
+        status: "new" | "up" | "down" | "stable";
+        streams: number | null;
+      }>;
+    };
+    const map = new Map<string, ChartData>();
+
+    for (const track of snapData.tracks ?? []) {
+      if (!track.spotify_track_id) continue;
+      map.set(track.spotify_track_id, {
+        position: track.position,
+        positionChange: track.position_change,
+        movement: track.status,
+        streams: track.streams,
+      });
+    }
+
+    chartCache = {
+      value: map,
+      expiresAt: Date.now() + CHART_CACHE_TTL_MS,
+    };
+    return map;
+  })();
+
+  try {
+    return await chartInFlight;
+  } finally {
+    chartInFlight = null;
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,11 +228,13 @@ function withEditorState(
   track: SpotifyEditablePlaylistTrack,
   index: number,
 ): TrackWithStreams {
+  const cachedStreams = getCachedKworbTrack(track.id);
+
   return {
     ...track,
     instanceKey: `${track.id}:${index}`,
-    streams: null,
-    streamsLoading: true,
+    streams: cachedStreams,
+    streamsLoading: !cachedStreams,
   };
 }
 
@@ -261,8 +392,12 @@ export default function PlaylistEditor({
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
 
   // Chart snapshot data
-  const [chartMap, setChartMap] = useState<Map<string, ChartData>>(new Map());
-  const [chartLoading, setChartLoading] = useState(true);
+  const [chartMap, setChartMap] = useState<Map<string, ChartData>>(
+    () => getCachedChartMap() ?? new Map(),
+  );
+  const [chartLoading, setChartLoading] = useState(
+    () => !getCachedChartMap(),
+  );
 
   // Outros estados
   const [deletingIndices, setDeletingIndices] = useState<Set<number>>(new Set());
@@ -279,12 +414,22 @@ export default function PlaylistEditor({
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const ids = initialTracks.map((t) => t.id);
+    const ids = Array.from(
+      new Set(
+        initialTracks
+          .map((track) => track.id)
+          .filter((trackId) => !getCachedKworbTrack(trackId)),
+      ),
+    );
     const BATCH = 5;
+    let cancelled = false;
+
     async function loadBatch(batch: string[]) {
       const results = await Promise.allSettled(
-        batch.map((id) => fetch(`/api/kworb/track/${id}`).then((r) => r.json() as Promise<KworbTrackData>)),
+        batch.map((trackId) => getKworbTrack(trackId)),
       );
+      if (cancelled) return;
+
       const update = (prev: TrackWithStreams[]) =>
         prev.map((t) => {
           const idx = batch.indexOf(t.id);
@@ -296,52 +441,43 @@ export default function PlaylistEditor({
       setSavedTracks(update);
     }
     async function loadAll() {
-      for (let i = 0; i < ids.length; i += BATCH) await loadBatch(ids.slice(i, i + BATCH));
+      for (let i = 0; i < ids.length; i += BATCH) {
+        if (cancelled) break;
+        await loadBatch(ids.slice(i, i + BATCH));
+      }
     }
     void loadAll();
+    return () => {
+      cancelled = true;
+    };
   }, [initialTracks]);
 
   // ── Chart snapshot BR ─────────────────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
+
     async function loadChart() {
+      const cached = getCachedChartMap();
+      if (cached) {
+        setChartMap(cached);
+        setChartLoading(false);
+        return;
+      }
+
       setChartLoading(true);
       try {
-        const datesRes = await fetch("/api/charts/snapshot-dates?country=BR");
-        if (!datesRes.ok) return;
-        const datesData = (await datesRes.json()) as { dates: string[] };
-        const latestDate = datesData.dates?.[0];
-        if (!latestDate) return;
-
-        const snapRes = await fetch(`/api/charts/snapshot?date=${latestDate}&country=BR`);
-        if (!snapRes.ok) return;
-        const snapData = (await snapRes.json()) as {
-          tracks: Array<{
-            spotify_track_id: string | null;
-            position: number;
-            position_change: number | null;
-            status: "new" | "up" | "down" | "stable";
-            streams: number | null;
-          }>;
-        };
-
-        const map = new Map<string, ChartData>();
-        for (const t of snapData.tracks ?? []) {
-          if (!t.spotify_track_id) continue;
-          map.set(t.spotify_track_id, {
-            position: t.position,
-            positionChange: t.position_change,
-            movement: t.status,
-            streams: t.streams,
-          });
-        }
-        setChartMap(map);
+        const map = await getLatestChartMap();
+        if (!cancelled) setChartMap(map);
       } catch {
         // silently fail — chart data is optional enrichment
       } finally {
-        setChartLoading(false);
+        if (!cancelled) setChartLoading(false);
       }
     }
     void loadChart();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ── Seleção ───────────────────────────────────────────────────────────────
@@ -654,10 +790,25 @@ export default function PlaylistEditor({
       if (indicesToDelete.size === 0 || deletingIndices.size > 0) return;
       setDeletingIndices(new Set(indicesToDelete));
       setError(null);
+      let currentSnapshot = snapshotId;
+      const deletedIndices = new Set<number>();
 
       try {
-        // Remove uma a uma em sequência (snapshot_id atualiza a cada remoção)
-        let currentSnapshot = snapshotId;
+        // Atualiza o snapshot somente quando a pessoa inicia a mutação. Assim a
+        // página abre rápido sem arriscar usar um snapshot antigo do cache.
+        const snapshotResponse = await fetch(
+          `/api/spotify/playlists/${playlistId}/snapshot`,
+        ).catch(() => null);
+        if (snapshotResponse?.ok) {
+          const freshSnapshot = (await snapshotResponse.json()) as {
+            snapshotId?: string;
+          };
+          if (freshSnapshot.snapshotId) {
+            currentSnapshot = freshSnapshot.snapshotId;
+          }
+        }
+
+        // Remove uma a uma em sequência; cada DELETE já devolve o próximo snapshot.
         const sortedIndices = [...indicesToDelete].sort((a, b) => b - a); // de trás pra frente
 
         for (const idx of sortedIndices) {
@@ -668,27 +819,28 @@ export default function PlaylistEditor({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ trackUri: `spotify:track:${track.id}`, snapshotId: currentSnapshot }),
           });
-          const data = (await res.json()) as { success?: boolean; message?: string };
+          const data = (await res.json()) as {
+            success?: boolean;
+            message?: string;
+            snapshotId?: string;
+          };
           if (!res.ok || !data.success) throw new Error(data.message ?? "Erro ao remover faixa.");
-
-          // Atualiza snapshot
-          const snapRes = await fetch(`/api/spotify/playlists/${playlistId}/snapshot`).catch(() => null);
-          if (snapRes?.ok) {
-            const snapData = (await snapRes.json()) as { snapshotId?: string };
-            if (snapData.snapshotId) currentSnapshot = snapData.snapshotId;
-          }
+          deletedIndices.add(idx);
+          if (data.snapshotId) currentSnapshot = data.snapshotId;
         }
-
-        setSnapshotId(currentSnapshot);
-        const indicesSet = new Set(indicesToDelete);
-        const updated = (prev: TrackWithStreams[]) => prev.filter((_, i) => !indicesSet.has(i));
-        setTracks(updated);
-        setSavedTracks(updated);
-        setSelectedSet(new Set());
-        lastClickedIndex.current = null;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erro ao remover faixas.");
       } finally {
+        if (deletedIndices.size > 0) {
+          const updated = (prev: TrackWithStreams[]) =>
+            prev.filter((_, index) => !deletedIndices.has(index));
+          setSnapshotId(currentSnapshot);
+          setTracks(updated);
+          setSavedTracks(updated);
+          setSelectedSet(new Set());
+          lastClickedIndex.current = null;
+          invalidateSpotifyAccountPlaylistsClientCache();
+        }
         setDeletingIndices(new Set());
       }
     },

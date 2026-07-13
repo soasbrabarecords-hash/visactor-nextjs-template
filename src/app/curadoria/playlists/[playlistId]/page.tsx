@@ -8,10 +8,7 @@ import PlaylistEditor from "@/components/workspace/playlist-editor";
 import PlaylistHeader from "@/components/workspace/playlist-header";
 import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
 import PlaylistTrackSearch from "@/components/workspace/playlist-track-search";
-import {
-  fetchSpotifyEditablePlaylist,
-  fetchPlaylistSnapshotId,
-} from "@/lib/spotify-user";
+import { fetchSpotifyEditablePlaylist } from "@/lib/spotify-user";
 
 export const dynamic = "force-dynamic";
 
@@ -61,12 +58,6 @@ export default async function SpotifyPlaylistEditorPage({
 
   const { playlist } = result;
 
-  // Busca snapshot_id atual para operações de edição
-  const { snapshotId } = await fetchPlaylistSnapshotId(playlistId).catch(() => ({
-    snapshotId: "",
-    refreshedToken: null,
-  }));
-
   return (
     <div className="spotify-skin">
       <TopNav title="Editar playlist" />
@@ -93,7 +84,7 @@ export default async function SpotifyPlaylistEditorPage({
         <PlaylistEditor
           playlistId={playlistId}
           initialTracks={playlist.tracks}
-          initialSnapshotId={snapshotId}
+          initialSnapshotId={playlist.snapshotId}
         />
 
         {/* Search de tracks + sugestões (estilo Spotify, abaixo da tabela) */}

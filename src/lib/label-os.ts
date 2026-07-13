@@ -291,61 +291,53 @@ export async function getTrackParticipants(
     ),
   );
 
-  let artistsById = new Map<
-    string,
-    Pick<LabelArtist, "id" | "name" | "artist_name">
-  >();
-  if (artistIds.length > 0) {
-    const artistsResult = await supabase
-      .from("label_artists")
-      .select("id, name, artist_name")
-      .eq("workspace_id", workspaceId)
-      .in("id", artistIds);
+  const [artistsResult, entitiesResult] = await Promise.all([
+    artistIds.length > 0
+      ? supabase
+          .from("label_artists")
+          .select("id, name, artist_name")
+          .eq("workspace_id", workspaceId)
+          .in("id", artistIds)
+      : Promise.resolve({ data: [], error: null }),
+    entityIds.length > 0
+      ? supabase
+          .from("label_entities")
+          .select("id, name, display_name, type")
+          .eq("workspace_id", workspaceId)
+          .in("id", entityIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-    if (artistsResult.error) {
-      throw new Error(
-        `getTrackParticipants artists: ${artistsResult.error.message}`,
-      );
-    }
-
-    artistsById = new Map(
-      (
-        (artistsResult.data ?? []) as Pick<
-          LabelArtist,
-          "id" | "name" | "artist_name"
-        >[]
-      ).map((artist) => [artist.id, artist]),
+  if (artistsResult.error) {
+    throw new Error(
+      `getTrackParticipants artists: ${artistsResult.error.message}`,
     );
   }
 
-  let entitiesById = new Map<
-    string,
-    { id: string; name: string; display_name: string | null; type: string }
-  >();
-  if (entityIds.length > 0) {
-    const entitiesResult = await supabase
-      .from("label_entities")
-      .select("id, name, display_name, type")
-      .eq("workspace_id", workspaceId)
-      .in("id", entityIds);
-
-    if (entitiesResult.error && !isMissingRelationError(entitiesResult.error)) {
-      throw new Error(
-        `getTrackParticipants entities: ${entitiesResult.error.message}`,
-      );
-    }
-
-    entitiesById = new Map(
-      (
-        (entitiesResult.data ?? []) as {
-          id: string;
-          name: string;
-          display_name: string | null;
-          type: string;
-        }[]
-      ).map((entity) => [entity.id, entity]),
+  if (entitiesResult.error && !isMissingRelationError(entitiesResult.error)) {
+    throw new Error(
+      `getTrackParticipants entities: ${entitiesResult.error.message}`,
     );
   }
+
+  const artistsById = new Map(
+    (
+      (artistsResult.data ?? []) as Pick<
+        LabelArtist,
+        "id" | "name" | "artist_name"
+      >[]
+    ).map((artist) => [artist.id, artist]),
+  );
+  const entitiesById = new Map(
+    (
+      (entitiesResult.data ?? []) as {
+        id: string;
+        name: string;
+        display_name: string | null;
+        type: string;
+      }[]
+    ).map((entity) => [entity.id, entity]),
+  );
 
   return rows.map((row) => ({
     ...row,
