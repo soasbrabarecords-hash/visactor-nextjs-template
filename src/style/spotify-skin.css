@@ -23,6 +23,21 @@
   --sp-text: #ffffff;
   --sp-text-muted: #b3b3b3;
   --sp-text-subdued: #6a6a6a;
+  --sp-divider: rgba(255, 255, 255, 0.14);
+  --sp-tint: rgba(255, 255, 255, 0.08);
+  --sp-tint-strong: rgba(255, 255, 255, 0.14);
+}
+
+.light .spotify-skin {
+  --sp-bg: #f5f7f8;
+  --sp-elevated: #ffffff;
+  --sp-hover: #e7ebee;
+  --sp-text: #101318;
+  --sp-text-muted: #4b5563;
+  --sp-text-subdued: #64748b;
+  --sp-divider: rgba(15, 23, 42, 0.14);
+  --sp-tint: rgba(15, 23, 42, 0.055);
+  --sp-tint-strong: rgba(15, 23, 42, 0.1);
 }
 
 /* ── Background da página inteira: degradê do gradient color → #121212 ────── */
@@ -104,7 +119,7 @@
 }
 .spotify-skin [data-spotify-table-wrapper] table thead {
   background: transparent !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-bottom: 1px solid var(--sp-divider) !important;
 }
 .spotify-skin [data-spotify-table-wrapper] table thead tr {
   text-transform: none !important;
@@ -128,7 +143,7 @@
   transition: background-color 80ms ease;
 }
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: var(--sp-tint) !important;
 }
 
 /* Sticky cells: TRANSPARENTES (igual o resto). Como a tabela tem
@@ -152,11 +167,11 @@
 /* Linha selecionada: cinza claro Spotify aplicado na <tr> inteira.
    Como sticky cells agora são transparentes, herdam essa mesma cor naturalmente */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
-  background-color: rgba(255, 255, 255, 0.16) !important;
+  background-color: var(--sp-tint-strong) !important;
 }
 /* Hover sobre linha selecionada: cinza um pouco mais claro */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"]:hover {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: color-mix(in srgb, var(--sp-tint-strong), var(--sp-text) 4%) !important;
 }
 
 /* Cards / botões / inputs no resto da página */
@@ -168,7 +183,7 @@
 }
 .spotify-skin button[class*="bg-white text-black"] {
   background: var(--sp-text) !important;
-  color: #000 !important;
+  color: var(--sp-bg) !important;
   font-weight: 700 !important;
   border-radius: 9999px !important;
   padding-left: 16px !important;
@@ -254,7 +269,7 @@
 
 /* Hover: branco com 8% opacity (não cinza chumbo) */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--sp-tint) !important;
 }
 
 /* ── Coluna # (número da faixa) ──────────────────────────────────────────── */
@@ -345,7 +360,7 @@
 
 /* ── Linha selecionada: cinza translúcido (não verde forte) ──────────────── */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] {
-  background-color: rgba(255, 255, 255, 0.16) !important;
+  background-color: var(--sp-tint-strong) !important;
 }
 .spotify-skin [data-spotify-table-wrapper] table tbody tr[class*="bg-primary"] td:nth-child(1) {
   color: var(--sp-text) !important;
@@ -626,10 +641,10 @@
 /* No hover da linha, o sticky precisa pintar pra não vazar conteúdo de baixo
    quando rola — usa hover branco translúcido (mesma cor do hover normal) */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--sp-tint) !important;
 }
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover td[style*="position: sticky"] {
-  background-color: #1a1a1a !important;  /* sticky cells precisam de bg sólido em hover */
+  background-color: var(--sp-hover) !important;  /* sticky cells precisam de bg sólido em hover */
 }
 
 /* Header sticky: mesmo bg da página pra não revelar conteúdo do tbody atrás */
@@ -769,7 +784,7 @@
 
 /* Hover row: cor branca translúcida em TUDO incluindo sticky cells */
 .spotify-skin [data-spotify-table-wrapper] table tbody tr:hover > td {
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--sp-tint) !important;
 }
 
 /* ── Mobile: ajustar negative margin (header é menor) ────────────────────── */
@@ -902,12 +917,12 @@
 /* Botão "Cancelar" outline — mantém pill mas estilo Spotify */
 .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"] {
   background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border: 1px solid var(--sp-divider) !important;
   color: var(--sp-text) !important;
 }
 .spotify-skin .py-6 .space-y-6 > .flex.flex-wrap.items-center.justify-between button[class*="outline"]:hover {
   border-color: var(--sp-text) !important;
-  background-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: var(--sp-tint) !important;
 }
 
 /* "Ordem alterada — não salvo" texto: branco discreto */

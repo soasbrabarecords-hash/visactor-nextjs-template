@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 33% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 225 100% 50%;
-    --primary-foreground: 210 40% 98%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 224 100% 48%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215 25% 34%;
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 94.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 25% 86%;
+    --input: 214 25% 82%;
+    --ring: 224 100% 48%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -34,25 +34,25 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 39% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 39% 10%;
     --popover-foreground: 210 40% 98%;
-    --primary: 225 100% 50%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 30% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217 30% 16%;
+    --muted-foreground: 215 25% 72%;
+    --accent: 217 30% 19%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 13.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 25% 26%;
+    --input: 217 25% 30%;
+    --ring: 213 94% 68%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -62,11 +62,20 @@
 }
 
 @layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  :focus-visible {
+    outline-color: hsl(var(--ring));
   }
 }
 
@@ -105,15 +114,15 @@
   }
 
   .light .theme-adaptive :where([class*="text-white/8"], [class*="text-white/7"]) {
-    color: hsl(var(--foreground) / 0.84) !important;
+    color: hsl(var(--foreground) / 0.92) !important;
   }
 
   .light .theme-adaptive :where([class*="text-white/6"], [class*="text-white/5"]) {
-    color: hsl(var(--muted-foreground)) !important;
+    color: hsl(var(--muted-foreground) / 0.98) !important;
   }
 
   .light .theme-adaptive :where([class*="text-white/4"], [class*="text-white/3"], [class*="text-white/2"]) {
-    color: hsl(var(--muted-foreground) / 0.78) !important;
+    color: hsl(var(--muted-foreground) / 0.9) !important;
   }
 
   .light .theme-adaptive :where([class*="placeholder:text-white/"])::placeholder {
@@ -122,5 +131,114 @@
 
   .light .theme-adaptive :where([class*="shadow-[0_24px"], [class*="shadow-[0_28px"], [class*="shadow-[0_18px"], [class*="shadow-[0_16px"]) {
     box-shadow: 0 18px 48px hsl(217 33% 17% / 0.08) !important;
+  }
+
+  /* Painéis que continuam deliberadamente escuros no modo claro. */
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) {
+    color: hsl(210 40% 98%) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where(.text-white) {
+    color: hsl(0 0% 100%) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where([class*="text-white/8"], [class*="text-white/7"]) {
+    color: hsl(210 40% 96% / 0.94) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where([class*="text-white/6"], [class*="text-white/5"], [class*="text-white/4"]) {
+    color: hsl(214 32% 85% / 0.9) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where([class*="text-white/3"], [class*="text-white/2"]) {
+    color: hsl(215 25% 74% / 0.82) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where([class*="bg-white/"]) {
+    background-color: hsl(0 0% 100% / 0.07) !important;
+  }
+
+  .light .theme-adaptive :where(
+    [class~="bg-slate-950"],
+    [class*="bg-[rgba(8"],
+    [class*="bg-[#1"]
+  ) :where([class*="border-white/"]) {
+    border-color: hsl(0 0% 100% / 0.16) !important;
+  }
+
+  /* Páginas claras antigas passam a respeitar o modo escuro sem tocar no markup. */
+  .dark .theme-adaptive :where([class*="bg-[#e"], [class*="bg-[#f"]) {
+    background-color: hsl(var(--background)) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="bg-[radial-gradient"], [class*="bg-[linear-gradient"]):not([class*="dark:bg-"]) {
+    background:
+      radial-gradient(circle at 82% 4%, hsl(213 94% 68% / 0.08), transparent 34%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(222 39% 9%)) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="bg-white/"]):not([class*="dark:bg-"]) {
+    background-color: hsl(var(--card) / 0.82) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="border-white/"]) {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .theme-adaptive :where(
+    [class~="text-slate-950"],
+    [class~="text-slate-900"],
+    [class~="text-slate-800"]
+  ):not([class*="dark:text-"]):not([class~="bg-white"]) {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .theme-adaptive :where(
+    [class~="text-slate-700"],
+    [class~="text-slate-600"],
+    [class~="text-slate-500"],
+    [class~="text-slate-400"]
+  ):not([class*="dark:text-"]) {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="text-white/8"], [class*="text-white/7"]) {
+    color: hsl(210 40% 98% / 0.94) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="text-white/6"], [class*="text-white/5"], [class*="text-white/4"]) {
+    color: hsl(214 32% 85% / 0.9) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="text-white/3"], [class*="text-white/2"]) {
+    color: hsl(215 25% 74% / 0.82) !important;
+  }
+
+  .dark .theme-adaptive :where([class*="placeholder:text-white/"])::placeholder {
+    color: hsl(var(--muted-foreground) / 0.78) !important;
   }
 }
