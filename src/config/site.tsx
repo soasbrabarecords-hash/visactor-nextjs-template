@@ -90,6 +90,11 @@ export const navigations: Navigation[] = [
         name: "Entidades",
         href: "/label-os/entities",
       },
+      {
+        icon: FileSignature,
+        name: "Contratos",
+        href: "/label-os/contracts",
+      },
     ],
   },
   {

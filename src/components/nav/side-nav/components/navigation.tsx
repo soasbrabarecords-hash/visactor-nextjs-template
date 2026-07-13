@@ -105,9 +105,12 @@ export default function Navigation() {
       (navigation.href === "/label-os" || navigation.href === "/artist-os");
     const nestedLabelSection =
       variant === "child" &&
-      ["/label-os/tracks", "/label-os/artists", "/label-os/entities"].includes(
-        navigation.href,
-      );
+      [
+        "/label-os/tracks",
+        "/label-os/artists",
+        "/label-os/entities",
+        "/label-os/contracts",
+      ].includes(navigation.href);
     const active = sectionRootChild
       ? pathname === navigation.href
       : nestedLabelSection

@@ -2,7 +2,9 @@ import { ArrowLeft, Disc3, FileText, Music, Pencil, Play } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Container from "@/components/container";
+import ContractGenerationControls from "@/components/label-os/contract-generation-controls";
 import ReleaseReadinessPanel from "@/components/label-os/release-readiness-panel";
+import { getLabelContractsByTrack } from "@/lib/label-contracts";
 import type { TrackParticipant } from "@/lib/label-os";
 import { getTrackReadinessBundle } from "@/lib/label-readiness-server";
 
@@ -20,6 +22,7 @@ const STEP_LABELS = [
   "Obra",
   "Fonograma",
   "Royalties",
+  "Resumo e Contrato",
 ] as const;
 
 function participantName(participant: TrackParticipant) {
@@ -72,7 +75,7 @@ function PreviewSection({
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="text-white/38 text-xs uppercase tracking-[0.24em]">
-            Etapa {step} / 4
+            Etapa {step} / 5
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
             {title}
@@ -92,7 +95,10 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params;
-  const bundle = await getTrackReadinessBundle(id);
+  const [bundle, contracts] = await Promise.all([
+    getTrackReadinessBundle(id),
+    getLabelContractsByTrack(id),
+  ]);
 
   if (!bundle) notFound();
 
@@ -110,8 +116,7 @@ export default async function TrackDetailPage({ params }: Props) {
   const mainArtists = participants.filter(
     (participant) =>
       participant.role === "main_artist" ||
-      participant.role === "featured_artist" ||
-      participant.artist_id,
+      (participant.artist_id && participant.role !== "featured_artist"),
   );
   const obraPreview =
     compositions.length > 0
@@ -436,6 +441,160 @@ export default async function TrackDetailPage({ params }: Props) {
                   Nenhum split de royalties preenchido ainda.
                 </div>
               )}
+            </div>
+          </PreviewSection>
+
+          <PreviewSection
+            step={5}
+            title="Resumo e Contrato"
+            description="Conferência final dos dados operacionais antes de congelar o snapshot e gerar o documento para assinatura."
+          >
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <InfoCard label="Track" value={track.title} />
+                <InfoCard
+                  label="Artista principal"
+                  value={
+                    mainArtists.length > 0
+                      ? mainArtists.map(participantName).join(", ")
+                      : null
+                  }
+                />
+                <InfoCard
+                  label="ISRC / UPC"
+                  value={[track.isrc, track.upc].filter(Boolean).join(" / ")}
+                />
+                <InfoCard label="Distribuidora" value={manual?.distributor} />
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-white/36 text-[11px] uppercase tracking-[0.2em]">
+                    Obra
+                  </div>
+                  <div className="mt-3 text-sm font-medium text-white">
+                    {obraPreview.length} compositor
+                    {obraPreview.length === 1 ? "" : "es"}
+                  </div>
+                  <div className="text-white/54 mt-2 text-sm">
+                    Split:{" "}
+                    {formatPercentage(
+                      obraPreview.reduce(
+                        (sum, item) => sum + Number(item.percentage),
+                        0,
+                      ),
+                    )}
+                  </div>
+                  <div className="text-white/54 mt-1 text-sm">
+                    Cadastro:{" "}
+                    {manual?.work_registered ? "confirmado" : "pendente"}
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-white/36 text-[11px] uppercase tracking-[0.2em]">
+                    Fonograma
+                  </div>
+                  <div className="mt-3 text-sm font-medium text-white">
+                    {fonogramaPreview.length} participante
+                    {fonogramaPreview.length === 1 ? "" : "s"}
+                  </div>
+                  <div className="text-white/54 mt-2 text-sm">
+                    P-line: {manual?.p_line || "pendente"}
+                  </div>
+                  <div className="text-white/54 mt-1 text-sm">
+                    C-line: {manual?.c_line || "pendente"}
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-white/36 text-[11px] uppercase tracking-[0.2em]">
+                    Royalties
+                  </div>
+                  <div className="mt-3 text-sm font-medium text-white">
+                    Split:{" "}
+                    {formatPercentage(
+                      royaltiesPreview.reduce(
+                        (sum, item) => sum + Number(item.percentage),
+                        0,
+                      ),
+                    )}
+                  </div>
+                  <div className="text-white/54 mt-2 text-sm">
+                    Comissão do selo:{" "}
+                    {manual?.label_commission_percentage === null ||
+                    manual?.label_commission_percentage === undefined
+                      ? "pendente"
+                      : formatPercentage(manual.label_commission_percentage)}
+                  </div>
+                  <div className="text-white/54 mt-1 line-clamp-2 text-sm">
+                    Pagamento: {manual?.payment_rule || "pendente"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,.8fr)]">
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-white">
+                      Participantes
+                    </div>
+                    <span className="text-white/42 text-xs">
+                      {participants.length} cadastrado
+                      {participants.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {participants.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {participants.map((participant) => (
+                        <span
+                          key={participant.id}
+                          className="text-white/72 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs"
+                        >
+                          {participantName(participant)} · {participant.role}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-white/44 text-sm">
+                      Nenhum participante cadastrado.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-white">
+                      Pendências antes do contrato
+                    </div>
+                    <span className="text-white/62 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs">
+                      {result.readinessScore}% pronta
+                    </span>
+                  </div>
+                  {result.blockingIssues.length > 0 ? (
+                    <ul className="space-y-2">
+                      {result.blockingIssues.slice(0, 6).map((issue) => (
+                        <li
+                          key={issue}
+                          className="text-white/62 flex gap-2 text-sm"
+                        >
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300" />
+                          {issue}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-emerald-200">
+                      Sem bloqueios operacionais.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <ContractGenerationControls
+                trackId={track.id}
+                contracts={contracts}
+              />
             </div>
           </PreviewSection>
         </div>

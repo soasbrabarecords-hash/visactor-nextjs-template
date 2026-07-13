@@ -1,3 +1,4 @@
+import type { ReadinessContractEvidence } from "@/lib/label-contract-types";
 import type { LabelEntity } from "@/lib/label-entities-types";
 import type { LabelTrack, TrackParticipant } from "@/lib/label-os-types";
 import type {
@@ -134,6 +135,7 @@ export type TrackReadinessInput = {
   entities: LabelEntity[];
   manual: LabelTrackReadiness | null;
   tasks: LabelTrackTask[];
+  contracts: ReadinessContractEvidence[];
 };
 
 export type TrackReadinessBundle = TrackReadinessInput & {

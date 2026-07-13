@@ -1,4 +1,5 @@
 import "server-only";
+import type { ReadinessContractEvidence } from "@/lib/label-contract-types";
 import type { LabelEntity } from "@/lib/label-entities-types";
 import type {
   LabelArtist,
@@ -46,6 +47,7 @@ function buildBundle(
   entities: LabelEntity[],
   manual: LabelTrackReadiness | null,
   tasks: LabelTrackTask[],
+  contracts: ReadinessContractEvidence[],
 ): TrackReadinessBundle {
   const input = {
     track,
@@ -56,6 +58,7 @@ function buildBundle(
     entities,
     manual,
     tasks,
+    contracts,
   };
 
   return { ...input, result: evaluateTrackReadiness(input) };
@@ -98,6 +101,11 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     .select("*")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true });
+  const contractsQuery = supabase
+    .from("label_contracts")
+    .select("track_id,status,pdf_path,signed_pdf_path")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: true });
 
   if (trackId) {
     tracksQuery.eq("id", trackId);
@@ -107,6 +115,7 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     royaltiesQuery.eq("track_id", trackId);
     readinessQuery.eq("track_id", trackId);
     tasksQuery.eq("track_id", trackId);
+    contractsQuery.eq("track_id", trackId);
   }
 
   const [
@@ -119,6 +128,7 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     artistsResult,
     readinessResult,
     tasksResult,
+    contractsResult,
   ] = await Promise.all([
     tracksQuery,
     participantsQuery,
@@ -129,6 +139,7 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     supabase.from("label_artists").select("*").eq("workspace_id", workspaceId),
     readinessQuery,
     tasksQuery,
+    contractsQuery,
   ]);
 
   throwQueryError("getLabelReadiness tracks", tracksResult.error);
@@ -140,6 +151,7 @@ async function getWorkspaceReadinessRows(trackId?: string) {
   throwQueryError("getLabelReadiness artists", artistsResult.error);
   throwQueryError("getLabelReadiness manual", readinessResult.error);
   throwQueryError("getLabelReadiness tasks", tasksResult.error);
+  throwQueryError("getLabelReadiness contracts", contractsResult.error);
 
   return {
     tracks: (tracksResult.data ?? []) as LabelTrack[],
@@ -151,6 +163,9 @@ async function getWorkspaceReadinessRows(trackId?: string) {
     artists: (artistsResult.data ?? []) as LabelArtist[],
     readiness: (readinessResult.data ?? []) as LabelTrackReadiness[],
     tasks: (tasksResult.data ?? []) as LabelTrackTask[],
+    contracts: (contractsResult.data ?? []) as Array<
+      ReadinessContractEvidence & { track_id: string }
+    >,
   };
 }
 
@@ -162,6 +177,7 @@ function buildAllBundles(
   const masterByTrack = groupByTrack(rows.masterSplits);
   const royaltiesByTrack = groupByTrack(rows.royaltySplits);
   const tasksByTrack = groupByTrack(rows.tasks);
+  const contractsByTrack = groupByTrack(rows.contracts);
   const readinessByTrack = new Map(
     rows.readiness.map((item) => [item.track_id, item]),
   );
@@ -176,6 +192,7 @@ function buildAllBundles(
       rows.entities,
       readinessByTrack.get(track.id) ?? null,
       tasksByTrack.get(track.id) ?? [],
+      contractsByTrack.get(track.id) ?? [],
     ),
   );
 }
@@ -231,16 +248,32 @@ export async function getTrackReadinessBundle(
           })()
         : undefined,
     }));
+  const withEntity = <T extends { entity_id: string }>(item: T) => {
+    const entity = entitiesById.get(item.entity_id);
+    return {
+      ...item,
+      entity_name: entity?.name,
+      entity_display_name: entity?.display_name,
+      entity_type: entity?.type,
+    };
+  };
 
   return buildBundle(
     track,
     participants,
-    rows.compositions.filter((item) => item.track_id === trackId),
-    rows.masterSplits.filter((item) => item.track_id === trackId),
-    rows.royaltySplits.filter((item) => item.track_id === trackId),
+    rows.compositions
+      .filter((item) => item.track_id === trackId)
+      .map(withEntity),
+    rows.masterSplits
+      .filter((item) => item.track_id === trackId)
+      .map(withEntity),
+    rows.royaltySplits
+      .filter((item) => item.track_id === trackId)
+      .map(withEntity),
     rows.entities,
     rows.readiness.find((item) => item.track_id === trackId) ?? null,
     rows.tasks.filter((item) => item.track_id === trackId),
+    rows.contracts.filter((item) => item.track_id === trackId),
   );
 }
 

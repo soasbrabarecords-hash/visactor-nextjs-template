@@ -1,6 +1,5 @@
 "use client";
 
-import type { ChangeEvent, ComponentType, ReactNode } from "react";
 import {
   ArrowRight,
   Check,
@@ -13,10 +12,12 @@ import {
   Users2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { LabelArtist } from "@/lib/label-os-types";
+import type { ChangeEvent, ComponentType, ReactNode } from "react";
+import { useMemo, useState } from "react";
+import EntityCombobox from "@/components/label-os/entity-combobox";
 import type { LabelEntity } from "@/lib/label-entities-types";
+import type { LabelArtist } from "@/lib/label-os-types";
 import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import {
   formatPercentage,
@@ -24,7 +25,6 @@ import {
   parsePercentageInput,
   sumPercentages,
 } from "@/lib/percentage";
-import EntityCombobox from "@/components/label-os/entity-combobox";
 
 const GENRE_GROUPS = [
   {
@@ -35,7 +35,13 @@ const GENRE_GROUPS = [
   {
     value: "Funk",
     label: "Funk",
-    subgenres: ["Funk BR", "Funk Mandelão", "Funk Pop", "Funk Proibidão", "Funk Melody"],
+    subgenres: [
+      "Funk BR",
+      "Funk Mandelão",
+      "Funk Pop",
+      "Funk Proibidão",
+      "Funk Melody",
+    ],
   },
   {
     value: "Hip-Hop/Rap",
@@ -120,7 +126,8 @@ function totalColor(total: number, target: number): string {
 }
 
 function totalBg(total: number, target: number): string {
-  if (total > target + 0.01) return "border-rose-300/18 bg-rose-300/[0.08] text-rose-100";
+  if (total > target + 0.01)
+    return "border-rose-300/18 bg-rose-300/[0.08] text-rose-100";
   if (isPercentageEqual(total, target))
     return "border-sky-200/18 bg-sky-200/[0.08] text-sky-100";
   return "border-amber-200/18 bg-amber-200/[0.08] text-amber-100";
@@ -154,7 +161,7 @@ function Section({
         </div>
         <div>
           <div className="text-base font-semibold text-white">{title}</div>
-          <div className="mt-1 text-sm text-white/54">{description}</div>
+          <div className="text-white/54 mt-1 text-sm">{description}</div>
         </div>
       </div>
       {children}
@@ -163,7 +170,13 @@ function Section({
 }
 
 function StepIndicator({ current }: { current: number }) {
-  const steps = ["Track", "Obra", "Fonograma", "Royalties"];
+  const steps = [
+    "Track",
+    "Obra",
+    "Fonograma",
+    "Royalties",
+    "Resumo e contrato",
+  ];
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -182,14 +195,16 @@ function StepIndicator({ current }: { current: number }) {
                     ? "border-sky-200/20 bg-sky-200/[0.1] text-white"
                     : done
                       ? "border-white/10 bg-white/[0.08] text-white"
-                      : "border-white/10 bg-white/[0.03] text-white/42",
+                      : "text-white/42 border-white/10 bg-white/[0.03]",
                 ].join(" ")}
               >
                 {done ? <Check className="h-4 w-4" /> : step}
               </div>
               <div className="text-sm font-medium text-white/70">{label}</div>
             </div>
-            {index < steps.length - 1 ? <div className="h-px w-8 bg-white/10" /> : null}
+            {index < steps.length - 1 ? (
+              <div className="h-px w-8 bg-white/10" />
+            ) : null}
           </div>
         );
       })}
@@ -220,7 +235,10 @@ function ArtistTagSelector({
           artist.name.toLowerCase().includes(normalized)
         );
       })
-      .filter((artist) => !selectedArtists.some((selected) => selected.id === artist.id))
+      .filter(
+        (artist) =>
+          !selectedArtists.some((selected) => selected.id === artist.id),
+      )
       .slice(0, 8)
       .map((artist) => ({
         id: artist.id,
@@ -251,7 +269,7 @@ function ArtistTagSelector({
     <div className="space-y-3">
       <div className="space-y-1">
         <label className="text-sm font-medium text-white">Artistas</label>
-        <div className="text-sm text-white/52">
+        <div className="text-white/52 text-sm">
           Digite para buscar no banco de artistas e confirme com Enter.
         </div>
       </div>
@@ -261,7 +279,7 @@ function ArtistTagSelector({
           {selectedArtists.map((artist) => (
             <span
               key={artist.id}
-              className="inline-flex items-center gap-2 rounded-full border border-sky-200/16 bg-sky-200/[0.08] px-3 py-2 text-sm font-medium text-sky-50"
+              className="border-sky-200/16 inline-flex items-center gap-2 rounded-full border bg-sky-200/[0.08] px-3 py-2 text-sm font-medium text-sky-50"
             >
               {artist.artistName}
               <button
@@ -283,7 +301,7 @@ function ArtistTagSelector({
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Buscar artista cadastrado..."
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.035] py-3 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]"
+              className="placeholder:text-white/28 focus:border-sky-200/24 w-full rounded-2xl border border-white/10 bg-white/[0.035] py-3 pl-10 pr-4 text-sm text-white outline-none focus:bg-white/[0.055]"
             />
           </div>
         </div>
@@ -297,17 +315,21 @@ function ArtistTagSelector({
                     key={artist.id}
                     type="button"
                     onClick={() => addArtist(artist)}
-                    className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm text-white/82 transition hover:bg-white/[0.06]"
+                    className="text-white/82 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm transition hover:bg-white/[0.06]"
                   >
                     <span>{artist.artistName}</span>
                     {artist.name !== artist.artistName ? (
-                      <span className="text-xs text-white/38">{artist.name}</span>
+                      <span className="text-white/38 text-xs">
+                        {artist.name}
+                      </span>
                     ) : null}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="px-3 py-2 text-sm text-white/45">Nenhum artista encontrado.</div>
+              <div className="px-3 py-2 text-sm text-white/45">
+                Nenhum artista encontrado.
+              </div>
             )}
           </div>
         ) : null}
@@ -338,11 +360,19 @@ function SplitEditor({
   }
 
   function updateEntity(index: number, entity: LabelEntity | null) {
-    onChange(rows.map((row, currentIndex) => (currentIndex === index ? { ...row, entity } : row)));
+    onChange(
+      rows.map((row, currentIndex) =>
+        currentIndex === index ? { ...row, entity } : row,
+      ),
+    );
   }
 
   function updatePct(index: number, pct: string) {
-    onChange(rows.map((row, currentIndex) => (currentIndex === index ? { ...row, pct } : row)));
+    onChange(
+      rows.map((row, currentIndex) =>
+        currentIndex === index ? { ...row, pct } : row,
+      ),
+    );
   }
 
   return (
@@ -383,7 +413,7 @@ function SplitEditor({
             <button
               type="button"
               onClick={() => removeRow(index)}
-              className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] px-4 text-sm font-medium text-white/64 transition hover:bg-white/[0.06] hover:text-white"
+              className="text-white/64 inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] px-4 text-sm font-medium transition hover:bg-white/[0.06] hover:text-white"
             >
               Remover
             </button>
@@ -394,7 +424,7 @@ function SplitEditor({
       <button
         type="button"
         onClick={addRow}
-        className="inline-flex h-10 items-center rounded-full border border-white/12 bg-white/[0.04] px-4 text-sm font-medium text-white/78 transition hover:bg-white/[0.07] hover:text-white"
+        className="border-white/12 text-white/78 inline-flex h-10 items-center rounded-full border bg-white/[0.04] px-4 text-sm font-medium transition hover:bg-white/[0.07] hover:text-white"
       >
         + Adicionar linha
       </button>
@@ -422,11 +452,21 @@ export default function TrackForm({ artists }: TrackFormProps) {
     contractFile: null,
   });
 
-  const [obraRows, setObraRows] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
-  const [interpretes, setInterpretes] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
-  const [produtores, setProdutores] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
-  const [musicos, setMusicos] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
-  const [royaltyRows, setRoyaltyRows] = useState<SplitRow[]>([{ entity: null, pct: "0" }]);
+  const [obraRows, setObraRows] = useState<SplitRow[]>([
+    { entity: null, pct: "0" },
+  ]);
+  const [interpretes, setInterpretes] = useState<SplitRow[]>([
+    { entity: null, pct: "0" },
+  ]);
+  const [produtores, setProdutores] = useState<SplitRow[]>([
+    { entity: null, pct: "0" },
+  ]);
+  const [musicos, setMusicos] = useState<SplitRow[]>([
+    { entity: null, pct: "0" },
+  ]);
+  const [royaltyRows, setRoyaltyRows] = useState<SplitRow[]>([
+    { entity: null, pct: "0" },
+  ]);
 
   const selectedGenre = useMemo(
     () => GENRE_GROUPS.find((group) => group.value === trackData.genre) ?? null,
@@ -434,12 +474,14 @@ export default function TrackForm({ artists }: TrackFormProps) {
   );
 
   const coverPreviewUrl = useMemo(
-    () => (trackData.coverFile ? URL.createObjectURL(trackData.coverFile) : null),
+    () =>
+      trackData.coverFile ? URL.createObjectURL(trackData.coverFile) : null,
     [trackData.coverFile],
   );
 
   const audioPreviewUrl = useMemo(
-    () => (trackData.audioFile ? URL.createObjectURL(trackData.audioFile) : null),
+    () =>
+      trackData.audioFile ? URL.createObjectURL(trackData.audioFile) : null,
     [trackData.audioFile],
   );
 
@@ -529,9 +571,18 @@ export default function TrackForm({ artists }: TrackFormProps) {
     setLoading(true);
 
     try {
-      const coverUrl = await uploadLabelOsFile(trackData.coverFile, "label-covers");
-      const audioUrl = await uploadLabelOsFile(trackData.audioFile, "label-audio");
-      const contractUrl = await uploadLabelOsFile(trackData.contractFile, "label-contracts");
+      const coverUrl = await uploadLabelOsFile(
+        trackData.coverFile,
+        "label-covers",
+      );
+      const audioUrl = await uploadLabelOsFile(
+        trackData.audioFile,
+        "label-audio",
+      );
+      const contractUrl = await uploadLabelOsFile(
+        trackData.contractFile,
+        "label-contracts",
+      );
 
       const trackRes = await fetch("/api/label-os/tracks", {
         method: "POST",
@@ -622,15 +673,21 @@ export default function TrackForm({ artists }: TrackFormProps) {
 
       const participantResponses = await Promise.all(
         participants.map(async (participant) => {
-          const response = await fetch(`/api/label-os/tracks/${trackId}/participants`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(participant),
-          });
+          const response = await fetch(
+            `/api/label-os/tracks/${trackId}/participants`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(participant),
+            },
+          );
 
           if (!response.ok) {
             throw new Error(
-              await readApiError(response, "Erro ao salvar participantes da track."),
+              await readApiError(
+                response,
+                "Erro ao salvar participantes da track.",
+              ),
             );
           }
 
@@ -659,7 +716,7 @@ export default function TrackForm({ artists }: TrackFormProps) {
       <StepIndicator current={step} />
 
       {error ? (
-        <div className="rounded-2xl border border-rose-300/18 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
+        <div className="border-rose-300/18 rounded-2xl border bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
           {error}
         </div>
       ) : null}
@@ -667,12 +724,15 @@ export default function TrackForm({ artists }: TrackFormProps) {
       {step === 1 ? (
         <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
           <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/42">Dados principais</div>
+            <div className="text-white/42 text-xs uppercase tracking-[0.2em]">
+              Dados principais
+            </div>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">
               Cadastro claro da track.
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/56">
-              Título, versão, artistas, gênero, capa e áudio em uma primeira leitura mais limpa.
+            <p className="text-white/56 mt-2 max-w-2xl text-sm leading-6">
+              Título, versão, artistas, gênero, capa e áudio em uma primeira
+              leitura mais limpa.
             </p>
           </div>
 
@@ -703,12 +763,14 @@ export default function TrackForm({ artists }: TrackFormProps) {
                   </div>
 
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-white">Selecionar capa</span>
+                    <span className="mb-2 block text-sm font-medium text-white">
+                      Selecionar capa
+                    </span>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       onChange={(event) => updateFile("coverFile", event)}
-                      className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                      className="text-white/58 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
                     />
                   </label>
                 </div>
@@ -721,21 +783,29 @@ export default function TrackForm({ artists }: TrackFormProps) {
               >
                 <div className="space-y-4">
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-white">Selecionar áudio</span>
+                    <span className="mb-2 block text-sm font-medium text-white">
+                      Selecionar áudio
+                    </span>
                     <input
                       type="file"
                       accept="audio/wav,audio/mpeg,audio/mp3"
                       onChange={(event) => updateFile("audioFile", event)}
-                      className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                      className="text-white/58 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
                     />
                   </label>
 
                   <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
                     {audioPreviewUrl ? (
                       // eslint-disable-next-line jsx-a11y/media-has-caption
-                      <audio controls src={audioPreviewUrl} className="w-full" />
+                      <audio
+                        controls
+                        src={audioPreviewUrl}
+                        className="w-full"
+                      />
                     ) : (
-                      <div className="text-sm text-white/42">Preview do áudio aparece aqui.</div>
+                      <div className="text-white/42 text-sm">
+                        Preview do áudio aparece aqui.
+                      </div>
                     )}
                   </div>
                 </div>
@@ -751,15 +821,22 @@ export default function TrackForm({ artists }: TrackFormProps) {
                 <div className="space-y-5">
                   <div className="grid gap-5 sm:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)]">
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-white" htmlFor="track-title">
-                        Título da música <span className="ml-1 text-sky-200">*</span>
+                      <label
+                        className="text-sm font-medium text-white"
+                        htmlFor="track-title"
+                      >
+                        Título da música{" "}
+                        <span className="ml-1 text-sky-200">*</span>
                       </label>
                       <input
                         id="track-title"
                         type="text"
                         value={trackData.title}
                         onChange={(event) =>
-                          setTrackData((current) => ({ ...current, title: event.target.value }))
+                          setTrackData((current) => ({
+                            ...current,
+                            title: event.target.value,
+                          }))
                         }
                         placeholder="Nome da faixa"
                         className={INPUT_CLASS}
@@ -767,7 +844,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-white" htmlFor="track-version">
+                      <label
+                        className="text-sm font-medium text-white"
+                        htmlFor="track-version"
+                      >
                         Versão
                       </label>
                       <input
@@ -775,7 +855,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                         type="text"
                         value={trackData.version}
                         onChange={(event) =>
-                          setTrackData((current) => ({ ...current, version: event.target.value }))
+                          setTrackData((current) => ({
+                            ...current,
+                            version: event.target.value,
+                          }))
                         }
                         placeholder="Radio Edit, Remix, Ao Vivo..."
                         className={INPUT_CLASS}
@@ -798,7 +881,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
               >
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white" htmlFor="track-genre">
+                    <label
+                      className="text-sm font-medium text-white"
+                      htmlFor="track-genre"
+                    >
                       Gênero
                     </label>
                     <select
@@ -817,7 +903,11 @@ export default function TrackForm({ artists }: TrackFormProps) {
                         Selecionar gênero
                       </option>
                       {GENRE_GROUPS.map((genre) => (
-                        <option key={genre.value} value={genre.value} className="bg-slate-950 text-white">
+                        <option
+                          key={genre.value}
+                          value={genre.value}
+                          className="bg-slate-950 text-white"
+                        >
                           {genre.label}
                         </option>
                       ))}
@@ -825,23 +915,35 @@ export default function TrackForm({ artists }: TrackFormProps) {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white" htmlFor="track-subgenre">
+                    <label
+                      className="text-sm font-medium text-white"
+                      htmlFor="track-subgenre"
+                    >
                       Subgênero
                     </label>
                     <select
                       id="track-subgenre"
                       value={trackData.subgenre}
                       onChange={(event) =>
-                        setTrackData((current) => ({ ...current, subgenre: event.target.value }))
+                        setTrackData((current) => ({
+                          ...current,
+                          subgenre: event.target.value,
+                        }))
                       }
                       disabled={!selectedGenre}
                       className={INPUT_CLASS}
                     >
                       <option value="" className="bg-slate-950 text-white">
-                        {selectedGenre ? "Selecionar subgênero" : "Escolha o gênero primeiro"}
+                        {selectedGenre
+                          ? "Selecionar subgênero"
+                          : "Escolha o gênero primeiro"}
                       </option>
                       {(selectedGenre?.subgenres ?? []).map((subgenre) => (
-                        <option key={subgenre} value={subgenre} className="bg-slate-950 text-white">
+                        <option
+                          key={subgenre}
+                          value={subgenre}
+                          className="bg-slate-950 text-white"
+                        >
                           {subgenre}
                         </option>
                       ))}
@@ -849,7 +951,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-white" htmlFor="track-release-date">
+                    <label
+                      className="text-sm font-medium text-white"
+                      htmlFor="track-release-date"
+                    >
                       Data de lançamento
                     </label>
                     <input
@@ -857,7 +962,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                       type="date"
                       value={trackData.release_date}
                       onChange={(event) =>
-                        setTrackData((current) => ({ ...current, release_date: event.target.value }))
+                        setTrackData((current) => ({
+                          ...current,
+                          release_date: event.target.value,
+                        }))
                       }
                       className={INPUT_CLASS}
                     />
@@ -869,7 +977,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                         type="checkbox"
                         checked={trackData.explicit}
                         onChange={(event) =>
-                          setTrackData((current) => ({ ...current, explicit: event.target.checked }))
+                          setTrackData((current) => ({
+                            ...current,
+                            explicit: event.target.checked,
+                          }))
                         }
                         className="h-4 w-4 rounded border-white/15 bg-transparent"
                       />
@@ -890,11 +1001,14 @@ export default function TrackForm({ artists }: TrackFormProps) {
           description="Letra da música e composição editorial. A soma da obra precisa fechar em 100%."
         >
           <div className="space-y-5">
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/58">
+            <div className="text-white/58 rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
               Preencha a letra e distribua 100% da obra entre os compositores.
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-white" htmlFor="track-lyrics">
+              <label
+                className="text-sm font-medium text-white"
+                htmlFor="track-lyrics"
+              >
                 Letra da música
               </label>
               <textarea
@@ -902,7 +1016,10 @@ export default function TrackForm({ artists }: TrackFormProps) {
                 rows={10}
                 value={trackData.lyrics}
                 onChange={(event) =>
-                  setTrackData((current) => ({ ...current, lyrics: event.target.value }))
+                  setTrackData((current) => ({
+                    ...current,
+                    lyrics: event.target.value,
+                  }))
                 }
                 placeholder="Cole ou escreva a letra completa aqui..."
                 className={INPUT_CLASS}
@@ -925,7 +1042,7 @@ export default function TrackForm({ artists }: TrackFormProps) {
           description="Distribua o fonograma entre intérpretes, produtores fonográficos e músicos com os alvos fixos."
         >
           <div className="space-y-5">
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/58">
+            <div className="text-white/58 rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
               Intérpretes 41,70% · Produtores 41,70% · Músicos 16,60%.
             </div>
 
@@ -979,7 +1096,7 @@ export default function TrackForm({ artists }: TrackFormProps) {
           description="Distribua 100% dos royalties share entre os envolvidos antes de salvar a track."
         >
           <div className="space-y-5">
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/58">
+            <div className="text-white/58 rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
               A soma precisa fechar em 100%.
             </div>
             <SplitEditor
@@ -1005,13 +1122,22 @@ export default function TrackForm({ artists }: TrackFormProps) {
             <ArrowRight className="ml-2 h-4 w-4" />
           </button>
         ) : (
-          <button type="button" onClick={handleSubmit} disabled={loading} className={buttonPrimary}>
-            {loading ? "Salvando..." : "Salvar track"}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className={buttonPrimary}
+          >
+            {loading ? "Salvando..." : "Salvar e revisar contrato"}
           </button>
         )}
 
         {step === 1 ? (
-          <button type="button" onClick={() => router.back()} className={buttonSecondary}>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className={buttonSecondary}
+          >
             Cancelar
           </button>
         ) : null}

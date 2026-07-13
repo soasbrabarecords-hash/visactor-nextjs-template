@@ -77,6 +77,7 @@ export function evaluateTrackReadiness(
     royaltySplits,
     entities,
     tasks,
+    contracts,
   } = input;
   const manual: LabelTrackReadinessInput =
     input.manual ?? EMPTY_TRACK_READINESS;
@@ -95,6 +96,10 @@ export function evaluateTrackReadiness(
       item.role === "main_artist" ||
       item.role === "featured_artist" ||
       item.artist_id,
+  );
+  const hasGeneratedContract = contracts.some((item) => Boolean(item.pdf_path));
+  const hasSignedContract = contracts.some(
+    (item) => item.status === "signed" && Boolean(item.signed_pdf_path),
   );
 
   const checks: ReadinessCheck[] = [
@@ -317,7 +322,7 @@ export function evaluateTrackReadiness(
       "contracts",
       "contracts-approved",
       "Contratos assinados e aprovados",
-      manual.contracts_approved,
+      manual.contracts_approved || hasSignedContract,
       "blocking",
       "manual",
       "Conferir e aprovar os contratos",
@@ -327,7 +332,7 @@ export function evaluateTrackReadiness(
       "contracts",
       "contracts-file",
       "Documento contratual anexado",
-      hasText(track.contract_url),
+      hasText(track.contract_url) || hasGeneratedContract,
       "warning",
       "automatic",
       "Anexar o documento contratual",
