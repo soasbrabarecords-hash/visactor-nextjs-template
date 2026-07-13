@@ -1,13 +1,10 @@
-import { notFound } from "next/navigation";
+import { ArrowLeft, Disc3, FileText, Music, Pencil, Play } from "lucide-react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Music, Pencil, Play, Disc3 } from "lucide-react";
+import { notFound } from "next/navigation";
 import Container from "@/components/container";
-import { getLabelTrackById, getTrackParticipants, type TrackParticipant } from "@/lib/label-os";
-import {
-  getTrackCompositions,
-  getTrackMasterSplits,
-  getTrackRoyaltySplits,
-} from "@/lib/label-splits";
+import ReleaseReadinessPanel from "@/components/label-os/release-readiness-panel";
+import type { TrackParticipant } from "@/lib/label-os";
+import { getTrackReadinessBundle } from "@/lib/label-readiness-server";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +48,9 @@ function InfoCard({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3">
-      <div className="text-[11px] uppercase tracking-[0.22em] text-white/34">{label}</div>
+      <div className="text-white/34 text-[11px] uppercase tracking-[0.22em]">
+        {label}
+      </div>
       <div className="mt-2 text-sm font-medium text-white">{value || "—"}</div>
     </div>
   );
@@ -72,13 +71,15 @@ function PreviewSection({
     <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.22)] backdrop-blur-xl">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.24em] text-white/38">
+          <div className="text-white/38 text-xs uppercase tracking-[0.24em]">
             Etapa {step} / 4
           </div>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{title}</h2>
-          <p className="mt-2 max-w-2xl text-sm text-white/56">{description}</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+            {title}
+          </h2>
+          <p className="text-white/56 mt-2 max-w-2xl text-sm">{description}</p>
         </div>
-        <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/72">
+        <div className="text-white/72 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium">
           {STEP_LABELS[step - 1]}
         </div>
       </div>
@@ -91,22 +92,20 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function TrackDetailPage({ params }: Props) {
   const { id } = await params;
-  const track = await getLabelTrackById(id);
+  const bundle = await getTrackReadinessBundle(id);
 
-  if (!track) notFound();
+  if (!bundle) notFound();
 
-  const [participantsResult, compositionsResult, masterResult, royaltiesResult] =
-    await Promise.allSettled([
-      getTrackParticipants(id),
-      getTrackCompositions(id),
-      getTrackMasterSplits(id),
-      getTrackRoyaltySplits(id),
-    ]);
-
-  const participants = participantsResult.status === "fulfilled" ? participantsResult.value : [];
-  const compositions = compositionsResult.status === "fulfilled" ? compositionsResult.value : [];
-  const masterSplits = masterResult.status === "fulfilled" ? masterResult.value : [];
-  const royaltySplits = royaltiesResult.status === "fulfilled" ? royaltiesResult.value : [];
+  const {
+    track,
+    participants,
+    compositions,
+    masterSplits,
+    royaltySplits,
+    manual,
+    tasks,
+    result,
+  } = bundle;
 
   const mainArtists = participants.filter(
     (participant) =>
@@ -123,7 +122,8 @@ export default async function TrackDetailPage({ params }: Props) {
       : participants
           .filter(
             (participant) =>
-              participant.role === "composer" || Number(participant.publishing_percentage) > 0,
+              participant.role === "composer" ||
+              Number(participant.publishing_percentage) > 0,
           )
           .map((participant) => ({
             name: participantName(participant),
@@ -164,7 +164,7 @@ export default async function TrackDetailPage({ params }: Props) {
         <Container className="py-4">
           <Link
             href="/label-os/tracks"
-            className="inline-flex items-center gap-2 text-sm text-white/58 transition hover:text-white"
+            className="text-white/58 inline-flex items-center gap-2 text-sm transition hover:text-white"
           >
             <ArrowLeft size={14} />
             Voltar para o catalogo
@@ -192,11 +192,15 @@ export default async function TrackDetailPage({ params }: Props) {
 
             <div className="flex flex-col justify-between gap-6">
               <div>
-                <div className="text-xs uppercase tracking-[0.24em] text-white/36">Label OS / Preview</div>
+                <div className="text-white/36 text-xs uppercase tracking-[0.24em]">
+                  Label OS / Preview
+                </div>
                 <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
                   {track.title}
                   {track.version ? (
-                    <span className="ml-3 text-2xl font-medium text-white/46">({track.version})</span>
+                    <span className="text-white/46 ml-3 text-2xl font-medium">
+                      ({track.version})
+                    </span>
                   ) : null}
                 </h1>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -204,17 +208,19 @@ export default async function TrackDetailPage({ params }: Props) {
                     {STATUS_LABEL[track.status] ?? track.status}
                   </span>
                   {track.genre ? (
-                    <span className="rounded-full border border-sky-200/14 bg-sky-200/[0.08] px-3 py-1.5 text-xs font-medium text-sky-50">
+                    <span className="border-sky-200/14 rounded-full border bg-sky-200/[0.08] px-3 py-1.5 text-xs font-medium text-sky-50">
                       {track.genre}
                     </span>
                   ) : null}
                   {track.subgenre ? (
-                    <span className="rounded-full border border-violet-200/14 bg-violet-200/[0.08] px-3 py-1.5 text-xs font-medium text-violet-50">
+                    <span className="border-violet-200/14 rounded-full border bg-violet-200/[0.08] px-3 py-1.5 text-xs font-medium text-violet-50">
                       {track.subgenre}
                     </span>
                   ) : null}
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/62">
-                    {track.explicit ? "Conteudo explicito" : "Sem conteudo explicito"}
+                  <span className="text-white/62 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium">
+                    {track.explicit
+                      ? "Conteudo explicito"
+                      : "Sem conteudo explicito"}
                   </span>
                 </div>
               </div>
@@ -224,11 +230,16 @@ export default async function TrackDetailPage({ params }: Props) {
                   label="Artistas"
                   value={
                     mainArtists.length > 0
-                      ? mainArtists.map((participant) => participantName(participant)).join(", ")
+                      ? mainArtists
+                          .map((participant) => participantName(participant))
+                          .join(", ")
                       : null
                   }
                 />
-                <InfoCard label="Lancamento" value={track.release_date || "Sem data"} />
+                <InfoCard
+                  label="Lancamento"
+                  value={track.release_date || "Sem data"}
+                />
                 <InfoCard label="ISRC" value={track.isrc} />
                 <InfoCard label="UPC" value={track.upc} />
               </div>
@@ -243,7 +254,7 @@ export default async function TrackDetailPage({ params }: Props) {
                 </Link>
                 <Link
                   href="/label-os/tracks"
-                  className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white"
+                  className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
                 >
                   Ver catalogo
                 </Link>
@@ -251,6 +262,13 @@ export default async function TrackDetailPage({ params }: Props) {
             </div>
           </div>
         </div>
+
+        <ReleaseReadinessPanel
+          trackId={track.id}
+          result={result}
+          manual={manual}
+          tasks={tasks}
+        />
 
         <div className="grid gap-6">
           <PreviewSection
@@ -263,9 +281,15 @@ export default async function TrackDetailPage({ params }: Props) {
                 <InfoCard label="Genero" value={track.genre} />
                 <InfoCard label="Subgenero" value={track.subgenre} />
                 <InfoCard label="Lancamento" value={track.release_date} />
-                <InfoCard label="BPM" value={track.bpm ? String(track.bpm) : null} />
+                <InfoCard
+                  label="BPM"
+                  value={track.bpm ? String(track.bpm) : null}
+                />
                 <InfoCard label="Tonalidade" value={track.key} />
-                <InfoCard label="Status" value={STATUS_LABEL[track.status] ?? track.status} />
+                <InfoCard
+                  label="Status"
+                  value={STATUS_LABEL[track.status] ?? track.status}
+                />
               </div>
 
               <div className="space-y-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
@@ -279,7 +303,7 @@ export default async function TrackDetailPage({ params }: Props) {
                     <audio controls src={track.audio_url} className="w-full" />
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3 text-sm text-white/46">
+                  <div className="text-white/46 rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3 text-sm">
                     Nenhum audio vinculado.
                   </div>
                 )}
@@ -289,7 +313,7 @@ export default async function TrackDetailPage({ params }: Props) {
                     href={track.contract_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-white/78 underline underline-offset-2 transition hover:text-white"
+                    className="text-white/78 inline-flex items-center gap-2 text-sm underline underline-offset-2 transition hover:text-white"
                   >
                     <FileText className="h-4 w-4" />
                     Abrir contrato
@@ -306,7 +330,9 @@ export default async function TrackDetailPage({ params }: Props) {
           >
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                <div className="mb-3 text-sm font-medium text-white">Splits de obra</div>
+                <div className="mb-3 text-sm font-medium text-white">
+                  Splits de obra
+                </div>
                 {obraPreview.length > 0 ? (
                   <div className="space-y-3">
                     {obraPreview.map((item, index) => (
@@ -314,13 +340,17 @@ export default async function TrackDetailPage({ params }: Props) {
                         key={`${item.name}-${index}`}
                         className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3"
                       >
-                        <div className="text-sm font-medium text-white">{item.name}</div>
-                        <div className="text-sm text-white/64">{formatPercentage(item.percentage)}</div>
+                        <div className="text-sm font-medium text-white">
+                          {item.name}
+                        </div>
+                        <div className="text-white/64 text-sm">
+                          {formatPercentage(item.percentage)}
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-white/44">
+                  <div className="text-white/44 rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm">
                     Nenhum split de obra preenchido ainda.
                   </div>
                 )}
@@ -328,11 +358,13 @@ export default async function TrackDetailPage({ params }: Props) {
 
               <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                 <div className="mb-3 text-sm font-medium text-white">Letra</div>
-                <div className="max-h-[280px] overflow-auto rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3 text-sm leading-6 text-white/72">
+                <div className="text-white/72 max-h-[280px] overflow-auto rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3 text-sm leading-6">
                   {track.lyrics ? (
                     <div className="whitespace-pre-wrap">{track.lyrics}</div>
                   ) : (
-                    <div className="text-white/42">Nenhuma letra cadastrada.</div>
+                    <div className="text-white/42">
+                      Nenhuma letra cadastrada.
+                    </div>
                   )}
                 </div>
               </div>
@@ -354,12 +386,14 @@ export default async function TrackDetailPage({ params }: Props) {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-medium text-white">{item.name}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.18em] text-white/34">
+                          <div className="text-sm font-medium text-white">
+                            {item.name}
+                          </div>
+                          <div className="text-white/34 mt-1 text-xs uppercase tracking-[0.18em]">
                             {item.role}
                           </div>
                         </div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/72">
+                        <div className="text-white/72 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium">
                           <Disc3 className="h-3.5 w-3.5" />
                           {formatPercentage(item.percentage)}
                         </div>
@@ -368,7 +402,7 @@ export default async function TrackDetailPage({ params }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-white/44">
+                <div className="text-white/44 rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm">
                   Nenhum dado de fonograma preenchido ainda.
                 </div>
               )}
@@ -388,13 +422,17 @@ export default async function TrackDetailPage({ params }: Props) {
                       key={`${item.name}-${index}`}
                       className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.025] px-4 py-3"
                     >
-                      <div className="text-sm font-medium text-white">{item.name}</div>
-                      <div className="text-sm text-white/64">{formatPercentage(item.percentage)}</div>
+                      <div className="text-sm font-medium text-white">
+                        {item.name}
+                      </div>
+                      <div className="text-white/64 text-sm">
+                        {formatPercentage(item.percentage)}
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-white/44">
+                <div className="text-white/44 rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm">
                   Nenhum split de royalties preenchido ainda.
                 </div>
               )}

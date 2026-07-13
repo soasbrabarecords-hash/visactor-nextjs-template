@@ -22,6 +22,10 @@ export type LabelEntity = {
   youtube_url: string | null;
   document: string | null;
   birth_date: string | null;
+  ipi_cae: string | null;
+  rights_society: string | null;
+  publisher_name: string | null;
+  payment_data_complete: boolean;
   notes: string | null;
   created_at: string;
 };

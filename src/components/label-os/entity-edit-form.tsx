@@ -1,8 +1,8 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
 import { BadgeCheck, Building2, FileText, Orbit } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ComponentType, ReactNode } from "react";
 import { useState } from "react";
 import RoleChipSelector from "@/components/label-os/role-chip-selector";
 import { ENTITY_TYPES } from "@/lib/label-entities-types";
@@ -83,7 +83,7 @@ function Section({
         </div>
         <div>
           <div className="text-base font-semibold text-white">{title}</div>
-          <div className="mt-1 text-sm text-white/54">{description}</div>
+          <div className="text-white/54 mt-1 text-sm">{description}</div>
         </div>
       </div>
       {children}
@@ -121,6 +121,10 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
       youtube_url: (formData.get("youtube_url") as string) || null,
       document: (formData.get("document") as string) || null,
       birth_date: null,
+      ipi_cae: (formData.get("ipi_cae") as string) || null,
+      rights_society: (formData.get("rights_society") as string) || null,
+      publisher_name: (formData.get("publisher_name") as string) || null,
+      payment_data_complete: formData.get("payment_data_complete") === "on",
       notes: (formData.get("notes") as string) || null,
     };
 
@@ -150,7 +154,7 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
       <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
         <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-sky-400/18 bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100">
+            <span className="border-sky-400/18 rounded-full border bg-sky-400/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-sky-100">
               {ENTITY_TYPE_LABELS[type]}
             </span>
             {roles.map((role) => (
@@ -165,14 +169,15 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
             Ajustar categoria e funcoes da entidade.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/56">
-            Mantenha o cadastro juridico alinhado com o papel real da empresa dentro da distribuicao e dos creditos.
+          <p className="text-white/56 mt-2 max-w-2xl text-sm leading-6">
+            Mantenha o cadastro juridico alinhado com o papel real da empresa
+            dentro da distribuicao e dos creditos.
           </p>
         </div>
 
         <div className="space-y-5 p-6">
           {error ? (
-            <div className="rounded-2xl border border-rose-300/18 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
+            <div className="border-rose-300/18 rounded-2xl border bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
               {error}
             </div>
           ) : null}
@@ -184,7 +189,10 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
           >
             <div className="space-y-5">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-white" htmlFor="type">
+                <label
+                  className="text-sm font-medium text-white"
+                  htmlFor="type"
+                >
                   Categoria principal
                 </label>
                 <select
@@ -195,7 +203,11 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
                   className={INPUT_CLASS}
                 >
                   {ENTITY_TYPES.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-slate-950 text-white"
+                    >
                       {option.label}
                     </option>
                   ))}
@@ -207,7 +219,9 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
                 hint="Selecione papeis complementares sem perder a categoria principal."
                 options={ENTITY_FUNCTION_OPTIONS}
                 value={roles}
-                onChange={(nextValue) => setRoles(nextValue as EntityFunction[])}
+                onChange={(nextValue) =>
+                  setRoles(nextValue as EntityFunction[])
+                }
               />
             </div>
           </Section>
@@ -231,10 +245,58 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
                 placeholder="Como aparece no sistema e nos creditos"
                 defaultValue={entity.display_name ?? ""}
               />
-              <Field label="Email" name="email" type="email" placeholder="contato@empresa.com" defaultValue={entity.email ?? ""} />
-              <Field label="Telefone" name="phone" placeholder="+55 11 99999-9999" defaultValue={entity.phone ?? ""} />
-              <Field label="Documento" name="document" placeholder="CNPJ ou CPF" defaultValue={entity.document ?? ""} />
-              <Field label="Instagram" name="instagram" placeholder="@perfil" defaultValue={entity.instagram ?? ""} />
+              <Field
+                label="Email"
+                name="email"
+                type="email"
+                placeholder="contato@empresa.com"
+                defaultValue={entity.email ?? ""}
+              />
+              <Field
+                label="Telefone"
+                name="phone"
+                placeholder="+55 11 99999-9999"
+                defaultValue={entity.phone ?? ""}
+              />
+              <Field
+                label="Documento"
+                name="document"
+                placeholder="CNPJ ou CPF"
+                defaultValue={entity.document ?? ""}
+              />
+              <Field
+                label="Instagram"
+                name="instagram"
+                placeholder="@perfil"
+                defaultValue={entity.instagram ?? ""}
+              />
+              <Field
+                label="IPI / CAE"
+                name="ipi_cae"
+                placeholder="Identificador autoral"
+                defaultValue={entity.ipi_cae ?? ""}
+              />
+              <Field
+                label="Associação autoral"
+                name="rights_society"
+                placeholder="Abramus, UBC..."
+                defaultValue={entity.rights_society ?? ""}
+              />
+              <Field
+                label="Editora"
+                name="publisher_name"
+                placeholder="Se houver"
+                defaultValue={entity.publisher_name ?? ""}
+              />
+              <label className="text-white/72 flex min-h-12 items-center gap-3 self-end rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="payment_data_complete"
+                  defaultChecked={entity.payment_data_complete}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5"
+                />
+                Dados de pagamento conferidos
+              </label>
             </div>
           </Section>
 
@@ -290,7 +352,7 @@ export default function EntityEditForm({ entity }: { entity: LabelEntity }) {
             <button
               type="button"
               onClick={() => router.back()}
-              className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white"
+              className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
             >
               Cancelar
             </button>
