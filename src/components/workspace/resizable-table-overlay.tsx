@@ -206,21 +206,16 @@ export default function ResizableTableOverlay({
             el.style.position = "sticky";
             el.style.left = `${leftOffsets[i] ?? 0}px`;
             el.style.zIndex = row.parentElement?.tagName === "THEAD" ? "30" : "10";
-            // Background para sobrepor conteúdo que rola atrás
-            if (!el.style.background && !el.style.backgroundColor) {
-              el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
-                ? "hsl(var(--card))"
-                : "hsl(var(--card))";
-            }
+            el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
+              ? "hsl(var(--card))"
+              : "transparent";
           } else if (stickyRightSet.has(i)) {
             el.style.position = "sticky";
             el.style.right = `${rightOffsets[i] ?? 0}px`;
             el.style.zIndex = row.parentElement?.tagName === "THEAD" ? "30" : "10";
-            if (!el.style.background && !el.style.backgroundColor) {
-              el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
-                ? "hsl(var(--card))"
-                : "hsl(var(--card))";
-            }
+            el.style.backgroundColor = row.parentElement?.tagName === "THEAD"
+              ? "hsl(var(--card))"
+              : "transparent";
           }
         });
       }

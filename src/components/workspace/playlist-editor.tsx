@@ -775,15 +775,6 @@ export default function PlaylistEditor({
   }, [selectedSet, tracks.length]);
 
   const isActivelyDragging = dragFrom !== null && dropIndicator !== null;
-  const dropPosition = dropIndicator
-    ? tracks.reduce(
-        (position, _track, index) =>
-          index < dropIndicator.slot && !dragSelection.current.has(index)
-            ? position + 1
-            : position,
-        1,
-      )
-    : null;
   const intelligence = useMemo(
     () => buildPlaylistIntelligence(
       tracks.map((track, index) => {
@@ -885,12 +876,10 @@ export default function PlaylistEditor({
         {isActivelyDragging && dropIndicator ? (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 z-50 h-[3px] -translate-y-1/2 bg-primary shadow-[0_0_18px_hsl(var(--primary)/0.75)]"
+            className="pointer-events-none absolute inset-x-2 z-50 h-px -translate-y-1/2 bg-primary/70"
             style={{ top: dropIndicator.top }}
           >
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-primary-foreground shadow-lg">
-              Soltar {dragSelection.current.size} faixa{dragSelection.current.size > 1 ? "s" : ""} · posição {dropPosition}
-            </span>
+            <span className="absolute -left-0.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary" />
           </div>
         ) : null}
         <table ref={tableRef} className="w-full divide-y divide-border text-left">
@@ -926,6 +915,7 @@ export default function PlaylistEditor({
               return (
                 <tr
                   key={track.instanceKey}
+                  data-selected={isSelected ? "true" : undefined}
                   onClick={(e) => handleRowClick(e, index)}
                   onPointerDown={(e) => handlePointerDown(e, index)}
                   onPointerMove={(e) => handlePointerMove(e, index)}
@@ -939,11 +929,6 @@ export default function PlaylistEditor({
                   }}
                   className={[
                     "group h-16 select-none overflow-hidden",
-                    isSelected
-                      ? isActivelyDragging
-                        ? "bg-primary/15"
-                        : "bg-primary/10 hover:bg-muted/15"
-                      : "hover:bg-muted/15",
                     isDeleting ? "pointer-events-none" : "",
                   ].filter(Boolean).join(" ")}
                 >
