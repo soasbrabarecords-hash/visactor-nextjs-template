@@ -123,12 +123,10 @@ export default function Navigation() {
         key={navigation.name}
         href={navigation.href}
         className={cn(
-          "group relative flex items-center overflow-hidden rounded-xl border transition-colors duration-200",
-          "hover:border-border hover:bg-accent/65",
+          "group relative flex items-center overflow-hidden rounded-lg transition-colors duration-150",
+          "hover:bg-muted/70",
           variant === "root" ? "px-3 py-2.5" : "px-3 py-2",
-          active
-            ? "border-border bg-accent text-accent-foreground"
-            : "border-transparent bg-transparent",
+          active ? "bg-muted text-accent-foreground" : "bg-transparent",
         )}
       >
         <Icon
@@ -170,11 +168,9 @@ export default function Navigation() {
       <div key={navigation.name} className="space-y-1">
         <div
           className={cn(
-            "group relative flex w-full items-center overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors duration-200",
-            "hover:border-border hover:bg-accent/65",
-            active
-              ? "border-border bg-accent text-accent-foreground"
-              : "border-transparent bg-transparent",
+            "group relative flex w-full items-center overflow-hidden rounded-lg px-3 py-2.5 text-left transition-colors duration-150",
+            "hover:bg-muted/70",
+            active ? "bg-muted text-accent-foreground" : "bg-transparent",
           )}
         >
           <Link
@@ -212,7 +208,7 @@ export default function Navigation() {
                 [navigation.name]: !(current[navigation.name] ?? active),
               }))
             }
-            className="relative z-10 -mr-1 ml-1 rounded-lg p-1.5 transition-colors hover:bg-background/70"
+            className="relative z-10 -mr-1 ml-1 rounded-md p-1.5 transition-colors hover:bg-card"
           >
             <ChevronDown
               size={16}
@@ -230,7 +226,7 @@ export default function Navigation() {
         {open ? (
           <div
             id={groupId}
-            className="ml-4 grid gap-1 border-l border-border/70 pl-2.5"
+            className="ml-4 grid gap-0.5 border-l border-border pl-2.5"
           >
             {navigation.children?.map((child) =>
               renderLinkItem(child, "child"),
@@ -251,11 +247,11 @@ export default function Navigation() {
 
   return (
     <div className="flex flex-grow flex-col">
-      <nav className="flex flex-grow flex-col gap-y-1 overflow-y-auto px-3 py-2">
+      <nav className="flex flex-grow flex-col gap-y-0.5 overflow-y-auto px-3 py-2">
         {navigations.filter(isNavigationVisible).map(renderNavigationItem)}
       </nav>
 
-      <div className="border-t border-border/70 px-3 py-3">
+      <div className="border-t border-border px-3 py-3">
         <User />
       </div>
     </div>

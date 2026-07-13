@@ -50,7 +50,7 @@ function InfoCard({
   value: string | null | undefined;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3">
+    <div className="rounded-xl border border-border bg-muted/25 px-4 py-3">
       <div className="text-white/34 text-[11px] uppercase tracking-[0.22em]">
         {label}
       </div>
@@ -71,7 +71,7 @@ function PreviewSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="text-white/38 text-xs uppercase tracking-[0.24em]">
@@ -124,7 +124,7 @@ export default async function TrackDetailPage({ params }: Props) {
           name:
             item.entity_name && item.entity_display_name
               ? `${item.entity_name} (${item.entity_display_name})`
-              : item.entity_name ?? item.entity_display_name ?? "Compositor",
+              : (item.entity_name ?? item.entity_display_name ?? "Compositor"),
           percentage: item.percentage,
         }))
       : participants
@@ -168,7 +168,7 @@ export default async function TrackDetailPage({ params }: Props) {
 
   return (
     <div>
-      <div className="border-b border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.86),rgba(11,16,27,0.95))]">
+      <div className="border-b border-border bg-card">
         <Container className="py-4">
           <Link
             href="/label-os/tracks"
@@ -181,7 +181,7 @@ export default async function TrackDetailPage({ params }: Props) {
       </div>
 
       <Container className="max-w-6xl py-8">
-        <div className="mb-8 overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.88),rgba(11,16,27,0.96))] shadow-[0_24px_120px_rgba(0,0,0,0.28)]">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="grid gap-6 px-6 py-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-8 lg:py-8">
             <div>
               {track.cover_url ? (
@@ -189,10 +189,10 @@ export default async function TrackDetailPage({ params }: Props) {
                 <img
                   src={track.cover_url}
                   alt={track.title}
-                  className="aspect-square w-full rounded-[28px] border border-white/10 object-cover"
+                  className="aspect-square w-full rounded-2xl border border-border object-cover"
                 />
               ) : (
-                <div className="flex aspect-square w-full items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04]">
+                <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-border bg-muted/30">
                   <Music className="h-10 w-10 text-white/30" />
                 </div>
               )}
@@ -255,14 +255,14 @@ export default async function TrackDetailPage({ params }: Props) {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href={`/label-os/tracks/${track.id}/edit`}
-                  className="inline-flex h-11 items-center gap-2 rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)]"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <Pencil size={15} />
                   Editar track
                 </Link>
                 <Link
                   href="/label-os/tracks"
-                  className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
+                  className="inline-flex h-9 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   Ver catalogo
                 </Link>

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Pencil, Plus } from "lucide-react";
+import Link from "next/link";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import { getLabelEntities } from "@/lib/label-entities";
@@ -13,14 +13,19 @@ export const dynamic = "force-dynamic";
 
 const TYPE_COLOR: Record<string, string> = {
   label: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-  imprint: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  publisher: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  imprint:
+    "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  publisher:
+    "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
   manager: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
   company: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   other: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  artist: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
-  producer: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  composer: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+  artist:
+    "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+  producer:
+    "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+  composer:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
 };
 
 type Props = {
@@ -48,7 +53,7 @@ export default async function EntitiesPage({ searchParams }: Props) {
         action={
           <Link
             href="/label-os/entities/new"
-            className="flex items-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300"
+            className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus size={15} />
             Novo participante
@@ -92,10 +97,10 @@ export default async function EntitiesPage({ searchParams }: Props) {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-slate-50 dark:bg-slate-900">
+                <tr className="border-b border-border bg-muted/45">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                     Nome
                   </th>
@@ -121,7 +126,7 @@ export default async function EntitiesPage({ searchParams }: Props) {
                 {filteredEntities.map((entity) => (
                   <tr
                     key={entity.id}
-                    className="border-b border-border last:border-0 hover:bg-slate-50 dark:hover:bg-slate-900"
+                    className="border-b border-border transition-colors last:border-0 hover:bg-muted/40"
                   >
                     <td className="px-4 py-3">
                       <div className="font-medium">
@@ -148,7 +153,8 @@ export default async function EntitiesPage({ searchParams }: Props) {
                               key={role}
                               className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                             >
-                              {ENTITY_FUNCTION_LABELS[role as EntityFunction] ?? role}
+                              {ENTITY_FUNCTION_LABELS[role as EntityFunction] ??
+                                role}
                             </span>
                           ))}
                         </div>
@@ -190,7 +196,7 @@ export default async function EntitiesPage({ searchParams }: Props) {
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/label-os/entities/${entity.id}/edit`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
                       >
                         <Pencil size={12} />
                         Editar

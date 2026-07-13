@@ -35,7 +35,7 @@ export default function RoleChipSelector({
     <div className="space-y-3">
       <div className="space-y-1">
         <div className="text-sm font-medium text-white">{label}</div>
-        {hint ? <div className="text-sm text-white/52">{hint}</div> : null}
+        {hint ? <div className="text-white/52 text-sm">{hint}</div> : null}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -50,8 +50,8 @@ export default function RoleChipSelector({
               className={cn(
                 "rounded-full border px-3 py-2 text-sm font-medium transition",
                 active
-                  ? "border-sky-300/30 bg-[linear-gradient(180deg,rgba(125,211,252,0.16),rgba(96,165,250,0.08))] text-slate-100 shadow-[0_0_0_1px_rgba(148,163,184,0.08)_inset]"
-                  : "border-white/10 bg-white/[0.035] text-white/68 hover:bg-white/[0.07] hover:text-white",
+                  ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200"
+                  : "text-white/68 border-white/10 bg-white/[0.035] hover:bg-white/[0.07] hover:text-white",
               )}
             >
               {option.label}

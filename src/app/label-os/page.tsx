@@ -72,7 +72,7 @@ function TrackSpotlightCard({
   return (
     <Link
       href={href}
-      className="dark:hover:border-white/16 group relative flex items-center gap-3 overflow-hidden rounded-[24px] border border-border/70 bg-background/[0.66] p-3 shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
+      className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-background p-3 shadow-none transition-colors duration-150 hover:border-slate-300 hover:bg-muted/40 dark:hover:border-slate-600"
     >
       <div className="dark:bg-white/18 absolute inset-x-4 top-0 h-px bg-white/80 opacity-70" />
       {coverUrl ? (
@@ -80,10 +80,10 @@ function TrackSpotlightCard({
         <img
           src={coverUrl}
           alt={title}
-          className="relative h-16 w-16 shrink-0 rounded-[18px] border border-border/70 object-cover shadow-[0_12px_30px_rgba(15,23,42,0.14)] dark:border-white/10 dark:shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+          className="relative h-16 w-16 shrink-0 rounded-xl border border-border object-cover shadow-sm"
         />
       ) : (
-        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] border border-border/70 bg-muted/70 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/70">
           <Music2 className="h-5 w-5 text-muted-foreground dark:text-white/40" />
         </div>
       )}
@@ -131,11 +131,11 @@ function ActionTile({
   return (
     <Link
       href={href}
-      className="dark:hover:border-white/16 group relative overflow-hidden rounded-[24px] border border-border/70 bg-background/[0.66] p-4 shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_18px_44px_rgba(15,23,42,0.10)] dark:border-white/10 dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
+      className="group relative overflow-hidden rounded-xl border border-border bg-background p-4 shadow-none transition-colors duration-150 hover:border-slate-300 hover:bg-muted/40 dark:hover:border-slate-600"
     >
       <div className="dark:bg-white/18 absolute inset-x-4 top-0 h-px bg-white/80 opacity-70" />
       <div className="flex items-start justify-between gap-3">
-        <div className="relative flex h-11 w-11 items-center justify-center rounded-[18px] border border-border/70 bg-muted/60 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-muted/60">
           <Icon className="dark:text-white/78 h-[18px] w-[18px] text-foreground/80" />
         </div>
         <ArrowRight className="relative h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground dark:text-white/30 dark:group-hover:text-white/65" />
@@ -219,16 +219,12 @@ export default async function LabelOsPage() {
       .find(Boolean)?.title ?? "Cadastrar o próximo lançamento";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_30%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.10),transparent_28%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--muted))_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.09),transparent_30%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.08),transparent_28%),linear-gradient(180deg,#080d16_0%,#0a0f18_42%,#0b0f17_100%)]">
-      <Container className="py-7 tablet:py-8">
-        <div className="space-y-7">
-          <section className="relative overflow-hidden rounded-[36px] border border-white/70 bg-white/[0.72] p-6 shadow-[0_24px_100px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(12,17,28,0.88))] dark:shadow-[0_24px_120px_rgba(0,0,0,0.28)] tablet:p-7">
-            <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_42%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_42%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_45%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)]" />
-            <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-sky-200/[0.34] blur-3xl dark:bg-sky-300/[0.10]" />
-            <div className="absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-emerald-200/[0.28] blur-3xl dark:bg-indigo-300/[0.10]" />
-
+    <div className="min-h-screen bg-transparent">
+      <Container className="py-5 tablet:py-6">
+        <div className="space-y-5">
+          <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
             <div className="relative grid gap-6 laptop:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="dark:border-sky-200/16 inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-sky-700 dark:bg-sky-200/[0.08] dark:text-sky-100">
                     <Sparkles className="h-3.5 w-3.5" />
@@ -243,7 +239,7 @@ export default async function LabelOsPage() {
                   <div className="dark:text-white/42 text-xs uppercase tracking-[0.2em] text-muted-foreground">
                     Label OS
                   </div>
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground dark:text-white tablet:text-[2.5rem]">
+                  <h1 className="text-3xl font-semibold tracking-[-0.04em] text-foreground dark:text-white tablet:text-4xl">
                     Painel da distribuidora para catálogo, splits e preparação
                     de lançamento.
                   </h1>
@@ -254,36 +250,36 @@ export default async function LabelOsPage() {
                 </div>
 
                 <div className="grid gap-3 tablet:grid-cols-3">
-                  <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.035]">
+                  <div className="rounded-xl border border-border bg-muted/30 p-3.5">
                     <div className="dark:text-white/42 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       <CheckCircle2 className="h-4 w-4" />
                       Prontidão
                     </div>
-                    <div className="mt-3 text-3xl font-semibold text-foreground dark:text-white">
+                    <div className="mt-2.5 text-3xl font-semibold text-foreground dark:text-white">
                       {formatPercent(averageReadiness)}
                     </div>
                     <div className="dark:text-white/52 mt-1 text-sm text-muted-foreground">
                       Média real do catálogo.
                     </div>
                   </div>
-                  <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.035]">
+                  <div className="rounded-xl border border-border bg-muted/30 p-3.5">
                     <div className="dark:text-white/42 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       <FileWarning className="h-4 w-4" />
                       Pendências
                     </div>
-                    <div className="mt-3 text-3xl font-semibold text-foreground dark:text-white">
+                    <div className="mt-2.5 text-3xl font-semibold text-foreground dark:text-white">
                       {blockedTracks}
                     </div>
                     <div className="dark:text-white/52 mt-1 text-sm text-muted-foreground">
                       Tracks com bloqueios.
                     </div>
                   </div>
-                  <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.035]">
+                  <div className="rounded-xl border border-border bg-muted/30 p-3.5">
                     <div className="dark:text-white/42 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       <Disc3 className="h-4 w-4" />
                       Vivo
                     </div>
-                    <div className="mt-3 text-3xl font-semibold text-foreground dark:text-white">
+                    <div className="mt-2.5 text-3xl font-semibold text-foreground dark:text-white">
                       {readyToUploadCount}
                     </div>
                     <div className="dark:text-white/52 mt-1 text-sm text-muted-foreground">
@@ -295,21 +291,21 @@ export default async function LabelOsPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Link
                     href="/label-os/tracks/new"
-                    className="inline-flex h-11 items-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-medium text-white shadow-[0_14px_34px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] dark:text-slate-900 dark:hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)]"
+                    className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     <Plus className="h-4 w-4" />
                     Nova track
                   </Link>
                   <Link
                     href="/label-os/entities/new"
-                    className="dark:border-white/14 inline-flex h-11 items-center gap-2 rounded-full border border-border/70 bg-background/[0.62] px-5 text-sm font-medium text-foreground backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-background dark:bg-white/[0.05] dark:text-white dark:hover:bg-white/[0.08]"
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                   >
                     <Building2 className="h-4 w-4" />
                     Nova entidade
                   </Link>
                   <Link
                     href="/label-os/tracks"
-                    className="dark:border-white/14 dark:text-white/78 inline-flex h-11 items-center gap-2 rounded-full border border-border/70 bg-background/[0.48] px-5 text-sm font-medium text-muted-foreground backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-background hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.06] dark:hover:text-white"
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <Library className="h-4 w-4" />
                     Ver catálogo
@@ -317,7 +313,7 @@ export default async function LabelOsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] border border-border/70 bg-slate-950 p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.035] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 text-white shadow-sm dark:border-border">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-white/42 text-[11px] uppercase tracking-[0.18em]">
@@ -334,12 +330,12 @@ export default async function LabelOsPage() {
                         : "Sem data cadastrada no pipeline agora."}
                     </div>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.05]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05]">
                     <CalendarClock className="text-white/78 h-5 w-5" />
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="text-white/38 text-[11px] uppercase tracking-[0.16em]">
                     Melhor ação agora
                   </div>
@@ -348,7 +344,7 @@ export default async function LabelOsPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
                     <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
                       Draft
@@ -375,7 +371,7 @@ export default async function LabelOsPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm">
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-white/38 text-[11px] uppercase tracking-[0.16em]">
@@ -389,7 +385,7 @@ export default async function LabelOsPage() {
                     </div>
                     <Link
                       href="/label-os/tracks"
-                      className="border-white/12 text-white/78 inline-flex items-center gap-2 rounded-full border bg-white/[0.04] px-3 py-2 text-xs font-medium transition hover:bg-white/[0.08] hover:text-white"
+                      className="border-white/12 text-white/78 inline-flex items-center gap-2 rounded-lg border bg-white/[0.04] px-3 py-2 text-xs font-medium transition-colors hover:bg-white/[0.08] hover:text-white"
                     >
                       Abrir tracks
                       <ArrowRight className="h-3.5 w-3.5" />
@@ -400,7 +396,7 @@ export default async function LabelOsPage() {
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-border/70 bg-background/[0.66] p-5 shadow-[0_18px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.035] dark:shadow-[0_18px_70px_rgba(0,0,0,0.22)] tablet:p-6">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground dark:text-white/40">
@@ -415,7 +411,7 @@ export default async function LabelOsPage() {
               </div>
               <Link
                 href="/label-os/tracks"
-                className="dark:border-white/12 dark:text-white/74 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-background dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >
                 Abrir catálogo <ArrowRight className="h-4 w-4" />
               </Link>
@@ -469,7 +465,7 @@ export default async function LabelOsPage() {
                 <Link
                   key={String(label)}
                   href="/label-os/tracks"
-                  className="group rounded-[22px] border border-border/70 bg-background/[0.56] p-4 transition hover:-translate-y-0.5 hover:bg-background dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.055]"
+                  className="group rounded-xl border border-border bg-muted/25 p-4 transition-colors hover:bg-muted/55"
                 >
                   <div
                     className={cn(
@@ -489,7 +485,7 @@ export default async function LabelOsPage() {
               ))}
               <Link
                 href="/label-os/tracks/new"
-                className="dark:border-white/12 group flex min-h-28 flex-col justify-between rounded-[22px] border border-dashed border-border bg-muted/30 p-4 transition hover:bg-muted/60 dark:bg-white/[0.02] dark:hover:bg-white/[0.045]"
+                className="group flex min-h-28 flex-col justify-between rounded-xl border border-dashed border-border bg-muted/20 p-4 transition-colors hover:bg-muted/50"
               >
                 <Plus className="dark:text-white/46 h-5 w-5 text-muted-foreground" />
                 <div className="text-sm font-medium text-foreground dark:text-white">
@@ -500,7 +496,7 @@ export default async function LabelOsPage() {
           </section>
 
           <section className="grid gap-5 laptop:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
-            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <div className="text-xs uppercase tracking-[0.18em] text-white/40">
@@ -516,7 +512,7 @@ export default async function LabelOsPage() {
                 </div>
                 <Link
                   href="/label-os/tracks"
-                  className="border-white/12 text-white/78 inline-flex items-center gap-2 rounded-full border bg-white/5 px-4 py-2 text-sm font-medium transition hover:bg-white/10 hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                 >
                   Ver todas
                   <ArrowRight className="h-4 w-4" />
@@ -542,7 +538,7 @@ export default async function LabelOsPage() {
                     />
                   ))
                 ) : (
-                  <div className="text-white/48 rounded-[24px] border border-dashed border-white/10 bg-black/20 px-5 py-10 text-center text-sm">
+                  <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-10 text-center text-sm text-muted-foreground">
                     Nenhuma faixa cadastrada ainda.
                   </div>
                 )}
@@ -550,7 +546,7 @@ export default async function LabelOsPage() {
             </div>
 
             <div className="space-y-5">
-              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
                 <div className="text-xs uppercase tracking-[0.18em] text-white/40">
                   Ações rápidas
                 </div>
@@ -579,7 +575,7 @@ export default async function LabelOsPage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.66),rgba(11,16,27,0.84))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl tablet:p-6">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-white/40">
@@ -603,7 +599,7 @@ export default async function LabelOsPage() {
                       <Link
                         key={artist.id}
                         href={`/label-os/entities/${artist.id}/edit`}
-                        className="hover:border-white/18 group flex items-center justify-between gap-3 rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:bg-white/[0.05]"
+                        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:bg-muted/50"
                       >
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-white">
@@ -620,7 +616,7 @@ export default async function LabelOsPage() {
                       </Link>
                     ))
                   ) : (
-                    <div className="text-white/48 rounded-[24px] border border-dashed border-white/10 bg-black/20 px-5 py-8 text-center text-sm">
+                    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-8 text-center text-sm text-muted-foreground">
                       Nenhum artista cadastrado ainda.
                     </div>
                   )}

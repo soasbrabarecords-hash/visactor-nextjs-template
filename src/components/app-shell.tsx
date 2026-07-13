@@ -12,9 +12,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-[100dvh]">
+    <div className="flex min-h-[100dvh] bg-transparent">
       <SideNav />
-      <main className="theme-adaptive min-w-0 flex-grow overflow-auto">
+      <main className="theme-adaptive min-w-0 flex-grow overflow-auto bg-transparent">
         {children}
       </main>
     </div>

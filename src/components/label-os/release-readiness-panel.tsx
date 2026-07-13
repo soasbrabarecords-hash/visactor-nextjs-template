@@ -50,7 +50,7 @@ const TASK_STATUS_LABEL: Record<ReadinessTaskStatus, string> = {
 };
 
 const INPUT_CLASS =
-  "h-11 w-full rounded-2xl border border-white/10 bg-white/[0.045] px-3 text-sm text-white outline-none transition placeholder:text-white/28 focus:border-sky-300/30 focus:bg-white/[0.065]";
+  "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/20";
 
 function manualInputFromRow(
   row: LabelTrackReadiness | null,
@@ -354,11 +354,11 @@ export default function ReleaseReadinessPanel({
   }
 
   return (
-    <section className="mb-8 overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,38,0.92),rgba(8,13,23,0.96))] shadow-[0_28px_120px_rgba(0,0,0,0.3)] backdrop-blur-2xl">
-      <div className="border-b border-white/10 px-5 py-5 sm:px-6">
+    <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-5 laptop:flex-row laptop:items-center laptop:justify-between">
           <div className="flex items-center gap-3">
-            <div className="border-sky-300/16 flex h-11 w-11 items-center justify-center rounded-[18px] border bg-sky-300/[0.08] text-sky-100">
+            <div className="border-sky-300/16 flex h-10 w-10 items-center justify-center rounded-xl border bg-sky-300/[0.08] text-sky-100">
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div>
@@ -371,7 +371,7 @@ export default function ReleaseReadinessPanel({
             </div>
           </div>
 
-          <div className="inline-flex w-fit rounded-full border border-white/10 bg-black/20 p-1">
+          <div className="inline-flex w-fit rounded-lg border border-border bg-muted/30 p-1">
             {(
               [
                 ["overview", "Resumo", Sparkles],
@@ -385,9 +385,9 @@ export default function ReleaseReadinessPanel({
                 onClick={() => setTab(key)}
                 aria-pressed={tab === key}
                 className={cn(
-                  "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-xs font-medium transition",
+                  "inline-flex h-8 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors",
                   tab === key
-                    ? "bg-white text-slate-950 shadow-sm"
+                    ? "bg-card text-foreground shadow-sm"
                     : "text-white/52 hover:text-white",
                 )}
               >
@@ -407,7 +407,7 @@ export default function ReleaseReadinessPanel({
 
       {tab === "overview" ? (
         <div className="grid gap-6 p-5 sm:p-6 laptop:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-          <div className="rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.12),transparent_42%),rgba(255,255,255,0.025)] p-5">
+          <div className="rounded-2xl border border-border bg-muted/20 p-5">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
               <ScoreRing score={result.readinessScore} />
               <div className="min-w-0 flex-1">
@@ -511,7 +511,7 @@ export default function ReleaseReadinessPanel({
             <details
               key={area.key}
               open={area.blockingCount > 0}
-              className="group rounded-[24px] border border-white/10 bg-white/[0.025]"
+              className="group rounded-xl border border-border bg-muted/20"
             >
               <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-4">
                 <div
@@ -583,7 +583,7 @@ export default function ReleaseReadinessPanel({
         <div className="grid gap-5 p-5 sm:p-6 laptop:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
           <form
             onSubmit={saveReadiness}
-            className="rounded-[26px] border border-white/10 bg-white/[0.025] p-4 sm:p-5"
+            className="rounded-2xl border border-border bg-muted/20 p-4 sm:p-5"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

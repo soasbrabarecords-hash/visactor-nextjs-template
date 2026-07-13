@@ -27,7 +27,7 @@ import {
 } from "@/lib/label-os-taxonomy";
 
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";
+  "w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/20";
 
 const CATEGORY_COLOR: Record<string, string> = {
   artist: "border-purple-300/20 bg-purple-300/12 text-purple-100",
@@ -102,14 +102,14 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.62),rgba(11,16,27,0.82))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-muted/50">
           <Icon className="h-[18px] w-[18px] text-sky-100" />
         </div>
         <div>
           <div className="text-base font-semibold text-white">{title}</div>
-          <div className="mt-1 text-sm text-white/54">{description}</div>
+          <div className="text-white/54 mt-1 text-sm">{description}</div>
         </div>
       </div>
       {children}
@@ -127,9 +127,7 @@ export default function EntityForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [kind, setKind] = useState<EntityKind>(
-    entity?.entity_kind ?? "person",
-  );
+  const [kind, setKind] = useState<EntityKind>(entity?.entity_kind ?? "person");
   const [category, setCategory] = useState<EntityType>(
     entity?.type ?? "artist",
   );
@@ -170,17 +168,17 @@ export default function EntityForm({
         String(formData.get("rights_society") ?? "").trim() || null,
       publisher_name: publisher?.display_name ?? publisher?.name ?? null,
       publisher_entity_id: publisher?.id ?? null,
-      payment_data_complete:
-        formData.get("payment_data_complete") === "on",
+      payment_data_complete: formData.get("payment_data_complete") === "on",
       pix_key: String(formData.get("pix_key") ?? "").trim() || null,
-      bank_details:
-        String(formData.get("bank_details") ?? "").trim() || null,
+      bank_details: String(formData.get("bank_details") ?? "").trim() || null,
       notes: String(formData.get("notes") ?? "").trim() || null,
     };
 
     try {
       const response = await fetch(
-        entity ? `/api/label-os/entities/${entity.id}` : "/api/label-os/entities",
+        entity
+          ? `/api/label-os/entities/${entity.id}`
+          : "/api/label-os/entities",
         {
           method: entity ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -206,8 +204,8 @@ export default function EntityForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
-        <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border bg-muted/20 px-5 py-5 tablet:px-6">
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={`rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] ${CATEGORY_COLOR[category] ?? CATEGORY_COLOR.other}`}
@@ -227,9 +225,11 @@ export default function EntityForm({
             ))}
           </div>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
-            {entity ? "Atualizar participante." : "Uma identidade, várias funções."}
+            {entity
+              ? "Atualizar participante."
+              : "Uma identidade, várias funções."}
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/56">
+          <p className="text-white/56 mt-2 max-w-2xl text-sm leading-6">
             Pessoas e empresas são cadastradas uma única vez e reutilizadas na
             obra, no fonograma, nos royalties e nos contratos.
           </p>
@@ -237,7 +237,10 @@ export default function EntityForm({
 
         <div className="space-y-5 p-6">
           {error ? (
-            <div role="alert" className="rounded-2xl border border-rose-300/20 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
+            <div
+              role="alert"
+              className="rounded-2xl border border-rose-300/20 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100"
+            >
               {error}
             </div>
           ) : null}
@@ -249,34 +252,52 @@ export default function EntityForm({
           >
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-white" htmlFor="entity-kind">
+                <label
+                  className="text-sm font-medium text-white"
+                  htmlFor="entity-kind"
+                >
                   Tipo jurídico
                 </label>
                 <select
                   id="entity-kind"
                   value={kind}
-                  onChange={(event) => setKind(event.target.value as EntityKind)}
+                  onChange={(event) =>
+                    setKind(event.target.value as EntityKind)
+                  }
                   className={INPUT_CLASS}
                 >
                   {ENTITY_KIND_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-slate-950 text-white"
+                    >
                       {option.label}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-white" htmlFor="entity-category">
+                <label
+                  className="text-sm font-medium text-white"
+                  htmlFor="entity-category"
+                >
                   Categoria
                 </label>
                 <select
                   id="entity-category"
                   value={category}
-                  onChange={(event) => setCategory(event.target.value as EntityType)}
+                  onChange={(event) =>
+                    setCategory(event.target.value as EntityType)
+                  }
                   className={INPUT_CLASS}
                 >
                   {ENTITY_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-slate-950 text-white">
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-slate-950 text-white"
+                    >
                       {option.label}
                     </option>
                   ))}
@@ -284,11 +305,11 @@ export default function EntityForm({
               </div>
               <div className="sm:col-span-2">
                 <RoleChipSelector
-                label="Funções exercidas no catálogo"
-                hint="Selecione todas as funções. Os campos da track usam esta lista para mostrar apenas participantes compatíveis."
-                options={ENTITY_FUNCTION_OPTIONS}
-                value={roles}
-                onChange={(value) => setRoles(value as EntityFunction[])}
+                  label="Funções exercidas no catálogo"
+                  hint="Selecione todas as funções. Os campos da track usam esta lista para mostrar apenas participantes compatíveis."
+                  options={ENTITY_FUNCTION_OPTIONS}
+                  value={roles}
+                  onChange={(value) => setRoles(value as EntityFunction[])}
                 />
               </div>
             </div>
@@ -300,17 +321,68 @@ export default function EntityForm({
             description="Nome legal para documentos e nome artístico ou fantasia para créditos e operação."
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={kind === "person" ? "Nome legal" : "Razão social"} name="name" required placeholder="Identidade legal" defaultValue={entity?.name} />
-              <Field label={kind === "person" ? "Nome artístico" : "Nome fantasia"} name="display_name" placeholder="Nome público ou de crédito" defaultValue={entity?.display_name ?? ""} />
-              <Field label="CPF / CNPJ" name="document" placeholder="Documento sem duplicar cadastros" defaultValue={entity?.document ?? ""} />
-              {kind === "person" ? <Field label="Data de nascimento" name="birth_date" type="date" defaultValue={entity?.birth_date ?? ""} /> : null}
-              <Field label="Email" name="email" type="email" placeholder="contato@exemplo.com" defaultValue={entity?.email ?? ""} />
-              <Field label="Telefone" name="phone" placeholder="+55 11 99999-9999" defaultValue={entity?.phone ?? ""} />
-              <Field label="Instagram" name="instagram" placeholder="@perfil" defaultValue={entity?.instagram ?? ""} />
-              <Field label="IPI / CAE" name="ipi_cae" placeholder="Identificador autoral" defaultValue={entity?.ipi_cae ?? ""} />
-              <Field label="Associação autoral" name="rights_society" placeholder="Abramus, UBC..." defaultValue={entity?.rights_society ?? ""} />
+              <Field
+                label={kind === "person" ? "Nome legal" : "Razão social"}
+                name="name"
+                required
+                placeholder="Identidade legal"
+                defaultValue={entity?.name}
+              />
+              <Field
+                label={kind === "person" ? "Nome artístico" : "Nome fantasia"}
+                name="display_name"
+                placeholder="Nome público ou de crédito"
+                defaultValue={entity?.display_name ?? ""}
+              />
+              <Field
+                label="CPF / CNPJ"
+                name="document"
+                placeholder="Documento sem duplicar cadastros"
+                defaultValue={entity?.document ?? ""}
+              />
+              {kind === "person" ? (
+                <Field
+                  label="Data de nascimento"
+                  name="birth_date"
+                  type="date"
+                  defaultValue={entity?.birth_date ?? ""}
+                />
+              ) : null}
+              <Field
+                label="Email"
+                name="email"
+                type="email"
+                placeholder="contato@exemplo.com"
+                defaultValue={entity?.email ?? ""}
+              />
+              <Field
+                label="Telefone"
+                name="phone"
+                placeholder="+55 11 99999-9999"
+                defaultValue={entity?.phone ?? ""}
+              />
+              <Field
+                label="Instagram"
+                name="instagram"
+                placeholder="@perfil"
+                defaultValue={entity?.instagram ?? ""}
+              />
+              <Field
+                label="IPI / CAE"
+                name="ipi_cae"
+                placeholder="Identificador autoral"
+                defaultValue={entity?.ipi_cae ?? ""}
+              />
+              <Field
+                label="Associação autoral"
+                name="rights_society"
+                placeholder="Abramus, UBC..."
+                defaultValue={entity?.rights_society ?? ""}
+              />
               <div className="flex flex-col gap-2 sm:col-span-2">
-                <label className="text-sm font-medium text-white">Editora vinculada</label>
+                <label className="text-sm font-medium text-white">
+                  Editora vinculada
+                </label>
                 <EntityCombobox
                   value={publisher}
                   onChange={setPublisher}
@@ -328,10 +400,30 @@ export default function EntityForm({
             description="Identificadores e links para conferir rapidamente o perfil certo."
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Spotify Artist ID" name="spotify_artist_id" placeholder="ID do artista no Spotify" defaultValue={entity?.spotify_artist_id ?? ""} />
-              <Field label="Spotify URL" name="spotify_url" placeholder="https://open.spotify.com/artist/..." defaultValue={entity?.spotify_url ?? ""} />
-              <Field label="Apple Music URL" name="apple_music_url" placeholder="https://music.apple.com/..." defaultValue={entity?.apple_music_url ?? ""} />
-              <Field label="YouTube URL" name="youtube_url" placeholder="https://youtube.com/@perfil" defaultValue={entity?.youtube_url ?? ""} />
+              <Field
+                label="Spotify Artist ID"
+                name="spotify_artist_id"
+                placeholder="ID do artista no Spotify"
+                defaultValue={entity?.spotify_artist_id ?? ""}
+              />
+              <Field
+                label="Spotify URL"
+                name="spotify_url"
+                placeholder="https://open.spotify.com/artist/..."
+                defaultValue={entity?.spotify_url ?? ""}
+              />
+              <Field
+                label="Apple Music URL"
+                name="apple_music_url"
+                placeholder="https://music.apple.com/..."
+                defaultValue={entity?.apple_music_url ?? ""}
+              />
+              <Field
+                label="YouTube URL"
+                name="youtube_url"
+                placeholder="https://youtube.com/@perfil"
+                defaultValue={entity?.youtube_url ?? ""}
+              />
             </div>
           </Section>
 
@@ -341,13 +433,30 @@ export default function EntityForm({
             description="Dados internos para repasses. Essas informações não entram automaticamente no PDF do contrato."
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Chave Pix" name="pix_key" placeholder="CPF, CNPJ, email, telefone ou chave" defaultValue={entity?.pix_key ?? ""} />
-              <label className="flex min-h-12 items-center gap-3 self-end rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/72">
-                <input type="checkbox" name="payment_data_complete" defaultChecked={entity?.payment_data_complete ?? false} className="h-4 w-4 rounded border-white/20 bg-white/5" />
+              <Field
+                label="Chave Pix"
+                name="pix_key"
+                placeholder="CPF, CNPJ, email, telefone ou chave"
+                defaultValue={entity?.pix_key ?? ""}
+              />
+              <label className="text-white/72 flex min-h-12 items-center gap-3 self-end rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="payment_data_complete"
+                  defaultChecked={entity?.payment_data_complete ?? false}
+                  className="h-4 w-4 rounded border-white/20 bg-white/5"
+                />
                 Dados de pagamento conferidos
               </label>
               <div className="sm:col-span-2">
-                <Field label="Dados bancários" name="bank_details" type="textarea" rows={3} placeholder="Banco, agência, conta, titular e observações de pagamento" defaultValue={entity?.bank_details ?? ""} />
+                <Field
+                  label="Dados bancários"
+                  name="bank_details"
+                  type="textarea"
+                  rows={3}
+                  placeholder="Banco, agência, conta, titular e observações de pagamento"
+                  defaultValue={entity?.bank_details ?? ""}
+                />
               </div>
             </div>
           </Section>
@@ -357,14 +466,32 @@ export default function EntityForm({
             title="Observações internas"
             description="Contexto contratual e operacional para a equipe."
           >
-            <Field label="Notas" name="notes" type="textarea" placeholder="Observações, pendências e detalhes importantes..." defaultValue={entity?.notes ?? ""} />
+            <Field
+              label="Notas"
+              name="notes"
+              type="textarea"
+              placeholder="Observações, pendências e detalhes importantes..."
+              defaultValue={entity?.notes ?? ""}
+            />
           </Section>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={loading} className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60">
-              {loading ? "Salvando..." : entity ? "Salvar alterações" : "Salvar participante"}
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60"
+            >
+              {loading
+                ? "Salvando..."
+                : entity
+                  ? "Salvar alterações"
+                  : "Salvar participante"}
             </button>
-            <button type="button" onClick={() => router.back()} className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
+            >
               Cancelar
             </button>
           </div>

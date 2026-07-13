@@ -1,17 +1,17 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import Container from "@/components/container";
+import CompositionForm from "@/components/label-os/composition-form";
+import MasterSplitForm from "@/components/label-os/master-split-form";
+import RoyaltySplitForm from "@/components/label-os/royalty-split-form";
+import TrackEditForm from "@/components/label-os/track-edit-form";
 import { getLabelTrackById } from "@/lib/label-os";
 import {
   getTrackCompositions,
   getTrackMasterSplits,
   getTrackRoyaltySplits,
 } from "@/lib/label-splits";
-import TrackEditForm from "@/components/label-os/track-edit-form";
-import CompositionForm from "@/components/label-os/composition-form";
-import MasterSplitForm from "@/components/label-os/master-split-form";
-import RoyaltySplitForm from "@/components/label-os/royalty-split-form";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +29,15 @@ function EditSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] p-6 shadow-[0_24px_120px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm tablet:p-6">
       <div className="mb-5">
-        <div className="text-xs uppercase tracking-[0.24em] text-white/38">Etapa {step} / 4</div>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">{title}</h2>
-        <p className="mt-2 max-w-2xl text-sm text-white/56">{description}</p>
+        <div className="text-white/38 text-xs uppercase tracking-[0.24em]">
+          Etapa {step} / 4
+        </div>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          {title}
+        </h2>
+        <p className="text-white/56 mt-2 max-w-2xl text-sm">{description}</p>
       </div>
       {children}
     </section>
@@ -46,15 +50,19 @@ export default async function EditTrackPage({ params }: Props) {
 
   if (!track) notFound();
 
-  const [compositionsResult, masterResult, royaltiesResult] = await Promise.allSettled([
-    getTrackCompositions(id),
-    getTrackMasterSplits(id),
-    getTrackRoyaltySplits(id),
-  ]);
+  const [compositionsResult, masterResult, royaltiesResult] =
+    await Promise.allSettled([
+      getTrackCompositions(id),
+      getTrackMasterSplits(id),
+      getTrackRoyaltySplits(id),
+    ]);
 
-  const compositions = compositionsResult.status === "fulfilled" ? compositionsResult.value : [];
-  const masterSplits = masterResult.status === "fulfilled" ? masterResult.value : [];
-  const royaltySplits = royaltiesResult.status === "fulfilled" ? royaltiesResult.value : [];
+  const compositions =
+    compositionsResult.status === "fulfilled" ? compositionsResult.value : [];
+  const masterSplits =
+    masterResult.status === "fulfilled" ? masterResult.value : [];
+  const royaltySplits =
+    royaltiesResult.status === "fulfilled" ? royaltiesResult.value : [];
 
   return (
     <div>
@@ -72,10 +80,15 @@ export default async function EditTrackPage({ params }: Props) {
 
       <Container className="max-w-6xl py-8">
         <div className="mb-6">
-          <div className="text-xs uppercase tracking-[0.24em] text-white/38">Label OS / Track</div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Editar track</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/54">
-            Agora a edicao cobre as quatro etapas do cadastro: dados da faixa, obra, fonograma e royalties.
+          <div className="text-white/38 text-xs uppercase tracking-[0.24em]">
+            Label OS / Track
+          </div>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">
+            Editar track
+          </h1>
+          <p className="text-white/54 mt-2 max-w-2xl text-sm">
+            Agora a edicao cobre as quatro etapas do cadastro: dados da faixa,
+            obra, fonograma e royalties.
           </p>
         </div>
 

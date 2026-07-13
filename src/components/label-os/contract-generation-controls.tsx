@@ -47,7 +47,7 @@ export default function ContractGenerationControls({
   }
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-sky-200/15 bg-sky-200/[0.055] p-4">
+    <div className="space-y-4 rounded-xl border border-border bg-muted/25 p-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-white">
@@ -62,7 +62,7 @@ export default function ContractGenerationControls({
           type="button"
           disabled={loading}
           onClick={() => void generate()}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#1473e6] px-5 text-sm font-semibold text-white shadow-[0_12px_34px_rgba(20,115,230,0.28)] transition hover:bg-[#2581ed] disabled:cursor-wait disabled:opacity-60"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
         >
           {loading ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />

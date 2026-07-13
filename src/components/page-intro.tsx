@@ -13,15 +13,15 @@ export default function PageIntro({
   action?: ReactNode;
 }) {
   return (
-    <Container className="border-b border-border py-6">
-      <div className="grid gap-5 laptop:grid-cols-[1fr_auto] laptop:items-center">
-        <div className="space-y-2">
+    <Container className="border-b border-border py-5">
+      <div className="grid gap-4 laptop:grid-cols-[1fr_auto] laptop:items-center">
+        <div className="space-y-1.5">
           {eyebrow ? (
             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               {eyebrow}
             </div>
           ) : null}
-          <h2 className="text-3xl font-semibold">{title}</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">{title}</h2>
           <p className="max-w-3xl text-sm text-muted-foreground">
             {description}
           </p>

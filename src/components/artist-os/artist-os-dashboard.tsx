@@ -108,7 +108,7 @@ function metricCard({
   return (
     <article
       className={cn(
-        "relative min-h-[136px] overflow-hidden rounded-[26px] border p-4 shadow-[0_18px_62px_-54px_rgba(15,23,42,0.3)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-md dark:shadow-[0_18px_68px_-54px_rgba(0,0,0,0.9)]",
+        "relative min-h-[124px] overflow-hidden rounded-2xl border p-4 shadow-sm transition-colors duration-150 hover:border-border",
         toneConfig.card,
       )}
     >
@@ -122,13 +122,13 @@ function metricCard({
           >
             {label}
           </div>
-          <div className="mt-3 text-4xl font-semibold tracking-[-0.055em] text-foreground">
+          <div className="mt-2.5 text-3xl font-semibold tracking-[-0.045em] text-foreground">
             {value}
           </div>
         </div>
         <div
           className={cn(
-            "ring-current/10 flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset",
+            "ring-current/10 flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-inset",
             toneConfig.icon,
           )}
         >
@@ -137,7 +137,7 @@ function metricCard({
       </div>
       <p
         className={cn(
-          "relative mt-4 text-sm font-medium leading-5",
+          "relative mt-3 text-sm font-normal leading-5",
           toneConfig.helper,
         )}
       >
@@ -173,12 +173,7 @@ function ListCard({
   } as const;
 
   return (
-    <section
-      className={cn(
-        "rounded-[26px] border p-4 shadow-[0_18px_62px_-56px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:shadow-[0_18px_68px_-56px_rgba(0,0,0,0.88)]",
-        tones[tone],
-      )}
-    >
+    <section className={cn("rounded-2xl border p-4 shadow-sm", tones[tone])}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold tracking-[-0.02em] text-foreground">
           {title}
@@ -193,7 +188,7 @@ function ListCard({
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-[20px] border border-border/70 bg-muted/35 p-5 text-sm font-medium text-muted-foreground">
+        <div className="rounded-xl border border-border bg-muted/30 p-5 text-sm font-medium text-muted-foreground">
           {empty}
         </div>
       ) : (
@@ -205,7 +200,7 @@ function ListCard({
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[18px] border border-border/60 bg-background/55 px-3 py-3 transition hover:bg-accent/40">
+    <div className="rounded-xl border border-border bg-background px-3 py-3 transition-colors hover:bg-muted/50">
       {children}
     </div>
   );

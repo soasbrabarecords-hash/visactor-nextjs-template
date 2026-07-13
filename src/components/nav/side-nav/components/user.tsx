@@ -201,7 +201,7 @@ export default function User() {
           }
         }}
       >
-        <DropdownMenuTrigger className="group flex w-full items-center justify-between rounded-2xl border border-transparent px-2.5 py-2 text-left transition hover:border-border hover:bg-accent/70">
+        <DropdownMenuTrigger className="group flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-muted/70">
           <div className="flex min-w-0 flex-1 items-center">
             <AccountAvatar
               name={accountName}
@@ -227,7 +227,7 @@ export default function User() {
           align="start"
           side="top"
           sideOffset={10}
-          className="w-80 rounded-2xl border-border bg-popover p-2 text-popover-foreground shadow-2xl"
+          className="w-80 rounded-xl border-border bg-popover p-2 text-popover-foreground shadow-sm"
         >
           <DropdownMenuLabel className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
             Contas conectadas

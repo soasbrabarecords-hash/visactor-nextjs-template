@@ -55,7 +55,7 @@ function PlaceholderCard({
   const content = (
     <div
       className={cn(
-        "group rounded-[24px] border p-4 shadow-[0_16px_50px_-46px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:shadow-md",
+        "group rounded-2xl border p-4 shadow-sm transition-colors hover:border-border",
         tones[tone],
       )}
     >
@@ -79,7 +79,7 @@ function PlaceholderCard({
 
 function ReportsPage() {
   return (
-    <section className="rounded-[28px] border border-border/70 bg-card/80 p-5 shadow-[0_18px_68px_-58px_rgba(15,23,42,0.32)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="max-w-3xl">
         <div className="text-xs font-medium text-muted-foreground">
           Relatórios
@@ -136,7 +136,7 @@ function ReportsPage() {
 
 function SettingsPage() {
   return (
-    <section className="rounded-[28px] border border-border/70 bg-card/80 p-5 shadow-[0_18px_68px_-58px_rgba(15,23,42,0.32)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-4 laptop:flex-row laptop:items-start laptop:justify-between">
         <div className="max-w-3xl">
           <div className="text-xs font-medium text-muted-foreground">
@@ -151,7 +151,7 @@ function SettingsPage() {
             atual do sistema continua controlando o acesso.
           </p>
         </div>
-        <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/[0.08] p-4 text-emerald-800 dark:text-emerald-200">
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4 text-emerald-800 dark:text-emerald-200">
           <Settings2 className="h-5 w-5" />
           <div className="mt-3 text-sm font-semibold">MVP seguro</div>
           <div className="mt-1 text-xs leading-5 text-emerald-800/75 dark:text-emerald-200/75">

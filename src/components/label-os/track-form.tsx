@@ -17,8 +17,8 @@ import type { ChangeEvent, ComponentType, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import EntityCombobox from "@/components/label-os/entity-combobox";
 import type { LabelEntity } from "@/lib/label-entities-types";
-import type { LabelArtist } from "@/lib/label-os-types";
 import type { EntityFunction } from "@/lib/label-os-taxonomy";
+import type { LabelArtist } from "@/lib/label-os-types";
 import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import {
   formatPercentage,
@@ -155,9 +155,9 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.62),rgba(11,16,27,0.82))] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="mb-5 flex items-start gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-muted/50">
           <Icon className="h-[18px] w-[18px] text-sky-100" />
         </div>
         <div>
@@ -812,9 +812,9 @@ export default function TrackForm({ artists }: TrackFormProps) {
   }
 
   const buttonPrimary =
-    "inline-flex h-11 items-center rounded-full bg-[linear-gradient(180deg,#f6f8fb,#dbe7ff)] px-5 text-sm font-medium text-slate-900 transition hover:bg-[linear-gradient(180deg,#ffffff,#e3ecff)] disabled:opacity-60";
+    "inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60";
   const buttonSecondary =
-    "inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white";
+    "inline-flex h-9 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60";
 
   return (
     <div className="space-y-6">
@@ -827,8 +827,8 @@ export default function TrackForm({ artists }: TrackFormProps) {
       ) : null}
 
       {step === 1 ? (
-        <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,39,0.72),rgba(11,16,27,0.88))] shadow-[0_24px_120px_rgba(0,0,0,0.26)] backdrop-blur-xl">
-          <div className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.14),transparent_44%),radial-gradient(circle_at_top_right,rgba(196,181,253,0.12),transparent_42%)] px-6 py-6">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border bg-muted/20 px-5 py-5 tablet:px-6">
             <div className="text-white/42 text-xs uppercase tracking-[0.2em]">
               Dados principais
             </div>

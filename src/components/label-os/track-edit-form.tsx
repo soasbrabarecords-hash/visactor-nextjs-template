@@ -3,11 +3,11 @@
 import { FileAudio2, FileImage } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 import type { LabelTrack } from "@/lib/label-os-types";
+import { uploadLabelOsFile } from "@/lib/label-os-upload-client";
 
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white outline-none placeholder:text-white/28 focus:border-sky-200/24 focus:bg-white/[0.055]";
+  "w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/20";
 
 type Props = {
   track: LabelTrack;
@@ -89,7 +89,9 @@ export default function TrackEditForm({ track }: Props) {
           audioUrl = await uploadLabelOsFile(audioFile, "label-audio");
         } catch (err) {
           warnings.push(
-            err instanceof Error ? `Audio nao atualizado: ${err.message}` : "Audio nao atualizado.",
+            err instanceof Error
+              ? `Audio nao atualizado: ${err.message}`
+              : "Audio nao atualizado.",
           );
         }
       }
@@ -112,11 +114,15 @@ export default function TrackEditForm({ track }: Props) {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Erro ao atualizar track."));
+        throw new Error(
+          await readApiError(response, "Erro ao atualizar track."),
+        );
       }
 
       if (warnings.length > 0) {
-        setNotice(`Track salva, mas alguns arquivos nao subiram. ${warnings.join(" ")}`);
+        setNotice(
+          `Track salva, mas alguns arquivos nao subiram. ${warnings.join(" ")}`,
+        );
         setCoverFile(null);
         setAudioFile(null);
         router.refresh();
@@ -135,24 +141,24 @@ export default function TrackEditForm({ track }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error ? (
-        <div className="rounded-2xl border border-rose-300/18 bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
+        <div className="border-rose-300/18 rounded-2xl border bg-rose-300/[0.08] px-4 py-3 text-sm text-rose-100">
           {error}
         </div>
       ) : null}
       {notice ? (
-        <div className="rounded-2xl border border-amber-300/18 bg-amber-300/[0.08] px-4 py-3 text-sm text-amber-100">
+        <div className="border-amber-300/18 rounded-2xl border bg-amber-300/[0.08] px-4 py-3 text-sm text-amber-100">
           {notice}
         </div>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="space-y-5">
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-border bg-muted/25 p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
               <FileImage className="h-4 w-4 text-sky-100" />
               Capa da track
             </div>
-            <div className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.025]">
+            <div className="overflow-hidden rounded-xl border border-border bg-background">
               {coverPreviewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -161,42 +167,52 @@ export default function TrackEditForm({ track }: Props) {
                   className="aspect-square w-full object-cover"
                 />
               ) : (
-                <div className="flex aspect-square items-center justify-center text-white/36">
+                <div className="text-white/36 flex aspect-square items-center justify-center">
                   Preview da capa
                 </div>
               )}
             </div>
             <label className="mt-4 block">
-              <span className="mb-2 block text-sm text-white/72">Trocar capa</span>
+              <span className="text-white/72 mb-2 block text-sm">
+                Trocar capa
+              </span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                onChange={(event) =>
+                  setCoverFile(event.target.files?.[0] ?? null)
+                }
+                className="text-white/58 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
               />
             </label>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-border bg-muted/25 p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white">
               <FileAudio2 className="h-4 w-4 text-sky-100" />
               WAV / audio
             </div>
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.025] p-4">
+            <div className="rounded-xl border border-border bg-background p-4">
               {audioPreviewUrl ? (
                 // eslint-disable-next-line jsx-a11y/media-has-caption
                 <audio controls src={audioPreviewUrl} className="w-full" />
               ) : (
-                <div className="text-sm text-white/42">Nenhum audio vinculado.</div>
+                <div className="text-white/42 text-sm">
+                  Nenhum audio vinculado.
+                </div>
               )}
             </div>
             <label className="mt-4 block">
-              <span className="mb-2 block text-sm text-white/72">Trocar audio</span>
+              <span className="text-white/72 mb-2 block text-sm">
+                Trocar audio
+              </span>
               <input
                 type="file"
                 accept="audio/wav,audio/mpeg,audio/mp3"
-                onChange={(event) => setAudioFile(event.target.files?.[0] ?? null)}
-                className="block w-full text-sm text-white/58 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
+                onChange={(event) =>
+                  setAudioFile(event.target.files?.[0] ?? null)
+                }
+                className="text-white/58 block w-full text-sm file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2.5 file:font-medium file:text-white"
               />
             </label>
           </div>
@@ -210,28 +226,47 @@ export default function TrackEditForm({ track }: Props) {
             <input
               type="text"
               value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
               className={INPUT_CLASS}
               placeholder="Nome da faixa"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Versao</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Versao
+            </label>
             <input
               type="text"
               value={form.version}
-              onChange={(event) => setForm((current) => ({ ...current, version: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  version: event.target.value,
+                }))
+              }
               className={INPUT_CLASS}
               placeholder="Ex: Ao Vivo, Remix, Radio Edit"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Status</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Status
+            </label>
             <select
               value={form.status}
-              onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  status: event.target.value,
+                }))
+              }
               className={INPUT_CLASS}
             >
               <option value="draft">Draft</option>
@@ -242,10 +277,17 @@ export default function TrackEditForm({ track }: Props) {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Genero</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Genero
+            </label>
             <select
               value={form.genre}
-              onChange={(event) => setForm((current) => ({ ...current, genre: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  genre: event.target.value,
+                }))
+              }
               className={INPUT_CLASS}
             >
               <option value="">Selecione</option>
@@ -258,23 +300,35 @@ export default function TrackEditForm({ track }: Props) {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Subgenero</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Subgenero
+            </label>
             <input
               type="text"
               value={form.subgenre}
-              onChange={(event) => setForm((current) => ({ ...current, subgenre: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  subgenre: event.target.value,
+                }))
+              }
               className={INPUT_CLASS}
               placeholder="Ex: Trap, Funk BR, Pagode"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-white">Data de lancamento</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Data de lancamento
+            </label>
             <input
               type="date"
               value={form.release_date}
               onChange={(event) =>
-                setForm((current) => ({ ...current, release_date: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  release_date: event.target.value,
+                }))
               }
               className={INPUT_CLASS}
             />
@@ -286,7 +340,10 @@ export default function TrackEditForm({ track }: Props) {
                 type="checkbox"
                 checked={form.explicit}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, explicit: event.target.checked }))
+                  setForm((current) => ({
+                    ...current,
+                    explicit: event.target.checked,
+                  }))
                 }
                 className="h-4 w-4 rounded border-white/20 bg-transparent"
               />
@@ -295,10 +352,17 @@ export default function TrackEditForm({ track }: Props) {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-white">Letra</label>
+            <label className="mb-2 block text-sm font-medium text-white">
+              Letra
+            </label>
             <textarea
               value={form.lyrics}
-              onChange={(event) => setForm((current) => ({ ...current, lyrics: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  lyrics: event.target.value,
+                }))
+              }
               className={`${INPUT_CLASS} min-h-[180px] resize-y`}
               placeholder="Cole a letra da musica aqui"
             />
@@ -310,7 +374,7 @@ export default function TrackEditForm({ track }: Props) {
         <button
           type="button"
           onClick={() => router.push(`/label-os/tracks/${track.id}`)}
-          className="inline-flex h-11 items-center rounded-full border border-white/12 bg-white/5 px-5 text-sm font-medium text-white/78 transition hover:bg-white/10 hover:text-white"
+          className="border-white/12 text-white/78 inline-flex h-11 items-center rounded-full border bg-white/5 px-5 text-sm font-medium transition hover:bg-white/10 hover:text-white"
         >
           Cancelar
         </button>

@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 210 33% 98%;
+    --background: 210 29% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -22,10 +22,10 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214 25% 86%;
-    --input: 214 25% 82%;
+    --border: 214 22% 88%;
+    --input: 214 22% 84%;
     --ring: 224 100% 48%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -73,6 +73,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(
+      circle at 86% -12%,
+      hsl(213 94% 68% / 0.055),
+      transparent 34rem
+    );
+    background-attachment: fixed;
   }
   :focus-visible {
     outline-color: hsl(var(--ring));
@@ -91,10 +97,11 @@
   .light .theme-adaptive :where([class*="bg-[#0"]),
   .light .theme-adaptive :where([class*="bg-[radial-gradient"]),
   .light .theme-adaptive :where([class*="bg-[linear-gradient"]) {
-    background:
-      radial-gradient(circle at top left, hsl(204 100% 96% / 0.9), transparent 38%),
-      radial-gradient(circle at top right, hsl(153 78% 92% / 0.7), transparent 36%),
-      linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted))) !important;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--card) / 0.98),
+      hsl(var(--background) / 0.98)
+    ) !important;
   }
 
   .light .theme-adaptive :where([class*="bg-black/"]) {
@@ -102,7 +109,7 @@
   }
 
   .light .theme-adaptive :where([class*="bg-white/"]) {
-    background-color: hsl(var(--card) / 0.78) !important;
+    background-color: hsl(var(--card) / 0.96) !important;
   }
 
   .light .theme-adaptive :where([class*="border-white/"]) {
@@ -113,80 +120,95 @@
     color: hsl(var(--foreground)) !important;
   }
 
-  .light .theme-adaptive :where([class*="text-white/8"], [class*="text-white/7"]) {
+  .light
+    .theme-adaptive
+    :where([class*="text-white/8"], [class*="text-white/7"]) {
     color: hsl(var(--foreground) / 0.92) !important;
   }
 
-  .light .theme-adaptive :where([class*="text-white/6"], [class*="text-white/5"]) {
+  .light
+    .theme-adaptive
+    :where([class*="text-white/6"], [class*="text-white/5"]) {
     color: hsl(var(--muted-foreground) / 0.98) !important;
   }
 
-  .light .theme-adaptive :where([class*="text-white/4"], [class*="text-white/3"], [class*="text-white/2"]) {
+  .light
+    .theme-adaptive
+    :where(
+      [class*="text-white/4"],
+      [class*="text-white/3"],
+      [class*="text-white/2"]
+    ) {
     color: hsl(var(--muted-foreground) / 0.9) !important;
   }
 
-  .light .theme-adaptive :where([class*="placeholder:text-white/"])::placeholder {
+  .light
+    .theme-adaptive
+    :where([class*="placeholder:text-white/"])::placeholder {
     color: hsl(var(--muted-foreground) / 0.62) !important;
   }
 
-  .light .theme-adaptive :where([class*="shadow-[0_24px"], [class*="shadow-[0_28px"], [class*="shadow-[0_18px"], [class*="shadow-[0_16px"]) {
-    box-shadow: 0 18px 48px hsl(217 33% 17% / 0.08) !important;
+  .light
+    .theme-adaptive
+    :where(
+      [class*="shadow-[0_24px"],
+      [class*="shadow-[0_28px"],
+      [class*="shadow-[0_18px"],
+      [class*="shadow-[0_16px"]
+    ) {
+    box-shadow: 0 1px 2px hsl(217 33% 17% / 0.055) !important;
   }
 
   /* Painéis que continuam deliberadamente escuros no modo claro. */
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"]) {
     color: hsl(210 40% 98%) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where(.text-white) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where(.text-white) {
     color: hsl(0 0% 100%) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where([class*="text-white/8"], [class*="text-white/7"]) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where([class*="text-white/8"], [class*="text-white/7"]) {
     color: hsl(210 40% 96% / 0.94) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where([class*="text-white/6"], [class*="text-white/5"], [class*="text-white/4"]) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where(
+      [class*="text-white/6"],
+      [class*="text-white/5"],
+      [class*="text-white/4"]
+    ) {
     color: hsl(214 32% 85% / 0.9) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where([class*="text-white/3"], [class*="text-white/2"]) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where([class*="text-white/3"], [class*="text-white/2"]) {
     color: hsl(215 25% 74% / 0.82) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where([class*="bg-white/"]) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where([class*="bg-white/"]) {
     background-color: hsl(0 0% 100% / 0.07) !important;
   }
 
-  .light .theme-adaptive :where(
-    [class~="bg-slate-950"],
-    [class*="bg-[rgba(8"],
-    [class*="bg-[#1"]
-  ) :where([class*="border-white/"]) {
+  .light
+    .theme-adaptive
+    :where([class~="bg-slate-950"], [class*="bg-[rgba(8"], [class*="bg-[#1"])
+    :where([class*="border-white/"]) {
     border-color: hsl(0 0% 100% / 0.16) !important;
   }
 
@@ -195,50 +217,136 @@
     background-color: hsl(var(--background)) !important;
   }
 
-  .dark .theme-adaptive :where([class*="bg-[radial-gradient"], [class*="bg-[linear-gradient"]):not([class*="dark:bg-"]) {
-    background:
-      radial-gradient(circle at 82% 4%, hsl(213 94% 68% / 0.08), transparent 34%),
-      linear-gradient(180deg, hsl(var(--background)), hsl(222 39% 9%)) !important;
+  .dark
+    .theme-adaptive
+    :where([class*="bg-[radial-gradient"], [class*="bg-[linear-gradient"]):not(
+      [class*="dark:bg-"]
+    ) {
+    background: linear-gradient(
+      180deg,
+      hsl(var(--card) / 0.98),
+      hsl(var(--background) / 0.98)
+    ) !important;
   }
 
   .dark .theme-adaptive :where([class*="bg-white/"]):not([class*="dark:bg-"]) {
-    background-color: hsl(var(--card) / 0.82) !important;
+    background-color: hsl(var(--card) / 0.92) !important;
   }
 
   .dark .theme-adaptive :where([class*="border-white/"]) {
     border-color: hsl(var(--border)) !important;
   }
 
-  .dark .theme-adaptive :where(
-    [class~="text-slate-950"],
-    [class~="text-slate-900"],
-    [class~="text-slate-800"]
-  ):not([class*="dark:text-"]):not([class~="bg-white"]) {
+  .dark
+    .theme-adaptive
+    :where(
+      [class~="text-slate-950"],
+      [class~="text-slate-900"],
+      [class~="text-slate-800"]
+    ):not([class*="dark:text-"]):not([class~="bg-white"]) {
     color: hsl(var(--foreground)) !important;
   }
 
-  .dark .theme-adaptive :where(
-    [class~="text-slate-700"],
-    [class~="text-slate-600"],
-    [class~="text-slate-500"],
-    [class~="text-slate-400"]
-  ):not([class*="dark:text-"]) {
+  .dark
+    .theme-adaptive
+    :where(
+      [class~="text-slate-700"],
+      [class~="text-slate-600"],
+      [class~="text-slate-500"],
+      [class~="text-slate-400"]
+    ):not([class*="dark:text-"]) {
     color: hsl(var(--muted-foreground)) !important;
   }
 
-  .dark .theme-adaptive :where([class*="text-white/8"], [class*="text-white/7"]) {
+  .dark
+    .theme-adaptive
+    :where([class*="text-white/8"], [class*="text-white/7"]) {
     color: hsl(210 40% 98% / 0.94) !important;
   }
 
-  .dark .theme-adaptive :where([class*="text-white/6"], [class*="text-white/5"], [class*="text-white/4"]) {
+  .dark
+    .theme-adaptive
+    :where(
+      [class*="text-white/6"],
+      [class*="text-white/5"],
+      [class*="text-white/4"]
+    ) {
     color: hsl(214 32% 85% / 0.9) !important;
   }
 
-  .dark .theme-adaptive :where([class*="text-white/3"], [class*="text-white/2"]) {
+  .dark
+    .theme-adaptive
+    :where([class*="text-white/3"], [class*="text-white/2"]) {
     color: hsl(215 25% 74% / 0.82) !important;
   }
 
-  .dark .theme-adaptive :where([class*="placeholder:text-white/"])::placeholder {
+  .dark
+    .theme-adaptive
+    :where([class*="placeholder:text-white/"])::placeholder {
     color: hsl(var(--muted-foreground) / 0.78) !important;
+  }
+
+  /* Visual polish global: superfícies discretas e densidade de produto SaaS. */
+  .theme-adaptive
+    :where(
+      [class~="shadow-lg"],
+      [class~="shadow-xl"],
+      [class~="shadow-2xl"],
+      [class*="shadow-["]
+    ) {
+    box-shadow: 0 1px 2px hsl(217 33% 17% / 0.055) !important;
+  }
+
+  .dark
+    .theme-adaptive
+    :where(
+      [class~="shadow-lg"],
+      [class~="shadow-xl"],
+      [class~="shadow-2xl"],
+      [class*="shadow-["]
+    ) {
+    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.28) !important;
+  }
+
+  .theme-adaptive
+    :where([class~="backdrop-blur-xl"], [class~="backdrop-blur-2xl"]) {
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .theme-adaptive :where([class~="blur-3xl"]) {
+    opacity: 0.24 !important;
+    filter: blur(28px) !important;
+  }
+
+  .theme-adaptive
+    :where(
+      [class*="rounded-[20px"],
+      [class*="rounded-[22px"],
+      [class*="rounded-[24px"],
+      [class*="rounded-[26px"],
+      [class*="rounded-[28px"],
+      [class*="rounded-[30px"],
+      [class*="rounded-[32px"],
+      [class*="rounded-[34px"],
+      [class*="rounded-[36px"]
+    ) {
+    border-radius: 1rem !important;
+  }
+
+  .ui-surface {
+    @apply rounded-2xl border border-border bg-card shadow-sm;
+  }
+
+  .ui-subtle-card {
+    @apply rounded-xl border border-border/80 bg-muted/30;
+  }
+
+  .ui-table-shell {
+    @apply overflow-hidden rounded-xl border border-border bg-card shadow-none;
+  }
+
+  .ui-field {
+    @apply rounded-lg border border-input bg-card text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/20;
   }
 }

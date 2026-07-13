@@ -49,7 +49,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
       />
 
       <Container className="py-8">
-        <form className="mb-6 grid gap-3 rounded-2xl border border-border bg-card/70 p-3 shadow-sm backdrop-blur-xl sm:grid-cols-[minmax(0,1fr)_220px_auto]">
+        <form className="mb-5 grid gap-3 rounded-xl border border-border bg-card p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_220px_auto]">
           <label className="relative">
             <span className="sr-only">Buscar contrato</span>
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -57,7 +57,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
               name="q"
               defaultValue={params.q ?? ""}
               placeholder="Buscar por música, artista ou número..."
-              className="h-11 w-full rounded-xl border border-border bg-background/70 pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-blue-400"
+              className="h-9 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/20"
             />
           </label>
           <label>
@@ -65,7 +65,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
             <select
               name="status"
               defaultValue={status}
-              className="h-11 w-full rounded-xl border border-border bg-background/70 px-3 text-sm text-foreground outline-none transition focus:border-blue-400"
+              className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary/60 focus:ring-1 focus:ring-primary/20"
             >
               <option value="all">Todos os status</option>
               {LABEL_CONTRACT_STATUSES.map((item) => (
@@ -77,7 +77,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
           </label>
           <button
             type="submit"
-            className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-500"
+            className="h-9 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Filtrar
           </button>
@@ -95,7 +95,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
             </p>
             <Link
               href="/label-os/tracks"
-              className="mt-5 inline-flex h-10 items-center rounded-full bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-500"
+              className="mt-5 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               Abrir catálogo
             </Link>
@@ -105,7 +105,7 @@ export default async function LabelContractsPage({ searchParams }: Props) {
             {contracts.map((contract) => (
               <article
                 key={contract.id}
-                className="grid gap-4 rounded-2xl border border-border bg-card/75 p-4 shadow-sm backdrop-blur-xl lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,.7fr)_minmax(0,1.4fr)] lg:items-center"
+                className="grid gap-4 rounded-xl border border-border bg-card p-4 shadow-sm lg:grid-cols-[minmax(0,1.4fr)_minmax(180px,.7fr)_minmax(0,1.4fr)] lg:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

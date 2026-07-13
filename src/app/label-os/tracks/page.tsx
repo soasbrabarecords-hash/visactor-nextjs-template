@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import Container from "@/components/container";
 import PageIntro from "@/components/page-intro";
 import { getLabelTracks } from "@/lib/label-os";
@@ -32,7 +32,7 @@ export default async function TracksPage() {
         action={
           <Link
             href="/label-os/tracks/new"
-            className="flex items-center gap-2 rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300"
+            className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus size={15} />
             Nova Track
@@ -44,26 +44,37 @@ export default async function TracksPage() {
         {tracks.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
             Nenhuma track cadastrada ainda.{" "}
-            <Link href="/label-os/tracks/new" className="underline underline-offset-2">
+            <Link
+              href="/label-os/tracks/new"
+              className="underline underline-offset-2"
+            >
               Cadastrar primeira track
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-slate-50 dark:bg-slate-900">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Título</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Gênero</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Lançamento</th>
+                <tr className="border-b border-border bg-muted/45">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Título
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Gênero
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                    Lançamento
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {tracks.map((track) => (
                   <tr
                     key={track.id}
-                    className="border-b border-border last:border-0 hover:bg-slate-50 dark:hover:bg-slate-900"
+                    className="border-b border-border transition-colors last:border-0 hover:bg-muted/40"
                   >
                     <td className="px-4 py-3 font-medium">
                       <Link
@@ -90,7 +101,9 @@ export default async function TracksPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {track.release_date
-                        ? new Date(track.release_date).toLocaleDateString("pt-BR")
+                        ? new Date(track.release_date).toLocaleDateString(
+                            "pt-BR",
+                          )
                         : "—"}
                     </td>
                   </tr>

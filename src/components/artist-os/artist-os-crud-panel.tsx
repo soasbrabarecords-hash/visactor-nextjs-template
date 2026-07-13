@@ -500,7 +500,7 @@ export default function ArtistOsCrudPanel({
     <div className="space-y-4">
       <section
         className={cn(
-          "relative overflow-hidden rounded-[30px] border shadow-[0_22px_70px_-56px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:shadow-[0_22px_78px_-58px_rgba(0,0,0,0.9)]",
+          "relative overflow-hidden rounded-2xl border shadow-sm",
           tone.shell,
         )}
       >
@@ -538,7 +538,7 @@ export default function ArtistOsCrudPanel({
               variant="outline"
               onClick={reloadRows}
               disabled={isReloading}
-              className="rounded-full border-border bg-background/70 text-foreground hover:bg-accent"
+              className="rounded-lg border-border bg-card text-foreground hover:bg-muted"
             >
               {isReloading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -550,7 +550,7 @@ export default function ArtistOsCrudPanel({
             <Button
               type="button"
               onClick={openCreate}
-              className="rounded-full bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+              className="rounded-lg bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
             >
               <Plus className="h-4 w-4" />
               {config.newLabel}
@@ -559,7 +559,7 @@ export default function ArtistOsCrudPanel({
         </div>
 
         {!tableReady ? (
-          <div className="mx-4 mt-4 flex items-start gap-3 rounded-[20px] border border-amber-500/20 bg-amber-500/[0.08] p-4 text-amber-800 dark:text-amber-200 tablet:mx-5">
+          <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.08] p-4 text-amber-800 dark:text-amber-200 tablet:mx-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-sm font-medium leading-5">
               {initialError ??
@@ -569,13 +569,13 @@ export default function ArtistOsCrudPanel({
         ) : null}
 
         {error ? (
-          <div className="mx-4 mt-4 rounded-[20px] border border-rose-500/20 bg-rose-500/[0.08] px-4 py-3 text-sm font-medium text-rose-800 dark:text-rose-200 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.08] px-4 py-3 text-sm font-medium text-rose-800 dark:text-rose-200 tablet:mx-5">
             {error}
           </div>
         ) : null}
 
         {success ? (
-          <div className="mx-4 mt-4 rounded-[20px] border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-3 text-sm font-medium text-emerald-800 dark:text-emerald-200 tablet:mx-5">
+          <div className="mx-4 mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] px-4 py-3 text-sm font-medium text-emerald-800 dark:text-emerald-200 tablet:mx-5">
             {success}
           </div>
         ) : null}
@@ -612,7 +612,7 @@ export default function ArtistOsCrudPanel({
         {isFormOpen ? (
           <form
             onSubmit={submit}
-            className="mx-4 mb-4 rounded-[24px] border border-border/70 bg-background/70 p-4 shadow-sm tablet:mx-5 tablet:mb-5"
+            className="mx-4 mb-4 rounded-xl border border-border bg-card p-4 shadow-none tablet:mx-5 tablet:mb-5"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -661,7 +661,7 @@ export default function ArtistOsCrudPanel({
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="rounded-full bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
+                className="rounded-lg bg-blue-600 font-medium text-white hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400"
               >
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -675,7 +675,7 @@ export default function ArtistOsCrudPanel({
                 variant="outline"
                 onClick={() => setIsFormOpen(false)}
                 disabled={isSaving}
-                className="rounded-full border-border bg-background/70 text-foreground hover:bg-accent"
+                className="rounded-lg border-border bg-card text-foreground hover:bg-muted"
               >
                 Cancelar
               </Button>
@@ -740,7 +740,7 @@ export default function ArtistOsCrudPanel({
 
           {filteredRows.length === 0 ? (
             <div className="p-6">
-              <div className="rounded-[24px] border border-border/70 bg-muted/35 p-8 text-center">
+              <div className="rounded-xl border border-border bg-muted/30 p-8 text-center">
                 <div className="text-base font-semibold text-foreground">
                   Nada encontrado
                 </div>
