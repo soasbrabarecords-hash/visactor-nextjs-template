@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
+import { fetchStoredTrackPopularities } from "@/lib/track-popularity-store";
 import {
   clearCurrentWorkspaceSpotifyConnection,
   getEffectiveSpotifyCredentials,
@@ -1053,44 +1054,58 @@ async function hydrateSpotifyTrackPopularityWithToken(
 
   const popularityById = new Map<string, number>();
   const scope = "spotify:tracks:popularity";
+  let spotifyHydrationFailed = false;
 
-  for (let index = 0; index < idsToHydrate.length; index += 50) {
-    throwIfRateLimited(scope, "Spotify popularity error");
-    const batch = idsToHydrate.slice(index, index + 50);
-    const response = await fetch(
-      `https://api.spotify.com/v1/tracks?ids=${encodeURIComponent(batch.join(","))}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+  try {
+    for (let index = 0; index < idsToHydrate.length; index += 50) {
+      throwIfRateLimited(scope, "Spotify popularity error");
+      const batch = idsToHydrate.slice(index, index + 50);
+      const response = await fetch(
+        `https://api.spotify.com/v1/tracks?ids=${encodeURIComponent(batch.join(","))}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          cache: "no-store",
         },
-        cache: "no-store",
-      },
-    );
+      );
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("Retry-After");
-        registerRateLimit(scope, retryAfter);
-        throw new Error(
-          `Spotify popularity error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`,
-        );
+      if (!response.ok) {
+        if (response.status === 429) {
+          registerRateLimit(scope, response.headers.get("Retry-After"));
+        }
+        spotifyHydrationFailed = true;
+        break;
       }
 
-      throw new Error(
-        await getSpotifyErrorMessage(
-          response,
-          `Spotify popularity error ${response.status}: Failed to hydrate track popularity.`,
-        ),
-      );
+      clearRateLimit(scope);
+      const payload = (await response.json()) as SpotifySeveralTracksResponse;
+
+      for (const track of payload.tracks ?? []) {
+        if (track?.id && typeof track.popularity === "number") {
+          popularityById.set(track.id, track.popularity);
+        }
+      }
+    }
+  } catch {
+    spotifyHydrationFailed = true;
+  }
+
+  const unresolvedIds = idsToHydrate.filter(
+    (trackId) => !popularityById.has(trackId),
+  );
+
+  if (unresolvedIds.length > 0) {
+    const storedPopularities = await fetchStoredTrackPopularities(unresolvedIds);
+
+    for (const [trackId, popularity] of storedPopularities) {
+      popularityById.set(trackId, popularity);
     }
 
-    clearRateLimit(scope);
-    const payload = (await response.json()) as SpotifySeveralTracksResponse;
-
-    for (const track of payload.tracks ?? []) {
-      if (track?.id && typeof track.popularity === "number") {
-        popularityById.set(track.id, track.popularity);
-      }
+    if (spotifyHydrationFailed || storedPopularities.size > 0) {
+      process.stderr.write(
+        `[spotify:popularity] Spotify resolved ${popularityById.size - storedPopularities.size}/${idsToHydrate.length}; restored ${storedPopularities.size} from snapshots.\n`,
+      );
     }
   }
 
@@ -1330,7 +1345,7 @@ async function fetchSpotifyEditablePlaylistWithToken(
       tracks = await hydrateSpotifyTrackPopularityWithToken(
         accessToken,
         tracks,
-      ).catch(() => tracks);
+      );
     }
 
     return setCachedValue(

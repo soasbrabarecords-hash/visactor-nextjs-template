@@ -362,18 +362,8 @@ export default function PlaylistEditor({
       setSelectedSet(next);
       // NÃO atualiza lastClickedIndex no shift — âncora permanece
     } else {
-      // Click normal: toggle individual
-      setSelectedSet((prev) => {
-        const next = new Set(prev);
-        if (next.has(index)) {
-          next.delete(index);
-          if (next.size === 0) lastClickedIndex.current = null;
-        } else {
-          next.add(index);
-          lastClickedIndex.current = index;
-        }
-        return next;
-      });
+      // Click normal: seleciona apenas a faixa clicada, como no Spotify.
+      setSelectedSet(new Set([index]));
       lastClickedIndex.current = index;
     }
   }
@@ -933,7 +923,7 @@ export default function PlaylistEditor({
                   onPointerCancel={() => handlePointerCancel(index)}
                   style={{
                     opacity: isDeleting ? 0.3 : isActivelyDragging && isSelected ? 0.58 : 1,
-                    cursor: isDraggingThis && isActivelyDragging ? "grabbing" : "grab",
+                    cursor: isDraggingThis && isActivelyDragging ? "grabbing" : "default",
                     position: "relative",
                     zIndex: isSelected && isActivelyDragging ? 20 : isActivelyDragging ? 1 : "auto",
                   }}
