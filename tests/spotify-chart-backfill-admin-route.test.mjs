@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { mock, test } from "node:test";
 
 let authorized = true;
@@ -120,4 +121,20 @@ test("admin trigger processes exactly three guarded core jobs", async () => {
   assert.equal(body.success, true);
   assert.equal(body.limit, 3);
   assert.equal(workerCalls, 1);
+});
+
+test("middleware exposes only the two self-authenticating admin operation routes", async () => {
+  const middleware = await readFile(
+    new URL("../src/middleware.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    middleware,
+    /pathname === "\/api\/settings\/admin\/spotify-charts\/source-test"/,
+  );
+  assert.match(
+    middleware,
+    /pathname === "\/api\/settings\/admin\/spotify-charts\/backfill-run"/,
+  );
 });
