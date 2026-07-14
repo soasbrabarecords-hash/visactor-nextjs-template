@@ -193,6 +193,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success:
         seedComplete &&
+        !worker.sourceBlocked &&
         worker.failed === 0 &&
         worker.retryPending === 0 &&
         worker.lostLease === 0,

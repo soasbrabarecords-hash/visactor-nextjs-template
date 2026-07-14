@@ -1,15 +1,14 @@
 import "server-only";
-
 import {
-  fetchSpotifyTracksByIds,
   type SpotifyTrackRecord,
+  fetchSpotifyTracksByIds,
 } from "@/lib/spotify";
-import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 import {
-  importSpotifyChartRows,
   type SpotifyChartImportRow,
   type SpotifyChartsImportResult,
+  importSpotifyChartRows,
 } from "@/lib/spotify-charts-importer";
+import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 
 type CsvRecord = Record<string, string>;
 type CsvImportDefaults = {
@@ -19,6 +18,28 @@ type CsvImportDefaults = {
   chartType?: string;
   sourceType?: string;
 };
+
+export type SpotifyChartCsvInspectionIssue = {
+  code: string;
+  message: string;
+};
+
+export type SpotifyChartCsvInspection = {
+  valid: boolean;
+  parsedRows: number;
+  validRows: number;
+  uniqueRanks: number;
+  minRank: number | null;
+  maxRank: number | null;
+  duplicateRanks: number;
+  completeTop200: boolean;
+  missingRequiredFields: Array<{ field: string; count: number }>;
+  dateEvidencePresent: boolean;
+  dateMatchesRequest: boolean;
+  errors: SpotifyChartCsvInspectionIssue[];
+};
+
+const EXPECTED_TOP_CHART_ROWS = 200;
 
 function normalizeHeader(value: string) {
   return value
@@ -234,6 +255,154 @@ function mapCsvRowToImportRow(
   };
 }
 
+export function inspectSpotifyChartsCsvContent({
+  csvText,
+  country,
+  chartDate,
+  chartType = "top-songs",
+  sourceType = "spotify_chart",
+}: {
+  csvText: string;
+  country: string;
+  chartDate: string;
+  chartType?: string;
+  sourceType?: string;
+}): SpotifyChartCsvInspection {
+  const records = parseCsv(csvText);
+  const rows = records.map((record) =>
+    mapCsvRowToImportRow(record, {
+      country,
+      chartDate,
+      chartType,
+      sourceType,
+    }),
+  );
+  const missingCounts = new Map<string, number>();
+  const ranks: number[] = [];
+  let validRows = 0;
+  let dateEvidencePresent = records.length > 0;
+  let dateMatchesRequest = records.length > 0;
+
+  for (const [index, row] of rows.entries()) {
+    const providerDate = getField(records[index], [
+      "chart_date",
+      "date",
+      "snapshot_date",
+    ]);
+    const required = [
+      ["spotify_track_id", row.spotify_track_id],
+      ["track_name", row.track_name],
+      ["artist_name", row.artist_name],
+      ["rank_position", row.rank_position],
+    ] as const;
+    let rowValid = true;
+
+    for (const [field, value] of required) {
+      if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ""
+      ) {
+        missingCounts.set(field, (missingCounts.get(field) ?? 0) + 1);
+        rowValid = false;
+      }
+    }
+
+    const rank = Number(row.rank_position);
+    if (
+      !Number.isFinite(rank) ||
+      !Number.isInteger(rank) ||
+      rank < 1 ||
+      rank > EXPECTED_TOP_CHART_ROWS
+    ) {
+      rowValid = false;
+    } else {
+      ranks.push(rank);
+    }
+
+    const normalizedDate = normalizeChartDate(providerDate ?? undefined);
+    if (!providerDate || !normalizedDate) {
+      dateEvidencePresent = false;
+      dateMatchesRequest = false;
+      rowValid = false;
+    }
+
+    if (normalizedDate !== chartDate) {
+      dateMatchesRequest = false;
+      rowValid = false;
+    }
+
+    if (rowValid) validRows += 1;
+  }
+
+  const uniqueRanks = new Set(ranks);
+  const duplicateRanks = ranks.length - uniqueRanks.size;
+  const completeTop200 =
+    records.length === EXPECTED_TOP_CHART_ROWS &&
+    ranks.length === EXPECTED_TOP_CHART_ROWS &&
+    uniqueRanks.size === EXPECTED_TOP_CHART_ROWS &&
+    Array.from(
+      { length: EXPECTED_TOP_CHART_ROWS },
+      (_value, index) => index + 1,
+    ).every((rank) => uniqueRanks.has(rank));
+  const missingRequiredFields = Array.from(missingCounts, ([field, count]) => ({
+    field,
+    count,
+  }));
+  const errors: SpotifyChartCsvInspectionIssue[] = [];
+
+  if (!completeTop200) {
+    errors.push({
+      code: "incomplete_top_200",
+      message: `A fonte precisa retornar o Top 200 completo, com ranks continuos de 1 a 200; foram recebidas ${records.length} linhas e ${uniqueRanks.size} ranks unicos validos.`,
+    });
+  }
+
+  if (validRows !== records.length) {
+    errors.push({
+      code: "invalid_rows",
+      message: `${records.length - validRows} linhas nao passaram na validacao.`,
+    });
+  }
+
+  if (duplicateRanks > 0) {
+    errors.push({
+      code: "duplicate_ranks",
+      message: `${duplicateRanks} posicoes de ranking estao duplicadas.`,
+    });
+  }
+
+  if (!dateEvidencePresent) {
+    errors.push({
+      code: "missing_date_evidence",
+      message:
+        "A fonte nao informou a data do snapshot em chart_date, date ou snapshot_date.",
+    });
+  }
+
+  if (dateEvidencePresent && !dateMatchesRequest) {
+    errors.push({
+      code: "date_mismatch",
+      message: `A fonte nao corresponde integralmente a ${chartDate}.`,
+    });
+  }
+
+  return {
+    valid: errors.length === 0,
+    parsedRows: records.length,
+    validRows,
+    uniqueRanks: uniqueRanks.size,
+    minRank: ranks.length > 0 ? Math.min(...ranks) : null,
+    maxRank: ranks.length > 0 ? Math.max(...ranks) : null,
+    duplicateRanks,
+    completeTop200,
+    missingRequiredFields,
+    dateEvidencePresent,
+    dateMatchesRequest,
+    errors,
+  };
+}
+
 function buildTrackRecordMap(tracks: SpotifyTrackRecord[]) {
   return new Map(tracks.map((track) => [track.id, track] as const));
 }
@@ -322,6 +491,8 @@ export async function importSpotifyChartsCsvContent({
   sourceType,
   enrichSpotifyMetadata = true,
   persistStreamSnapshots = true,
+  persistLegacyEntries = true,
+  persistSnapshotAtomically = false,
 }: {
   csvText: string;
   country?: string;
@@ -332,6 +503,8 @@ export async function importSpotifyChartsCsvContent({
   sourceType?: string;
   enrichSpotifyMetadata?: boolean;
   persistStreamSnapshots?: boolean;
+  persistLegacyEntries?: boolean;
+  persistSnapshotAtomically?: boolean;
 }): Promise<SpotifyChartsImportResult> {
   const parsedRows = parseCsv(csvText);
   const mappedRows = parsedRows.map((record) =>
@@ -350,7 +523,11 @@ export async function importSpotifyChartsCsvContent({
       )
     : mappedRows;
 
-  return importSpotifyChartRows(enrichedRows, { persistStreamSnapshots });
+  return importSpotifyChartRows(enrichedRows, {
+    persistStreamSnapshots,
+    persistLegacyEntries,
+    persistSnapshotAtomically,
+  });
 }
 
 export async function importSpotifyChartsCsvFromUrl({

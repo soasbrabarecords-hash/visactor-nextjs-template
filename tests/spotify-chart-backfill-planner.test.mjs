@@ -9,10 +9,12 @@ const {
 const previousBrTemplate = process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE;
 const previousGlobalTemplate =
   process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE;
+const previousServiceWorkspace = process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID;
 process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
   "https://charts.example.test/br/{date}.csv";
 process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE =
   "https://charts.example.test/global/{date}.csv";
+process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID = "test-workspace";
 
 test.after(() => {
   if (previousBrTemplate === undefined) {
@@ -25,6 +27,12 @@ test.after(() => {
     delete process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE;
   } else {
     process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE = previousGlobalTemplate;
+  }
+
+  if (previousServiceWorkspace === undefined) {
+    delete process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID;
+  } else {
+    process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID = previousServiceWorkspace;
   }
 });
 
@@ -85,25 +93,46 @@ test("planner rejects unsupported windows", () => {
   );
 });
 
-test("planner excludes a region without a date-aware historical source", () => {
+test("planner falls back to the official historical API when a CSV template has no date", () => {
   process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
     "https://charts.example.test/br/latest.csv";
 
   try {
     const plan = planRecentSpotifyChartBackfillJobs(7, fixedNow);
 
-    assert.deepEqual(plan.regionIds, ["GLOBAL"]);
-    assert.equal(plan.jobs.length, 7);
-    assert.deepEqual(plan.unavailableRegions, [
-      {
-        regionId: "BR",
-        supportsHistoricalDates: false,
-        requiredEnvironmentVariable: "SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE",
-        reason: "template_missing_date_placeholder",
-      },
-    ]);
+    assert.deepEqual(plan.regionIds, ["BR", "GLOBAL"]);
+    assert.equal(plan.jobs.length, 14);
+    assert.deepEqual(plan.unavailableRegions, []);
   } finally {
     process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
       "https://charts.example.test/br/{date}.csv";
+  }
+});
+
+test("planner fails closed when neither a dated CSV nor a pinned service workspace exists", () => {
+  delete process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE;
+  delete process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE;
+  delete process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID;
+
+  try {
+    const plan = planRecentSpotifyChartBackfillJobs(7, fixedNow);
+
+    assert.deepEqual(plan.regionIds, []);
+    assert.equal(plan.jobs.length, 0);
+    assert.equal(plan.unavailableRegions.length, 2);
+    assert.ok(
+      plan.unavailableRegions.every(
+        (region) =>
+          region.reason === "historical_service_workspace_not_configured" &&
+          region.requiredEnvironmentVariable ===
+            "SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID",
+      ),
+    );
+  } finally {
+    process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
+      "https://charts.example.test/br/{date}.csv";
+    process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE =
+      "https://charts.example.test/global/{date}.csv";
+    process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID = "test-workspace";
   }
 });

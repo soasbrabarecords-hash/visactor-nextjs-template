@@ -3,6 +3,7 @@ import "server-only";
 import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import { buildSpotifyOfficialChartUrl } from "@/lib/charts/spotify-chart-source-resolver";
 import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 import { fetchStoredTrackPopularities } from "@/lib/track-popularity-store";
 import {
@@ -304,7 +305,6 @@ const spotifyRateLimitUntilByScope = new Map<string, number>();
 function buildTokenCacheKey(accessToken: string) {
   return accessToken.trim();
 }
-
 function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string) {
   const entry = cache.get(key);
 
@@ -1438,7 +1438,7 @@ export async function fetchSpotifyTrackCoverUrls(
       : `regional-${normalizedCountry.toLowerCase()}-daily`;
   const chartCovers = await withSpotifyToken(async (accessToken) => {
     const response = await fetch(
-      `https://charts-spotify-com-service.spotify.com/auth/v0/charts/${encodeURIComponent(chartAlias)}/${encodeURIComponent(chartDate)}`,
+      buildSpotifyOfficialChartUrl(chartAlias, chartDate),
       {
         headers: {
           Accept: "application/json",

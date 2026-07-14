@@ -25,6 +25,10 @@ export async function ingestSpotifyChart(
   chart: AutomaticChart,
   requestedDate: string,
   download: () => Promise<DownloadedSpotifyChart>,
+  options: {
+    persistLegacyEntries?: boolean;
+    persistSnapshotAtomically?: boolean;
+  } = {},
 ): Promise<SpotifyChartIngestionResult> {
   let runId: string | null = null;
   let attemptedDate = requestedDate;
@@ -49,8 +53,14 @@ export async function ingestSpotifyChart(
       chartDate: downloaded.chartDate,
       sourceUrl: downloaded.sourceUrl,
       sourceType: downloaded.sourceType,
-      enrichSpotifyMetadata: true,
+      // The official historical response already carries track metadata and
+      // artwork. Avoid a second Spotify API round-trip for every backfill job.
+      // CSV/Kworb keep the exact enrichment behavior used by the daily path.
+      enrichSpotifyMetadata:
+        downloaded.sourceProvider !== "spotify_official_api",
       persistStreamSnapshots: false,
+      persistLegacyEntries: options.persistLegacyEntries,
+      persistSnapshotAtomically: options.persistSnapshotAtomically,
     });
 
     if (result.rows_count === 0) {

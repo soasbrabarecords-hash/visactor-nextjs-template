@@ -180,6 +180,55 @@ export async function claimNextSpotifyChartBackfillJob(input: {
   return asSpotifyChartBackfillJob(data);
 }
 
+export async function peekNextSpotifyChartBackfillJobs(input: {
+  limit?: number;
+}) {
+  const admin = requireBackfillAdmin();
+  const limit = Math.min(
+    Math.max(
+      Math.trunc(input.limit ?? SPOTIFY_CHART_BACKFILL_DEFAULT_LIMIT),
+      1,
+    ),
+    SPOTIFY_CHART_BACKFILL_MAX_LIMIT,
+  );
+  const { data, error } = await admin.rpc("peek_spotify_chart_backfill_jobs", {
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw new Error(
+      `Nao foi possivel visualizar a fila antes do preflight: ${error.message}`,
+    );
+  }
+
+  return (Array.isArray(data) ? data : [])
+    .map(asSpotifyChartBackfillJob)
+    .filter((job): job is SpotifyChartBackfillJob => Boolean(job));
+}
+
+export async function claimSpotifyChartBackfillJobById(input: {
+  jobId: string;
+  workerId: string;
+  leaseSeconds?: number;
+}) {
+  const admin = requireBackfillAdmin();
+  const { data, error } = await admin
+    .rpc("claim_spotify_chart_backfill_job_by_id", {
+      p_job_id: input.jobId,
+      p_worker_id: input.workerId,
+      p_lease_seconds: input.leaseSeconds ?? 300,
+    })
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Nao foi possivel reservar o backfill validado: ${error.message}`,
+    );
+  }
+
+  return asSpotifyChartBackfillJob(data);
+}
+
 export async function settleSpotifyChartBackfillJob(input: {
   jobId: string;
   leaseToken: string;

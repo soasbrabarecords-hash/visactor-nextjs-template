@@ -1,15 +1,15 @@
 import "server-only";
-
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  type ChartSnapshotTrackInput,
+  replaceChartSnapshotAtomically,
+  upsertChartSnapshot,
+  upsertChartSnapshotTracks,
+} from "./chart-snapshots";
 import {
   type SpotifyChartEntryInput,
   upsertSpotifyChartEntries,
 } from "./spotify-charts-store";
-import {
-  upsertChartSnapshot,
-  upsertChartSnapshotTracks,
-  type ChartSnapshotTrackInput,
-} from "./chart-snapshots";
 
 type SupabaseStreamSnapshotInput = {
   spotify_track_id: string;
@@ -282,7 +282,11 @@ async function upsertTrackStreamSnapshots(
 
 export async function importSpotifyChartRows(
   rows: SpotifyChartImportRow[],
-  options: { persistStreamSnapshots?: boolean } = {},
+  options: {
+    persistStreamSnapshots?: boolean;
+    persistLegacyEntries?: boolean;
+    persistSnapshotAtomically?: boolean;
+  } = {},
 ): Promise<SpotifyChartsImportResult> {
   const errors: string[] = [];
   const entryRows: SpotifyChartEntryInput[] = [];
@@ -336,16 +340,21 @@ export async function importSpotifyChartRows(
     };
   }
 
-  // pipeline antiga — compatibilidade apenas, não bloqueia o salvamento principal
-  const entriesSaved = await upsertSpotifyChartEntries(entryRows);
-  if (!entriesSaved) {
+  // The historical worker deliberately bypasses this compatibility table. Its
+  // identity is track-based, so replaying an old rank with a corrected track
+  // can retain two rows for the same position. Daily/latest keeps its exact
+  // existing behavior because persistLegacyEntries defaults to true.
+  const shouldPersistLegacyEntries = options.persistLegacyEntries !== false;
+  const entriesSaved = shouldPersistLegacyEntries
+    ? await upsertSpotifyChartEntries(entryRows)
+    : true;
+  if (shouldPersistLegacyEntries && !entriesSaved) {
     errors.push(
       `[debug] spotify_chart_entries: falha no upsert (não crítico, continuando).`,
     );
   }
 
-  const shouldPersistStreamSnapshots =
-    options.persistStreamSnapshots !== false;
+  const shouldPersistStreamSnapshots = options.persistStreamSnapshots !== false;
   const snapshotsSaved = shouldPersistStreamSnapshots
     ? await upsertTrackStreamSnapshots(snapshotRows)
     : true;
@@ -372,22 +381,6 @@ export async function importSpotifyChartRows(
     const first = group[0];
     if (!first) continue;
 
-    const snapshot = await upsertChartSnapshot({
-      chart_date: first.chart_date,
-      country: first.country,
-      chart_type: first.chart_name,
-      source: first.source_type,
-      total_tracks: group.length,
-    });
-
-    if (!snapshot) {
-      const msg = `[debug] chart_snapshot upsert falhou para ${first.chart_date} (country=${first.country}).`;
-      errors.push(msg);
-      continue;
-    }
-
-    snapshotCreated = true;
-
     const sortedGroup = [...group].sort(
       (a, b) => a.rank_position - b.rank_position,
     );
@@ -403,6 +396,47 @@ export async function importSpotifyChartRows(
       genre: e.genre ?? null,
       image_url: e.image_url ?? null,
     }));
+
+    if (options.persistSnapshotAtomically) {
+      const atomicResult = await replaceChartSnapshotAtomically(
+        {
+          chart_date: first.chart_date,
+          country: first.country,
+          chart_type: first.chart_name,
+          source: first.source_type,
+          total_tracks: group.length,
+        },
+        trackInputs,
+      );
+
+      if (atomicResult.error || !atomicResult.snapshotId) {
+        tracksError = atomicResult.error;
+        errors.push(
+          `[debug] atomic chart snapshot (${first.chart_date}): ${atomicResult.error ?? "resultado ausente"}`,
+        );
+        continue;
+      }
+
+      snapshotCreated = true;
+      tracksSaved = atomicResult.count;
+      continue;
+    }
+
+    const snapshot = await upsertChartSnapshot({
+      chart_date: first.chart_date,
+      country: first.country,
+      chart_type: first.chart_name,
+      source: first.source_type,
+      total_tracks: group.length,
+    });
+
+    if (!snapshot) {
+      const msg = `[debug] chart_snapshot upsert falhou para ${first.chart_date} (country=${first.country}).`;
+      errors.push(msg);
+      continue;
+    }
+
+    snapshotCreated = true;
 
     const tracksResult = await upsertChartSnapshotTracks(
       snapshot.id,

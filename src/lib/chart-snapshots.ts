@@ -109,7 +109,6 @@ function clearSnapshotCaches() {
   snapshotComparisonCache.clear();
   snapshotComparisonInFlight.clear();
 }
-
 function getCachedValue<T>(cache: Map<string, CacheEntry<T>>, key: string) {
   const entry = cache.get(key);
 
@@ -281,6 +280,64 @@ export async function upsertChartSnapshotTracks(
 
   clearSnapshotCaches();
   return { count: tracks.length, error: null };
+}
+
+// Historical backfill only: the database function validates and replaces the
+// complete Top 200 in one transaction. The daily/latest importer deliberately
+// continues using the existing upsert functions above.
+export async function replaceChartSnapshotAtomically(
+  input: ChartSnapshotInput,
+  tracks: ChartSnapshotTrackInput[],
+): Promise<{ snapshotId: string | null; count: number; error: string | null }> {
+  const supabase = createAdminClient();
+
+  if (!supabase) {
+    return {
+      snapshotId: null,
+      count: 0,
+      error: "SUPABASE_SERVICE_ROLE_KEY is required to write chart snapshots.",
+    };
+  }
+
+  const { data, error } = await supabase
+    .rpc("replace_spotify_chart_snapshot_v1", {
+      p_chart_date: input.chart_date,
+      p_country: input.country ?? "BR",
+      p_chart_type: input.chart_type ?? "top-songs",
+      p_source: input.source ?? "spotify_charts_csv",
+      p_tracks: tracks.map((track) => ({
+        position: track.position,
+        previous_position: track.previous_position ?? null,
+        spotify_track_id: track.spotify_track_id ?? null,
+        track_name: track.track_name,
+        artist_name: track.artist_name ?? null,
+        streams: track.streams ?? null,
+        genre: track.genre ?? null,
+        image_url: track.image_url ?? null,
+      })),
+    })
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      snapshotId: null,
+      count: 0,
+      error: error?.message ?? "Atomic Top 200 snapshot returned no result.",
+    };
+  }
+
+  clearSnapshotCaches();
+
+  const result = data as {
+    snapshot_id: string;
+    tracks_count: number | string;
+  };
+
+  return {
+    snapshotId: String(result.snapshot_id),
+    count: Number(result.tracks_count),
+    error: null,
+  };
 }
 
 // ── List available dates ──────────────────────────────────────────────────────

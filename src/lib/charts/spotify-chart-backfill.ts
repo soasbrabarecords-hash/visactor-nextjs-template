@@ -1,6 +1,8 @@
 import "server-only";
 import { ingestSpotifyChart } from "@/lib/charts/spotify-chart-ingestion";
 import {
+  type AutomaticChart,
+  type DownloadedSpotifyChart,
   downloadSpotifyChartForDate,
   getBackfillChart,
   getBackfillChartRegionKeys,
@@ -43,17 +45,26 @@ function enumerateDates(startDate: string, endDate: string) {
   return dates;
 }
 
-export async function backfillSpotifyCharts(input: {
-  country: string;
-  chartType: string;
-  startDate: string;
-  endDate: string;
-}) {
+export async function backfillSpotifyCharts(
+  input: {
+    country: string;
+    chartType: string;
+    startDate: string;
+    endDate: string;
+  },
+  options: {
+    chart?: AutomaticChart;
+    download?: (
+      chart: NonNullable<ReturnType<typeof getBackfillChart>>,
+      chartDate: string,
+    ) => Promise<DownloadedSpotifyChart>;
+  } = {},
+) {
   const country = input.country.trim().toUpperCase();
   const chartType = input.chartType.trim().toLowerCase();
-  const chart = getBackfillChart(country, chartType);
+  const chart = options.chart ?? getBackfillChart(country, chartType);
 
-  if (!chart) {
+  if (!chart || chart.country !== country || chart.chartType !== chartType) {
     throw new Error(
       `Chart de backfill nao configurado. Regioes conhecidas: ${getBackfillChartRegionKeys().join("/")}.`,
     );
@@ -64,8 +75,20 @@ export async function backfillSpotifyCharts(input: {
 
   for (const chartDate of dates) {
     results.push(
-      await ingestSpotifyChart(chart, chartDate, () =>
-        downloadSpotifyChartForDate(chart, chartDate),
+      await ingestSpotifyChart(
+        chart,
+        chartDate,
+        () =>
+          options.download
+            ? options.download(chart, chartDate)
+            : downloadSpotifyChartForDate(chart, chartDate),
+        {
+          // Historical snapshots are authoritative in chart_snapshots. Avoid
+          // replaying old data into the track-keyed compatibility table and use
+          // the transactional Top 200 writer. The daily 10h call omits both.
+          persistLegacyEntries: false,
+          persistSnapshotAtomically: true,
+        },
       ),
     );
   }

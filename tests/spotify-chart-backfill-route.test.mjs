@@ -7,10 +7,12 @@ const { GET } =
 const previousBrTemplate = process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE;
 const previousGlobalTemplate =
   process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE;
+const previousServiceWorkspace = process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID;
 process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
   "https://charts.example.test/br/{date}.csv";
 process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE =
   "https://charts.example.test/global/{date}.csv";
+process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID = "test-workspace";
 
 test.after(() => {
   if (previousBrTemplate === undefined) {
@@ -23,6 +25,12 @@ test.after(() => {
     delete process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE;
   } else {
     process.env.SPOTIFY_CHARTS_GLOBAL_CSV_URL_TEMPLATE = previousGlobalTemplate;
+  }
+
+  if (previousServiceWorkspace === undefined) {
+    delete process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID;
+  } else {
+    process.env.SPOTIFY_CHARTS_SOURCE_WORKSPACE_ID = previousServiceWorkspace;
   }
 });
 
@@ -182,7 +190,7 @@ test("route dry-run supports thirty days and the default worker limit", async ()
   }
 });
 
-test("route dry-run reports unavailable historical sources without enqueueing", async () => {
+test("route dry-run keeps core regions available through the official historical API", async () => {
   const previousSecret = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "unit-test-secret";
   delete process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE;
@@ -195,9 +203,9 @@ test("route dry-run reports unavailable historical sources without enqueueing", 
 
     assert.equal(response.status, 200);
     assert.equal(response.body.success, true);
-    assert.equal(response.body.seedComplete, false);
-    assert.equal(response.body.seed.jobs.length, 0);
-    assert.equal(response.body.seed.unavailableRegions.length, 2);
+    assert.equal(response.body.seedComplete, true);
+    assert.equal(response.body.seed.jobs.length, 14);
+    assert.equal(response.body.seed.unavailableRegions.length, 0);
   } finally {
     process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE =
       "https://charts.example.test/br/{date}.csv";

@@ -4,15 +4,21 @@ import {
   SPOTIFY_CHART_BACKFILL_DEFAULT_LIMIT,
   SPOTIFY_CHART_BACKFILL_MAX_LIMIT,
   type SpotifyChartBackfillJob,
-  claimNextSpotifyChartBackfillJob,
+  claimSpotifyChartBackfillJobById,
+  peekNextSpotifyChartBackfillJobs,
   recoverExpiredSpotifyChartBackfillJobs,
   settleSpotifyChartBackfillJob,
 } from "@/lib/charts/spotify-chart-backfill-jobs";
-import { getBackfillChart } from "@/lib/charts/spotify-chart-source";
+import type {
+  AutomaticChart,
+  DownloadedSpotifyChart,
+} from "@/lib/charts/spotify-chart-source";
+import { probeSpotifyChartHistoricalSource } from "@/lib/charts/spotify-chart-source-test";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const WORKER_LEASE_SECONDS = 300;
 const WORKER_START_BUDGET_MS = 20_000;
+const EXPECTED_TOP_200_TRACKS = 200;
 
 export type SpotifyChartBackfillWorkerResult = {
   jobId: string;
@@ -65,10 +71,12 @@ async function readSnapshotIntegrity(job: SpotifyChartBackfillJob) {
 
   if (!snapshot) return null;
 
-  const { count, error: tracksError } = await admin
+  const { data: tracks, error: tracksError } = await admin
     .from("chart_snapshot_tracks")
-    .select("id", { count: "exact", head: true })
-    .eq("snapshot_id", snapshot.id);
+    .select("position,spotify_track_id")
+    .eq("snapshot_id", snapshot.id)
+    .order("position", { ascending: true })
+    .limit(EXPECTED_TOP_200_TRACKS + 1);
 
   if (tracksError) {
     throw new Error(
@@ -76,10 +84,31 @@ async function readSnapshotIntegrity(job: SpotifyChartBackfillJob) {
     );
   }
 
+  const rows = tracks ?? [];
+  const positions = rows.map((track) => Number(track.position));
+  const uniquePositions = new Set(positions);
+  const trackIds = rows
+    .map((track) => track.spotify_track_id?.trim() ?? "")
+    .filter(Boolean);
+  const uniqueTrackIds = new Set(trackIds);
+  const hasContinuousPositions = Array.from(
+    { length: EXPECTED_TOP_200_TRACKS },
+    (_value, index) => index + 1,
+  ).every((position) => uniquePositions.has(position));
+
   return {
     snapshotId: snapshot.id as string,
     totalTracks: snapshot.total_tracks as number,
-    tracksCount: count ?? 0,
+    tracksCount: rows.length,
+    uniquePositions: uniquePositions.size,
+    uniqueTrackIds: uniqueTrackIds.size,
+    completeTop200:
+      snapshot.total_tracks === EXPECTED_TOP_200_TRACKS &&
+      rows.length === EXPECTED_TOP_200_TRACKS &&
+      uniquePositions.size === EXPECTED_TOP_200_TRACKS &&
+      uniqueTrackIds.size === EXPECTED_TOP_200_TRACKS &&
+      trackIds.length === EXPECTED_TOP_200_TRACKS &&
+      hasContinuousPositions,
   };
 }
 
@@ -90,13 +119,12 @@ async function verifyImportedSnapshot(
   const snapshot = await readSnapshotIntegrity(job);
 
   if (
-    !snapshot ||
-    snapshot.totalTracks <= 0 ||
-    snapshot.tracksCount !== snapshot.totalTracks ||
+    expectedRowsCount !== EXPECTED_TOP_200_TRACKS ||
+    !snapshot?.completeTop200 ||
     snapshot.tracksCount !== expectedRowsCount
   ) {
     throw new Error(
-      `Snapshot incompleto: esperado=${expectedRowsCount}, cabecalho=${snapshot?.totalTracks ?? 0}, faixas=${snapshot?.tracksCount ?? 0}.`,
+      `Snapshot incompleto: esperado=${expectedRowsCount}, cabecalho=${snapshot?.totalTracks ?? 0}, faixas=${snapshot?.tracksCount ?? 0}, posicoes=${snapshot?.uniquePositions ?? 0}, track_ids=${snapshot?.uniqueTrackIds ?? 0}.`,
     );
   }
 
@@ -124,6 +152,8 @@ async function settleClaimedJob(
 
 async function processClaimedJob(
   job: SpotifyChartBackfillJob,
+  chart: AutomaticChart,
+  downloaded: DownloadedSpotifyChart,
 ): Promise<SpotifyChartBackfillWorkerResult> {
   const baseResult = {
     jobId: job.id,
@@ -147,28 +177,9 @@ async function processClaimedJob(
       };
     }
 
-    if (!getBackfillChart(job.region_id, job.chart_type)) {
-      const reason = `Fonte regional ainda nao configurada para ${job.region_id}.`;
-      const settled = await settleClaimedJob(job, {
-        outcome: "skipped",
-        error: reason,
-      });
-
-      return {
-        ...baseResult,
-        status: settled ? "skipped" : "lost-lease",
-        rowsCount: 0,
-        error: reason,
-      };
-    }
-
     const existingSnapshot = await readSnapshotIntegrity(job);
 
-    if (
-      existingSnapshot &&
-      existingSnapshot.totalTracks > 0 &&
-      existingSnapshot.tracksCount === existingSnapshot.totalTracks
-    ) {
+    if (existingSnapshot?.completeTop200) {
       const reason = "Snapshot ja esta completo no calendario.";
       const settled = await settleClaimedJob(job, {
         outcome: "skipped",
@@ -183,12 +194,15 @@ async function processClaimedJob(
       };
     }
 
-    const summary = await backfillSpotifyCharts({
-      country: job.region_id,
-      chartType: job.chart_type,
-      startDate: job.target_date,
-      endDate: job.target_date,
-    });
+    const summary = await backfillSpotifyCharts(
+      {
+        country: job.region_id,
+        chartType: job.chart_type,
+        startDate: job.target_date,
+        endDate: job.target_date,
+      },
+      { chart, download: async () => downloaded },
+    );
     const result = summary.results[0];
 
     if (!result?.success) {
@@ -246,22 +260,65 @@ export async function processSpotifyChartBackfillQueue(
   const workerId = `spotify-backfill:${crypto.randomUUID()}`;
   const recovered = await recoverExpiredSpotifyChartBackfillJobs(10);
   const results: SpotifyChartBackfillWorkerResult[] = [];
+  const sourceErrors: Array<{
+    jobId: string;
+    regionId: string;
+    targetDate: string;
+    error: string;
+  }> = [];
+  const candidates = await peekNextSpotifyChartBackfillJobs({ limit });
+  const prepared: Array<{
+    candidate: SpotifyChartBackfillJob;
+    chart: AutomaticChart;
+    downloaded: DownloadedSpotifyChart;
+  }> = [];
 
-  for (let index = 0; index < limit; index += 1) {
-    if (index > 0 && Date.now() - startedAt >= WORKER_START_BUDGET_MS) {
+  for (const candidate of candidates) {
+    if (
+      prepared.length > 0 &&
+      Date.now() - startedAt >= WORKER_START_BUDGET_MS
+    ) {
       break;
     }
 
-    const job = await claimNextSpotifyChartBackfillJob({
-      workerId,
-      leaseSeconds: WORKER_LEASE_SECONDS,
-    });
-
-    if (!job) {
+    try {
+      const probe = await probeSpotifyChartHistoricalSource({
+        regionId: candidate.region_id,
+        chartType: candidate.chart_type,
+        date: candidate.target_date,
+      });
+      prepared.push({
+        candidate,
+        chart: probe.chart,
+        downloaded: probe.downloaded,
+      });
+    } catch (error) {
+      sourceErrors.push({
+        jobId: candidate.id,
+        regionId: candidate.region_id,
+        targetDate: candidate.target_date,
+        error: normalizeError(error),
+      });
       break;
     }
+  }
 
-    results.push(await processClaimedJob(job));
+  // The batch is all-or-nothing at preflight time. A failure in the second or
+  // third candidate cannot consume a previously validated job.
+  if (sourceErrors.length === 0) {
+    for (const item of prepared) {
+      const job = await claimSpotifyChartBackfillJobById({
+        jobId: item.candidate.id,
+        workerId,
+        leaseSeconds: WORKER_LEASE_SECONDS,
+      });
+
+      if (!job) {
+        continue;
+      }
+
+      results.push(await processClaimedJob(job, item.chart, item.downloaded));
+    }
   }
 
   return {
@@ -269,6 +326,10 @@ export async function processSpotifyChartBackfillQueue(
     requestedLimit: input.limit ?? SPOTIFY_CHART_BACKFILL_DEFAULT_LIMIT,
     appliedLimit: limit,
     recovered,
+    previewed: candidates.length,
+    sourceValidated: prepared.length,
+    sourceBlocked: sourceErrors.length > 0,
+    sourceErrors,
     processed: results.length,
     success: results.filter((result) => result.status === "success").length,
     failed: results.filter((result) => result.status === "failed").length,
