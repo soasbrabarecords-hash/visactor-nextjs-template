@@ -58,7 +58,7 @@ const { SpotifyChartSourceDownloadError } =
 const { POST } =
   await import("../src/app/api/settings/admin/spotify-charts/source-test/route.ts");
 
-function request(body, headers = {}) {
+function request(body) {
   return new Request(
     "http://localhost/api/settings/admin/spotify-charts/source-test",
     {
@@ -66,7 +66,6 @@ function request(body, headers = {}) {
       headers: {
         "content-type": "application/json",
         origin: "http://localhost",
-        ...headers,
       },
       body: JSON.stringify(body),
     },
@@ -78,21 +77,6 @@ test.beforeEach(() => {
   sourceTestCalls.length = 0;
   sourceTestError = null;
   process.env.SPOTIFY_CHARTS_ADMIN_USER_ID = "admin-1";
-  delete process.env.SPOTIFY_CHARTS_OPERATION_SECRET;
-});
-
-test("source test accepts the short-lived operation key without a browser session", async () => {
-  process.env.SPOTIFY_CHARTS_OPERATION_SECRET = "unit-operation-secret";
-
-  const response = await POST(
-    request(
-      { regionId: "BR", date: "2026-06-15" },
-      { authorization: "Bearer unit-operation-secret" },
-    ),
-  );
-
-  assert.equal(response.status, 200);
-  assert.equal(sourceTestCalls.length, 1);
 });
 
 test("source test rejects anonymous and non-admin users", async () => {

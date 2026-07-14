@@ -11,8 +11,6 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith("/api/spotify/auth") ||
     pathname === "/api/import/spotify-charts" ||
     pathname === "/api/cron/spotify-charts-backfill" ||
-    pathname === "/api/settings/admin/spotify-charts/source-test" ||
-    pathname === "/api/settings/admin/spotify-charts/backfill-run" ||
     pathname === "/api/jobs/spotify-charts/ingest" ||
     pathname === "/api/jobs/spotify-charts/backfill" ||
     /\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$/.test(pathname)
