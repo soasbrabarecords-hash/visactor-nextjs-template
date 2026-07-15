@@ -52,11 +52,6 @@ export const navigations: Navigation[] = [
         href: "/playlists-ia",
       },
       {
-        icon: ListMusic,
-        name: "Playlists Analytics",
-        href: "/playlists-concorrentes",
-      },
-      {
         icon: BarChart2,
         name: "Spotify Charts",
         href: "/spotify-charts",

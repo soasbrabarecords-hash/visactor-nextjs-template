@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:playlists-ai": "node --experimental-strip-types --experimental-test-module-mocks --loader ./tests/support/ts-alias-loader.mjs --test --test-concurrency=1 tests/playlists-ai-*.test.mjs",
     "test:spotify-backfill": "node --experimental-strip-types --experimental-test-module-mocks --loader ./tests/support/ts-alias-loader.mjs --test --test-concurrency=1 tests/spotify-chart-backfill-*.test.mjs",
     "test:music-intelligence": "node --experimental-strip-types --experimental-test-module-mocks --loader ./tests/support/ts-alias-loader.mjs --test --test-concurrency=1 tests/music-intelligence-*.test.mjs"
   },

@@ -1,1147 +1,516 @@
 "use client";
 
-import { startTransition, useState } from "react";
-import type { FormEvent } from "react";
 import {
+  ArrowUpDown,
   Bot,
   CheckCircle2,
-  Disc3,
-  ExternalLink,
+  Database,
+  Eye,
+  FileText,
+  Globe2,
   ListMusic,
   Loader2,
-  MessageSquareText,
-  PlusCircle,
+  LockKeyhole,
+  MapPin,
+  Music2,
+  Plus,
   Send,
+  ShieldCheck,
   Sparkles,
-  Wand2,
+  TrendingDown,
+  TrendingUp,
+  UserRound,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "@/lib/utils";
-import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
-
-type ChatRole = "assistant" | "user";
-
-type TrackSuggestion = {
-  id: string;
-  title: string;
-  artist: string;
-  imageUrl: string | null;
-  source: "Spotify" | "TikTok" | "Catalogo" | "Curadoria";
-  energy: number;
-  reason: string;
-  chartPosition?: number;
-  movement?: "new" | "up" | "down" | "stable";
-  spotifyTrackId?: string | null;
-  streams?: number | null;
-};
-
-type PlaylistPlan = {
-  id: string;
-  title: string;
-  subtitle: string;
-  targetSize: number;
-  confidence: number;
-  marketBlend: {
-    spotify: number;
-    tiktok: number;
-    catalog: number;
-  };
-  strategy: string[];
-  tracks: TrackSuggestion[];
-  nextSteps: string[];
-  spotifyResolvedCount: number;
-  chartResolvedCount: number;
-  dataSource: "openai-agent" | "spotify-api" | "charts-fallback" | "local-fallback";
-  researchSummary?: string;
-  researchSources?: Array<{
-    title: string;
-    url: string;
-  }>;
-};
+import type {
+  PlaylistsAiChatResponse,
+  PlaylistsAiPreparedActionType,
+  PlaylistsAiTrackCard,
+} from "@/types/playlists-ai";
 
 type ChatMessage = {
   id: string;
-  role: ChatRole;
+  role: "assistant" | "user";
   content: string;
-  plan?: PlaylistPlan;
+  result?: PlaylistsAiChatResponse;
 };
 
-type SpotifySearchTrack = {
-  id: string;
-  name: string;
-  artists: string;
-  albumName: string;
-  imageUrl: string | null;
-  durationLabel: string;
-  spotifyUrl: string;
-  popularity: number;
-};
-
-type PlaylistCreation = {
-  playlistId: string;
-  playlistUrl: string;
-};
-
-type PlaylistsAiAgentResponse = {
-  action?: "clarifying_question" | "playlist_brief" | "playlist_plan";
-  message?: string;
-  mode?: "openai-agent" | "fallback" | "clarifying_question" | "brief";
-  aiModel?: string | null;
-  aiSource?: "global_app" | "workspace_app" | null;
-  questions?: string[];
-  plan?: PlaylistPlan;
-};
-
-export type PlaylistsAiChartTrack = {
-  id: string;
-  spotifyTrackId: string | null;
-  title: string;
-  artist: string;
-  imageUrl: string | null;
-  position: number;
-  status: "new" | "up" | "down" | "stable";
-  positionChange: number | null;
-  streams: number | null;
-};
-
-const promptPresets = [
-  "Cria uma playlist trap BR atual, com energia alta e musicas para bombar no fim de semana.",
-  "Monta uma playlist funk para festa, misturando hits atuais com algumas apostas virais.",
-  "Quero uma playlist romantica brasileira, moderna, mas com classicos marcantes.",
-  "Faz uma playlist treino pesado, rap/trap/funk, sem deixar cair a energia.",
+const QUICK_QUESTIONS = [
+  "Quais músicas estão mais quentes no BR hoje?",
+  "Quais oportunidades globais ainda não estão nas minhas playlists?",
+  "Essa música já está em alguma playlist?",
+  "Me sugere 10 músicas para FUNK 2026.",
+  "Cria uma ideia de playlist baseada nas maiores subidas da semana.",
 ];
 
-const catalogTracks: Record<string, TrackSuggestion[]> = {
-  trap: [
-    { id: "fallback-trap-1", title: "Noite Cara", artist: "KayBlack", imageUrl: null, source: "Spotify", energy: 86, reason: "Funciona como ancora popular para abrir a playlist." },
-    { id: "fallback-trap-2", title: "Flow de Rua", artist: "Veigh", imageUrl: null, source: "Spotify", energy: 88, reason: "Mantem linguagem atual e alto encaixe com trap BR." },
-    { id: "fallback-trap-3", title: "Luxo e Lama", artist: "Wiu", imageUrl: null, source: "TikTok", energy: 82, reason: "Boa ponte entre descoberta social e consumo de streaming." },
-    { id: "fallback-trap-4", title: "Vitrine", artist: "Teto", imageUrl: null, source: "Curadoria", energy: 79, reason: "Ajuda a deixar o bloco mais melodico sem perder identidade." },
-    { id: "fallback-trap-5", title: "Sem Sinal", artist: "Brandao85", imageUrl: null, source: "Catalogo", energy: 76, reason: "Aposta de textura para nao ficar so no obvio." },
-    { id: "fallback-trap-6", title: "Plug Nacional", artist: "Alee", imageUrl: null, source: "Curadoria", energy: 81, reason: "Boa faixa de meio para sustentar retencao." },
-  ],
-  funk: [
-    { id: "fallback-funk-1", title: "Sequencia de Vapo", artist: "DJ GBR", imageUrl: null, source: "TikTok", energy: 94, reason: "Abre com impacto e leitura viral clara." },
-    { id: "fallback-funk-2", title: "Ela Joga", artist: "MC Tuto", imageUrl: null, source: "Spotify", energy: 91, reason: "Hit direto para manter skip baixo no comeco." },
-    { id: "fallback-funk-3", title: "Baile Acendeu", artist: "DJ Arana", imageUrl: null, source: "TikTok", energy: 93, reason: "Funciona como faixa de pico para festa." },
-    { id: "fallback-funk-4", title: "Modo Mandela", artist: "MC GW", imageUrl: null, source: "Curadoria", energy: 89, reason: "Entrega identidade de baile e movimento." },
-    { id: "fallback-funk-5", title: "Tropa da Madruga", artist: "MC IG", imageUrl: null, source: "Spotify", energy: 86, reason: "Conecta funk com publico de trap/funk." },
-    { id: "fallback-funk-6", title: "Paredao Ligado", artist: "DJ Topo", imageUrl: null, source: "Catalogo", energy: 90, reason: "Aposta para variar assinatura sonora." },
-  ],
-  romantica: [
-    { id: "fallback-romantica-1", title: "Ainda Bem", artist: "Marisa Monte", imageUrl: null, source: "Catalogo", energy: 46, reason: "Classico afetivo para criar memoria emocional." },
-    { id: "fallback-romantica-2", title: "Seu Astral", artist: "Jorge & Mateus", imageUrl: null, source: "Catalogo", energy: 58, reason: "Funciona como ponte popular e cantavel." },
-    { id: "fallback-romantica-3", title: "Idiota", artist: "Jao", imageUrl: null, source: "Spotify", energy: 62, reason: "Traz pop brasileiro moderno para renovar o clima." },
-    { id: "fallback-romantica-4", title: "Meu Abrigo", artist: "Melim", imageUrl: null, source: "Spotify", energy: 54, reason: "Mantem leveza e alto reconhecimento." },
-    { id: "fallback-romantica-5", title: "Temporal", artist: "Lagum", imageUrl: null, source: "Curadoria", energy: 57, reason: "Boa transicao entre pop e romantico alternativo." },
-    { id: "fallback-romantica-6", title: "Pra Voce Guardei", artist: "Nando Reis", imageUrl: null, source: "Catalogo", energy: 49, reason: "Fecha bloco com valor de catalogo forte." },
-  ],
-  treino: [
-    { id: "fallback-treino-1", title: "Modo Aviao", artist: "Matue", imageUrl: null, source: "Spotify", energy: 90, reason: "Energia alta e refrao forte para inicio de treino." },
-    { id: "fallback-treino-2", title: "Toma Toma Vapo Vapo", artist: "Ze Felipe", imageUrl: null, source: "TikTok", energy: 92, reason: "Hook rapido para manter ritmo e humor." },
-    { id: "fallback-treino-3", title: "Poesia Acustica Energia", artist: "Pineapple StormTV", imageUrl: null, source: "Curadoria", energy: 78, reason: "Respiro de rap sem derrubar totalmente o BPM." },
-    { id: "fallback-treino-4", title: "Acorda Pedrinho", artist: "Jovem Dionisio", imageUrl: null, source: "Catalogo", energy: 74, reason: "Contraste conhecido para evitar fadiga." },
-    { id: "fallback-treino-5", title: "Foguete", artist: "Oruam", imageUrl: null, source: "Spotify", energy: 88, reason: "Mantem intensidade urbana no meio da sequencia." },
-    { id: "fallback-treino-6", title: "Mega Energia", artist: "DJ GM", imageUrl: null, source: "TikTok", energy: 95, reason: "Bloco de pico para sprint ou final." },
-  ],
+const ACTION_ICONS: Record<PlaylistsAiPreparedActionType, typeof Plus> = {
+  add_to_playlist: Plus,
+  watch_7_days: Eye,
+  create_playlist: ListMusic,
+  update_description: FileText,
+  reorder_top_20: ArrowUpDown,
 };
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function inferMood(prompt: string) {
-  const lower = prompt.toLowerCase();
-
-  if (lower.includes("funk") || lower.includes("baile") || lower.includes("festa")) return "funk";
-  if (lower.includes("romant") || lower.includes("love") || lower.includes("sofrencia")) return "romantica";
-  if (lower.includes("treino") || lower.includes("academia") || lower.includes("corrida")) return "treino";
-  return "trap";
+function formatPosition(position: number | undefined) {
+  return typeof position === "number" ? `#${position}` : "—";
 }
 
-function movementLabel(status: PlaylistsAiChartTrack["status"], change: number | null) {
-  if (status === "new") return "entrada nova";
-  if (status === "up") return `subiu ${Math.abs(change ?? 0)} posicoes`;
-  if (status === "down") return `caiu ${Math.abs(change ?? 0)} posicoes`;
-  return "estavel";
+function movementLabel(value: number | null) {
+  if (value === null) return "7d indisponível";
+  if (value > 0) return `+${value} em 7d`;
+  if (value < 0) return `${value} em 7d`;
+  return "estável em 7d";
 }
 
-function compactStreams(streams: number | null) {
-  if (!streams) return null;
-  if (streams >= 1_000_000) return `${(streams / 1_000_000).toFixed(1)}M`;
-  if (streams >= 1_000) return `${Math.round(streams / 1_000)}K`;
-  return `${streams}`;
-}
-
-function clampScore(value: number, min = 35, max = 98) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function normalizeTrackKey(title: string, artist: string) {
-  return `${title}::${artist}`
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function normalizeChatText(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function hasBriefInConversation(conversation: Array<{ role: ChatRole; content: string }>) {
-  return conversation.some((message) => {
-    if (message.role !== "assistant") return false;
-    const content = normalizeChatText(message.content);
-    return content.includes("brief da playlist") || content.includes("brand da playlist");
-  });
-}
-
-function isPlaylistGenerationConfirmation(prompt: string) {
-  const normalized = normalizeChatText(prompt);
-  if (/\b(nao|muda|ajusta|troca|sem|menos|mais|porem|mas|antes|prefiro)\b/.test(normalized)) {
-    return false;
-  }
-
-  return /\b(confirmo|confirmado|pode gerar|pode criar|pode mandar|gera|gerar|cria|criar|manda|fechado|fechou|bora|segue|sim|ok|okay|isso|ta bom|esta bom|ta certo|esta certo|perfeito)\b/.test(
-    normalized,
+function MovementIcon({ value }: { value: number | null }) {
+  if (value === null || value === 0)
+    return <ShieldCheck className="h-3.5 w-3.5" />;
+  return value > 0 ? (
+    <TrendingUp className="h-3.5 w-3.5" />
+  ) : (
+    <TrendingDown className="h-3.5 w-3.5" />
   );
 }
 
-function dedupeTrackSuggestions(tracks: TrackSuggestion[]) {
-  const seen = new Set<string>();
-
-  return tracks.filter((track) => {
-    const key = track.spotifyTrackId
-      ? `spotify:${track.spotifyTrackId}`
-      : normalizeTrackKey(track.title, track.artist);
-
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function getSpotifySearchQueries(prompt: string, mood: string) {
-  const cleanPrompt = prompt
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 120);
-  const moodQuery = {
-    funk: "funk brasil hits atuais 2026",
-    romantica: "romanticas brasil pop sertanejo classicos",
-    treino: "trap funk treino energia brasil",
-    trap: "trap brasil rap hits atuais 2026",
-  }[mood] ?? "hits brasil atuais";
-  const intentQuery = /viral|tiktok|reels|bomb/i.test(prompt)
-    ? "viral brasil tiktok reels spotify"
-    : "spotify brasil top tracks";
-
-  return Array.from(new Set([cleanPrompt, moodQuery, intentQuery].filter(Boolean))).slice(0, 3);
-}
-
-async function fetchSpotifySearchTracks(query: string, limit = 8) {
-  const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new Error(body.message ?? "Falha ao pesquisar no Spotify.");
-  }
-
-  const body = (await response.json()) as { tracks?: SpotifySearchTrack[] };
-  return body.tracks ?? [];
-}
-
-function getMoodKeywords(mood: string) {
-  if (mood === "funk") return ["mc", "dj", "funk", "baile", "mandela", "set"];
-  if (mood === "romantica") return ["amor", "love", "saudade", "volta", "coracao", "sentimento"];
-  if (mood === "treino") return ["mc", "dj", "trap", "funk", "beat", "mega"];
-  return ["mc", "trap", "matue", "veigh", "teto", "kay", "wiu", "orochi", "oruan", "poze", "borges"];
-}
-
-function getChartTrackScore(track: PlaylistsAiChartTrack, mood: string) {
-  const searchable = `${track.title} ${track.artist}`.toLowerCase();
-  const keywordHit = getMoodKeywords(mood).some((keyword) => searchable.includes(keyword));
-  const movementBoost = track.status === "new" ? 22 : track.status === "up" ? 16 : track.status === "stable" ? 6 : -8;
-  const rankScore = Math.max(0, 220 - track.position);
-  const moodBoost = keywordHit ? 42 : mood === "romantica" ? -4 : 0;
-
-  return rankScore + movementBoost + moodBoost;
-}
-
-function chartToSuggestion(track: PlaylistsAiChartTrack, mood: string): TrackSuggestion {
-  const streamLabel = compactStreams(track.streams);
-  const movement = movementLabel(track.status, track.positionChange);
-  const baseEnergy = mood === "romantica" ? 48 : mood === "treino" ? 86 : mood === "funk" ? 88 : 82;
-  const rankBoost = Math.max(0, 18 - Math.floor(track.position / 10));
-  const movementBoost = track.status === "up" || track.status === "new" ? 6 : track.status === "down" ? -4 : 0;
-
-  return {
-    id: `chart-${track.id}`,
-    title: track.title,
-    artist: track.artist,
-    imageUrl: track.imageUrl,
-    source: "Spotify",
-    energy: clampScore(baseEnergy + rankBoost + movementBoost),
-    reason: `#${track.position} no Spotify Charts BR, ${movement}${streamLabel ? `, ${streamLabel} streams` : ""}.`,
-    chartPosition: track.position,
-    movement: track.status,
-    spotifyTrackId: track.spotifyTrackId,
-    streams: track.streams,
-  };
-}
-
-function spotifySearchToSuggestion(
-  track: SpotifySearchTrack,
-  mood: string,
-  query: string,
-): TrackSuggestion {
-  const moodEnergy = mood === "romantica" ? 46 : mood === "treino" ? 88 : mood === "funk" ? 90 : 84;
-  const popularityBoost = Math.round((track.popularity - 50) / 3);
-
-  return {
-    id: `spotify-api-${track.id}`,
-    title: track.name,
-    artist: track.artists || "Artista nao identificado",
-    imageUrl: track.imageUrl,
-    source: "Spotify",
-    energy: clampScore(moodEnergy + popularityBoost),
-    reason: `Encontrada pela Spotify API em "${query}", popularidade ${track.popularity}/100.`,
-    spotifyTrackId: track.id,
-  };
-}
-
-function getRealTrackSuggestions(
-  prompt: string,
-  chartTracks: PlaylistsAiChartTrack[],
-  mood: string,
-) {
-  if (chartTracks.length === 0) return [];
-
-  const wantsViral = /viral|tiktok|reels|bomb/i.test(prompt);
-  const source = [...chartTracks]
-    .sort((a, b) => getChartTrackScore(b, mood) - getChartTrackScore(a, mood))
-    .slice(0, wantsViral ? 8 : 6);
-
-  return source.map((track) => chartToSuggestion(track, mood));
-}
-
-function buildPlaylistPlan(
-  prompt: string,
-  chartTracks: PlaylistsAiChartTrack[],
-  chartDate: string | null,
-): PlaylistPlan {
-  const mood = inferMood(prompt);
-  const fallbackTracks = catalogTracks[mood] ?? catalogTracks.trap;
-  const realTracks = getRealTrackSuggestions(prompt, chartTracks, mood);
-  const seen = new Set(realTracks.map((track) => normalizeTrackKey(track.title, track.artist)));
-  const tracks = dedupeTrackSuggestions([
-    ...realTracks,
-    ...fallbackTracks.filter((track) => !seen.has(normalizeTrackKey(track.title, track.artist))),
-  ]).slice(0, 8);
-  const wantsClassic = /classico|antigo|anos|2000|2010/i.test(prompt);
-  const wantsViral = /viral|tiktok|reels|bomb/i.test(prompt);
-  const wantsCurrent = /atual|novo|2026|moderno|charts/i.test(prompt);
-  const hasRealCharts = realTracks.length > 0;
-
-  let spotify = hasRealCharts ? 58 : wantsCurrent ? 50 : 42;
-  let tiktok = wantsViral ? 34 : mood === "funk" ? 30 : 22;
-  let catalog = Math.max(12, 100 - spotify - tiktok);
-
-  if (wantsClassic) {
-    catalog = 34;
-    const remaining = 100 - catalog;
-    spotify = Math.min(spotify, Math.round(remaining * 0.68));
-    tiktok = remaining - spotify;
-  }
-
-  return {
-    id: newId("plan"),
-    title:
-      mood === "funk"
-        ? "Baile em Alta"
-        : mood === "romantica"
-          ? "Romanticas com Memoria"
-          : mood === "treino"
-            ? "Treino Sem Queda"
-            : "Trap BR Radar",
-    subtitle: prompt,
-    targetSize: mood === "romantica" ? 45 : 60,
-    confidence: hasRealCharts ? 88 : wantsCurrent || wantsViral ? 84 : 76,
-    marketBlend: { spotify, tiktok, catalog },
-    strategy: [
-      "Abrir com faixas reconheciveis para reduzir skip nos primeiros minutos.",
-      hasRealCharts
-        ? `Usar Spotify Charts BR${chartDate ? ` de ${chartDate}` : ""} como base real de demanda.`
-        : "Intercalar apostas com hits para testar descoberta sem perder retencao.",
-      "Organizar a energia em blocos: entrada forte, meio sustentado e final com pico.",
-    ],
-    tracks,
-    nextSteps: [
-      hasRealCharts
-        ? "Cruzar esta lista com suas playlists para evitar repeticao e achar lacunas."
-        : "Importar ou atualizar snapshots para ativar leitura real de charts.",
-      "Escolher capa, nome e tamanho final da playlist.",
-      "Criar no Spotify apenas depois de revisar a lista.",
-    ],
-    spotifyResolvedCount: tracks.filter((track) => Boolean(track.spotifyTrackId)).length,
-    chartResolvedCount: realTracks.length,
-    dataSource: hasRealCharts ? "charts-fallback" : "local-fallback",
-  };
-}
-
-async function buildSpotifyBackedPlan(
-  prompt: string,
-  chartTracks: PlaylistsAiChartTrack[],
-  chartDate: string | null,
-) {
-  const mood = inferMood(prompt);
-  const basePlan = buildPlaylistPlan(prompt, chartTracks, chartDate);
-  const queries = getSpotifySearchQueries(prompt, mood);
-
-  try {
-    const settledBatches = await Promise.allSettled(
-      queries.map(async (query) => ({
-        query,
-        tracks: await fetchSpotifySearchTracks(query, 8),
-      })),
-    );
-    const batches = settledBatches.flatMap((result) =>
-      result.status === "fulfilled" ? [result.value] : [],
-    );
-
-    if (batches.length === 0) {
-      const firstError = settledBatches.find(
-        (result): result is PromiseRejectedResult => result.status === "rejected",
-      );
-      throw new Error(
-        firstError?.reason instanceof Error
-          ? firstError.reason.message
-          : "Falha ao usar a Spotify API.",
-      );
-    }
-
-    const spotifySuggestions = dedupeTrackSuggestions(
-      batches.flatMap((batch) =>
-        batch.tracks.map((track) => spotifySearchToSuggestion(track, mood, batch.query)),
-      ),
-    ).slice(0, 10);
-
-    if (spotifySuggestions.length === 0) {
-      return {
-        plan: basePlan,
-        usedSpotifyApi: false,
-        error: "A Spotify API nao retornou faixas para esse pedido.",
-      };
-    }
-
-    const fallbackTracks = catalogTracks[mood] ?? catalogTracks.trap;
-    const realTracks = getRealTrackSuggestions(prompt, chartTracks, mood);
-    const tracks = dedupeTrackSuggestions([
-      ...spotifySuggestions,
-      ...realTracks,
-      ...fallbackTracks,
-    ]).slice(0, 12);
-    const spotifyResolvedCount = tracks.filter((track) => Boolean(track.spotifyTrackId)).length;
-    const chartResolvedCount = tracks.filter((track) => Boolean(track.chartPosition)).length;
-    const spotifyBlend = Math.min(72, Math.max(basePlan.marketBlend.spotify, 64));
-    const catalogBlend = Math.max(8, Math.min(24, basePlan.marketBlend.catalog));
-    const tiktokBlend = Math.max(8, 100 - spotifyBlend - catalogBlend);
-
-    return {
-      plan: {
-        ...basePlan,
-        confidence: Math.min(96, Math.max(basePlan.confidence, 90 + Math.min(spotifyResolvedCount, 6))),
-        marketBlend: {
-          spotify: spotifyBlend,
-          tiktok: tiktokBlend,
-          catalog: catalogBlend,
-        },
-        strategy: [
-          "Pesquisar faixas oficiais pela Spotify API a partir do pedido do chat.",
-          chartTracks.length > 0
-            ? `Cruzar com Spotify Charts BR${chartDate ? ` de ${chartDate}` : ""} para priorizar demanda real.`
-            : "Usar catalogo e curadoria como fallback se nao houver snapshot importado.",
-          "Deduplicar por ID oficial e ordenar por aderencia, popularidade e energia.",
-        ],
-        tracks,
-        nextSteps: [
-          `${spotifyResolvedCount} faixas tem ID oficial para criacao direta no Spotify.`,
-          "Revisar capa, nome e tamanho antes de publicar.",
-          "Criar como playlist privada e depois ajustar no editor do sistema.",
-        ],
-        spotifyResolvedCount,
-        chartResolvedCount,
-        dataSource: "spotify-api" as const,
-      },
-      usedSpotifyApi: true,
-      error: null,
-    };
-  } catch (error) {
-    return {
-      plan: basePlan,
-      usedSpotifyApi: false,
-      error: error instanceof Error ? error.message : "Falha ao usar a Spotify API.",
-    };
-  }
-}
-
-async function buildAgentPlan(
-  prompt: string,
-  conversation: Array<{ role: ChatRole; content: string }>,
-) {
-  const response = await fetch("/api/playlists-ia/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, messages: conversation }),
-  });
-  const body = (await response.json().catch(() => ({}))) as PlaylistsAiAgentResponse & {
-    message?: string;
-  };
-
-  if (!response.ok) {
-    throw new Error(body.message ?? "Falha ao acionar a Playlists IA.");
-  }
-
-  if (body.action === "clarifying_question" || body.mode === "clarifying_question") {
-    return {
-      plan: null,
-      message:
-        body.message ??
-        "Pra eu acertar a vibe real antes de criar, me passa mais alguns detalhes.",
-    };
-  }
-
-  if (body.action === "playlist_brief" || body.mode === "brief") {
-    return {
-      plan: null,
-      message:
-        body.message ??
-        "Montei o brief da playlist. Se estiver certo, confirma para eu pesquisar fundo e gerar a lista.",
-    };
-  }
-
-  if (!body.plan) {
-    throw new Error(body.message ?? "A Playlists IA nao retornou uma playlist.");
-  }
-
-  return {
-    plan: body.plan,
-    message:
-      body.message ??
-      (body.mode === "openai-agent"
-        ? `Pesquisei com ${body.aiModel ?? "ChatGPT"} e cruzei com os dados reais do sistema.`
-        : "Montei com ranking interno e dados reais disponiveis."),
-  };
-}
-
-function getSpotifyTrackUris(plan: PlaylistPlan) {
-  return Array.from(
-    new Set(
-      plan.tracks
-        .map((track) => track.spotifyTrackId)
-        .filter((id): id is string => Boolean(id))
-        .map((id) => `spotify:track:${id}`),
-    ),
-  );
-}
-
-function SourceBadge({ source }: { source: TrackSuggestion["source"] }) {
-  const tone = {
-    Spotify: "border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200",
-    TikTok: "border-sky-400/30 bg-sky-400/10 text-sky-700 dark:text-sky-200",
-    Catalogo: "border-amber-400/30 bg-amber-400/10 text-amber-700 dark:text-amber-200",
-    Curadoria: "border-violet-400/30 bg-violet-400/10 text-violet-700 dark:text-violet-200",
-  }[source];
-
+function TrackCard({ card }: { card: PlaylistsAiTrackCard }) {
   return (
-    <span className={cn("rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em]", tone)}>
-      {source}
-    </span>
-  );
-}
-
-function coverStyle(imageUrl: string | null) {
-  if (!imageUrl) return undefined;
-
-  return {
-    backgroundImage: `url(${imageUrl})`,
-    backgroundPosition: "center",
-    backgroundSize: "cover",
-  };
-}
-
-function PlaylistPlanCard({
-  plan,
-  creation,
-  creationError,
-  isCreating,
-  onCreatePlaylist,
-}: {
-  plan: PlaylistPlan;
-  creation?: PlaylistCreation;
-  creationError?: string;
-  isCreating: boolean;
-  onCreatePlaylist: (plan: PlaylistPlan) => void;
-}) {
-  const [isConfirming, setIsConfirming] = useState(false);
-  const spotifyTrackUris = getSpotifyTrackUris(plan);
-
-  return (
-    <section className="mt-4 overflow-hidden rounded-[28px] border border-border/80 bg-background/[0.72] shadow-[0_20px_70px_-48px_rgba(15,23,42,0.55)] dark:border-white/10 dark:bg-white/[0.035]">
-      <div className="border-b border-border/70 p-4 dark:border-white/10 tablet:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Lista sugerida
+    <article className="group overflow-hidden rounded-[22px] border border-border/70 bg-background/75 p-3.5 shadow-sm transition hover:border-primary/25 dark:border-white/10 dark:bg-black/20">
+      <div className="flex gap-3">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-muted">
+          {card.coverUrl ? (
+            <Image
+              src={card.coverUrl}
+              alt=""
+              fill
+              sizes="56px"
+              className="object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-400/25 to-sky-400/20 text-muted-foreground">
+              <Music2 className="h-5 w-5" />
             </div>
-            <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-foreground">
-              {plan.title}
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm font-medium text-muted-foreground">
-              {plan.subtitle}
-            </p>
-          </div>
-          <div className="rounded-[20px] border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-right">
-            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
-              {plan.dataSource === "openai-agent" ? "ChatGPT" : "Confianca"}
-            </div>
-            <div className="text-2xl font-black tabular-nums text-foreground">{plan.confidence}%</div>
-            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700/80 dark:text-emerald-200/80">
-              {plan.spotifyResolvedCount} ids oficiais
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="mt-5 grid gap-3 tablet:grid-cols-3">
-          <div className="rounded-[20px] border border-border/70 bg-muted/40 p-4 dark:border-white/10 dark:bg-black/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Spotify</p>
-            <p className="mt-2 text-2xl font-black tabular-nums">{plan.marketBlend.spotify}%</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="truncate text-sm font-black tracking-[-0.02em] text-foreground">
+                {card.name}
+              </h4>
+              <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
+                {card.artists}
+              </p>
+            </div>
+            {card.opportunityScore !== null ? (
+              <div className="shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-center">
+                <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                  {card.opportunityScore}
+                </div>
+                <div className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700/70 dark:text-emerald-300/70">
+                  score
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="rounded-[20px] border border-border/70 bg-muted/40 p-4 dark:border-white/10 dark:bg-black/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">TikTok/Reels</p>
-            <p className="mt-2 text-2xl font-black tabular-nums">{plan.marketBlend.tiktok}%</p>
-          </div>
-          <div className="rounded-[20px] border border-border/70 bg-muted/40 p-4 dark:border-white/10 dark:bg-black/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Catalogo</p>
-            <p className="mt-2 text-2xl font-black tabular-nums">{plan.marketBlend.catalog}%</p>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid gap-5 p-4 tablet:p-5 laptop:grid-cols-[1.35fr_0.65fr]">
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-black text-foreground">Faixas sugeridas</h4>
-            <span className="rounded-full border border-border/70 bg-muted/50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-              preview
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground dark:border-white/10">
+              <MapPin className="h-3 w-3" /> BR{" "}
+              {formatPosition(card.positions.BR)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground dark:border-white/10">
+              <Globe2 className="h-3 w-3" /> Global{" "}
+              {formatPosition(card.positions.GLOBAL)}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-1",
+                (card.movement7d ?? 0) > 0
+                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                  : (card.movement7d ?? 0) < 0
+                    ? "border-rose-400/25 bg-rose-400/10 text-rose-700 dark:text-rose-300"
+                    : "border-border/70 bg-muted/45 text-muted-foreground dark:border-white/10",
+              )}
+            >
+              <MovementIcon value={card.movement7d} />
+              {movementLabel(card.movement7d)}
             </span>
           </div>
-          <div className="space-y-2">
-            {plan.tracks.map((track, index) => (
-              <article
-                key={track.id}
-                className="grid gap-3 rounded-[20px] border border-border/70 bg-background/[0.66] p-3 dark:border-white/10 dark:bg-black/20 tablet:grid-cols-[48px_1fr_auto] tablet:items-center"
-              >
-                <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-border/70 bg-muted/60 dark:border-white/10">
-                  <div className="absolute inset-0" style={coverStyle(track.imageUrl)} />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-sm font-black tabular-nums text-white">
-                    {index + 1}
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <h5 className="truncate text-sm font-black text-foreground">{track.title}</h5>
-                  <p className="truncate text-xs font-medium text-muted-foreground">{track.artist}</p>
-                  <p className="mt-1 line-clamp-1 text-[11px] font-medium text-muted-foreground">{track.reason}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 tablet:justify-end">
-                  <SourceBadge source={track.source} />
-                  {track.chartPosition ? (
-                    <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
-                      chart #{track.chartPosition}
-                    </span>
-                  ) : null}
-                  <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-1 text-[10px] font-bold tabular-nums text-muted-foreground">
-                    energia {track.energy}
-                  </span>
-                </div>
-              </article>
-            ))}
-          </div>
         </div>
-
-        <aside className="space-y-3">
-          {plan.researchSummary ? (
-            <div className="rounded-[22px] border border-sky-400/25 bg-sky-400/10 p-4 dark:border-sky-300/15 dark:bg-sky-300/[0.08]">
-              <h4 className="flex items-center gap-2 text-sm font-black text-foreground">
-                <Sparkles className="h-4 w-4" />
-                Pesquisa
-              </h4>
-              <p className="mt-3 text-xs font-medium leading-5 text-muted-foreground">
-                {plan.researchSummary}
-              </p>
-              {plan.researchSources && plan.researchSources.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {plan.researchSources.slice(0, 4).map((source) => (
-                    <a
-                      key={source.url}
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-2 text-[11px] font-bold text-muted-foreground transition hover:border-sky-400/35 hover:text-foreground dark:border-white/10 dark:bg-black/20"
-                    >
-                      <span className="line-clamp-1">{source.title}</span>
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    </a>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="rounded-[22px] border border-border/70 bg-muted/35 p-4 dark:border-white/10 dark:bg-black/20">
-            <h4 className="flex items-center gap-2 text-sm font-black text-foreground">
-              <Wand2 className="h-4 w-4" />
-              Estrategia
-            </h4>
-            <div className="mt-3 space-y-2">
-              {plan.strategy.map((item) => (
-                <p key={item} className="flex gap-2 text-xs font-medium leading-5 text-muted-foreground">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                  {item}
-                </p>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-border/70 bg-muted/35 p-4 dark:border-white/10 dark:bg-black/20">
-            <h4 className="flex items-center gap-2 text-sm font-black text-foreground">
-              <PlusCircle className="h-4 w-4" />
-              Proximos passos
-            </h4>
-            <div className="mt-3 space-y-2">
-              {plan.nextSteps.map((item) => (
-                <p key={item} className="text-xs font-medium leading-5 text-muted-foreground">
-                  {item}
-                </p>
-              ))}
-            </div>
-            <div className="mt-4 space-y-2">
-              {creation ? (
-                <div className="rounded-[18px] border border-emerald-400/30 bg-emerald-400/10 p-3">
-                  <p className="text-xs font-black text-emerald-700 dark:text-emerald-200">
-                    Playlist criada no Spotify.
-                  </p>
-                  <div className="mt-3 grid gap-2">
-                    <a
-                      href={creation.playlistUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-400/15 dark:text-emerald-200"
-                    >
-                      Abrir no Spotify
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                </div>
-              ) : null}
-
-              {creationError ? (
-                <p className="rounded-[16px] border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs font-bold text-red-700 dark:text-red-200">
-                  {creationError}
-                </p>
-              ) : null}
-
-              {!creation && isConfirming ? (
-                <div className="grid gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={isCreating}
-                    onClick={() => onCreatePlaylist(plan)}
-                    className="w-full rounded-full"
-                  >
-                    {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-                    Confirmar criacao privada
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={isCreating}
-                    onClick={() => setIsConfirming(false)}
-                    className="w-full rounded-full"
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              ) : null}
-
-              {!creation && !isConfirming ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={spotifyTrackUris.length === 0 || isCreating}
-                  onClick={() => setIsConfirming(true)}
-                  className="w-full rounded-full"
-                >
-                  {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-                  Criar no Spotify
-                </Button>
-              ) : null}
-
-              <p className="text-[11px] font-medium leading-4 text-muted-foreground">
-                {spotifyTrackUris.length > 0
-                  ? `${spotifyTrackUris.length} faixas prontas para envio. Cria privada por seguranca.`
-                  : "Gere com Spotify API para liberar criacao direta."}
-              </p>
-            </div>
-          </div>
-        </aside>
       </div>
-    </section>
-  );
-}
 
-function MessageBubble({
-  message,
-  createdPlaylists,
-  creationErrors,
-  creatingPlanId,
-  onCreatePlaylist,
-}: {
-  message: ChatMessage;
-  createdPlaylists: Record<string, PlaylistCreation>;
-  creationErrors: Record<string, string>;
-  creatingPlanId: string | null;
-  onCreatePlaylist: (plan: PlaylistPlan) => void;
-}) {
-  const isUser = message.role === "user";
+      <p className="mt-3 text-xs font-medium leading-5 text-muted-foreground">
+        {card.reason}
+      </p>
 
-  return (
-    <article className={cn("flex gap-3", isUser ? "justify-end" : "justify-start")}>
-      {!isUser && (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200">
-          <Bot className="h-4 w-4" />
-        </div>
-      )}
-      <div className={cn("max-w-[92%]", isUser ? "tablet:max-w-[74%]" : "tablet:max-w-[92%]")}>
-        <div
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3 dark:border-white/10">
+        <span
           className={cn(
-            "whitespace-pre-line rounded-[24px] border px-4 py-3 text-sm font-medium leading-6",
-            isUser
-              ? "border-sky-400/30 bg-sky-400/[0.12] text-foreground dark:bg-sky-400/10"
-              : "border-border/80 bg-background/[0.72] text-foreground dark:border-white/10 dark:bg-white/[0.035]",
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em]",
+            card.status === "already_in_playlist"
+              ? "bg-sky-400/10 text-sky-700 dark:text-sky-300"
+              : card.status === "watch"
+                ? "bg-amber-400/10 text-amber-700 dark:text-amber-300"
+                : "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
           )}
         >
-          {message.content}
-        </div>
-        {message.plan ? (
-          <PlaylistPlanCard
-            plan={message.plan}
-            creation={createdPlaylists[message.plan.id]}
-            creationError={creationErrors[message.plan.id]}
-            isCreating={creatingPlanId === message.plan.id}
-            onCreatePlaylist={onCreatePlaylist}
-          />
-        ) : null}
+          <CheckCircle2 className="h-3 w-3" />
+          {card.statusLabel}
+        </span>
+        <span className="text-right text-[10px] font-bold text-muted-foreground">
+          {card.suggestedAction}
+        </span>
       </div>
     </article>
   );
 }
 
-export default function PlaylistsAiWorkbench({
-  chartTracks = [],
-  chartDate = null,
-}: {
-  chartTracks?: PlaylistsAiChartTrack[];
-  chartDate?: string | null;
-}) {
-  const hasChartData = chartTracks.length > 0;
+function ResponseDetails({ result }: { result: PlaylistsAiChatResponse }) {
+  return (
+    <div className="mt-4 space-y-4">
+      {result.cards.length > 0 ? (
+        <div className="grid gap-2.5 desktop:grid-cols-2">
+          {result.cards.map((card) => (
+            <TrackCard key={`${card.id}-${card.statusLabel}`} card={card} />
+          ))}
+        </div>
+      ) : null}
+
+      {result.actions.length > 0 ? (
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <LockKeyhole className="h-3.5 w-3.5" />
+            Ações preparadas · V1 read-only
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {result.actions.map((preparedAction) => {
+              const Icon = ACTION_ICONS[preparedAction.type];
+              return (
+                <button
+                  key={preparedAction.id}
+                  type="button"
+                  disabled
+                  title={preparedAction.description}
+                  className="inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-border/70 bg-muted/45 px-3 py-2 text-xs font-black text-muted-foreground opacity-80 dark:border-white/10"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {preparedAction.label}
+                  <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[8px] uppercase tracking-[0.1em]">
+                    em breve
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-[18px] border border-border/60 bg-muted/25 p-3 dark:border-white/10 dark:bg-white/[0.025]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            <Database className="h-3.5 w-3.5" /> Fontes consultadas
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground">
+            Confiança {result.confidence}%
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${result.confidence}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {result.dataSources.map((dataSource) => (
+            <span
+              key={`${dataSource.id}-${dataSource.detail}`}
+              title={dataSource.detail}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[9px] font-bold",
+                dataSource.status === "used"
+                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                  : dataSource.status === "partial"
+                    ? "border-amber-400/20 bg-amber-400/10 text-amber-700 dark:text-amber-300"
+                    : "border-border/70 bg-muted/50 text-muted-foreground dark:border-white/10",
+              )}
+            >
+              {dataSource.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const assistant = message.role === "assistant";
+  return (
+    <article
+      className={cn(
+        "flex gap-3",
+        assistant ? "items-start" : "items-start justify-end",
+      )}
+    >
+      {assistant ? (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-700 shadow-sm dark:text-emerald-300">
+          <Bot className="h-4 w-4" />
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          "max-w-[min(100%,920px)] rounded-[24px] px-4 py-3.5",
+          assistant
+            ? "border border-border/70 bg-background/70 text-foreground shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
+            : "bg-foreground text-background",
+        )}
+      >
+        <p className="whitespace-pre-wrap text-sm font-medium leading-6">
+          {message.content}
+        </p>
+        {message.result ? <ResponseDetails result={message.result} /> : null}
+      </div>
+
+      {!assistant ? (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background">
+          <UserRound className="h-4 w-4" />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+export default function PlaylistsAiWorkbench() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
       content:
-        hasChartData
-          ? `Estou pronto para buscar na Spotify API e cruzar com ${chartTracks.length} faixas do Spotify Charts BR${chartDate ? ` (${chartDate})` : ""}. Me fala a vibe, genero, energia e objetivo.`
-          : "Estou pronto para buscar na Spotify API. Me fala a vibe, genero, ano, energia e objetivo.",
+        "Sou o cérebro de decisões do Playlist OS. Posso cruzar Spotify Charts BR/Global, suas playlists conectadas e a Spotify API para responder com dados reais. Nesta V1 eu apenas analiso e preparo ações — nada será alterado sem uma etapa futura de confirmação.",
     },
   ]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [creatingPlanId, setCreatingPlanId] = useState<string | null>(null);
-  const [createdPlaylists, setCreatedPlaylists] = useState<Record<string, PlaylistCreation>>({});
-  const [creationErrors, setCreationErrors] = useState<Record<string, string>>({});
+  const endRef = useRef<HTMLDivElement>(null);
 
-  async function submitPrompt(prompt: string) {
-    const cleanPrompt = prompt.trim();
-    if (!cleanPrompt || isThinking) return;
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isThinking]);
+
+  async function submitMessage(value: string) {
+    const cleanMessage = value.trim();
+    if (!cleanMessage || isThinking) return;
 
     const userMessage: ChatMessage = {
       id: newId("user"),
       role: "user",
-      content: cleanPrompt,
+      content: cleanMessage,
     };
+    const history = [...messages, userMessage]
+      .slice(-10)
+      .map((message) => ({ role: message.role, content: message.content }));
 
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setIsThinking(true);
 
     try {
-      const conversation = [...messages, userMessage]
-        .slice(-10)
-        .map((message) => ({
-          role: message.role,
-          content: message.content,
-        }));
-      const canUsePlanFallback =
-        hasBriefInConversation(conversation) && isPlaylistGenerationConfirmation(cleanPrompt);
-      const result = await buildAgentPlan(cleanPrompt, conversation).catch(async () => {
-        if (!canUsePlanFallback) {
-          return {
-            plan: null,
-            message:
-              "Nao consegui acionar o agente agora. Me manda a vibe de novo ou confirma o brief quando ele aparecer, que eu gero a lista na etapa certa.",
-          };
-        }
-
-        const fallback = await buildSpotifyBackedPlan(cleanPrompt, chartTracks, chartDate);
-        return {
-          plan: fallback.plan,
-          message:
-            fallback.usedSpotifyApi
-              ? "O agente nao respondeu agora; montei usando Spotify API e charts internos como fallback."
-              : `O agente nao respondeu agora. ${fallback.error ? `Fallback: ${fallback.error}` : "Usei a versao segura local."}`,
-        };
-      });
-      startTransition(() => {
-        setMessages((current) => [
-          ...current,
-          {
-            id: newId("assistant"),
-            role: "assistant",
-            content: result.message,
-            plan: result.plan ?? undefined,
-          },
-        ]);
-        setIsThinking(false);
-      });
-    } catch (error) {
-      startTransition(() => {
-        setMessages((current) => [
-          ...current,
-          {
-            id: newId("assistant"),
-            role: "assistant",
-            content:
-              error instanceof Error
-                ? `Nao consegui montar agora: ${error.message}`
-                : "Nao consegui montar agora. Tenta de novo em instantes.",
-          },
-        ]);
-        setIsThinking(false);
-      });
-    }
-  }
-
-  async function createPlaylistFromPlan(plan: PlaylistPlan) {
-    const trackUris = getSpotifyTrackUris(plan);
-    if (trackUris.length === 0 || creatingPlanId) return;
-
-    setCreatingPlanId(plan.id);
-    setCreationErrors((current) => {
-      const next = { ...current };
-      delete next[plan.id];
-      return next;
-    });
-
-    try {
-      const response = await fetch("/api/spotify/playlists/create", {
+      const response = await fetch("/api/playlists-ia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: plan.title,
-          description: `Criada pela Playlists IA. Pedido: ${plan.subtitle}`.slice(0, 300),
-          isPublic: false,
-          trackUris,
-        }),
+        body: JSON.stringify({ message: cleanMessage, messages: history }),
       });
-      const body = (await response.json().catch(() => ({}))) as {
-        playlistId?: string;
-        playlistUrl?: string;
-        message?: string;
-      };
+      const payload = (await response.json().catch(() => null)) as
+        | (PlaylistsAiChatResponse & { success?: true })
+        | { success?: false; message?: string }
+        | null;
 
-      if (!response.ok || !body.playlistId) {
-        throw new Error(body.message ?? "Erro ao criar playlist no Spotify.");
+      if (!response.ok || !payload || !("text" in payload)) {
+        throw new Error(
+          payload && "message" in payload && payload.message
+            ? payload.message
+            : "Não foi possível consultar a inteligência agora.",
+        );
       }
 
-      const playlistId = body.playlistId;
-      const playlistUrl = body.playlistUrl ?? `https://open.spotify.com/playlist/${playlistId}`;
-      setCreatedPlaylists((current) => ({
+      setMessages((current) => [
         ...current,
-        [plan.id]: {
-          playlistId,
-          playlistUrl,
+        {
+          id: newId("assistant"),
+          role: "assistant",
+          content: payload.text,
+          result: payload,
         },
-      }));
-      invalidateSpotifyAccountPlaylistsClientCache();
+      ]);
     } catch (error) {
-      setCreationErrors((current) => ({
+      setMessages((current) => [
         ...current,
-        [plan.id]: error instanceof Error ? error.message : "Erro ao criar playlist no Spotify.",
-      }));
+        {
+          id: newId("assistant"),
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? `${error.message} Nenhuma alteração foi executada.`
+              : "Não consegui consultar os dados agora. Nenhuma alteração foi executada.",
+        },
+      ]);
     } finally {
-      setCreatingPlanId(null);
+      setIsThinking(false);
     }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void submitPrompt(input);
+    void submitMessage(input);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void submitMessage(input);
+    }
   }
 
   return (
-    <div className="grid gap-5 laptop:grid-cols-[0.72fr_1.28fr]">
+    <div className="mx-auto grid max-w-[1540px] gap-4 laptop:grid-cols-[290px_minmax(0,1fr)]">
       <aside className="space-y-4">
-        <section className="relative overflow-hidden rounded-[34px] border border-white/70 bg-white/[0.74] p-5 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_28px_110px_rgba(0,0,0,0.35)]">
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-300/[0.25] blur-3xl dark:bg-emerald-400/[0.12]" />
-          <div className="absolute -bottom-24 left-12 h-64 w-64 rounded-full bg-sky-300/[0.22] blur-3xl dark:bg-sky-500/[0.12]" />
+        <section className="relative overflow-hidden rounded-[30px] border border-border/70 bg-card/75 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="absolute -right-16 -top-20 h-48 w-48 rounded-full bg-emerald-400/15 blur-3xl" />
           <div className="relative">
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              Playlists IA
-            </span>
-            <h2 className="mt-5 text-4xl font-black tracking-[-0.06em] text-foreground">
-              Um chat para lapidar a ideia antes de criar.
+            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] border border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <h2 className="mt-5 text-2xl font-black tracking-[-0.05em] text-foreground">
+              Decisões, não prompts.
             </h2>
-            <p className="mt-4 text-sm font-medium leading-6 text-muted-foreground">
-              Primeiro ele monta o brief, espera tua confirmacao e so depois pesquisa fundo com ChatGPT, Spotify API, TikTok/Kworb e charts internos.
+            <p className="mt-3 text-sm font-medium leading-6 text-muted-foreground">
+              Pergunte livremente. O agente escolhe as leituras necessárias e
+              explica cada recomendação.
             </p>
 
-            <div className="mt-6 grid gap-3">
-              <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                  <MessageSquareText className="h-4 w-4" />
-                  Comando
+            <div className="mt-5 space-y-2">
+              {[
+                "Spotify Charts BR + Global",
+                "Playlists reais do workspace",
+                "Busca oficial Spotify",
+                "Scores e motivos explicáveis",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2 text-xs font-bold text-muted-foreground"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  {item}
                 </div>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  Vibe, genero, ano, publico, tamanho e objetivo.
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                  <Disc3 className="h-4 w-4" />
-                  Leitura
-                </div>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  {hasChartData
-                    ? `ChatGPT + Spotify API + ${chartTracks.length} faixas do Charts BR${chartDate ? ` (${chartDate})` : ""}.`
-                    : "ChatGPT + Spotify API + TikTok/Kworb."}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-border/70 bg-background/[0.62] p-4 dark:border-white/10 dark:bg-black/20">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                  <ListMusic className="h-4 w-4" />
-                  Saida
-                </div>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  Brief, lista sugerida e criacao privada no Spotify.
-                </p>
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-border/80 bg-card/70 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-          <h3 className="text-sm font-black text-foreground">Prompts rapidos</h3>
+        <section className="rounded-[26px] border border-border/70 bg-card/65 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Perguntas para começar
+          </div>
           <div className="mt-3 space-y-2">
-            {promptPresets.map((preset) => (
+            {QUICK_QUESTIONS.map((question) => (
               <button
-                key={preset}
+                key={question}
                 type="button"
-                onClick={() => void submitPrompt(preset)}
+                onClick={() => void submitMessage(question)}
                 disabled={isThinking}
-                className="w-full rounded-[18px] border border-border/70 bg-background/[0.62] px-3 py-3 text-left text-xs font-semibold leading-5 text-muted-foreground transition hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground disabled:opacity-60 dark:border-white/10 dark:bg-black/20"
+                className="w-full rounded-[17px] border border-border/60 bg-background/55 px-3 py-2.5 text-left text-[11px] font-bold leading-4 text-muted-foreground transition hover:border-primary/25 hover:text-foreground disabled:opacity-50 dark:border-white/10 dark:bg-black/15"
               >
-                {preset}
+                {question}
               </button>
             ))}
           </div>
         </section>
       </aside>
 
-      <section className="flex min-h-[760px] flex-col overflow-hidden rounded-[34px] border border-border/80 bg-card/[0.72] shadow-[0_24px_90px_-58px_rgba(15,23,42,0.54)] dark:border-white/10 dark:bg-white/[0.035]">
-        <div className="border-b border-border/80 p-4 dark:border-white/10 tablet:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                Builder
-              </div>
-              <h3 className="mt-1 text-xl font-black tracking-[-0.03em] text-foreground">
-                Chat de criacao de playlists
-              </h3>
+      <section className="bg-card/72 flex max-h-[calc(100vh-150px)] min-h-[780px] flex-col overflow-hidden rounded-[32px] border border-border/70 shadow-[0_28px_100px_-65px_rgba(15,23,42,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.03]">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-5 py-4 dark:border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-foreground text-background">
+              <Bot className="h-4 w-4" />
             </div>
-            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
-              {hasChartData ? "agente + dados reais" : "agente ia"}
-            </span>
+            <div>
+              <h1 className="text-base font-black tracking-[-0.03em] text-foreground">
+                Playlists IA
+              </h1>
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Agente de curadoria conectado aos seus dados
+              </p>
+            </div>
           </div>
-        </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+            <LockKeyhole className="h-3 w-3" /> V1 read-only
+          </span>
+        </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-4 tablet:p-5">
+        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5 tablet:px-6">
           {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              createdPlaylists={createdPlaylists}
-              creationErrors={creationErrors}
-              creatingPlanId={creatingPlanId}
-              onCreatePlaylist={createPlaylistFromPlan}
-            />
+            <MessageBubble key={message.id} message={message} />
           ))}
-          {isThinking && (
-            <article className="flex gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200">
+          {isThinking ? (
+            <article className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
                 <Bot className="h-4 w-4" />
               </div>
-              <div className="rounded-[24px] border border-border/80 bg-background/[0.72] px-4 py-3 text-sm font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.035]">
+              <div className="rounded-[22px] border border-border/70 bg-background/70 px-4 py-3 text-sm font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.035]">
                 <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                alinhando brief e pesquisa...
+                cruzando charts, playlists e Spotify...
               </div>
             </article>
-          )}
+          ) : null}
+          <div ref={endRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t border-border/80 p-4 dark:border-white/10 tablet:p-5">
-          <div className="rounded-[26px] border border-border/80 bg-background/[0.74] p-2 shadow-inner dark:border-white/10 dark:bg-black/20">
+        <form
+          onSubmit={handleSubmit}
+          className="border-t border-border/70 p-4 dark:border-white/10 tablet:p-5"
+        >
+          <div className="rounded-[24px] border border-border/80 bg-background/80 p-2 shadow-inner focus-within:border-primary/30 dark:border-white/10 dark:bg-black/20">
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              rows={3}
-              placeholder="Ex: cria uma playlist trap/funk atual para noite, 60 faixas, misturando Spotify Charts e TikTok..."
-              className="min-h-20 w-full resize-none bg-transparent px-3 py-3 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/70"
+              onKeyDown={handleKeyDown}
+              maxLength={1600}
+              rows={2}
+              placeholder="Pergunte sobre oportunidades, uma faixa, uma playlist ou uma decisão de curadoria..."
+              className="min-h-[66px] w-full resize-none bg-transparent px-3 py-2.5 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/65"
             />
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-2 py-2 dark:border-white/10">
-              <p className="text-xs font-medium text-muted-foreground">
-                {hasChartData
-                  ? "Agente com ChatGPT quando OPENAI_API_KEY estiver ativa. Fallback interno sempre ligado."
-                  : "ChatGPT + Spotify API com fallback local se a conexao falhar."}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 px-2 pt-2 dark:border-white/10">
+              <p className="text-[10px] font-semibold text-muted-foreground">
+                Enter envia · Shift + Enter quebra linha · nenhuma ação é
+                executada
               </p>
-              <Button type="submit" disabled={!input.trim() || isThinking} className="rounded-full">
-                {isThinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <button
+                type="submit"
+                disabled={!input.trim() || isThinking}
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-foreground px-4 text-xs font-black text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isThinking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
                 Enviar
-              </Button>
+              </button>
             </div>
           </div>
         </form>
