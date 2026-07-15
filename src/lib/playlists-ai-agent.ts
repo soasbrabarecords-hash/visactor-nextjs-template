@@ -270,6 +270,10 @@ function buildWorkspaceSource(workspace: WorkspacePlaylistsToolResult) {
 }
 
 function buildChartSources(result: ChartOpportunitiesToolResult) {
+  const classified = result.cards.filter(
+    (card) =>
+      card.genreProfile && card.genreProfile.primaryGenre !== "desconhecido",
+  ).length;
   return [
     source(
       "spotify_charts",
@@ -284,6 +288,14 @@ function buildChartSources(result: ChartOpportunitiesToolResult) {
       "Music Intelligence",
       `Scores explicáveis com janela validada de até ${result.maxWindow} dias.`,
       result.maxWindow > 0 ? "used" : "partial",
+    ),
+    source(
+      "genre_intelligence",
+      "Genre Intelligence",
+      classified > 0
+        ? `${classified}/${result.cards.length} cards com gênero classificado e evidência rastreável.`
+        : "Perfis ainda sem evidência suficiente; gênero mantido em análise.",
+      classified === result.cards.length && classified > 0 ? "used" : "partial",
     ),
   ];
 }
@@ -320,6 +332,8 @@ function cardForPresence(
         ? "Manter ou revisar posição"
         : "Avaliar oportunidade",
       playlistNames: result.playlistNames,
+      genreProfile: result.genreProfile ?? signal?.genreProfile ?? null,
+      playlistFit: null,
     },
   ];
 }
@@ -536,6 +550,18 @@ async function answerTrackPresence({
       "Playlists do workspace",
       `${presence.playlistsChecked}/${presence.playlistsTotal} playlists verificadas.`,
       presence.complete ? "used" : "partial",
+    ),
+    source(
+      "genre_intelligence",
+      "Genre Intelligence",
+      presence.genreProfile &&
+        presence.genreProfile.primaryGenre !== "desconhecido"
+        ? `Gênero ${presence.genreProfile?.label} com confiança ${presence.genreProfile?.confidenceLabel}.`
+        : "Gênero ainda sem evidência suficiente.",
+      presence.genreProfile &&
+        presence.genreProfile.primaryGenre !== "desconhecido"
+        ? "used"
+        : "partial",
     ),
   ];
   if (chart.track) {

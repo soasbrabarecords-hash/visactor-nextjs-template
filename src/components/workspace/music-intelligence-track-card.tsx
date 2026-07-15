@@ -1,4 +1,11 @@
-import { ArrowUpRight, Disc3, Plus, Radio, ShieldAlert } from "lucide-react";
+import {
+  ArrowUpRight,
+  Disc3,
+  Plus,
+  Radio,
+  ShieldAlert,
+  Tags,
+} from "lucide-react";
 import Link from "next/link";
 import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
 import type { MusicIntelligenceTrack } from "@/types/music-intelligence";
@@ -101,6 +108,17 @@ export function MusicIntelligenceTrackCard({
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {track.genreProfile ? (
+              <span
+                title={`Confiança ${track.genreProfile.confidenceLabel}: ${track.genreProfile.genreConfidence}%${track.genreProfile.manualOverride ? " · correção manual" : ""}`}
+                className="inline-flex items-center gap-1 rounded-full bg-violet-400/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.11em] text-violet-300 ring-1 ring-inset ring-violet-400/20"
+              >
+                <Tags className="h-3 w-3" /> {track.genreProfile.label}
+                <span className="opacity-60">
+                  {track.genreProfile.genreConfidence}%
+                </span>
+              </span>
+            ) : null}
             <span
               className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.11em] ring-1 ring-inset ${accentClasses.badge}`}
             >

@@ -1,3 +1,5 @@
+import type { TrackGenreCardProfile } from "@/types/track-profile";
+
 export type MusicIntelligenceCountry = "BR" | "GLOBAL";
 
 export type MusicIntelligenceStatus =
@@ -43,6 +45,7 @@ export type MusicIntelligenceTrack = {
   suggestedPlaylistName: string | null;
   explanation: string;
   scores: MusicIntelligenceScores;
+  genreProfile?: TrackGenreCardProfile | null;
 };
 
 export type MusicIntelligenceArtistSignal = {

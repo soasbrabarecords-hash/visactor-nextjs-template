@@ -13,13 +13,18 @@ import {
   LockKeyhole,
   MapPin,
   Music2,
+  Pencil,
   Plus,
+  RefreshCw,
+  Save,
   Send,
   ShieldCheck,
   Sparkles,
+  Tags,
   TrendingDown,
   TrendingUp,
   UserRound,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -35,6 +40,12 @@ import type {
   PlaylistsAiPreparedActionType,
   PlaylistsAiTrackCard,
 } from "@/types/playlists-ai";
+import {
+  TRACK_PROFILE_GENRES,
+  TRACK_PROFILE_GENRE_LABELS,
+  type TrackGenreCardProfile,
+  type TrackProfileGenre,
+} from "@/types/track-profile";
 
 type ChatMessage = {
   id: string;
@@ -85,6 +96,76 @@ function MovementIcon({ value }: { value: number | null }) {
 }
 
 function TrackCard({ card }: { card: PlaylistsAiTrackCard }) {
+  const [genreProfile, setGenreProfile] =
+    useState<TrackGenreCardProfile | null>(card.genreProfile ?? null);
+  const [genreEditorOpen, setGenreEditorOpen] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState<TrackProfileGenre>(
+    card.genreProfile?.primaryGenre ?? "desconhecido",
+  );
+  const [genreBusy, setGenreBusy] = useState(false);
+  const [genreError, setGenreError] = useState<string | null>(null);
+
+  const updateGenreProfile = async (mode: "enrich" | "override") => {
+    if (!card.spotifyTrackId || genreBusy) return;
+    setGenreBusy(true);
+    setGenreError(null);
+    try {
+      const endpoint =
+        mode === "enrich"
+          ? "/api/playlist-os/track-profiles/enrich"
+          : `/api/playlist-os/track-profiles/${encodeURIComponent(card.spotifyTrackId)}`;
+      const response = await fetch(endpoint, {
+        method: mode === "enrich" ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          mode === "enrich"
+            ? {
+                spotifyTrackId: card.spotifyTrackId,
+                name: card.name,
+                artists: card.artists,
+                chartCountry: card.positions.BR ? "BR" : "GLOBAL",
+              }
+            : {
+                entityType: "track",
+                primaryGenre: selectedGenre,
+                note: "Correção feita no card do Playlists IA.",
+              },
+        ),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        profile?: TrackGenreCardProfile & {
+          primaryGenre: TrackProfileGenre;
+        };
+      };
+      if (!response.ok || !payload.success || !payload.profile) {
+        throw new Error(
+          payload.message || "Não foi possível atualizar o gênero.",
+        );
+      }
+      setGenreProfile({
+        primaryGenre: payload.profile.primaryGenre,
+        label:
+          TRACK_PROFILE_GENRE_LABELS[payload.profile.primaryGenre] ??
+          payload.profile.label,
+        genreConfidence: payload.profile.genreConfidence,
+        confidenceLabel: payload.profile.confidenceLabel,
+        manualOverride: payload.profile.manualOverride,
+      });
+      setSelectedGenre(payload.profile.primaryGenre);
+      setGenreEditorOpen(false);
+    } catch (error) {
+      setGenreError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível atualizar o gênero.",
+      );
+    } finally {
+      setGenreBusy(false);
+    }
+  };
+
   return (
     <article className="group overflow-hidden rounded-[22px] border border-border/70 bg-background/75 p-3.5 shadow-sm transition hover:border-primary/25 dark:border-white/10 dark:bg-black/20">
       <div className="flex gap-3">
@@ -128,6 +209,48 @@ function TrackCard({ card }: { card: PlaylistsAiTrackCard }) {
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black">
+            {genreProfile ? (
+              <span
+                title={`Confiança ${genreProfile.confidenceLabel}: ${genreProfile.genreConfidence}%${genreProfile.manualOverride ? " · correção manual" : ""}`}
+                className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-1 text-violet-700 dark:text-violet-300"
+              >
+                <Tags className="h-3 w-3" /> {genreProfile.label}
+                <span className="opacity-65">
+                  {genreProfile.genreConfidence}%
+                </span>
+              </span>
+            ) : null}
+            {card.spotifyTrackId ? (
+              <button
+                type="button"
+                disabled={genreBusy}
+                onClick={() => setGenreEditorOpen((current) => !current)}
+                className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-50 dark:border-white/10"
+                title="Atualizar ou corrigir o gênero desta faixa"
+              >
+                {genreBusy ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Pencil className="h-3 w-3" />
+                )}
+                Gênero
+              </button>
+            ) : null}
+            {card.playlistFit ? (
+              <span
+                title={card.playlistFit.reason}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2 py-1",
+                  card.playlistFit.label === "alto"
+                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                    : card.playlistFit.label === "baixo"
+                      ? "border-rose-400/20 bg-rose-400/10 text-rose-700 dark:text-rose-300"
+                      : "border-amber-400/20 bg-amber-400/10 text-amber-700 dark:text-amber-300",
+                )}
+              >
+                Fit {card.playlistFit.score}%
+              </span>
+            ) : null}
             <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground dark:border-white/10">
               <MapPin className="h-3 w-3" /> BR{" "}
               {formatPosition(card.positions.BR)}
@@ -156,6 +279,61 @@ function TrackCard({ card }: { card: PlaylistsAiTrackCard }) {
       <p className="mt-3 text-xs font-medium leading-5 text-muted-foreground">
         {card.reason}
       </p>
+
+      {genreEditorOpen ? (
+        <div className="mt-3 rounded-2xl border border-violet-400/20 bg-violet-400/[0.055] p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedGenre}
+              onChange={(event) =>
+                setSelectedGenre(event.target.value as TrackProfileGenre)
+              }
+              disabled={genreBusy}
+              className="h-9 min-w-[170px] flex-1 rounded-xl border border-border/70 bg-background px-3 text-xs font-bold text-foreground outline-none focus:border-violet-400/50 dark:border-white/10"
+            >
+              {TRACK_PROFILE_GENRES.map((genre) => (
+                <option key={genre} value={genre}>
+                  {TRACK_PROFILE_GENRE_LABELS[genre]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={genreBusy}
+              onClick={() => void updateGenreProfile("override")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-violet-500 px-3 text-[10px] font-black uppercase tracking-[0.09em] text-white disabled:opacity-50"
+            >
+              <Save className="h-3.5 w-3.5" /> Corrigir
+            </button>
+            <button
+              type="button"
+              disabled={genreBusy}
+              onClick={() => void updateGenreProfile("enrich")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/70 bg-background px-3 text-[10px] font-black uppercase tracking-[0.09em] text-foreground disabled:opacity-50 dark:border-white/10"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Consultar fontes
+            </button>
+            <button
+              type="button"
+              onClick={() => setGenreEditorOpen(false)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted"
+              aria-label="Fechar editor de gênero"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {genreError ? (
+            <p className="mt-2 text-[10px] font-bold text-rose-600 dark:text-rose-300">
+              {genreError}
+            </p>
+          ) : (
+            <p className="mt-2 text-[10px] leading-4 text-muted-foreground">
+              “Consultar fontes” usa metadados, MusicBrainz e Last.fm quando
+              configurado. “Corrigir” prevalece somente neste workspace.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3 dark:border-white/10">
         <span

@@ -1,4 +1,5 @@
 import type { MusicIntelligenceCountry } from "@/types/music-intelligence";
+import type { TrackGenreCardProfile } from "@/types/track-profile";
 
 export type PlaylistsAiIntent =
   | "chart_opportunities"
@@ -27,6 +28,12 @@ export type PlaylistsAiTrackCard = {
   statusLabel: string;
   suggestedAction: string;
   playlistNames: string[];
+  genreProfile?: TrackGenreCardProfile | null;
+  playlistFit?: {
+    score: number;
+    label: "alto" | "medio" | "baixo" | "indeterminado";
+    reason: string;
+  } | null;
 };
 
 export type PlaylistsAiPreparedActionType =
@@ -50,7 +57,8 @@ export type PlaylistsAiDataSource = {
     | "spotify_charts"
     | "workspace_playlists"
     | "spotify_api"
-    | "music_intelligence";
+    | "music_intelligence"
+    | "genre_intelligence";
   label: string;
   detail: string;
   status: "used" | "partial" | "unavailable";

@@ -14,6 +14,7 @@ import {
   RadioTower,
   ShieldCheck,
   Sparkles,
+  Tags,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -360,6 +361,15 @@ export function MusicIntelligenceDashboard({
                       <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/55 ring-1 ring-inset ring-white/[0.07]">
                         {positionLabel(hero)}
                       </span>
+                      {hero.genreProfile ? (
+                        <span
+                          title={`Confiança ${hero.genreProfile.confidenceLabel}: ${hero.genreProfile.genreConfidence}%`}
+                          className="inline-flex items-center gap-1 rounded-full bg-violet-400/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-violet-300 ring-1 ring-inset ring-violet-400/20"
+                        >
+                          <Tags className="h-3 w-3" />
+                          {hero.genreProfile.label}
+                        </span>
+                      ) : null}
                     </div>
                     <h2 className="mt-3 truncate text-2xl font-semibold tracking-[-0.04em] text-white tablet:text-3xl">
                       {hero.name}

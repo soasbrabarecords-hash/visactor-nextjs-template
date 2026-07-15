@@ -13,11 +13,19 @@ import {
   fetchSpotifyPlaylistTrackIds,
   withSpotifyToken,
 } from "@/lib/spotify-user";
+import { getTrackGenreProfiles } from "@/lib/track-profile-engine";
+import { getCurrentWorkspaceSelection } from "@/lib/workspaces";
 import type {
   MusicIntelligenceCountry,
   MusicIntelligenceTrack,
 } from "@/types/music-intelligence";
 import type { PlaylistsAiTrackCard } from "@/types/playlists-ai";
+import {
+  TRACK_PROFILE_GENRE_LABELS,
+  type TrackGenreCardProfile,
+  type TrackGenreProfile,
+  type TrackProfileGenre,
+} from "@/types/track-profile";
 
 export type WorkspacePlaylistsToolResult = {
   connected: boolean;
@@ -67,6 +75,7 @@ export type TrackPresenceToolResult = {
   playlistsTotal: number;
   complete: boolean;
   message: string | null;
+  genreProfile?: TrackGenreCardProfile | null;
 };
 
 export type PlaylistRecommendationToolResult = {
@@ -93,15 +102,60 @@ type SpotifyApiTrack = {
   album?: { images?: Array<{ url?: string }> };
 };
 
-const ADJACENT_GENRES: Partial<Record<TrackGenre, TrackGenre[]>> = {
+const ADJACENT_PROFILE_GENRES: Partial<
+  Record<TrackProfileGenre, TrackProfileGenre[]>
+> = {
+  funk: ["trap", "rap"],
   trap: ["rap", "funk"],
-  rap: ["trap"],
-  funk: ["trap", "pagodao"],
-  pagode: ["pagodao"],
-  pagodao: ["pagode", "funk"],
-  sertanejo: ["piseiro"],
-  piseiro: ["sertanejo"],
+  rap: ["trap", "funk"],
+  sertanejo: ["piseiro_forro"],
+  piseiro_forro: ["sertanejo"],
+  pop: ["pop_global", "dance_eletronico"],
+  pop_global: ["pop", "dance_eletronico", "afro_latin"],
+  dance_eletronico: ["pop_global", "pop", "afro_latin"],
+  afro_latin: ["pop_global", "dance_eletronico"],
 };
+
+function genreCardProfile(
+  profile: TrackGenreProfile | null | undefined,
+): TrackGenreCardProfile | null {
+  if (!profile) return null;
+  return {
+    primaryGenre: profile.primaryGenre,
+    label: TRACK_PROFILE_GENRE_LABELS[profile.primaryGenre],
+    genreConfidence: profile.genreConfidence,
+    confidenceLabel: profile.confidenceLabel,
+    manualOverride: profile.manualOverride,
+  };
+}
+
+async function loadProfilesForIntelligenceTracks(
+  tracks: MusicIntelligenceTrack[],
+  options: {
+    playlistContext?: Array<{ name: string; description?: string | null }>;
+  } = {},
+) {
+  const selection = await getCurrentWorkspaceSelection();
+  return getTrackGenreProfiles(
+    tracks.flatMap((track) =>
+      track.spotifyTrackId
+        ? [
+            {
+              spotifyTrackId: track.spotifyTrackId,
+              name: track.name,
+              artists: track.artists,
+              chartCountry: track.primaryCountry,
+              playlistContext: options.playlistContext,
+            },
+          ]
+        : [],
+    ),
+    {
+      workspaceId: selection?.workspace.id,
+      persistFallbacks: true,
+    },
+  );
+}
 
 export function normalizePlaylistAiText(value: string) {
   return value
@@ -207,6 +261,8 @@ function trackToCard(
     suggestedAction?: string;
     reasonPrefix?: string;
     opportunityScore?: number;
+    genreProfile?: TrackGenreProfile | null;
+    playlistFit?: PlaylistsAiTrackCard["playlistFit"];
   } = {},
 ): PlaylistsAiTrackCard {
   return {
@@ -232,6 +288,8 @@ function trackToCard(
         ? "Observar por 7 dias"
         : "Avaliar para adicionar"),
     playlistNames: options.playlistNames ?? [],
+    genreProfile: genreCardProfile(options.genreProfile),
+    playlistFit: options.playlistFit ?? null,
   };
 }
 
@@ -414,6 +472,17 @@ export async function searchTrackInPlaylists(
   }
 
   const index = await getWorkspaceTrackIndex(workspace.playlists);
+  const selection = await getCurrentWorkspaceSelection();
+  const profiles = await getTrackGenreProfiles(
+    [
+      {
+        spotifyTrackId: track.id,
+        name: track.name,
+        artists: track.artists,
+      },
+    ],
+    { workspaceId: selection?.workspace.id },
+  );
   return {
     track,
     playlistNames: index.trackPlaylistNames.get(track.id) ?? [],
@@ -421,6 +490,7 @@ export async function searchTrackInPlaylists(
     playlistsTotal: index.playlistsTotal,
     complete: index.complete,
     message: null,
+    genreProfile: genreCardProfile(profiles.get(track.id)),
   };
 }
 
@@ -460,13 +530,19 @@ export async function getChartOpportunities({
     return right.scores.opportunityScore - left.scores.opportunityScore;
   });
 
+  const selected = sorted.slice(0, clamp(limit, 1, 20));
+  const profiles = await loadProfilesForIntelligenceTracks(selected);
+
   return {
-    cards: sorted.slice(0, clamp(limit, 1, 20)).map((track) =>
+    cards: selected.map((track) =>
       trackToCard(track, {
         status: mode === "review" ? "already_in_playlist" : undefined,
         statusLabel: mode === "review" ? "Revisar presença" : undefined,
         suggestedAction:
           mode === "review" ? "Revisar antes de remover" : undefined,
+        genreProfile: track.spotifyTrackId
+          ? profiles.get(track.spotifyTrackId)
+          : null,
       }),
     ),
     latestChartDate: intelligence.summary.latestChartDate,
@@ -508,34 +584,72 @@ function inferPlaylistGenre(playlist: SpotifyEditablePlaylist) {
   );
 }
 
+function mapLegacyGenre(genre: TrackGenre): TrackProfileGenre {
+  if (genre === "piseiro") return "piseiro_forro";
+  if (
+    genre === "funk" ||
+    genre === "trap" ||
+    genre === "rap" ||
+    genre === "sertanejo" ||
+    genre === "pop" ||
+    genre === "rock"
+  ) {
+    return genre;
+  }
+  return "desconhecido";
+}
+
 function getPlaylistFit(
-  track: MusicIntelligenceTrack,
-  genre: TrackGenre,
+  trackProfile: TrackGenreProfile | null | undefined,
+  genre: TrackProfileGenre,
   playlistArtists: Set<string>,
+  trackArtists: string,
 ) {
-  const sharedArtist = artistNames(track.artists).some((artist) =>
+  const sharedArtist = artistNames(trackArtists).some((artist) =>
     playlistArtists.has(artist),
   );
   if (sharedArtist)
-    return { score: 100, reason: "Artista já validado no repertório." };
+    return {
+      score: 100,
+      label: "alto" as const,
+      reason: "Artista já validado no repertório.",
+    };
 
-  const trackGenre = detectGenre(track.artists, track.name);
-  if (genre === "unknown") {
-    return { score: 58, reason: "Fit estimado pelos sinais atuais do chart." };
+  const trackGenre = trackProfile?.primaryGenre ?? "desconhecido";
+  if (genre === "desconhecido") {
+    return {
+      score: 58,
+      label: "indeterminado" as const,
+      reason: "Fit estimado pelos sinais atuais do chart.",
+    };
   }
   if (trackGenre === genre) {
     return {
       score: 100,
+      label: "alto" as const,
       reason: "Gênero compatível com o perfil da playlist.",
     };
   }
-  if (ADJACENT_GENRES[genre]?.includes(trackGenre)) {
-    return { score: 74, reason: "Gênero adjacente ao perfil da playlist." };
+  if (ADJACENT_PROFILE_GENRES[genre]?.includes(trackGenre)) {
+    return {
+      score: 74,
+      label: "medio" as const,
+      reason: "Gênero adjacente ao perfil da playlist.",
+    };
   }
-  if (trackGenre === "unknown") {
-    return { score: 48, reason: "Gênero ainda não confirmado." };
+  if (trackGenre === "desconhecido") {
+    return {
+      score: 48,
+      label: "indeterminado" as const,
+      reason:
+        "Gênero ainda não confirmado; recomendação mantida em observação.",
+    };
   }
-  return { score: 18, reason: "Baixa afinidade de gênero." };
+  return {
+    score: 18,
+    label: "baixo" as const,
+    reason: "Quente nos charts, mas fora do gênero principal da playlist.",
+  };
 }
 
 export async function recommendTracksForPlaylist(
@@ -572,6 +686,35 @@ export async function recommendTracksForPlaylist(
   const playlist = playlistResult.playlist;
   const intelligence = await getMusicIntelligence();
   const playlistGenre = inferPlaylistGenre(playlist);
+  const selection = await getCurrentWorkspaceSelection();
+  const playlistContext = [
+    { name: playlist.name, description: playlist.description },
+  ];
+  const playlistProfiles = await getTrackGenreProfiles(
+    playlist.tracks.map((track) => ({
+      spotifyTrackId: track.id,
+      name: track.name,
+      artists: track.artists,
+      albumName: track.albumName,
+      playlistContext,
+    })),
+    {
+      workspaceId: selection?.workspace.id,
+      persistFallbacks: true,
+    },
+  );
+  const playlistGenreCounts = new Map<TrackProfileGenre, number>();
+  for (const profile of playlistProfiles.values()) {
+    if (profile.primaryGenre === "desconhecido") continue;
+    playlistGenreCounts.set(
+      profile.primaryGenre,
+      (playlistGenreCounts.get(profile.primaryGenre) ?? 0) + 1,
+    );
+  }
+  const playlistProfileGenre =
+    [...playlistGenreCounts.entries()].sort(
+      (left, right) => right[1] - left[1],
+    )[0]?.[0] ?? mapLegacyGenre(playlistGenre);
   const existingTrackIds = new Set(playlist.tracks.map((track) => track.id));
   const playlistArtists = new Set(
     playlist.tracks.flatMap((track) => artistNames(track.artists)),
@@ -584,7 +727,7 @@ export async function recommendTracksForPlaylist(
     })),
   );
   const seen = new Set<string>();
-  const ranked = candidates
+  const eligible = candidates
     .flatMap(({ market, track }) => {
       if (
         !track.spotifyTrackId ||
@@ -595,13 +738,37 @@ export async function recommendTracksForPlaylist(
         return [];
       }
       seen.add(track.spotifyTrackId);
-      const fit = getPlaylistFit(track, playlistGenre, playlistArtists);
+      return [{ market, track }];
+    })
+    .sort(
+      (left, right) =>
+        right.track.scores.opportunityScore -
+        left.track.scores.opportunityScore,
+    )
+    .slice(0, 120);
+  const candidateProfiles = await loadProfilesForIntelligenceTracks(
+    eligible.map(({ track }) => track),
+    { playlistContext },
+  );
+  const ranked = eligible
+    .map(({ market, track }) => {
+      const profile = track.spotifyTrackId
+        ? candidateProfiles.get(track.spotifyTrackId)
+        : null;
+      const fit = getPlaylistFit(
+        profile,
+        playlistProfileGenre,
+        playlistArtists,
+        track.artists,
+      );
       const score = Math.round(
         clamp(track.scores.opportunityScore * 0.68 + fit.score * 0.32),
       );
-      return [{ market, track, fit, score }];
+      return { market, track, profile, fit, score };
     })
-    .filter(({ fit }) => playlistGenre === "unknown" || fit.score >= 70)
+    .filter(
+      ({ fit }) => playlistProfileGenre === "desconhecido" || fit.score >= 70,
+    )
     .sort(
       (left, right) =>
         right.score - left.score ||
@@ -612,7 +779,7 @@ export async function recommendTracksForPlaylist(
 
   return {
     playlist,
-    cards: ranked.map(({ track, fit, score }) =>
+    cards: ranked.map(({ track, profile, fit, score }) =>
       trackToCard(track, {
         status: track.action === "watch" ? "watch" : "not_in_playlist",
         statusLabel:
@@ -623,6 +790,8 @@ export async function recommendTracksForPlaylist(
             : `Avaliar para ${playlist.name}`,
         reasonPrefix: `${fit.reason} Fit ${score}/100.`,
         opportunityScore: score,
+        genreProfile: profile,
+        playlistFit: fit,
       }),
     ),
     playlistGenre,
