@@ -52,6 +52,7 @@ test("rollout catalog preserves the requested gradual order", () => {
     [
       "core-30d",
       "core-60d",
+      "core-79d",
       "core-180d",
       "core-365d",
       "core-730d",
@@ -66,6 +67,7 @@ test("core phases plan every nested window through three years", () => {
   const plans = [
     planSpotifyChartBackfillPhase("core-30d", fixedNow),
     planSpotifyChartBackfillPhase("core-60d", fixedNow),
+    planSpotifyChartBackfillPhase("core-79d", fixedNow),
     planSpotifyChartBackfillPhase("core-180d", fixedNow),
     planSpotifyChartBackfillPhase("core-365d", fixedNow),
     planSpotifyChartBackfillPhase("core-730d", fixedNow),
@@ -74,7 +76,7 @@ test("core phases plan every nested window through three years", () => {
 
   assert.deepEqual(
     plans.map((plan) => plan.expectedJobs),
-    [60, 120, 360, 730, 1460, 2190],
+    [60, 120, 158, 360, 730, 1460, 2190],
   );
   assert.ok(plans.every((plan) => plan.endDate === "2026-07-12"));
 
@@ -83,6 +85,24 @@ test("core phases plan every nested window through three years", () => {
       plans[index - 1].dates.every((date) => plans[index].dates.includes(date)),
     );
   }
+});
+
+test("core-79d bridges the completed 60-day phase without renumbering later phases", () => {
+  const phase = SPOTIFY_CHART_BACKFILL_PHASES.find(
+    (candidate) => candidate.key === "core-79d",
+  );
+  const plan = planSpotifyChartBackfillPhase("core-79d", fixedNow);
+
+  assert.deepEqual(phase, {
+    key: "core-79d",
+    order: 25,
+    name: "BR + Global — 79 dias",
+    windowDays: 79,
+    regionIds: ["BR", "GLOBAL"],
+  });
+  assert.equal(plan.startDate, "2026-04-25");
+  assert.equal(plan.endDate, "2026-07-12");
+  assert.equal(plan.expectedJobs, 158);
 });
 
 test("later phases retain the persisted rollout anchor", () => {

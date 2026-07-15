@@ -21,6 +21,13 @@ export const SPOTIFY_CHART_BACKFILL_PHASES = [
     regionIds: ["BR", "GLOBAL"],
   },
   {
+    key: "core-79d",
+    order: 25,
+    name: "BR + Global — 79 dias",
+    windowDays: 79,
+    regionIds: ["BR", "GLOBAL"],
+  },
+  {
     key: "core-180d",
     order: 30,
     name: "BR + Global — 6 meses",

@@ -11,18 +11,23 @@ import {
   startSpotifyChartBackfillCampaign,
 } from "@/lib/charts/spotify-chart-backfill-campaigns";
 import {
+  drainSpotifyChartBackfillCron,
+  isAutomaticSpotifyChartBackfillCronRequest,
+} from "@/lib/charts/spotify-chart-backfill-cron";
+import {
   SPOTIFY_CHART_BACKFILL_DEFAULT_LIMIT,
   SPOTIFY_CHART_BACKFILL_MAX_LIMIT,
   SPOTIFY_CHART_BACKFILL_SUPPORTED_DAYS,
   type SpotifyChartBackfillSeedDays,
   enqueueRecentSpotifyChartBackfillJobs,
   planRecentSpotifyChartBackfillJobs,
+  reconcileSpotifyChartBackfillCoveredJobs,
 } from "@/lib/charts/spotify-chart-backfill-jobs";
 import { processSpotifyChartBackfillQueue } from "@/lib/charts/spotify-chart-backfill-worker";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const BACKFILL_ACTIONS = [
   "run",
@@ -67,8 +72,14 @@ export async function GET(request: Request) {
     );
   }
 
+  const automaticCron = isAutomaticSpotifyChartBackfillCronRequest(request);
   const searchParams = new URL(request.url).searchParams;
-  const limit = parseLimit(searchParams.get("limit"));
+  const rawLimit = searchParams.get("limit");
+  const parsedLimit = parseLimit(rawLimit);
+  const limit =
+    automaticCron && rawLimit === null
+      ? SPOTIFY_CHART_BACKFILL_MAX_LIMIT
+      : parsedLimit;
   const rawDays = searchParams.get("days");
   const days = parseDays(rawDays);
   const rawDryRun = searchParams.get("dry_run");
@@ -275,27 +286,60 @@ export async function GET(request: Request) {
     const seed = days
       ? await enqueueRecentSpotifyChartBackfillJobs(days)
       : null;
-    await refreshSpotifyChartBackfillCampaignProgress();
-    const worker = await processSpotifyChartBackfillQueue({
-      limit,
-      phaseKey: selectedPhasePlan?.phaseKey,
-    });
+    const campaignsBeforeDrain =
+      await refreshSpotifyChartBackfillCampaignProgress();
+    const selectedCampaignBeforeDrain = selectedPhasePlan
+      ? campaignsBeforeDrain.find(
+          (candidate) => candidate.phase_key === selectedPhasePlan.phaseKey,
+        )
+      : null;
+    const reconciledCoveredJobs =
+      selectedPhasePlan && selectedCampaignBeforeDrain?.status === "running"
+        ? await reconcileSpotifyChartBackfillCoveredJobs({
+            phaseKey: selectedPhasePlan.phaseKey,
+            limit: 500,
+          })
+        : 0;
+    const drainResult = await drainSpotifyChartBackfillCron(
+      {
+        automatic: automaticCron,
+        limit,
+        phaseKey: selectedPhasePlan?.phaseKey,
+      },
+      processSpotifyChartBackfillQueue,
+    );
+    const worker = drainResult.rounds.at(-1);
+
+    if (!worker) {
+      throw new Error("O worker nao executou nenhuma rodada.");
+    }
+
     const campaigns = await refreshSpotifyChartBackfillCampaignProgress();
     const seedComplete = !seed || seed.unavailableRegions.length === 0;
+    const cleanDrain = drainResult.rounds.every(
+      (round) =>
+        !round.sourceBlocked &&
+        round.failed === 0 &&
+        round.retryPending === 0 &&
+        round.lostLease === 0,
+    );
 
     return NextResponse.json({
-      success:
-        seedComplete &&
-        !worker.sourceBlocked &&
-        worker.failed === 0 &&
-        worker.retryPending === 0 &&
-        worker.lostLease === 0,
+      success: seedComplete && cleanDrain,
       seedComplete,
       seed,
       campaign,
       phase: selectedPhasePlan?.phaseKey ?? null,
+      reconciledCoveredJobs,
       campaigns,
       worker,
+      drain: {
+        automatic: drainResult.automatic,
+        roundCount: drainResult.roundCount,
+        stopReason: drainResult.stopReason,
+        durationMs: drainResult.durationMs,
+        totals: drainResult.totals,
+      },
     });
   } catch (error) {
     return NextResponse.json(

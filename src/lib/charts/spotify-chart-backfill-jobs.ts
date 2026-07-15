@@ -287,6 +287,30 @@ export async function recoverExpiredSpotifyChartBackfillJobs(limit = 10) {
   return typeof data === "number" ? data : Number(data ?? 0);
 }
 
+export async function reconcileSpotifyChartBackfillCoveredJobs(input: {
+  phaseKey: SpotifyChartBackfillPhaseKey;
+  limit?: number;
+}) {
+  const admin = requireBackfillAdmin();
+  const requestedLimit = Number.isFinite(input.limit) ? input.limit : 100;
+  const limit = Math.min(Math.max(Math.trunc(requestedLimit ?? 100), 1), 500);
+  const { data, error } = await admin.rpc(
+    "reconcile_spotify_chart_backfill_covered_jobs",
+    {
+      p_phase_key: normalizeOptionalPhaseKey(input.phaseKey),
+      p_limit: limit,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Nao foi possivel reconciliar jobs ja cobertos: ${error.message}`,
+    );
+  }
+
+  return typeof data === "number" ? data : Number(data ?? 0);
+}
+
 export function getRecentSpotifyChartBackfillDates(
   days: SpotifyChartBackfillSeedDays,
   now = new Date(),

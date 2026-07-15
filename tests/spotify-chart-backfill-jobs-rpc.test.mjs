@@ -16,6 +16,10 @@ mock.module("@/lib/supabase/admin", {
           return Promise.resolve({ data: rpcList, error: null });
         }
 
+        if (name === "reconcile_spotify_chart_backfill_covered_jobs") {
+          return Promise.resolve({ data: rpcResult, error: null });
+        }
+
         return {
           maybeSingle: async () => ({ data: rpcResult, error: null }),
         };
@@ -28,6 +32,7 @@ const {
   claimNextSpotifyChartBackfillJob,
   claimSpotifyChartBackfillJobById,
   peekNextSpotifyChartBackfillJobs,
+  reconcileSpotifyChartBackfillCoveredJobs,
   settleSpotifyChartBackfillJob,
 } = await import("../src/lib/charts/spotify-chart-backfill-jobs.ts");
 
@@ -119,6 +124,22 @@ test("validated claim reserves the exact preflight job id", async () => {
   assert.equal(lastRpc.params.p_job_id, jobId);
   assert.equal(lastRpc.params.p_worker_id, "preflight-worker");
   assert.equal(lastRpc.params.p_phase_key, "core-60d");
+});
+
+test("covered-job reconciliation is phase-scoped and supports a 500-row pass", async () => {
+  rpcResult = "19";
+
+  const reconciled = await reconcileSpotifyChartBackfillCoveredJobs({
+    phaseKey: "core-79d",
+    limit: 500,
+  });
+
+  assert.equal(reconciled, 19);
+  assert.equal(lastRpc.name, "reconcile_spotify_chart_backfill_covered_jobs");
+  assert.deepEqual(lastRpc.params, {
+    p_phase_key: "core-79d",
+    p_limit: 500,
+  });
 });
 
 test("preflight SQL requires the explicit running rollout phase", async () => {

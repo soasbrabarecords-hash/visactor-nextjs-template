@@ -4,11 +4,14 @@ import { mock, test } from "node:test";
 let campaigns = [];
 let startCalls = [];
 let workerCalls = [];
+let reconcileCalls = [];
+let workerRoundsBeforeEmpty = 1;
 
 const phases = new Map(
   [
     ["core-30d", ["BR", "GLOBAL"]],
     ["core-60d", ["BR", "GLOBAL"]],
+    ["core-79d", ["BR", "GLOBAL"]],
     ["core-180d", ["BR", "GLOBAL"]],
     ["cities-30d", ["BR-SP-SAO-PAULO"]],
   ].map(([key, regionIds]) => [key, { key, regionIds }]),
@@ -41,11 +44,18 @@ mock.module("@/lib/charts/spotify-chart-backfill-campaigns", {
     setSpotifyChartBackfillCampaignPaused: async () => null,
     startSpotifyChartBackfillCampaign: async (phaseKey) => {
       startCalls.push(phaseKey);
+      const target =
+        campaigns.find((item) => item.phase_key === phaseKey) ?? null;
+
+      if (target?.status === "ready") {
+        target.status = "running";
+      }
+
       return {
         started: true,
         reason: null,
         plan: { phaseKey },
-        campaign: campaigns.find((item) => item.phase_key === phaseKey) ?? null,
+        campaign: target,
       };
     },
   },
@@ -58,6 +68,10 @@ mock.module("@/lib/charts/spotify-chart-backfill-jobs", {
     SPOTIFY_CHART_BACKFILL_SUPPORTED_DAYS: [7, 30],
     enqueueRecentSpotifyChartBackfillJobs: async () => null,
     planRecentSpotifyChartBackfillJobs: () => null,
+    reconcileSpotifyChartBackfillCoveredJobs: async (input) => {
+      reconcileCalls.push(input);
+      return input.phaseKey === "core-79d" ? 19 : 0;
+    },
   },
 });
 
@@ -65,14 +79,18 @@ mock.module("@/lib/charts/spotify-chart-backfill-worker", {
   exports: {
     processSpotifyChartBackfillQueue: async (input) => {
       workerCalls.push(input);
+      const hasWork = workerCalls.length <= workerRoundsBeforeEmpty;
       return {
-        processed: 3,
+        appliedLimit: input.limit,
+        previewed: hasWork ? input.limit : 0,
+        processed: hasWork ? input.limit : 0,
         sourceBlocked: false,
         failed: 0,
         retryPending: 0,
         lostLease: 0,
-        success: 3,
+        success: hasWork ? input.limit : 0,
         skipped: 0,
+        stoppedForTimeBudget: false,
       };
     },
   },
@@ -81,10 +99,23 @@ mock.module("@/lib/charts/spotify-chart-backfill-worker", {
 const { GET } =
   await import("../src/app/api/cron/spotify-charts-backfill/route.ts");
 
-function request() {
-  return new Request("http://localhost/api/cron/spotify-charts-backfill", {
-    headers: { authorization: "Bearer unit-test-secret" },
-  });
+function request(query = "") {
+  return new Request(
+    `http://localhost/api/cron/spotify-charts-backfill${query}`,
+    {
+      headers: {
+        authorization: "Bearer unit-test-secret",
+        "x-vercel-cron-schedule": "0 11 * * *",
+      },
+    },
+  );
+}
+
+function expectedWorkerCalls(phaseKey, count = 2, limit = 10) {
+  return Array.from({ length: count }, () => ({
+    limit,
+    phaseKey,
+  }));
 }
 
 test.beforeEach(() => {
@@ -92,11 +123,14 @@ test.beforeEach(() => {
   campaigns = [
     campaign("core-30d", 10, "completed"),
     campaign("core-60d", 20, "running"),
+    campaign("core-79d", 25, "locked"),
     campaign("core-180d", 30, "locked"),
     campaign("cities-30d", 70, "locked"),
   ];
   startCalls = [];
   workerCalls = [];
+  reconcileCalls = [];
+  workerRoundsBeforeEmpty = 1;
 });
 
 test.after(() => {
@@ -110,8 +144,40 @@ test("scheduled worker scopes itself to the running core phase", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.phase, "core-60d");
+  assert.equal(body.drain.automatic, true);
+  assert.equal(body.drain.roundCount, 2);
+  assert.equal(body.drain.stopReason, "queue_empty");
+  assert.equal(body.drain.totals.processed, 10);
+  assert.equal(body.worker.appliedLimit, 10);
   assert.deepEqual(startCalls, []);
-  assert.deepEqual(workerCalls, [{ limit: 3, phaseKey: "core-60d" }]);
+  assert.deepEqual(reconcileCalls, [{ phaseKey: "core-60d", limit: 500 }]);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d"));
+});
+
+test("explicit run requests preserve a single worker round", async () => {
+  const response = await GET(request("?action=run"));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.phase, "core-60d");
+  assert.equal(body.drain.automatic, false);
+  assert.equal(body.drain.roundCount, 1);
+  assert.equal(body.drain.stopReason, "explicit_single_round");
+  assert.equal(body.worker.appliedLimit, 3);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d", 1, 3));
+});
+
+test("an explicit completed phase skips covered-job reconciliation", async () => {
+  campaigns[1] = campaign("core-60d", 20, "completed");
+
+  const response = await GET(request("?action=run&phase=core-60d"));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.phase, "core-60d");
+  assert.equal(body.reconciledCoveredJobs, 0);
+  assert.deepEqual(reconcileCalls, []);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d", 1, 3));
 });
 
 test("scheduled worker starts the first ready core phase", async () => {
@@ -123,11 +189,26 @@ test("scheduled worker starts the first ready core phase", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.phase, "core-60d");
   assert.deepEqual(startCalls, ["core-60d"]);
-  assert.deepEqual(workerCalls, [{ limit: 3, phaseKey: "core-60d" }]);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d"));
+});
+
+test("scheduled worker starts core-79d immediately after core-60d", async () => {
+  campaigns[1] = campaign("core-60d", 20, "completed");
+  campaigns[2] = campaign("core-79d", 25, "ready");
+
+  const response = await GET(request());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.phase, "core-79d");
+  assert.equal(body.reconciledCoveredJobs, 19);
+  assert.deepEqual(startCalls, ["core-79d"]);
+  assert.deepEqual(reconcileCalls, [{ phaseKey: "core-79d", limit: 500 }]);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-79d"));
 });
 
 test("running core wins over a later ready phase", async () => {
-  campaigns[2] = campaign("core-180d", 30, "ready");
+  campaigns[2] = campaign("core-79d", 25, "ready");
 
   const response = await GET(request());
   const body = await response.json();
@@ -135,12 +216,12 @@ test("running core wins over a later ready phase", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.phase, "core-60d");
   assert.deepEqual(startCalls, []);
-  assert.deepEqual(workerCalls, [{ limit: 3, phaseKey: "core-60d" }]);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d"));
 });
 
 test("scheduled worker stays idle without a running or ready core", async () => {
   campaigns[1] = campaign("core-60d", 20, "completed");
-  campaigns[3] = campaign("cities-30d", 70, "ready");
+  campaigns[4] = campaign("cities-30d", 70, "ready");
 
   const response = await GET(request());
   const body = await response.json();
@@ -154,7 +235,7 @@ test("scheduled worker stays idle without a running or ready core", async () => 
 });
 
 test("scheduled worker fails closed for concurrent running phases", async () => {
-  campaigns[2] = campaign("core-180d", 30, "running");
+  campaigns[3] = campaign("core-180d", 30, "running");
 
   const response = await GET(request());
   const body = await response.json();
@@ -168,7 +249,7 @@ test("scheduled worker fails closed for concurrent running phases", async () => 
 
 test("scheduled worker never consumes a running city phase", async () => {
   campaigns[1] = campaign("core-60d", 20, "completed");
-  campaigns[3] = campaign("cities-30d", 70, "running");
+  campaigns[4] = campaign("cities-30d", 70, "running");
 
   const response = await GET(request());
   const body = await response.json();
@@ -178,4 +259,17 @@ test("scheduled worker never consumes a running city phase", async () => {
   assert.equal(body.runningPhase, "cities-30d");
   assert.deepEqual(startCalls, []);
   assert.deepEqual(workerCalls, []);
+});
+
+test("scheduled worker caps a healthy drain at ten rounds", async () => {
+  workerRoundsBeforeEmpty = Number.POSITIVE_INFINITY;
+
+  const response = await GET(request());
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.drain.roundCount, 10);
+  assert.equal(body.drain.stopReason, "max_rounds");
+  assert.equal(body.drain.totals.processed, 100);
+  assert.deepEqual(workerCalls, expectedWorkerCalls("core-60d", 10));
 });

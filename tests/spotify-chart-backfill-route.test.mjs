@@ -29,7 +29,7 @@ mock.module("@/lib/supabase/admin", {
   },
 });
 
-const { GET } =
+const { GET, maxDuration } =
   await import("../src/app/api/cron/spotify-charts-backfill/route.ts");
 
 const previousBrTemplate = process.env.SPOTIFY_CHARTS_BR_CSV_URL_TEMPLATE;
@@ -96,6 +96,10 @@ test("route rejects missing or invalid cron authorization", async () => {
     if (previousSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = previousSecret;
   }
+});
+
+test("historical cron reserves five minutes for bounded multi-round drains", () => {
+  assert.equal(maxDuration, 300);
 });
 
 test("route rejects requests when CRON_SECRET is not configured", async () => {
@@ -182,6 +186,7 @@ test("route dry-run exposes the complete long-range core catalog", async () => {
   try {
     const expectations = [
       ["core-60d", 120, "2026-05-14"],
+      ["core-79d", 158, "2026-04-25"],
       ["core-180d", 360, "2026-01-14"],
       ["core-365d", 730, "2025-07-13"],
       ["core-730d", 1460, "2024-07-13"],
