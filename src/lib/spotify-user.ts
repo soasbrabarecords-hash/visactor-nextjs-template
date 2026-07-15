@@ -4,7 +4,10 @@ import { Buffer } from "node:buffer";
 import "server-only";
 import { buildSpotifyOfficialChartUrl } from "@/lib/charts/spotify-chart-source-resolver";
 import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
-import { fetchStoredTrackPopularities } from "@/lib/track-popularity-store";
+import {
+  fetchStoredTrackPopularities,
+  storeSpotifyTrackPopularities,
+} from "@/lib/track-popularity-store";
 import {
   clearCurrentWorkspaceSpotifyConnection,
   getCurrentWorkspaceContext,
@@ -1471,6 +1474,8 @@ async function fetchSpotifyEditablePlaylistWithToken(
       );
     }
 
+    await storeSpotifyTrackPopularities(tracks);
+
     return setCachedValue(
       spotifyEditablePlaylistCache,
       cacheKey,
@@ -2421,9 +2426,7 @@ export async function updatePlaylistDetails(
   }
 }
 
-export async function fetchPlaylistSnapshotId(
-  playlistId: string,
-): Promise<{
+export async function fetchPlaylistSnapshotId(playlistId: string): Promise<{
   snapshotId: string;
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {

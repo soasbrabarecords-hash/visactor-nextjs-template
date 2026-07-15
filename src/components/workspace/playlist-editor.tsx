@@ -46,7 +46,7 @@ type ChartData = {
 
 type PopularityReading = {
   value: number;
-  source: "spotify" | "snapshot" | "signals";
+  source: "spotify" | "snapshot";
   label: string;
 };
 
@@ -246,7 +246,6 @@ function clampScore(value: number) {
 
 function getPopularityReading(
   track: TrackWithStreams,
-  chartData: ChartData | null,
 ): PopularityReading | null {
   if (track.popularity > 0) {
     return {
@@ -259,43 +258,7 @@ function getPopularityReading(
     };
   }
 
-  const signalScores: number[] = [];
-
-  if (chartData?.position) {
-    const positionScore =
-      100 - ((Math.min(200, chartData.position) - 1) / 199) * 70;
-    const movementBonus =
-      chartData.movement === "new"
-        ? 8
-        : chartData.movement === "up"
-          ? Math.min(8, Math.max(0, chartData.positionChange ?? 0) * 0.25)
-          : chartData.movement === "down"
-            ? -Math.min(8, Math.abs(chartData.positionChange ?? 0) * 0.25)
-            : 0;
-    signalScores.push(clampScore(positionScore + movementBonus));
-  }
-
-  const dailyStreams = track.streams?.dailyStreams ?? null;
-  if (dailyStreams && dailyStreams > 0) {
-    signalScores.push(clampScore(35 + 25 * Math.log10(dailyStreams / 100_000)));
-  }
-
-  const totalStreams = track.streams?.totalStreams ?? null;
-  if (totalStreams && totalStreams > 0) {
-    signalScores.push(
-      clampScore(35 + 15 * Math.log10(totalStreams / 10_000_000)),
-    );
-  }
-
-  if (signalScores.length === 0) {
-    return null;
-  }
-
-  return {
-    value: Math.max(...signalScores),
-    source: "signals",
-    label: "Índice estimado por chart e streams",
-  };
+  return null;
 }
 
 function withEditorState(
@@ -1087,7 +1050,7 @@ export default function PlaylistEditor({
       buildPlaylistIntelligence(
         tracks.map((track, index) => {
           const chartData = chartMap.get(track.id) ?? null;
-          const popularityReading = getPopularityReading(track, chartData);
+          const popularityReading = getPopularityReading(track);
 
           return {
             id: track.id,
@@ -1274,10 +1237,7 @@ export default function PlaylistEditor({
                 const isDraggingThis = dragFrom === index;
                 const isDeleting = deletingIndices.has(index);
                 const decision = decisionByTrackKey.get(`${track.id}:${index}`);
-                const popularityReading = getPopularityReading(
-                  track,
-                  chartMap.get(track.id) ?? null,
-                );
+                const popularityReading = getPopularityReading(track);
 
                 return (
                   <tr
@@ -1391,11 +1351,7 @@ export default function PlaylistEditor({
                           <span className="text-sm font-medium tabular-nums">
                             {popularityReading?.value ?? "—"}
                           </span>
-                          {popularityReading?.source === "signals" ? (
-                            <span className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
-                              sinal
-                            </span>
-                          ) : popularityReading?.source === "snapshot" ? (
+                          {popularityReading?.source === "snapshot" ? (
                             <span className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
                               histórico
                             </span>

@@ -1,5 +1,8 @@
 import "server-only";
-
+import {
+  type SpotifyPopularityCacheTrack,
+  buildSpotifyPopularitySnapshotRows,
+} from "@/lib/spotify-popularity-cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,7 +68,7 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
   let client;
 
   try {
-    client = createAdminClient() ?? await createClient();
+    client = createAdminClient() ?? (await createClient());
   } catch {
     return new Map<string, number>();
   }
@@ -102,7 +105,9 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
           const parsedTimestamp = Date.parse(
             String(row[source.timestampColumn] ?? ""),
           );
-          const capturedAt = Number.isFinite(parsedTimestamp) ? parsedTimestamp : 0;
+          const capturedAt = Number.isFinite(parsedTimestamp)
+            ? parsedTimestamp
+            : 0;
           const current = candidates.get(trackId);
 
           if (!current || capturedAt > current.capturedAt) {
@@ -122,4 +127,34 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
       candidate.popularity,
     ]),
   );
+}
+
+export async function storeSpotifyTrackPopularities(
+  tracks: SpotifyPopularityCacheTrack[],
+) {
+  const rows = buildSpotifyPopularitySnapshotRows(tracks);
+
+  if (rows.length === 0) {
+    return;
+  }
+
+  const client = createAdminClient();
+
+  if (!client) {
+    return;
+  }
+
+  try {
+    const { error } = await client.from("music_track_snapshots").upsert(rows, {
+      onConflict: "market,genre,track_id,snapshot_date",
+    });
+
+    if (error) {
+      process.stderr.write(
+        `[spotify:popularity] Não foi possível salvar o cache oficial: ${error.message}\n`,
+      );
+    }
+  } catch {
+    // O cache compartilhado é um enriquecimento opcional e não pode bloquear a playlist.
+  }
 }
