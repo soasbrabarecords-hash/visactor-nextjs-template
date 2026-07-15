@@ -13,6 +13,7 @@ import {
   fetchSpotifyPlaylistTrackIds,
   withSpotifyToken,
 } from "@/lib/spotify-user";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getTrackGenreProfiles } from "@/lib/track-profile-engine";
 import { getCurrentWorkspaceSelection } from "@/lib/workspaces";
 import type {
@@ -63,6 +64,9 @@ export type ChartOpportunitiesToolResult = {
   latestChartDate: string | null;
   maxWindow: number;
   status: string;
+  windowDays?: number;
+  windowStartDate?: string | null;
+  historical?: boolean;
 };
 
 export type ChartTrackSignalToolResult = {
@@ -103,6 +107,31 @@ type SpotifyApiTrack = {
   external_urls?: { spotify?: string };
   artists?: Array<{ name?: string }>;
   album?: { images?: Array<{ url?: string }> };
+};
+
+type HistoricalChartRankingRow = {
+  spotify_track_id: string;
+  track_name: string;
+  artist_name: string;
+  primary_genre: TrackProfileGenre | null;
+  genre_confidence: number | null;
+  countries: MusicIntelligenceCountry[] | null;
+  chart_days: number;
+  chart_appearances: number;
+  total_streams: number;
+  average_daily_streams: number | null;
+  best_position: number;
+  average_position: number;
+  first_chart_date: string;
+  last_chart_date: string;
+  current_position_br: number | null;
+  current_position_global: number | null;
+  position_7d_br: number | null;
+  position_7d_global: number | null;
+  image_url: string | null;
+  latest_chart_date: string;
+  window_start_date: string;
+  available_days: number;
 };
 
 const ADJACENT_PROFILE_GENRES: Partial<
@@ -172,6 +201,13 @@ export function normalizePlaylistAiText(value: string) {
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
+}
+
+function compactNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function mapSpotifyApiTrack(
@@ -497,17 +533,169 @@ export async function searchTrackInPlaylists(
   };
 }
 
+async function getHistoricalChartRankings({
+  market,
+  limit,
+  windowDays,
+  genre,
+  excludeTrackIds,
+}: {
+  market: PlaylistsAiCurationMarket;
+  limit: number;
+  windowDays: number;
+  genre: TrackProfileGenre | null;
+  excludeTrackIds: ReadonlySet<string>;
+}): Promise<ChartOpportunitiesToolResult> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return {
+      cards: [],
+      latestChartDate: null,
+      maxWindow: 0,
+      status: "unavailable",
+      windowDays,
+      windowStartDate: null,
+      historical: true,
+    };
+  }
+
+  const countries: MusicIntelligenceCountry[] =
+    market === "BOTH" ? ["BR", "GLOBAL"] : [market];
+  const requestedLimit = clamp(limit + excludeTrackIds.size, 1, 50);
+  const { data, error } = await admin.rpc(
+    "get_spotify_chart_history_rankings",
+    {
+      p_window_days: clamp(windowDays, 1, 365),
+      p_countries: countries,
+      p_primary_genre: genre,
+      p_limit: requestedLimit,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Historical chart ranking failed: ${error.message}`);
+  }
+
+  const rows = ((data ?? []) as HistoricalChartRankingRow[]).filter(
+    (row) => !excludeTrackIds.has(row.spotify_track_id),
+  );
+  const selected = rows.slice(0, clamp(limit, 1, 20));
+  const selection = await getCurrentWorkspaceSelection();
+  const profiles = await getTrackGenreProfiles(
+    selected.map((row) => ({
+      spotifyTrackId: row.spotify_track_id,
+      name: row.track_name,
+      artists: row.artist_name,
+      chartCountry: row.countries?.includes("BR") ? "BR" : "GLOBAL",
+    })),
+    { workspaceId: selection?.workspace.id },
+  );
+
+  const cards = selected.map((row): PlaylistsAiTrackCard => {
+    const positions: PlaylistsAiTrackCard["positions"] = {};
+    if (row.current_position_br !== null) {
+      positions.BR = row.current_position_br;
+    }
+    if (row.current_position_global !== null) {
+      positions.GLOBAL = row.current_position_global;
+    }
+    const currentPosition =
+      market === "GLOBAL"
+        ? row.current_position_global
+        : market === "BR"
+          ? row.current_position_br
+          : (row.current_position_br ?? row.current_position_global);
+    const position7d =
+      market === "GLOBAL"
+        ? row.position_7d_global
+        : market === "BR"
+          ? row.position_7d_br
+          : (row.position_7d_br ?? row.position_7d_global);
+    const movement7d =
+      currentPosition !== null && position7d !== null
+        ? position7d - currentPosition
+        : null;
+    const coverageScore = clamp((row.chart_days / windowDays) * 45);
+    const positionScore = clamp((1 - (row.average_position - 1) / 199) * 40);
+    const recencyScore = row.last_chart_date === row.latest_chart_date ? 15 : 0;
+    const historicalScore = Math.round(
+      coverageScore + positionScore + recencyScore,
+    );
+    const profile = profiles.get(row.spotify_track_id);
+    const genreLabel = profile
+      ? `${profile.primaryGenre === "desconhecido" ? "gênero em análise" : TRACK_PROFILE_GENRE_LABELS[profile.primaryGenre]} (${profile.genreConfidence}% de confiança)`
+      : "gênero sem perfil";
+    const marketNames = (row.countries ?? countries)
+      .map((country) => (country === "BR" ? "BR" : "Global"))
+      .join(" + ");
+
+    return {
+      id: row.spotify_track_id,
+      spotifyTrackId: row.spotify_track_id,
+      spotifyUrl: `https://open.spotify.com/track/${row.spotify_track_id}`,
+      coverUrl: row.image_url,
+      name: row.track_name,
+      artists: row.artist_name || "Artista não informado",
+      opportunityScore: historicalScore,
+      positions,
+      movement7d,
+      reason: `${row.chart_days} de ${windowDays} dias no Top 200 ${marketNames}, ${compactNumber(row.total_streams)} streams acumulados, melhor posição #${row.best_position} e média #${row.average_position}. Classificação: ${genreLabel}.`,
+      status: "not_in_playlist",
+      statusLabel: "Resultado histórico",
+      suggestedAction: "Avaliar para curadoria",
+      playlistNames: [],
+      genreProfile: genreCardProfile(profile),
+      playlistFit: null,
+      historicalMetrics: {
+        windowDays,
+        chartDays: row.chart_days,
+        appearances: row.chart_appearances,
+        totalStreams: row.total_streams,
+        averageDailyStreams: row.average_daily_streams,
+        bestPosition: row.best_position,
+        averagePosition: row.average_position,
+        firstChartDate: row.first_chart_date,
+        lastChartDate: row.last_chart_date,
+      },
+    };
+  });
+
+  return {
+    cards,
+    latestChartDate: selected[0]?.latest_chart_date ?? null,
+    maxWindow: selected[0]?.available_days ?? 0,
+    status: cards.length > 0 ? "ready" : "partial",
+    windowDays,
+    windowStartDate: selected[0]?.window_start_date ?? null,
+    historical: true,
+  };
+}
+
 export async function getChartOpportunities({
   market = "BR",
   limit = 10,
   excludeTrackIds = new Set<string>(),
   mode = "opportunity",
+  windowDays,
+  genre = null,
 }: {
   market?: PlaylistsAiCurationMarket;
   limit?: number;
   excludeTrackIds?: ReadonlySet<string>;
-  mode?: "opportunity" | "heat" | "riser" | "review";
+  mode?: "opportunity" | "heat" | "riser" | "review" | "historical";
+  windowDays?: number;
+  genre?: TrackProfileGenre | null;
 } = {}): Promise<ChartOpportunitiesToolResult> {
+  if (mode === "historical") {
+    return getHistoricalChartRankings({
+      market,
+      limit,
+      windowDays: windowDays ?? 30,
+      genre,
+      excludeTrackIds,
+    });
+  }
+
   const intelligence = await getMusicIntelligence();
   const marketTracks =
     market === "BOTH"
@@ -556,8 +744,18 @@ export async function getChartOpportunities({
     return right.scores.opportunityScore - left.scores.opportunityScore;
   });
 
-  const selected = sorted.slice(0, clamp(limit, 1, 20));
-  const profiles = await loadProfilesForIntelligenceTracks(selected);
+  const profileCandidates = genre
+    ? sorted
+    : sorted.slice(0, clamp(limit, 1, 20));
+  const profiles = await loadProfilesForIntelligenceTracks(profileCandidates);
+  const genreFiltered = genre
+    ? sorted.filter(
+        (track) =>
+          track.spotifyTrackId &&
+          profiles.get(track.spotifyTrackId)?.primaryGenre === genre,
+      )
+    : sorted;
+  const selected = genreFiltered.slice(0, clamp(limit, 1, 20));
 
   return {
     cards: selected.map((track) =>

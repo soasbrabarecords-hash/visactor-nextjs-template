@@ -133,13 +133,57 @@ test("classifies the five acceptance questions without fixed prompt matching", (
   assert.equal(recommendation.name, "playlist_recommendations");
   assert.equal(recommendation.playlistReference, "FUNK 2026");
   assert.equal(recommendation.limit, 10);
-  assert.equal(
-    classifyPlaylistAiIntent(
-      "Cria uma ideia de playlist baseada nas maiores subidas da semana.",
-      playlistNames,
-    ).name,
-    "playlist_idea",
+  const weeklyRisers = classifyPlaylistAiIntent(
+    "Cria uma ideia de playlist baseada nas maiores subidas da semana.",
+    playlistNames,
   );
+  assert.equal(weeklyRisers.name, "playlist_idea");
+  assert.equal(weeklyRisers.mode, "riser");
+  assert.equal(weeklyRisers.windowDays, 7);
+});
+
+test("understands a strict genre and a full historical window", () => {
+  const intent = classifyPlaylistAiIntent(
+    "Crie uma lista com as músicas de trap que mais tocaram nos charts nos últimos 180 dias.",
+  );
+
+  assert.equal(intent.name, "chart_opportunities");
+  assert.equal(intent.market, "BR");
+  assert.equal(intent.mode, "historical");
+  assert.equal(intent.windowDays, 180);
+  assert.equal(intent.genre, "trap");
+  assert.equal(intent.limit, 10);
+});
+
+test("passes historical genre filters to the database tool without broad fallback", async () => {
+  const tools = buildTools();
+  let receivedOptions = null;
+  tools.getChartOpportunities = async (options) => {
+    receivedOptions = options;
+    return {
+      cards: [],
+      latestChartDate: "2026-07-13",
+      maxWindow: 180,
+      status: "partial",
+      historical: true,
+      windowDays: 180,
+      windowStartDate: "2026-01-15",
+    };
+  };
+
+  const result = await runPlaylistsAiAgent(
+    {
+      message:
+        "Crie uma lista com as músicas de trap que mais tocaram nos charts nos últimos 180 dias.",
+    },
+    { tools, polish: false },
+  );
+
+  assert.equal(receivedOptions.mode, "historical");
+  assert.equal(receivedOptions.windowDays, 180);
+  assert.equal(receivedOptions.genre, "trap");
+  assert.equal(result.cards.length, 0);
+  assert.match(result.text, /não encontrei|misturar outros gêneros/i);
 });
 
 test("answers hot BR tracks with real-data cards and prepared actions", async () => {

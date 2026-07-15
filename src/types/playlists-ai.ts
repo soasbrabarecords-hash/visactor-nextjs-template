@@ -70,6 +70,17 @@ export type PlaylistsAiTrackCard = {
     label: "alto" | "medio" | "baixo" | "indeterminado";
     reason: string;
   } | null;
+  historicalMetrics?: {
+    windowDays: number;
+    chartDays: number;
+    appearances: number;
+    totalStreams: number;
+    averageDailyStreams: number | null;
+    bestPosition: number;
+    averagePosition: number;
+    firstChartDate: string;
+    lastChartDate: string;
+  } | null;
 };
 
 export type PlaylistsAiPreparedActionType =

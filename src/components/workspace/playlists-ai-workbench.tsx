@@ -9,9 +9,9 @@ import {
   CheckCircle2,
   ChevronRight,
   Database,
+  ExternalLink,
   Eye,
   EyeOff,
-  ExternalLink,
   FileText,
   Globe2,
   History,
@@ -161,6 +161,13 @@ function formatPosition(position: number | undefined) {
   return typeof position === "number" ? `#${position}` : "—";
 }
 
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 function movementLabel(value: number | null) {
   if (value === null) return "7d indisponível";
   if (value > 0) return `+${value} em 7d`;
@@ -287,7 +294,7 @@ function TrackCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-[20px] border bg-background/45 p-3.5 transition duration-200 hover:border-primary/25 hover:bg-background/70 dark:bg-white/[0.025] dark:hover:bg-white/[0.045]",
+        "group overflow-hidden rounded-[18px] border bg-background/40 p-3 transition duration-200 hover:border-primary/20 hover:bg-background/60 dark:bg-white/[0.018] dark:hover:bg-white/[0.032]",
         isPinned
           ? "border-emerald-400/35 ring-1 ring-emerald-400/10"
           : "border-border/65 dark:border-white/10",
@@ -376,27 +383,41 @@ function TrackCard({
                 Fit {card.playlistFit.score}%
               </span>
             ) : null}
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground dark:border-white/10">
-              <MapPin className="h-3 w-3" /> BR{" "}
-              {formatPosition(card.positions.BR)}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground dark:border-white/10">
-              <Globe2 className="h-3 w-3" /> Global{" "}
-              {formatPosition(card.positions.GLOBAL)}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full border px-2 py-1",
-                (card.movement7d ?? 0) > 0
-                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
-                  : (card.movement7d ?? 0) < 0
-                    ? "border-rose-400/25 bg-rose-400/10 text-rose-700 dark:text-rose-300"
-                    : "border-border/70 bg-muted/45 text-muted-foreground dark:border-white/10",
-              )}
-            >
-              <MovementIcon value={card.movement7d} />
-              {movementLabel(card.movement7d)}
-            </span>
+            {typeof card.positions.BR === "number" ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-muted-foreground dark:border-white/[0.08]">
+                <MapPin className="h-3 w-3" /> BR{" "}
+                {formatPosition(card.positions.BR)}
+              </span>
+            ) : null}
+            {typeof card.positions.GLOBAL === "number" ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-muted-foreground dark:border-white/[0.08]">
+                <Globe2 className="h-3 w-3" /> Global{" "}
+                {formatPosition(card.positions.GLOBAL)}
+              </span>
+            ) : null}
+            {card.historicalMetrics ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-400/10 px-2 py-1 text-sky-700 dark:text-sky-300">
+                <History className="h-3 w-3" />{" "}
+                {card.historicalMetrics.chartDays}/
+                {card.historicalMetrics.windowDays} dias ·{" "}
+                {formatCompactNumber(card.historicalMetrics.totalStreams)}{" "}
+                streams
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-1",
+                  (card.movement7d ?? 0) > 0
+                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                    : (card.movement7d ?? 0) < 0
+                      ? "border-rose-400/25 bg-rose-400/10 text-rose-700 dark:text-rose-300"
+                      : "border-border/70 bg-muted/45 text-muted-foreground dark:border-white/10",
+                )}
+              >
+                <MovementIcon value={card.movement7d} />
+                {movementLabel(card.movement7d)}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -501,10 +522,16 @@ function TrackCard({
           </div>
           <div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px] font-semibold text-muted-foreground">
             <div className="rounded-xl border border-border/45 px-2.5 py-2 dark:border-white/10">
-              Chart BR <strong className="text-foreground">{formatPosition(card.positions.BR)}</strong>
+              Chart BR{" "}
+              <strong className="text-foreground">
+                {formatPosition(card.positions.BR)}
+              </strong>
             </div>
             <div className="rounded-xl border border-border/45 px-2.5 py-2 dark:border-white/10">
-              Chart Global <strong className="text-foreground">{formatPosition(card.positions.GLOBAL)}</strong>
+              Chart Global{" "}
+              <strong className="text-foreground">
+                {formatPosition(card.positions.GLOBAL)}
+              </strong>
             </div>
           </div>
           <p className="mt-2.5 text-[10px] font-medium leading-4 text-muted-foreground">
@@ -513,7 +540,7 @@ function TrackCard({
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3 dark:border-white/10">
+      <div className="mt-3 flex items-center gap-2 border-t border-border/45 pt-2.5 dark:border-white/[0.08]">
         <span
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em]",
@@ -527,31 +554,31 @@ function TrackCard({
           <CheckCircle2 className="h-3 w-3" />
           {card.statusLabel}
         </span>
-        <span className="text-right text-[10px] font-bold text-muted-foreground">
-          {card.suggestedAction}
-        </span>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={onTogglePin}
+          title={isPinned ? "Desafixar" : "Fixar"}
+          aria-label={isPinned ? "Desafixar" : "Fixar"}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[9px] font-black transition",
+            "ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
             isPinned
               ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
               : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
           )}
         >
-          {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
-          {isPinned ? "Desafixar" : "Fixar"}
+          {isPinned ? (
+            <PinOff className="h-3 w-3" />
+          ) : (
+            <Pin className="h-3 w-3" />
+          )}
         </button>
         <button
           type="button"
           onClick={onToggleSaved}
           title="Pré-seleção visual desta resposta; não altera o Spotify."
+          aria-label={isSaved ? "Remover da pré-seleção" : "Pré-selecionar"}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[9px] font-black transition",
+            "inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
             isSaved
               ? "border-sky-400/25 bg-sky-400/10 text-sky-700 dark:text-sky-300"
               : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
@@ -562,26 +589,28 @@ function TrackCard({
           ) : (
             <Bookmark className="h-3 w-3" />
           )}
-          {isSaved ? "Pré-selecionada" : "Pré-selecionar"}
         </button>
         <button
           type="button"
           onClick={() => setSignalsOpen((current) => !current)}
+          title="Ver sinais e detalhes"
+          aria-label="Ver sinais e detalhes"
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[9px] font-black transition",
+            "inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
             signalsOpen
               ? "border-violet-400/25 bg-violet-400/10 text-violet-700 dark:text-violet-300"
               : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
           )}
         >
           <BarChart3 className="h-3 w-3" />
-          Sinais
         </button>
         <Link
           href="/spotify-charts"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/60 px-2.5 text-[9px] font-black text-muted-foreground transition hover:text-foreground dark:border-white/10"
+          title="Abrir Spotify Charts"
+          aria-label="Abrir Spotify Charts"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-[9px] font-black text-muted-foreground transition hover:text-foreground dark:border-white/10"
         >
-          <TrendingUp className="h-3 w-3" /> Charts
+          <TrendingUp className="h-3 w-3" />
         </Link>
         {card.spotifyUrl ? (
           <a
@@ -607,9 +636,11 @@ function TrackCard({
         <button
           type="button"
           onClick={onIgnore}
-          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-2 text-[9px] font-black text-muted-foreground transition hover:bg-rose-400/10 hover:text-rose-700 dark:hover:text-rose-300"
+          title="Ignorar nesta seleção"
+          aria-label="Ignorar nesta seleção"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[9px] font-black text-muted-foreground transition hover:bg-rose-400/10 hover:text-rose-700 dark:hover:text-rose-300"
         >
-          <EyeOff className="h-3 w-3" /> Ignorar
+          <EyeOff className="h-3 w-3" />
         </button>
       </div>
     </article>
@@ -634,7 +665,7 @@ function ConversationRail({
   onSelectConversation: (conversationId: string) => void;
 }) {
   return (
-    <aside className="hidden min-h-[780px] flex-col rounded-[28px] border border-border/60 bg-card/45 p-3 dark:border-white/10 dark:bg-white/[0.018] desktop:flex">
+    <aside className="hidden h-full min-h-0 flex-col rounded-[24px] border border-border/50 bg-card/35 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.012] desktop:flex">
       <button
         type="button"
         onClick={onNewConversation}
@@ -649,7 +680,7 @@ function ConversationRail({
         Conversas
       </div>
 
-      <div className="mt-2 max-h-[600px] space-y-1 overflow-y-auto pr-0.5">
+      <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
         {isLoading ? (
           <div className="flex items-center gap-2 px-3 py-4 text-[10px] font-semibold text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -702,7 +733,7 @@ function ConversationRail({
         )}
       </div>
 
-      <div className="mt-auto rounded-2xl border border-border/55 px-3 py-3 dark:border-white/10">
+      <div className="mt-2 rounded-2xl border border-border/45 px-3 py-2.5 dark:border-white/[0.08]">
         <div className="flex items-center gap-2 text-[10px] font-black text-foreground">
           <History className="h-3.5 w-3.5 text-muted-foreground" />
           Memória privada
@@ -776,8 +807,8 @@ function DecisionBoard({
   ];
 
   return (
-    <aside className="flex min-h-[680px] flex-col overflow-hidden rounded-[30px] border border-border/65 bg-card/50 dark:border-white/10 dark:bg-white/[0.022] laptop:max-h-[calc(100vh-150px)] laptop:min-h-[780px]">
-      <header className="border-b border-border/60 px-5 py-4 dark:border-white/10">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/50 bg-card/35 dark:border-white/[0.08] dark:bg-white/[0.015]">
+      <header className="border-b border-border/45 px-4 py-3.5 dark:border-white/[0.08]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
@@ -787,11 +818,8 @@ function DecisionBoard({
             <h2 className="mt-1.5 text-lg font-black tracking-[-0.035em] text-foreground">
               Painel de músicas
             </h2>
-            <p className="mt-1 text-[11px] font-medium text-muted-foreground">
+            <p className="mt-1 text-[10px] font-medium text-muted-foreground">
               A seleção acompanha o raciocínio da conversa.
-            </p>
-            <p className="mt-1 text-[9px] font-semibold text-muted-foreground/75">
-              Fixar, ignorar e pré-selecionar afetam somente esta visualização.
             </p>
           </div>
           <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-foreground px-2.5 py-1.5 text-[10px] font-black text-background">
@@ -799,7 +827,7 @@ function DecisionBoard({
           </span>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1 rounded-full border border-border/60 bg-background/45 p-1 dark:border-white/10 dark:bg-black/10">
             {filters.map((filter) => (
               <button
@@ -829,7 +857,11 @@ function DecisionBoard({
         {ignoredTrackIds.size > 0 ? (
           <div className="mt-3 flex items-center justify-between rounded-xl border border-border/50 bg-background/35 px-3 py-2 text-[9px] font-bold text-muted-foreground dark:border-white/10">
             <span>
-              {ignoredTrackIds.size} {ignoredTrackIds.size === 1 ? "faixa ignorada" : "faixas ignoradas"} nesta seleção
+              {ignoredTrackIds.size}{" "}
+              {ignoredTrackIds.size === 1
+                ? "faixa ignorada"
+                : "faixas ignoradas"}{" "}
+              nesta seleção
             </span>
             <button
               type="button"
@@ -842,7 +874,7 @@ function DecisionBoard({
         ) : null}
       </header>
 
-      <div className="flex-1 overflow-y-auto p-3.5 tablet:p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {!result ? (
           <div className="flex min-h-[520px] flex-col items-center justify-center px-8 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-[20px] border border-border/60 bg-background/55 text-muted-foreground dark:border-white/10 dark:bg-white/[0.025]">
@@ -990,10 +1022,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
       <div
         className={cn(
-          "max-w-[min(100%,920px)] rounded-[24px] px-4 py-3.5",
+          "max-w-[min(100%,760px)] px-1 py-2",
           assistant
-            ? "border border-border/70 bg-background/70 text-foreground shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
-            : "bg-foreground text-background",
+            ? "text-foreground"
+            : "rounded-[20px] bg-muted/80 px-4 text-foreground dark:bg-white/[0.075]",
         )}
       >
         <p className="whitespace-pre-wrap text-sm font-medium leading-6">
@@ -1038,13 +1070,11 @@ export default function PlaylistsAiWorkbench() {
     let mounted = true;
     void fetch("/api/playlists-ia/conversations", { cache: "no-store" })
       .then(async (response) => {
-        const payload = (await response.json().catch(() => null)) as
-          | {
-              success?: boolean;
-              conversations?: PlaylistsAiConversationSummary[];
-              message?: string;
-            }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          success?: boolean;
+          conversations?: PlaylistsAiConversationSummary[];
+          message?: string;
+        } | null;
         if (!response.ok || !payload?.success) {
           throw new Error(
             payload?.message ?? "Histórico temporariamente indisponível.",
@@ -1098,15 +1128,15 @@ export default function PlaylistsAiWorkbench() {
         `/api/playlists-ia/conversations/${encodeURIComponent(conversationId)}`,
         { cache: "no-store" },
       );
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            success?: boolean;
-            conversation?: PlaylistsAiConversationDetail;
-            message?: string;
-          }
-        | null;
+      const payload = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        conversation?: PlaylistsAiConversationDetail;
+        message?: string;
+      } | null;
       if (!response.ok || !payload?.success || !payload.conversation) {
-        throw new Error(payload?.message ?? "Não foi possível abrir a conversa.");
+        throw new Error(
+          payload?.message ?? "Não foi possível abrir a conversa.",
+        );
       }
 
       const conversation = payload.conversation;
@@ -1244,7 +1274,7 @@ export default function PlaylistsAiWorkbench() {
   }
 
   return (
-    <div className="mx-auto grid max-w-[1760px] gap-3 laptop:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)] desktop:grid-cols-[210px_minmax(0,0.92fr)_minmax(430px,1.08fr)]">
+    <div className="mx-auto grid h-full min-h-0 max-w-[1760px] gap-2.5 overflow-y-auto laptop:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] laptop:overflow-hidden desktop:grid-cols-[190px_minmax(0,1.12fr)_minmax(380px,0.88fr)]">
       <ConversationRail
         conversations={savedConversations}
         activeConversationId={activeConversationId}
@@ -1257,8 +1287,8 @@ export default function PlaylistsAiWorkbench() {
         }
       />
 
-      <section className="flex min-h-[720px] flex-col overflow-hidden rounded-[30px] border border-border/65 bg-card/50 dark:border-white/10 dark:bg-white/[0.022] laptop:max-h-[calc(100vh-150px)] laptop:min-h-[780px]">
-        <header className="border-b border-border/60 px-5 py-4 dark:border-white/10">
+      <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/50 bg-card/35 dark:border-white/[0.08] dark:bg-white/[0.015]">
+        <header className="border-b border-border/45 px-5 py-3 dark:border-white/[0.08]">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-foreground text-background">
@@ -1289,66 +1319,70 @@ export default function PlaylistsAiWorkbench() {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {briefChips(curationBrief).map((item) => (
-              <span
-                key={item}
-                className="rounded-full bg-muted/45 px-2.5 py-1 text-[8px] font-black text-muted-foreground"
-              >
-                {item}
-              </span>
-            ))}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {briefChips(curationBrief)
+              .slice(0, 3)
+              .map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full bg-muted/45 px-2.5 py-1 text-[8px] font-black text-muted-foreground"
+                >
+                  {item}
+                </span>
+              ))}
             <span className="rounded-full border border-border/55 px-2.5 py-1 text-[8px] font-black text-muted-foreground dark:border-white/10">
               Contexto {curationBrief.completeness}%
             </span>
           </div>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-5">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+          <div className="mx-auto max-w-[800px] space-y-6">
+            {messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
 
-          {activeConversationId === null && messages.length === 1 ? (
-            <div className="ml-12 space-y-2">
-              <div className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-                Comece por uma decisão
+            {activeConversationId === null && messages.length === 1 ? (
+              <div className="ml-12 space-y-2">
+                <div className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
+                  Comece por uma decisão
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_QUESTIONS.slice(0, 4).map((question) => (
+                    <button
+                      key={question}
+                      type="button"
+                      onClick={() => void submitMessage(question)}
+                      disabled={isThinking || isLoadingConversation}
+                      className="rounded-full border border-border/60 bg-background/35 px-3 py-2 text-left text-[9px] font-bold text-muted-foreground transition hover:border-primary/25 hover:text-foreground disabled:opacity-50 dark:border-white/10"
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_QUESTIONS.slice(0, 4).map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    onClick={() => void submitMessage(question)}
-                    disabled={isThinking || isLoadingConversation}
-                    className="rounded-full border border-border/60 bg-background/35 px-3 py-2 text-left text-[9px] font-bold text-muted-foreground transition hover:border-primary/25 hover:text-foreground disabled:opacity-50 dark:border-white/10"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {isThinking ? (
-            <article className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-700 dark:text-emerald-300">
-                <Bot className="h-4 w-4" />
-              </div>
-              <div className="rounded-[20px] border border-border/60 bg-background/45 px-4 py-3 text-xs font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.025]">
-                <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                entendendo o contexto e cruzando os sinais...
-              </div>
-            </article>
-          ) : null}
-          <div ref={endRef} />
+            {isThinking ? (
+              <article className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-700 dark:text-emerald-300">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="rounded-[20px] border border-border/60 bg-background/45 px-4 py-3 text-xs font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.025]">
+                  <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
+                  entendendo o contexto e cruzando os sinais...
+                </div>
+              </article>
+            ) : null}
+            <div ref={endRef} />
+          </div>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="border-t border-border/60 p-3.5 dark:border-white/10 tablet:p-4"
+          className="shrink-0 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-3 pt-2"
         >
-          <div className="rounded-[22px] border border-border/75 bg-background/65 p-2 transition focus-within:border-primary/35 dark:border-white/10 dark:bg-black/15">
+          <div className="mx-auto max-w-[800px] rounded-[22px] border border-border/70 bg-background/95 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition focus-within:border-primary/35 dark:border-white/10 dark:bg-[#111318]">
             <textarea
               value={input}
               disabled={isLoadingConversation}
@@ -1365,9 +1399,7 @@ export default function PlaylistsAiWorkbench() {
               </p>
               <button
                 type="submit"
-                disabled={
-                  !input.trim() || isThinking || isLoadingConversation
-                }
+                disabled={!input.trim() || isThinking || isLoadingConversation}
                 className="inline-flex h-9 items-center gap-2 rounded-full bg-foreground px-4 text-[10px] font-black text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {isThinking ? (

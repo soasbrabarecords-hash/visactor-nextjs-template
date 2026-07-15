@@ -1,9 +1,5 @@
 import "server-only";
-import {
-  GENRE_LABEL,
-  detectGenre,
-  detectPlaylistGenre,
-} from "@/lib/genre-detection";
+import { GENRE_LABEL, detectPlaylistGenre } from "@/lib/genre-detection";
 import {
   buildCurationQuestion,
   createEmptyCurationBrief,
@@ -40,6 +36,10 @@ import type {
   PlaylistsAiResponseMode,
   PlaylistsAiTrackCard,
 } from "@/types/playlists-ai";
+import {
+  TRACK_PROFILE_GENRE_LABELS,
+  type TrackProfileGenre,
+} from "@/types/track-profile";
 
 export type DetectedPlaylistsAiIntent = {
   name: PlaylistsAiIntent;
@@ -49,7 +49,9 @@ export type DetectedPlaylistsAiIntent = {
   playlistReference: string | null;
   trackQuery: string | null;
   excludeWorkspaceTracks: boolean;
-  mode: "opportunity" | "heat" | "riser" | "review";
+  mode: "opportunity" | "heat" | "riser" | "review" | "historical";
+  windowDays: number | null;
+  genre: TrackProfileGenre | null;
 };
 
 export type PlaylistsAiAgentTools = {
@@ -102,6 +104,42 @@ function inferTargetSize(prompt: string) {
   return requested ?? 50;
 }
 
+function inferWindowDays(prompt: string) {
+  const normalized = normalizePlaylistAiText(prompt);
+  const explicitDays = normalized.match(
+    /(?:ultimos?\s+)?(\d{1,3})\s*(?:d|dia|dias)\b/,
+  )?.[1];
+  if (explicitDays) {
+    return clampWindow(Number.parseInt(explicitDays, 10));
+  }
+
+  const explicitMonths = normalized.match(
+    /(?:ultimos?\s+)?(\d{1,2})\s*(?:mes|meses)\b/,
+  )?.[1];
+  if (explicitMonths) {
+    return clampWindow(Number.parseInt(explicitMonths, 10) * 30);
+  }
+
+  if (/ultima semana|ultimos sete dias|semana/.test(normalized)) return 7;
+  if (/ultimo mes|ultimos trinta dias/.test(normalized)) return 30;
+  if (/ultimo ano|ultimos doze meses/.test(normalized)) return 365;
+  return null;
+}
+
+function clampWindow(value: number) {
+  return Math.max(1, Math.min(365, value));
+}
+
+function profileGenreFromPrompt(prompt: string): TrackProfileGenre | null {
+  const genre = detectPlaylistGenre(prompt, "");
+  if (genre === "unknown") return null;
+  if (genre === "piseiro") return "piseiro_forro";
+  if (genre === "pagode" || genre === "pagodao" || genre === "reggae") {
+    return null;
+  }
+  return genre;
+}
+
 function findPlaylistReference(prompt: string, playlistNames: string[]) {
   const normalizedPrompt = normalizePlaylistAiText(prompt);
   const matchedName = [...playlistNames]
@@ -152,9 +190,23 @@ export function classifyPlaylistAiIntent(
 ): DetectedPlaylistsAiIntent {
   const normalized = normalizePlaylistAiText(prompt);
   const playlistReference = findPlaylistReference(prompt, playlistNames);
-  const market: PlaylistsAiCurationMarket = /\bglobais?\b/.test(normalized)
-    ? "GLOBAL"
-    : "BR";
+  const market: PlaylistsAiCurationMarket =
+    /(?:brasil|\bbr\b)\s*(?:e|\+|\/|mais)\s*global|global\s*(?:e|\+|\/|mais)\s*(?:brasil|\bbr\b)/.test(
+      normalized,
+    )
+      ? "BOTH"
+      : /\bglobais?\b/.test(normalized)
+        ? "GLOBAL"
+        : "BR";
+  const windowDays = inferWindowDays(prompt);
+  const historical =
+    windowDays !== null ||
+    /historico|historica|mais tocaram|mais tocadas|mais ouvidas|acumulad/.test(
+      normalized,
+    );
+  const rising = /maiores? subidas|subindo|crescendo|acelerando/.test(
+    normalized,
+  );
   const base = {
     market,
     limit: inferLimit(prompt),
@@ -165,11 +217,15 @@ export function classifyPlaylistAiIntent(
       /ainda nao|nao estao|fora das|minhas playlists|nenhuma playlist/.test(
         normalized,
       ),
-    mode: /maiores? subidas|subindo|crescendo|acelerando/.test(normalized)
+    mode: rising
       ? ("riser" as const)
-      : /quentes|bombando|mais fortes|forca atual/.test(normalized)
-        ? ("heat" as const)
-        : ("opportunity" as const),
+      : historical
+        ? ("historical" as const)
+        : /quentes|bombando|mais fortes|forca atual/.test(normalized)
+          ? ("heat" as const)
+          : ("opportunity" as const),
+    windowDays,
+    genre: profileGenreFromPrompt(prompt),
   };
 
   if (
@@ -307,14 +363,18 @@ function buildChartSources(result: ChartOpportunitiesToolResult) {
       "spotify_charts",
       "Spotify Charts",
       result.latestChartDate
-        ? `Top 200 completo até ${result.latestChartDate}.`
+        ? result.historical && result.windowDays
+          ? `Todos os Top 200 completos entre ${result.windowStartDate ?? "o início da janela"} e ${result.latestChartDate} (${result.windowDays} dias solicitados).`
+          : `Top 200 completo até ${result.latestChartDate}.`
         : "Nenhum snapshot completo disponível.",
       result.latestChartDate ? "used" : "unavailable",
     ),
     source(
       "music_intelligence",
       "Music Intelligence",
-      `Scores explicáveis com janela validada de até ${result.maxWindow} dias.`,
+      result.historical && result.windowDays
+        ? `Ranking histórico por streams acumulados, presença e posição em ${result.windowDays} dias.`
+        : `Scores explicáveis com janela validada de até ${result.maxWindow} dias.`,
       result.maxWindow > 0 ? "used" : "partial",
     ),
     source(
@@ -385,6 +445,8 @@ async function answerChartOpportunities({
     limit: intent.limit,
     excludeTrackIds: new Set(index?.trackPlaylistNames.keys() ?? []),
     mode: intent.mode,
+    windowDays: intent.windowDays ?? undefined,
+    genre: intent.genre,
   });
   const exclusions = intent.excludeWorkspaceTracks
     ? index?.complete
@@ -393,9 +455,16 @@ async function answerChartOpportunities({
         ? ` e excluí as faixas encontradas em ${index.playlistsChecked} de ${index.playlistsTotal} playlists`
         : "; não consegui confirmar a ausência nas playlists porque o Spotify do workspace está indisponível"
     : "";
+  const requestedGenre = intent.genre
+    ? TRACK_PROFILE_GENRE_LABELS[intent.genre]
+    : null;
   const text = chart.cards.length
-    ? `Estas são as ${chart.cards.length} decisões mais fortes de ${marketLabel(intent.market)} agora${exclusions}. A ordem considera força atual, movimento, frescor, estabilidade e risco de saturação.`
-    : `Não encontrei oportunidades de ${marketLabel(intent.market)} que atendam aos filtros com dados suficientes agora.`;
+    ? chart.historical && chart.windowDays
+      ? `Pesquisei todos os snapshots diários de ${chart.windowStartDate ?? "início da janela"} a ${chart.latestChartDate ?? "hoje"}. Estas são as ${chart.cards.length} faixas${requestedGenre ? ` classificadas como ${requestedGenre}` : ""} com maior volume acumulado no Top 200 ${marketLabel(intent.market)} em ${chart.windowDays} dias${exclusions}. Não misturei outros gêneros para completar a lista.`
+      : `Estas são as ${chart.cards.length} decisões mais fortes de ${marketLabel(intent.market)} agora${exclusions}. A ordem considera força atual, movimento, frescor, estabilidade e risco de saturação.`
+    : requestedGenre
+      ? `Não encontrei faixas classificadas como ${requestedGenre} com evidência suficiente no Top 200 ${marketLabel(intent.market)} para a janela pedida. Mantive a resposta vazia para não misturar outros gêneros.`
+      : `Não encontrei oportunidades de ${marketLabel(intent.market)} que atendam aos filtros com dados suficientes agora.`;
   const dataSources = [...buildChartSources(chart)];
   if (intent.excludeWorkspaceTracks) {
     dataSources.push(
@@ -722,12 +791,10 @@ async function answerPlaylistReview({
 }
 
 async function answerPlaylistIdea({
-  prompt,
   intent,
   workspace,
   tools,
 }: {
-  prompt: string;
   intent: DetectedPlaylistsAiIntent;
   workspace: WorkspacePlaylistsToolResult;
   tools: PlaylistsAiAgentTools;
@@ -736,26 +803,24 @@ async function answerPlaylistIdea({
     market: intent.market,
     limit: 20,
     mode: intent.mode === "opportunity" ? "riser" : intent.mode,
+    windowDays: intent.windowDays ?? undefined,
+    genre: intent.genre,
   });
-  const genre = detectPlaylistGenre(prompt, "");
-  const genreMatches =
-    genre === "unknown"
-      ? chart.cards
-      : chart.cards.filter(
-          (card) => detectGenre(card.artists, card.name) === genre,
-        );
-  const cards = (genreMatches.length >= 3 ? genreMatches : chart.cards).slice(
-    0,
-    intent.limit,
-  );
-  const genreLabel = genre === "unknown" ? "Radar" : GENRE_LABEL[genre];
+  const cards = chart.cards.slice(0, intent.limit);
+  const genreLabel = intent.genre
+    ? TRACK_PROFILE_GENRE_LABELS[intent.genre]
+    : "Radar";
   const playlistName = `${genreLabel} em Ascensão · ${intent.market === "BR" ? "BR" : intent.market === "GLOBAL" ? "Global" : "BR + Global"}`;
   const description = `Seleção editorial de ${genreLabel.toLowerCase()} baseada nas maiores subidas e oportunidades recentes do Spotify Charts ${marketLabel(intent.market)}. Atualize conforme os sinais mudarem.`;
 
   return response("playlist_idea", {
     text: cards.length
-      ? `Ideia: “${playlistName}”, com alvo de ${intent.targetSize} faixas. Estas ${cards.length} formam o bloco inicial mais defensável pelos sinais atuais; complete o restante só depois de validar aderência e continuidade.`
-      : "Não encontrei dados suficientes para montar uma ideia de playlist baseada nos charts agora.",
+      ? chart.historical && chart.windowDays
+        ? `Ideia: “${playlistName}”, com alvo de ${intent.targetSize} faixas. Pesquisei cada Top 200 diário dos últimos ${chart.windowDays} dias e mantive somente ${genreLabel}; estas ${cards.length} lideram por streams acumulados, presença e posição. Não completei com gêneros diferentes.`
+        : `Ideia: “${playlistName}”, com alvo de ${intent.targetSize} faixas. Estas ${cards.length} formam o bloco inicial mais defensável pelos sinais atuais; complete o restante só depois de validar aderência e continuidade.`
+      : intent.genre
+        ? `Não encontrei faixas suficientes classificadas como ${genreLabel} na janela pedida. Prefiro deixar a seleção vazia a misturar gêneros sem evidência.`
+        : "Não encontrei dados suficientes para montar uma ideia de playlist baseada nos charts agora.",
     cards,
     actions: cards.length
       ? [
@@ -920,7 +985,7 @@ async function polishResponseText({
       body: JSON.stringify({
         model: credentials.model,
         instructions:
-          "Você é o copiloto read-only de curadoria do Playlist OS. Pense como curador editorial, A&R, especialista em Spotify Charts e estrategista de playlists. Reescreva a resposta em português brasileiro natural, direto e executivo, sem soar como chatbot genérico. Use somente os fatos fornecidos. Nunca invente posições, movimentos, presença em playlists, gêneros ou ações executadas. Considere o brief da curadoria e preserve qualquer ressalva sobre dados parciais. Responda apenas JSON no schema pedido.",
+          "Você é o copiloto read-only de curadoria do Playlist OS. Converse em português brasileiro como um curador editorial experiente pensando junto com o usuário: natural, seguro, curto e específico. Não use abertura robótica, não repita a pergunta e não transforme tudo em lista. Se a intenção já estiver clara, entregue a decisão sem fazer perguntas extras. Se faltar uma escolha realmente decisiva, faça uma única pergunta simples e explique em uma frase por que ela muda a curadoria. Use somente os fatos fornecidos e considere o histórico recente da conversa. Nunca invente posições, streams, movimentos, presença em playlists, gêneros ou ações executadas. Preserve filtros obrigatórios, janelas históricas e ressalvas sobre dados parciais. Responda apenas JSON no schema pedido.",
         input: JSON.stringify({
           userMessage: prompt,
           conversation: conversation.slice(-6),
@@ -1049,7 +1114,6 @@ export async function runPlaylistsAiAgent(
     result = await answerPlaylistReview({ intent, workspace, tools });
   } else if (intent.name === "playlist_idea") {
     result = await answerPlaylistIdea({
-      prompt: message,
       intent,
       workspace,
       tools,
@@ -1077,7 +1141,7 @@ export async function runPlaylistsAiAgent(
     },
   };
 
-  return polish && mode !== "question"
+  return polish
     ? polishResponseText({ prompt: message, conversation: messages, result })
     : result;
 }
