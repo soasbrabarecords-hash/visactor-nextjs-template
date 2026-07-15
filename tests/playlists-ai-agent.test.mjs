@@ -222,3 +222,51 @@ test("builds a read-only playlist idea from weekly risers", async () => {
   assert.equal(result.actions[0].disabled, true);
   assert.match(result.text, /Ideia:/);
 });
+
+test("asks for strategic context before changing a broad playlist direction", async () => {
+  let recommendationCalls = 0;
+  const tools = buildTools();
+  tools.recommendTracksForPlaylist = async (...args) => {
+    recommendationCalls += 1;
+    return buildTools().recommendTracksForPlaylist(...args);
+  };
+
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero melhorar a FUNK 2026." },
+    { tools, polish: false },
+  );
+
+  assert.equal(result.meta.intent, "playlist_recommendations");
+  assert.equal(result.meta.mode, "question");
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.brief.playlistName, "FUNK 2026");
+  assert.match(result.text, /objetivo|prioridade|crescimento/i);
+  assert.equal(recommendationCalls, 0);
+});
+
+test("remembers the brief and recommends after the user supplies context", async () => {
+  const tools = buildTools();
+  const first = await runPlaylistsAiAgent(
+    { message: "Quero melhorar a FUNK 2026." },
+    { tools, polish: false },
+  );
+  const second = await runPlaylistsAiAgent(
+    {
+      message: "Quero crescimento no Brasil, com foco em descoberta.",
+      messages: [
+        { role: "user", content: "Quero melhorar a FUNK 2026." },
+        { role: "assistant", content: first.text },
+      ],
+      brief: first.brief,
+    },
+    { tools, polish: false },
+  );
+
+  assert.equal(second.meta.intent, "playlist_recommendations");
+  assert.equal(second.meta.mode, "recommendation");
+  assert.equal(second.meta.contextComplete, true);
+  assert.equal(second.brief.goal, "growth");
+  assert.equal(second.brief.market, "BR");
+  assert.equal(second.brief.strategy, "discovery");
+  assert.equal(second.cards.length, 10);
+});

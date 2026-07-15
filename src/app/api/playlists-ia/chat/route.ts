@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getPlaylistOsReadAccess } from "@/lib/playlist-os-read-access";
 import { runPlaylistsAiAgent } from "@/lib/playlists-ai-agent";
+import {
+  appendPlaylistAiExchange,
+  createPlaylistAiConversation,
+  getPlaylistAiConversation,
+  titleFromPlaylistAiMessage,
+} from "@/lib/playlists-ai-conversations";
 import type { PlaylistsAiConversationMessage } from "@/types/playlists-ai";
 
 export const runtime = "nodejs";
@@ -9,6 +15,8 @@ export const dynamic = "force-dynamic";
 const NO_STORE_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0",
 } as const;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseMessages(value: unknown): PlaylistsAiConversationMessage[] {
   if (!Array.isArray(value)) return [];
@@ -66,11 +74,66 @@ export async function POST(request: Request) {
       );
     }
 
+    const conversationIdValue = body?.conversationId;
+    const conversationId =
+      typeof conversationIdValue === "string"
+        ? conversationIdValue.trim()
+        : "";
+    if (conversationId && !UUID_PATTERN.test(conversationId)) {
+      return NextResponse.json(
+        { success: false, message: "Conversa inválida." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const storedConversation = conversationId
+      ? await getPlaylistAiConversation({
+          conversationId,
+          workspaceId: access.workspaceId,
+          userId: access.userId,
+        })
+      : null;
+    if (conversationId && !storedConversation) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Conversa não encontrada neste workspace.",
+        },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const conversationMessages = storedConversation
+      ? storedConversation.messages
+          .slice(-10)
+          .map(({ role, content }) => ({ role, content }))
+      : parseMessages(body?.messages);
+
     const result = await runPlaylistsAiAgent({
       message,
-      messages: parseMessages(body?.messages),
+      messages: conversationMessages,
+      brief: storedConversation?.brief ?? body?.brief,
     });
-    return NextResponse.json(result, { headers: NO_STORE_HEADERS });
+    const conversation =
+      storedConversation ??
+      (await createPlaylistAiConversation({
+        workspaceId: access.workspaceId,
+        userId: access.userId,
+        title: titleFromPlaylistAiMessage(message),
+        brief: result.brief,
+      }));
+    const persistedConversation = await appendPlaylistAiExchange({
+      conversationId: conversation.id,
+      workspaceId: access.workspaceId,
+      userId: access.userId,
+      userMessage: message,
+      assistantResponse: result,
+    });
+
+    return NextResponse.json(
+      { ...result, conversation: persistedConversation },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Playlists IA chat failed: ${message}\n`);

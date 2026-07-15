@@ -5,6 +5,12 @@ import {
   detectPlaylistGenre,
 } from "@/lib/genre-detection";
 import {
+  buildCurationQuestion,
+  createEmptyCurationBrief,
+  inferCurationBrief,
+  shouldAskForCurationContext,
+} from "@/lib/playlists-ai-memory";
+import {
   type ChartOpportunitiesToolResult,
   type ChartTrackSignalToolResult,
   type PlaylistRecommendationToolResult,
@@ -23,19 +29,21 @@ import {
   searchTrackInPlaylists,
 } from "@/lib/playlists-ai-tools";
 import { getEffectiveOpenAICredentials } from "@/lib/workspaces";
-import type { MusicIntelligenceCountry } from "@/types/music-intelligence";
 import type {
   PlaylistsAiChatResponse,
   PlaylistsAiConversationMessage,
+  PlaylistsAiCurationBrief,
+  PlaylistsAiCurationMarket,
   PlaylistsAiDataSource,
   PlaylistsAiIntent,
   PlaylistsAiPreparedAction,
+  PlaylistsAiResponseMode,
   PlaylistsAiTrackCard,
 } from "@/types/playlists-ai";
 
 export type DetectedPlaylistsAiIntent = {
   name: PlaylistsAiIntent;
-  market: MusicIntelligenceCountry;
+  market: PlaylistsAiCurationMarket;
   limit: number;
   targetSize: number;
   playlistReference: string | null;
@@ -144,7 +152,7 @@ export function classifyPlaylistAiIntent(
 ): DetectedPlaylistsAiIntent {
   const normalized = normalizePlaylistAiText(prompt);
   const playlistReference = findPlaylistReference(prompt, playlistNames);
-  const market: MusicIntelligenceCountry = /\bglobais?\b/.test(normalized)
+  const market: PlaylistsAiCurationMarket = /\bglobais?\b/.test(normalized)
     ? "GLOBAL"
     : "BR";
   const base = {
@@ -205,6 +213,13 @@ export function classifyPlaylistAiIntent(
   }
 
   if (
+    (playlistReference || /playlist/.test(normalized)) &&
+    /melhorar|otimizar|atualizar|renovar|repensar|reformular/.test(normalized)
+  ) {
+    return { ...base, name: "playlist_recommendations" };
+  }
+
+  if (
     /chart|quentes|bombando|subindo|oportunidades|entradas|crossover|br hoje|global/.test(
       normalized,
     )
@@ -242,19 +257,32 @@ function action(
 
 function response(
   intent: PlaylistsAiIntent,
-  input: Omit<PlaylistsAiChatResponse, "meta">,
+  input: Omit<PlaylistsAiChatResponse, "meta" | "brief">,
+  {
+    brief = createEmptyCurationBrief(),
+    mode = input.cards.length > 0 ? "recommendation" : "analysis",
+    contextComplete = false,
+  }: {
+    brief?: PlaylistsAiCurationBrief;
+    mode?: PlaylistsAiResponseMode;
+    contextComplete?: boolean;
+  } = {},
 ): PlaylistsAiChatResponse {
   return {
     ...input,
+    brief,
     meta: {
       intent,
+      mode,
+      contextComplete,
       readOnly: true,
       generatedAt: new Date().toISOString(),
     },
   };
 }
 
-function marketLabel(market: MusicIntelligenceCountry) {
+function marketLabel(market: PlaylistsAiCurationMarket) {
+  if (market === "BOTH") return "Brasil + Global";
   return market === "BR" ? "Brasil" : "Global";
 }
 
@@ -721,7 +749,7 @@ async function answerPlaylistIdea({
     intent.limit,
   );
   const genreLabel = genre === "unknown" ? "Radar" : GENRE_LABEL[genre];
-  const playlistName = `${genreLabel} em Ascensão · ${intent.market === "BR" ? "BR" : "Global"}`;
+  const playlistName = `${genreLabel} em Ascensão · ${intent.market === "BR" ? "BR" : intent.market === "GLOBAL" ? "Global" : "BR + Global"}`;
   const description = `Seleção editorial de ${genreLabel.toLowerCase()} baseada nas maiores subidas e oportunidades recentes do Spotify Charts ${marketLabel(intent.market)}. Atualize conforme os sinais mudarem.`;
 
   return response("playlist_idea", {
@@ -836,22 +864,15 @@ async function answerPlaylistDescription({
 
 async function answerGeneral({
   workspace,
-  tools,
 }: {
   workspace: WorkspacePlaylistsToolResult;
-  tools: PlaylistsAiAgentTools;
 }) {
-  const chart = await tools.getChartOpportunities({
-    market: "BR",
-    limit: 3,
-    mode: "opportunity",
-  });
   return response("general", {
-    text: "Entendi a pergunta, mas ainda não identifiquei com segurança se você quer analisar charts, uma playlist específica ou uma música. Diga o nome da playlist/faixa e a decisão desejada. Eu consigo buscar oportunidades, presença, quedas, descrição ou uma ideia editorial sem executar alterações.",
-    cards: chart.cards,
+    text: "Ainda não identifiquei com segurança a decisão que você quer tomar. Posso pensar com você sobre uma playlist existente, uma faixa, oportunidades dos charts ou uma nova ideia editorial.",
+    cards: [],
     actions: [],
-    confidence: 35,
-    dataSources: [buildWorkspaceSource(workspace), ...buildChartSources(chart)],
+    confidence: 30,
+    dataSources: [buildWorkspaceSource(workspace)],
   });
 }
 
@@ -899,10 +920,11 @@ async function polishResponseText({
       body: JSON.stringify({
         model: credentials.model,
         instructions:
-          "Você é o cérebro conversacional read-only de curadoria do Playlist OS. Reescreva a resposta em português brasileiro claro, direto e executivo. Use somente os fatos fornecidos. Não invente posições, movimentos, presença em playlists, gêneros ou ações executadas. Se os dados forem parciais, preserve essa ressalva. Responda apenas JSON no schema pedido.",
+          "Você é o copiloto read-only de curadoria do Playlist OS. Pense como curador editorial, A&R, especialista em Spotify Charts e estrategista de playlists. Reescreva a resposta em português brasileiro natural, direto e executivo, sem soar como chatbot genérico. Use somente os fatos fornecidos. Nunca invente posições, movimentos, presença em playlists, gêneros ou ações executadas. Considere o brief da curadoria e preserve qualquer ressalva sobre dados parciais. Responda apenas JSON no schema pedido.",
         input: JSON.stringify({
           userMessage: prompt,
           conversation: conversation.slice(-6),
+          curationBrief: result.brief,
           verifiedDraft: result.text,
           cards: result.cards.slice(0, 12).map((card) => ({
             name: card.name,
@@ -948,9 +970,11 @@ export async function runPlaylistsAiAgent(
   {
     message,
     messages = [],
+    brief: briefValue,
   }: {
     message: string;
     messages?: PlaylistsAiConversationMessage[];
+    brief?: unknown;
   },
   {
     tools = DEFAULT_TOOLS,
@@ -961,10 +985,58 @@ export async function runPlaylistsAiAgent(
   } = {},
 ) {
   const workspace = await tools.getWorkspacePlaylists();
-  const intent = classifyPlaylistAiIntent(
+  let intent = classifyPlaylistAiIntent(
     message,
     workspace.playlists.map((playlist) => playlist.name),
   );
+  const brief = inferCurationBrief({
+    message,
+    messages,
+    value: briefValue,
+    intent: intent.name,
+    playlistReference: intent.playlistReference,
+  });
+  const activeIntent =
+    intent.name === "general" && brief.activeIntent
+      ? brief.activeIntent
+      : intent.name;
+  intent = {
+    ...intent,
+    name: activeIntent,
+    market: brief.market ?? intent.market,
+    playlistReference: intent.playlistReference ?? brief.playlistName,
+    trackQuery:
+      intent.trackQuery ??
+      (intent.name === "general" &&
+      activeIntent === "track_presence" &&
+      message.trim().length > 1
+        ? message.trim()
+        : null),
+  };
+
+  if (
+    shouldAskForCurationContext({
+      message,
+      intent: intent.name,
+      brief,
+    })
+  ) {
+    return response(
+      intent.name,
+      {
+        text: buildCurationQuestion({
+          brief,
+          playlistNames: workspace.playlists.map((playlist) => playlist.name),
+        }),
+        cards: [],
+        actions: [],
+        confidence: 80,
+        dataSources: [buildWorkspaceSource(workspace)],
+      },
+      { brief, mode: "question", contextComplete: false },
+    );
+  }
+
   let result: PlaylistsAiChatResponse;
 
   if (intent.name === "chart_opportunities") {
@@ -985,10 +1057,27 @@ export async function runPlaylistsAiAgent(
   } else if (intent.name === "playlist_description") {
     result = await answerPlaylistDescription({ intent, workspace, tools });
   } else {
-    result = await answerGeneral({ workspace, tools });
+    result = await answerGeneral({ workspace });
   }
 
-  return polish
+  const mode: PlaylistsAiResponseMode =
+    result.cards.length > 0 || result.actions.length > 0
+      ? "recommendation"
+      : result.confidence <= 25
+        ? "question"
+        : "analysis";
+  result = {
+    ...result,
+    brief,
+    meta: {
+      ...result.meta,
+      intent: intent.name,
+      mode,
+      contextComplete: brief.missingFields.length === 0,
+    },
+  };
+
+  return polish && mode !== "question"
     ? polishResponseText({ prompt: message, conversation: messages, result })
     : result;
 }

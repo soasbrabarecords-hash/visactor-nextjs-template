@@ -19,7 +19,10 @@ import type {
   MusicIntelligenceCountry,
   MusicIntelligenceTrack,
 } from "@/types/music-intelligence";
-import type { PlaylistsAiTrackCard } from "@/types/playlists-ai";
+import type {
+  PlaylistsAiCurationMarket,
+  PlaylistsAiTrackCard,
+} from "@/types/playlists-ai";
 import {
   TRACK_PROFILE_GENRE_LABELS,
   type TrackGenreCardProfile,
@@ -500,16 +503,39 @@ export async function getChartOpportunities({
   excludeTrackIds = new Set<string>(),
   mode = "opportunity",
 }: {
-  market?: MusicIntelligenceCountry;
+  market?: PlaylistsAiCurationMarket;
   limit?: number;
   excludeTrackIds?: ReadonlySet<string>;
   mode?: "opportunity" | "heat" | "riser" | "review";
 } = {}): Promise<ChartOpportunitiesToolResult> {
   const intelligence = await getMusicIntelligence();
-  const pool = [...(intelligence.candidatePool[market] ?? [])].filter(
-    (track) =>
-      track.spotifyTrackId && !excludeTrackIds.has(track.spotifyTrackId),
-  );
+  const marketTracks =
+    market === "BOTH"
+      ? [
+          ...(intelligence.candidatePool.BR ?? []),
+          ...(intelligence.candidatePool.GLOBAL ?? []),
+        ]
+      : [...(intelligence.candidatePool[market] ?? [])];
+  const uniqueTracks = new Map<string, MusicIntelligenceTrack>();
+  for (const track of marketTracks) {
+    if (!track.spotifyTrackId || excludeTrackIds.has(track.spotifyTrackId))
+      continue;
+    const existing = uniqueTracks.get(track.spotifyTrackId);
+    if (!existing) {
+      uniqueTracks.set(track.spotifyTrackId, track);
+      continue;
+    }
+    const strongest =
+      track.scores.opportunityScore > existing.scores.opportunityScore
+        ? track
+        : existing;
+    uniqueTracks.set(track.spotifyTrackId, {
+      ...strongest,
+      countries: [...new Set([...existing.countries, ...track.countries])],
+      positions: { ...existing.positions, ...track.positions },
+    });
+  }
+  const pool = [...uniqueTracks.values()];
 
   const filtered = pool.filter((track) =>
     mode === "review" ? track.action === "review" : track.action !== "review",

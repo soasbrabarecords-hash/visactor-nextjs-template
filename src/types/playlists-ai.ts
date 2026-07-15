@@ -10,6 +10,42 @@ export type PlaylistsAiIntent =
   | "playlist_description"
   | "general";
 
+export type PlaylistsAiResponseMode =
+  "question" | "analysis" | "recommendation";
+
+export type PlaylistsAiCurationGoal =
+  "growth" | "editorial" | "discovery" | "hits" | "retention" | "balanced";
+
+export type PlaylistsAiCurationMarket = MusicIntelligenceCountry | "BOTH";
+
+export type PlaylistsAiPlaylistMode = "existing" | "new";
+
+export type PlaylistsAiCurationStrategy =
+  "retention" | "discovery" | "renewal" | "hits" | "balanced";
+
+export type PlaylistsAiCurationBriefField =
+  | "goal"
+  | "market"
+  | "playlistMode"
+  | "playlistName"
+  | "genre"
+  | "audience"
+  | "strategy";
+
+export type PlaylistsAiCurationBrief = {
+  goal: PlaylistsAiCurationGoal | null;
+  market: PlaylistsAiCurationMarket | null;
+  playlistMode: PlaylistsAiPlaylistMode | null;
+  playlistName: string | null;
+  genre: string | null;
+  audience: string | null;
+  strategy: PlaylistsAiCurationStrategy | null;
+  targetSize: number | null;
+  activeIntent: PlaylistsAiIntent | null;
+  completeness: number;
+  missingFields: PlaylistsAiCurationBriefField[];
+};
+
 export type PlaylistsAiTrackStatus =
   "already_in_playlist" | "not_in_playlist" | "watch";
 
@@ -70,8 +106,11 @@ export type PlaylistsAiChatResponse = {
   actions: PlaylistsAiPreparedAction[];
   confidence: number;
   dataSources: PlaylistsAiDataSource[];
+  brief: PlaylistsAiCurationBrief;
   meta: {
     intent: PlaylistsAiIntent;
+    mode: PlaylistsAiResponseMode;
+    contextComplete: boolean;
     readOnly: true;
     generatedAt: string;
   };
@@ -80,4 +119,31 @@ export type PlaylistsAiChatResponse = {
 export type PlaylistsAiConversationMessage = {
   role: "user" | "assistant";
   content: string;
+};
+
+export type PlaylistsAiConversationStatus = "active" | "archived";
+
+export type PlaylistsAiConversationSummary = {
+  id: string;
+  title: string;
+  status: PlaylistsAiConversationStatus;
+  brief: PlaylistsAiCurationBrief;
+  lastMessageAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlaylistsAiPersistedMessage = PlaylistsAiConversationMessage & {
+  id: string;
+  result: PlaylistsAiChatResponse | null;
+  createdAt: string;
+};
+
+export type PlaylistsAiConversationDetail = PlaylistsAiConversationSummary & {
+  latestResponse: PlaylistsAiChatResponse | null;
+  messages: PlaylistsAiPersistedMessage[];
+};
+
+export type PlaylistsAiChatApiResponse = PlaylistsAiChatResponse & {
+  conversation: PlaylistsAiConversationSummary;
 };
