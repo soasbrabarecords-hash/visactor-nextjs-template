@@ -19,7 +19,8 @@ export type PlaylistIntelligenceTrackInput = {
   signalsLoading: boolean;
 };
 
-export type PlaylistDecisionAction = "priority" | "raise" | "keep" | "lower" | "test";
+export type PlaylistDecisionAction =
+  "priority" | "raise" | "keep" | "lower" | "test";
 
 export type PlaylistTrackDecision = {
   trackKey: string;
@@ -67,22 +68,31 @@ function compactNumber(value: number) {
 
 function streamScore(value: number | null, maxScore: number) {
   if (!value || value <= 0) return 0;
-  return clamp(Math.log10(value) - 3, 0, 4) / 4 * maxScore;
+  return (clamp(Math.log10(value) - 3, 0, 4) / 4) * maxScore;
 }
 
 function getChartScore(track: PlaylistIntelligenceTrackInput) {
   if (!track.chartPosition) return 0;
 
   const positionScore = ((201 - clamp(track.chartPosition, 1, 200)) / 200) * 34;
-  const topBonus = track.chartPosition <= 25 ? 8 : track.chartPosition <= 50 ? 5 : 0;
+  const topBonus =
+    track.chartPosition <= 25 ? 8 : track.chartPosition <= 50 ? 5 : 0;
 
   let movementScore = 0;
   if (track.chartMovement === "new") movementScore = 12;
-  if (track.chartMovement === "up") movementScore = 8 + clamp(track.chartPositionChange ?? 0, 0, 25) * 0.2;
+  if (track.chartMovement === "up")
+    movementScore = 8 + clamp(track.chartPositionChange ?? 0, 0, 25) * 0.2;
   if (track.chartMovement === "stable") movementScore = 3;
-  if (track.chartMovement === "down") movementScore = -6 - clamp(Math.abs(track.chartPositionChange ?? 0), 0, 25) * 0.2;
+  if (track.chartMovement === "down")
+    movementScore =
+      -6 - clamp(Math.abs(track.chartPositionChange ?? 0), 0, 25) * 0.2;
 
-  return positionScore + topBonus + movementScore + streamScore(track.chartStreams, 8);
+  return (
+    positionScore +
+    topBonus +
+    movementScore +
+    streamScore(track.chartStreams, 8)
+  );
 }
 
 function getStreamTrendScore(track: PlaylistIntelligenceTrackInput) {
@@ -121,14 +131,20 @@ function getSignals(track: PlaylistIntelligenceTrackInput, score: number) {
     signals.push("Kworb em queda");
   }
 
-  if ((track.popularity ?? 0) >= 75) {
+  if (track.popularity !== null && track.popularity >= 75) {
     signals.push("popularidade forte");
-  } else if ((track.popularity ?? 0) < 45) {
+  } else if (track.popularity !== null && track.popularity < 45) {
     signals.push("popularidade baixa");
   }
 
   if (signals.length === 0) {
-    signals.push(track.signalsLoading ? "atualizando sinais" : score >= 55 ? "base consistente" : "poucos sinais externos");
+    signals.push(
+      track.signalsLoading
+        ? "atualizando sinais"
+        : score >= 55
+          ? "base consistente"
+          : "poucos sinais externos",
+    );
   }
 
   return signals.slice(0, 3);
@@ -140,7 +156,18 @@ function getDecisionAction(
   suggestedIndex: number,
 ): Pick<PlaylistTrackDecision, "action" | "label" | "tone" | "reason"> {
   const shift = track.currentIndex - suggestedIndex;
-  const hasMarketSignal = Boolean(track.chartPosition || track.dailyStreams);
+  const hasMarketSignal = Boolean(
+    track.popularity !== null || track.chartPosition || track.dailyStreams,
+  );
+
+  if (!hasMarketSignal && !track.signalsLoading) {
+    return {
+      action: "keep",
+      label: "Sem leitura",
+      tone: "neutral",
+      reason: "Ainda não há sinais suficientes para recomendar uma mudança.",
+    };
+  }
 
   if (score >= 78 && shift >= 2) {
     return {
@@ -209,10 +236,13 @@ export function buildPlaylistIntelligence(
     return a.track.currentIndex - b.track.currentIndex;
   });
 
-  const suggestedIndexByKey = new Map(suggested.map((item, index) => [item.trackKey, index]));
+  const suggestedIndexByKey = new Map(
+    suggested.map((item, index) => [item.trackKey, index]),
+  );
 
   const decisions = scoredTracks.map(({ track, trackKey, score }) => {
-    const suggestedIndex = suggestedIndexByKey.get(trackKey) ?? track.currentIndex;
+    const suggestedIndex =
+      suggestedIndexByKey.get(trackKey) ?? track.currentIndex;
     const action = getDecisionAction(track, score, suggestedIndex);
     const signals = getSignals(track, score);
 
@@ -230,14 +260,21 @@ export function buildPlaylistIntelligence(
     };
   });
 
-  const chartMatches = tracks.filter((track) => Boolean(track.chartPosition)).length;
-  const streamMatches = tracks.filter((track) => Boolean(track.dailyStreams)).length;
+  const chartMatches = tracks.filter((track) =>
+    Boolean(track.chartPosition),
+  ).length;
+  const streamMatches = tracks.filter((track) =>
+    Boolean(track.dailyStreams),
+  ).length;
   const readyStreams = tracks.filter((track) => !track.streamsLoading).length;
   const orderChangesCount = decisions.filter(
     (decision) => decision.currentIndex !== decision.suggestedIndex,
   ).length;
   const averageScore = decisions.length
-    ? Math.round(decisions.reduce((total, decision) => total + decision.score, 0) / decisions.length)
+    ? Math.round(
+        decisions.reduce((total, decision) => total + decision.score, 0) /
+          decisions.length,
+      )
     : 0;
   const signalCoverage = tracks.length
     ? (chartMatches + streamMatches + readyStreams) / (tracks.length * 3)
@@ -252,12 +289,20 @@ export function buildPlaylistIntelligence(
       chartMatches,
       streamMatches,
       orderChangesCount,
-      priorityCount: decisions.filter((decision) => decision.action === "priority").length,
-      raiseCount: decisions.filter((decision) => decision.action === "raise").length,
+      priorityCount: decisions.filter(
+        (decision) => decision.action === "priority",
+      ).length,
+      raiseCount: decisions.filter((decision) => decision.action === "raise")
+        .length,
       reviewCount: decisions.filter(
         (decision) => decision.action === "test" || decision.action === "lower",
       ).length,
-      confidenceLabel: signalCoverage >= 0.55 ? "Alta" : signalCoverage >= 0.3 ? "Media" : "Inicial",
+      confidenceLabel:
+        signalCoverage >= 0.55
+          ? "Alta"
+          : signalCoverage >= 0.3
+            ? "Media"
+            : "Inicial",
     },
   };
 }

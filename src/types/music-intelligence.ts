@@ -51,6 +51,13 @@ export type MusicIntelligenceArtistSignal = {
   averageOpportunityScore: number;
 };
 
+export type MusicIntelligenceMarketQueue = {
+  nextBestOpportunity: MusicIntelligenceTrack | null;
+  addNow: MusicIntelligenceTrack[];
+  watch: MusicIntelligenceTrack[];
+  review: MusicIntelligenceTrack[];
+};
+
 export type MusicIntelligenceSummary = {
   latestChartDate: string | null;
   availableDaysBR: number;
@@ -71,6 +78,7 @@ export type MusicIntelligenceSummary = {
 
 export type MusicIntelligenceResponse = {
   summary: MusicIntelligenceSummary;
+  markets: Record<MusicIntelligenceCountry, MusicIntelligenceMarketQueue>;
   nextBestOpportunity: MusicIntelligenceTrack | null;
   addNow: MusicIntelligenceTrack[];
   watch: MusicIntelligenceTrack[];

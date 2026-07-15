@@ -1,16 +1,15 @@
-import "server-only";
-
-import { Buffer } from "node:buffer";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import { Buffer } from "node:buffer";
+import "server-only";
 import { buildSpotifyOfficialChartUrl } from "@/lib/charts/spotify-chart-source-resolver";
 import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
 import { fetchStoredTrackPopularities } from "@/lib/track-popularity-store";
 import {
   clearCurrentWorkspaceSpotifyConnection,
-  getEffectiveSpotifyCredentials,
   getCurrentWorkspaceContext,
   getCurrentWorkspaceSpotifyStoredAuth,
+  getEffectiveSpotifyCredentials,
   syncCurrentWorkspaceSpotifyConnection,
 } from "@/lib/workspaces";
 
@@ -139,6 +138,7 @@ export type SpotifyEditablePlaylistTrack = {
   imageUrl: string | null;
   durationLabel: string;
   popularity: number;
+  popularitySource: "spotify" | "snapshot" | "unavailable";
   spotifyUrl: string;
 };
 
@@ -293,14 +293,30 @@ const ACCOUNT_PLAYLISTS_CACHE_TTL_MS = 90 * 1000;
 const EDITABLE_PLAYLIST_CACHE_TTL_MS = 3 * 60 * 1000;
 const PLAYLIST_TRACK_IDS_TTL_MS = 2 * 60 * 1000;
 
-const spotifyCurrentUserCache = new Map<string, CacheEntry<SpotifyCurrentUserResponse>>();
-const spotifyAccountPlaylistsCache = new Map<string, CacheEntry<SpotifyAccountPlaylist[]>>();
-const spotifyEditablePlaylistCache = new Map<string, CacheEntry<SpotifyEditablePlaylist>>();
+const spotifyCurrentUserCache = new Map<
+  string,
+  CacheEntry<SpotifyCurrentUserResponse>
+>();
+const spotifyAccountPlaylistsCache = new Map<
+  string,
+  CacheEntry<SpotifyAccountPlaylist[]>
+>();
+const spotifyEditablePlaylistCache = new Map<
+  string,
+  CacheEntry<SpotifyEditablePlaylist>
+>();
 const spotifyPlaylistTrackIdsCache = new Map<string, CacheEntry<string[]>>();
-const spotifyPlaylistsInFlight = new Map<string, Promise<SpotifyAccountPlaylist[]>>();
-const spotifyEditablePlaylistsInFlight = new Map<string, Promise<SpotifyEditablePlaylist>>();
+const spotifyPlaylistsInFlight = new Map<
+  string,
+  Promise<SpotifyAccountPlaylist[]>
+>();
+const spotifyEditablePlaylistsInFlight = new Map<
+  string,
+  Promise<SpotifyEditablePlaylist>
+>();
 const spotifyPlaylistTrackIdsInFlight = new Map<string, Promise<string[]>>();
 const spotifyRateLimitUntilByScope = new Map<string, number>();
+let spotifyCatalogTokenCache: CacheEntry<string> | null = null;
 
 function buildTokenCacheKey(accessToken: string) {
   return accessToken.trim();
@@ -454,7 +470,9 @@ async function getSpotifyOAuthEnv() {
   };
 }
 
-function isUsableWorkspaceAccessToken(tokenExpiresAt: string | null | undefined) {
+function isUsableWorkspaceAccessToken(
+  tokenExpiresAt: string | null | undefined,
+) {
   if (!tokenExpiresAt) {
     return true;
   }
@@ -511,7 +529,8 @@ async function resolveSpotifySession(
   }
 
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value ?? null;
+  const accessToken =
+    cookieStore.get(SPOTIFY_ACCESS_TOKEN_COOKIE)?.value ?? null;
   const refreshToken =
     cookieStore.get(SPOTIFY_REFRESH_TOKEN_COOKIE)?.value ?? null;
 
@@ -579,11 +598,7 @@ export async function buildSpotifyAuthorizeUrl({
 }
 
 export function setSpotifyStateCookie(response: NextResponse, state: string) {
-  response.cookies.set(
-    SPOTIFY_STATE_COOKIE,
-    state,
-    getCookieOptions(10 * 60),
-  );
+  response.cookies.set(SPOTIFY_STATE_COOKIE, state, getCookieOptions(10 * 60));
 }
 
 export function setSpotifyNextCookie(response: NextResponse, nextPath: string) {
@@ -678,7 +693,10 @@ export async function exchangeSpotifyCode({
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
-      Authorization: getSpotifyCredentialsHeader(env.clientId, env.clientSecret),
+      Authorization: getSpotifyCredentialsHeader(
+        env.clientId,
+        env.clientSecret,
+      ),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
@@ -690,21 +708,24 @@ export async function exchangeSpotifyCode({
   });
 
   if (!response.ok) {
-    const errBody = await response.json().catch(() => ({})) as { error?: string; error_description?: string };
-    throw new Error(`Spotify auth error: ${errBody.error ?? response.status} — ${errBody.error_description ?? "unknown"}`);
+    const errBody = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      error_description?: string;
+    };
+    throw new Error(
+      `Spotify auth error: ${errBody.error ?? response.status} — ${errBody.error_description ?? "unknown"}`,
+    );
   }
 
   return (await response.json()) as SpotifyOAuthTokenResponse;
 }
 
 async function getSpotifyErrorMessage(response: Response, fallback: string) {
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        error?: string | { message?: string; status?: number };
-        error_description?: string;
-        message?: string;
-      }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    error?: string | { message?: string; status?: number };
+    error_description?: string;
+    message?: string;
+  } | null;
   const spotifyMessage =
     typeof payload?.error === "string"
       ? payload.error_description || payload.error
@@ -732,7 +753,10 @@ async function refreshSpotifyToken(refreshToken: string) {
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
-      Authorization: getSpotifyCredentialsHeader(env.clientId, env.clientSecret),
+      Authorization: getSpotifyCredentialsHeader(
+        env.clientId,
+        env.clientSecret,
+      ),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
@@ -883,7 +907,14 @@ function mapSpotifyEditablePlaylistTrack(
     albumName: track.album?.name || "Album nao informado",
     imageUrl: track.album?.images?.[0]?.url?.trim() || null,
     durationLabel: formatDuration(track.duration_ms),
-    popularity: typeof track.popularity === "number" ? track.popularity : 0,
+    popularity:
+      typeof track.popularity === "number" && track.popularity > 0
+        ? track.popularity
+        : 0,
+    popularitySource:
+      typeof track.popularity === "number" && track.popularity > 0
+        ? "spotify"
+        : "unavailable",
     spotifyUrl:
       track.external_urls?.spotify ||
       `https://open.spotify.com/track/${track.id}`,
@@ -901,7 +932,10 @@ async function fetchSpotifyAccountPlaylistsWithToken(
   { force = false }: { force?: boolean } = {},
 ) {
   const cacheKey = buildTokenCacheKey(accessToken);
-  const cachedPlaylists = getCachedValue(spotifyAccountPlaylistsCache, cacheKey);
+  const cachedPlaylists = getCachedValue(
+    spotifyAccountPlaylistsCache,
+    cacheKey,
+  );
 
   if (!force && cachedPlaylists) {
     return cachedPlaylists;
@@ -918,9 +952,8 @@ async function fetchSpotifyAccountPlaylistsWithToken(
   const requestPromise = (async () => {
     const currentUser = await fetchSpotifyCurrentUserWithToken(accessToken);
     const playlists: SpotifyAccountPlaylist[] = [];
-    let nextUrl:
-      | string
-      | null = "https://api.spotify.com/v1/me/playlists?limit=50";
+    let nextUrl: string | null =
+      "https://api.spotify.com/v1/me/playlists?limit=50";
 
     while (nextUrl) {
       const response = await fetch(nextUrl, {
@@ -996,7 +1029,8 @@ async function fetchSpotifyPlaylistTracksWithToken(
   throwIfRateLimited("spotify:playlist:tracks", "Spotify tracks error");
 
   const tracks: SpotifyEditablePlaylistTrack[] = [];
-  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
+  let nextUrl: string | null =
+    `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
 
   while (nextUrl) {
     const response = await fetch(nextUrl, {
@@ -1010,7 +1044,9 @@ async function fetchSpotifyPlaylistTracksWithToken(
       if (response.status === 429) {
         const retryAfter = response.headers.get("Retry-After");
         registerRateLimit("spotify:playlist:tracks", retryAfter);
-        throw new Error(`Spotify tracks error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`);
+        throw new Error(
+          `Spotify tracks error 429: rate limit atingido. Tente novamente em ${retryAfter ?? "alguns"} segundos.`,
+        );
       }
       throw new Error(
         await getSpotifyErrorMessage(
@@ -1044,9 +1080,7 @@ async function hydrateSpotifyTrackPopularityWithToken(
 ) {
   const idsToHydrate = Array.from(
     new Set(
-      tracks
-        .filter((track) => track.popularity === 0)
-        .map((track) => track.id),
+      tracks.filter((track) => track.popularity === 0).map((track) => track.id),
     ),
   );
 
@@ -1055,18 +1089,26 @@ async function hydrateSpotifyTrackPopularityWithToken(
   }
 
   const popularityById = new Map<string, number>();
+  const popularitySourceById = new Map<
+    string,
+    SpotifyEditablePlaylistTrack["popularitySource"]
+  >();
   const scope = "spotify:tracks:popularity";
   let spotifyHydrationFailed = false;
 
-  try {
-    for (let index = 0; index < idsToHydrate.length; index += 50) {
-      throwIfRateLimited(scope, "Spotify popularity error");
-      const batch = idsToHydrate.slice(index, index + 50);
+  async function fetchPopularities(
+    token: string,
+    ids: string[],
+    requestScope: string,
+  ) {
+    for (let index = 0; index < ids.length; index += 50) {
+      throwIfRateLimited(requestScope, "Spotify popularity error");
+      const batch = ids.slice(index, index + 50);
       const response = await fetch(
         `https://api.spotify.com/v1/tracks?ids=${encodeURIComponent(batch.join(","))}`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
           },
           cache: "no-store",
         },
@@ -1074,23 +1116,97 @@ async function hydrateSpotifyTrackPopularityWithToken(
 
       if (!response.ok) {
         if (response.status === 429) {
-          registerRateLimit(scope, response.headers.get("Retry-After"));
+          registerRateLimit(requestScope, response.headers.get("Retry-After"));
         }
-        spotifyHydrationFailed = true;
-        break;
+        return false;
       }
 
-      clearRateLimit(scope);
+      clearRateLimit(requestScope);
       const payload = (await response.json()) as SpotifySeveralTracksResponse;
 
       for (const track of payload.tracks ?? []) {
-        if (track?.id && typeof track.popularity === "number") {
+        if (
+          track?.id &&
+          typeof track.popularity === "number" &&
+          track.popularity > 0
+        ) {
           popularityById.set(track.id, track.popularity);
+          popularitySourceById.set(track.id, "spotify");
         }
       }
     }
+
+    return true;
+  }
+
+  async function getGlobalCatalogToken() {
+    if (
+      spotifyCatalogTokenCache &&
+      spotifyCatalogTokenCache.expiresAt > Date.now()
+    ) {
+      return spotifyCatalogTokenCache.value;
+    }
+
+    const clientId = process.env.SPOTIFY_CLIENT_ID?.trim();
+    const clientSecret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+    if (!clientId || !clientSecret) {
+      return null;
+    }
+
+    const response = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        Authorization: getSpotifyCredentialsHeader(clientId, clientSecret),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ grant_type: "client_credentials" }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const token = (await response.json()) as SpotifyOAuthTokenResponse;
+    if (!token.access_token) {
+      return null;
+    }
+
+    spotifyCatalogTokenCache = {
+      value: token.access_token,
+      expiresAt:
+        Date.now() + Math.max(60, (token.expires_in || 3600) - 120) * 1000,
+    };
+    return token.access_token;
+  }
+
+  try {
+    spotifyHydrationFailed = !(await fetchPopularities(
+      accessToken,
+      idsToHydrate,
+      scope,
+    ));
   } catch {
     spotifyHydrationFailed = true;
+  }
+
+  const unresolvedAfterWorkspace = idsToHydrate.filter(
+    (trackId) => !popularityById.has(trackId),
+  );
+
+  if (unresolvedAfterWorkspace.length > 0) {
+    try {
+      const catalogToken = await getGlobalCatalogToken();
+      if (catalogToken) {
+        await fetchPopularities(
+          catalogToken,
+          unresolvedAfterWorkspace,
+          "spotify:catalog:popularity",
+        );
+      }
+    } catch {
+      // Popularity is optional and stored/chart signals remain available.
+    }
   }
 
   const unresolvedIds = idsToHydrate.filter(
@@ -1098,10 +1214,12 @@ async function hydrateSpotifyTrackPopularityWithToken(
   );
 
   if (unresolvedIds.length > 0) {
-    const storedPopularities = await fetchStoredTrackPopularities(unresolvedIds);
+    const storedPopularities =
+      await fetchStoredTrackPopularities(unresolvedIds);
 
     for (const [trackId, popularity] of storedPopularities) {
       popularityById.set(trackId, popularity);
+      popularitySourceById.set(trackId, "snapshot");
     }
 
     if (spotifyHydrationFailed || storedPopularities.size > 0) {
@@ -1118,6 +1236,8 @@ async function hydrateSpotifyTrackPopularityWithToken(
   return tracks.map((track) => ({
     ...track,
     popularity: popularityById.get(track.id) ?? track.popularity,
+    popularitySource:
+      popularitySourceById.get(track.id) ?? track.popularitySource,
   }));
 }
 
@@ -1148,9 +1268,8 @@ async function fetchSpotifyPlaylistTrackIdsWithToken(
 
   const requestPromise = (async () => {
     const trackIds: string[] = [];
-    let nextUrl:
-      | string
-      | null = `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
+    let nextUrl: string | null =
+      `https://api.spotify.com/v1/playlists/${playlistId}/${playlistItemsPath}?limit=50`;
 
     while (nextUrl) {
       const response = await fetch(nextUrl, {
@@ -1169,7 +1288,9 @@ async function fetchSpotifyPlaylistTrackIdsWithToken(
           error?: { message?: string };
         };
 
-        throw new Error(err?.error?.message ?? `Spotify error ${response.status}`);
+        throw new Error(
+          err?.error?.message ?? `Spotify error ${response.status}`,
+        );
       }
 
       clearRateLimit(scope);
@@ -1381,8 +1502,8 @@ export async function fetchSpotifyAccountPlaylists({
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
-    const { data: playlists, refreshedToken } = await withSpotifyToken((token) =>
-      fetchSpotifyAccountPlaylistsWithToken(token, { force }),
+    const { data: playlists, refreshedToken } = await withSpotifyToken(
+      (token) => fetchSpotifyAccountPlaylistsWithToken(token, { force }),
     );
     return {
       result: {
@@ -1565,13 +1686,11 @@ export async function fetchSpotifyEditablePlaylist(
 }
 
 function getSpotifyDiagnosticMessage(payload: unknown) {
-  const data = payload as
-    | {
-        error?: string | { message?: string; status?: number };
-        error_description?: string;
-        message?: string;
-      }
-    | null;
+  const data = payload as {
+    error?: string | { message?: string; status?: number };
+    error_description?: string;
+    message?: string;
+  } | null;
 
   if (!data) {
     return null;
@@ -1584,10 +1703,7 @@ function getSpotifyDiagnosticMessage(payload: unknown) {
   return data.error?.message || data.message || null;
 }
 
-async function fetchSpotifyDiagnosticJson<T>(
-  accessToken: string,
-  url: string,
-) {
+async function fetchSpotifyDiagnosticJson<T>(accessToken: string, url: string) {
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -1643,125 +1759,128 @@ export async function fetchSpotifyWorkspaceDiagnostics({
   const integration = buildSpotifyIntegrationDiagnostics(auth);
 
   try {
-    const { data, refreshedToken } = await withSpotifyToken(async (
-      token,
-      playlistItemsPath,
-    ) => {
-      const profile = await fetchSpotifyCurrentUserWithToken(token);
-      if (
-        auth?.providerAccountId &&
-        profile.id &&
-        auth.providerAccountId !== profile.id
-      ) {
-        throw new Error(
-          `token_workspace_mismatch: token pertence a ${profile.id}, mas o workspace esta vinculado a ${auth.providerAccountId}.`,
-        );
-      }
-      const playlistsResponse =
-        await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistsResponse>(
-          token,
-          "https://api.spotify.com/v1/me/playlists?limit=10",
-        );
-      const playlists = playlistsResponse.payload?.items ?? [];
-      const firstItems = playlists
-        .map((playlist) => mapSpotifyAccountPlaylist(playlist))
-        .filter(Boolean)
-        .slice(0, 10) as SpotifyAccountPlaylist[];
-      const selectedPlaylistId = playlistId?.trim() || firstItems[0]?.id || null;
-      let detailCheck: SpotifyWorkspaceDiagnosticsDetailCheck = null;
-      let tracksCheck: SpotifyWorkspaceDiagnosticsTracksCheck = null;
-
-      if (selectedPlaylistId) {
-        const playlistCollectionFields =
-          playlistItemsPath === "items"
-            ? "items(total,items(item(id,name)))"
-            : "tracks(total,items(track(id,name)))";
-        const detailResponse =
-          await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistObject>(
-            token,
-            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}?fields=id,name,owner(id,display_name),${playlistCollectionFields},snapshot_id`,
+    const { data, refreshedToken } = await withSpotifyToken(
+      async (token, playlistItemsPath) => {
+        const profile = await fetchSpotifyCurrentUserWithToken(token);
+        if (
+          auth?.providerAccountId &&
+          profile.id &&
+          auth.providerAccountId !== profile.id
+        ) {
+          throw new Error(
+            `token_workspace_mismatch: token pertence a ${profile.id}, mas o workspace esta vinculado a ${auth.providerAccountId}.`,
           );
-        const detailPayload = detailResponse.payload;
+        }
+        const playlistsResponse =
+          await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistsResponse>(
+            token,
+            "https://api.spotify.com/v1/me/playlists?limit=10",
+          );
+        const playlists = playlistsResponse.payload?.items ?? [];
+        const firstItems = playlists
+          .map((playlist) => mapSpotifyAccountPlaylist(playlist))
+          .filter(Boolean)
+          .slice(0, 10) as SpotifyAccountPlaylist[];
+        const selectedPlaylistId =
+          playlistId?.trim() || firstItems[0]?.id || null;
+        let detailCheck: SpotifyWorkspaceDiagnosticsDetailCheck = null;
+        let tracksCheck: SpotifyWorkspaceDiagnosticsTracksCheck = null;
 
-        detailCheck = {
-          status: detailResponse.status,
-          ok: detailResponse.ok,
-          name: detailPayload?.name ?? null,
-          ownerId: detailPayload?.owner?.id ?? null,
-          tracksTotal:
-            typeof detailPayload?.items?.total === "number"
-              ? detailPayload.items.total
-              : typeof detailPayload?.tracks?.total === "number"
-                ? detailPayload.tracks.total
+        if (selectedPlaylistId) {
+          const playlistCollectionFields =
+            playlistItemsPath === "items"
+              ? "items(total,items(item(id,name)))"
+              : "tracks(total,items(track(id,name)))";
+          const detailResponse =
+            await fetchSpotifyDiagnosticJson<SpotifyUserPlaylistObject>(
+              token,
+              `https://api.spotify.com/v1/playlists/${selectedPlaylistId}?fields=id,name,owner(id,display_name),${playlistCollectionFields},snapshot_id`,
+            );
+          const detailPayload = detailResponse.payload;
+
+          detailCheck = {
+            status: detailResponse.status,
+            ok: detailResponse.ok,
+            name: detailPayload?.name ?? null,
+            ownerId: detailPayload?.owner?.id ?? null,
+            tracksTotal:
+              typeof detailPayload?.items?.total === "number"
+                ? detailPayload.items.total
+                : typeof detailPayload?.tracks?.total === "number"
+                  ? detailPayload.tracks.total
+                  : null,
+            embeddedItemsCount:
+              detailPayload?.items?.items?.length ??
+              detailPayload?.tracks?.items?.length ??
+              0,
+            message: detailResponse.message,
+          };
+
+          const tracksResponse =
+            await fetchSpotifyDiagnosticJson<SpotifyPlaylistTracksResponse>(
+              token,
+              `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/${playlistItemsPath}?limit=1`,
+            );
+          const tracksPayload = tracksResponse.payload;
+
+          tracksCheck = {
+            status: tracksResponse.status,
+            ok: tracksResponse.ok,
+            total:
+              typeof tracksPayload?.total === "number"
+                ? tracksPayload.total
                 : null,
-          embeddedItemsCount:
-            detailPayload?.items?.items?.length ??
-            detailPayload?.tracks?.items?.length ??
-            0,
-          message: detailResponse.message,
-        };
+            itemsCount: tracksPayload?.items?.length ?? 0,
+            firstItems: (tracksPayload?.items ?? [])
+              .slice(0, 10)
+              .map((item) => ({
+                id: item.item?.id ?? item.track?.id ?? null,
+                name: item.item?.name ?? item.track?.name ?? null,
+              })),
+            message: tracksResponse.message,
+          };
+        }
 
-        const tracksResponse =
-          await fetchSpotifyDiagnosticJson<SpotifyPlaylistTracksResponse>(
-            token,
-            `https://api.spotify.com/v1/playlists/${selectedPlaylistId}/${playlistItemsPath}?limit=1`,
-          );
-        const tracksPayload = tracksResponse.payload;
-
-        tracksCheck = {
-          status: tracksResponse.status,
-          ok: tracksResponse.ok,
-          total:
-            typeof tracksPayload?.total === "number"
-              ? tracksPayload.total
-              : null,
-          itemsCount: tracksPayload?.items?.length ?? 0,
-          firstItems: (tracksPayload?.items ?? []).slice(0, 10).map((item) => ({
-            id: item.item?.id ?? item.track?.id ?? null,
-            name: item.item?.name ?? item.track?.name ?? null,
-          })),
-          message: tracksResponse.message,
-        };
-      }
-
-      return {
-        success: true,
-        workspace: workspaceSummary,
-        integration,
-        spotifyUser: profile
-          ? {
-              id: profile.id ?? null,
-              displayName: profile.display_name ?? null,
-              email: profile.email ?? null,
-              product: profile.product ?? null,
-            }
-          : null,
-        playlistsCheck: {
-          status: playlistsResponse.status,
-          ok: playlistsResponse.ok,
-          total:
-            typeof playlistsResponse.payload?.total === "number"
-              ? playlistsResponse.payload.total
-              : null,
-          itemsCount: playlists.length,
-          firstItems: firstItems.map((playlist) => ({
-            id: playlist.id,
-            name: playlist.name,
-            ownerId: playlist.ownerId,
-            tracksTotal: playlist.tracksTotal,
-          })),
-          message: playlistsResponse.message,
-        },
-        selectedPlaylistCheck: {
-          playlistId: selectedPlaylistId,
-          detail: detailCheck,
-          tracks: tracksCheck,
-        },
-      } satisfies SpotifyWorkspaceDiagnosticsResult;
-    }, {
-      requireWorkspace: auth?.appMode === "workspace_app",
-      forceRefresh: auth?.appMode === "workspace_app",
-    });
+        return {
+          success: true,
+          workspace: workspaceSummary,
+          integration,
+          spotifyUser: profile
+            ? {
+                id: profile.id ?? null,
+                displayName: profile.display_name ?? null,
+                email: profile.email ?? null,
+                product: profile.product ?? null,
+              }
+            : null,
+          playlistsCheck: {
+            status: playlistsResponse.status,
+            ok: playlistsResponse.ok,
+            total:
+              typeof playlistsResponse.payload?.total === "number"
+                ? playlistsResponse.payload.total
+                : null,
+            itemsCount: playlists.length,
+            firstItems: firstItems.map((playlist) => ({
+              id: playlist.id,
+              name: playlist.name,
+              ownerId: playlist.ownerId,
+              tracksTotal: playlist.tracksTotal,
+            })),
+            message: playlistsResponse.message,
+          },
+          selectedPlaylistCheck: {
+            playlistId: selectedPlaylistId,
+            detail: detailCheck,
+            tracks: tracksCheck,
+          },
+        } satisfies SpotifyWorkspaceDiagnosticsResult;
+      },
+      {
+        requireWorkspace: auth?.appMode === "workspace_app",
+        forceRefresh: auth?.appMode === "workspace_app",
+      },
+    );
 
     return {
       result: data,
@@ -1786,8 +1905,7 @@ export async function fetchSpotifyWorkspaceDiagnostics({
 // ─── Edição de Playlist ───────────────────────────────────────────────────────
 
 export type SpotifyMutationResult =
-  | { success: true }
-  | { success: false; message: string };
+  { success: true } | { success: false; message: string };
 
 export type SpotifyMutationResponse = {
   result: SpotifyMutationResult;
@@ -1861,11 +1979,15 @@ async function removeTrackFromPlaylistWithToken(
   );
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err?.error?.message ?? "Falha ao remover faixa da playlist.");
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
+    throw new Error(
+      err?.error?.message ?? "Falha ao remover faixa da playlist.",
+    );
   }
 
-  const data = await response.json() as { snapshot_id?: string };
+  const data = (await response.json()) as { snapshot_id?: string };
   return data.snapshot_id ?? snapshotId;
 }
 
@@ -1896,11 +2018,15 @@ async function reorderPlaylistTracksWithToken(
   );
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err?.error?.message ?? "Falha ao reordenar faixas da playlist.");
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
+    throw new Error(
+      err?.error?.message ?? "Falha ao reordenar faixas da playlist.",
+    );
   }
 
-  const data = await response.json() as { snapshot_id?: string };
+  const data = (await response.json()) as { snapshot_id?: string };
   return data.snapshot_id ?? snapshotId;
 }
 
@@ -1924,8 +2050,12 @@ async function updatePlaylistDetailsWithToken(
   );
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err?.error?.message ?? "Falha ao atualizar detalhes da playlist.");
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
+    throw new Error(
+      err?.error?.message ?? "Falha ao atualizar detalhes da playlist.",
+    );
   }
 }
 
@@ -1941,7 +2071,7 @@ async function fetchPlaylistSnapshotIdWithToken(
     },
   );
   if (!response.ok) throw new Error("Falha ao buscar snapshot_id da playlist.");
-  const data = await response.json() as { snapshot_id?: string };
+  const data = (await response.json()) as { snapshot_id?: string };
   return data.snapshot_id ?? "";
 }
 
@@ -1969,7 +2099,9 @@ async function replacePlaylistTracksWithToken(
       const err = (await response.json().catch(() => ({}))) as {
         error?: { message?: string };
       };
-      throw new Error(err?.error?.message ?? `Spotify error ${response.status}`);
+      throw new Error(
+        err?.error?.message ?? `Spotify error ${response.status}`,
+      );
     }
 
     const data = (await response.json()) as { snapshot_id?: string };
@@ -1994,7 +2126,9 @@ async function replacePlaylistTracksWithToken(
     const err = (await putResponse.json().catch(() => ({}))) as {
       error?: { message?: string };
     };
-    throw new Error(err?.error?.message ?? `Spotify error ${putResponse.status}`);
+    throw new Error(
+      err?.error?.message ?? `Spotify error ${putResponse.status}`,
+    );
   }
 
   const putData = (await putResponse.json()) as { snapshot_id?: string };
@@ -2025,7 +2159,9 @@ async function replacePlaylistTracksWithToken(
       const err = (await postResponse.json().catch(() => ({}))) as {
         error?: { message?: string };
       };
-      throw new Error(err?.error?.message ?? `Spotify error ${postResponse.status}`);
+      throw new Error(
+        err?.error?.message ?? `Spotify error ${postResponse.status}`,
+      );
     }
 
     const postData = (await postResponse.json()) as { snapshot_id?: string };
@@ -2039,8 +2175,7 @@ export async function fetchSpotifyPlaylistTrackIds(
   playlistId: string,
 ): Promise<{
   result:
-    | { success: true; trackIds: string[] }
-    | { success: false; message: string };
+    { success: true; trackIds: string[] } | { success: false; message: string };
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
@@ -2082,20 +2217,20 @@ export async function addTrackToPlaylist(
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
-    const { data, refreshedToken } = await withSpotifyToken(async (
-      token,
-      playlistItemsPath,
-    ) => {
-      const result = await addTrackToPlaylistWithToken(
-        token,
-        playlistId,
-        trackUri,
-        playlistItemsPath,
-      );
-      clearSpotifyAccountPlaylistCache(token);
-      clearSpotifyEditablePlaylistCache(token, playlistId);
-      return result;
-    }, { requireWorkspace: true });
+    const { data, refreshedToken } = await withSpotifyToken(
+      async (token, playlistItemsPath) => {
+        const result = await addTrackToPlaylistWithToken(
+          token,
+          playlistId,
+          trackUri,
+          playlistItemsPath,
+        );
+        clearSpotifyAccountPlaylistCache(token);
+        clearSpotifyEditablePlaylistCache(token, playlistId);
+        return result;
+      },
+      { requireWorkspace: true },
+    );
 
     return {
       result: {
@@ -2122,8 +2257,7 @@ export async function removeTrackFromPlaylist(
   snapshotId: string,
 ): Promise<{
   result:
-    | { success: true; snapshotId: string }
-    | { success: false; message: string };
+    { success: true; snapshotId: string } | { success: false; message: string };
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
@@ -2159,7 +2293,8 @@ export async function removeTrackFromPlaylist(
     return {
       result: {
         success: false,
-        message: error instanceof Error ? error.message : "Erro ao remover faixa.",
+        message:
+          error instanceof Error ? error.message : "Erro ao remover faixa.",
       },
       refreshedToken: null,
     };
@@ -2171,7 +2306,11 @@ export async function reorderPlaylistTracks(
   rangeStart: number,
   insertBefore: number,
   snapshotId: string,
-): Promise<{ result: { success: true; snapshotId: string } | { success: false; message: string }; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+): Promise<{
+  result:
+    { success: true; snapshotId: string } | { success: false; message: string };
+  refreshedToken: SpotifyOAuthTokenResponse | null;
+}> {
   try {
     const { data: newSnapshotId, refreshedToken } = await withSpotifyToken(
       async (token, playlistItemsPath) => {
@@ -2187,12 +2326,16 @@ export async function reorderPlaylistTracks(
         return nextSnapshotId;
       },
     );
-    return { result: { success: true, snapshotId: newSnapshotId }, refreshedToken };
+    return {
+      result: { success: true, snapshotId: newSnapshotId },
+      refreshedToken,
+    };
   } catch (error) {
     return {
       result: {
         success: false,
-        message: error instanceof Error ? error.message : "Erro ao reordenar faixas.",
+        message:
+          error instanceof Error ? error.message : "Erro ao reordenar faixas.",
       },
       refreshedToken: null,
     };
@@ -2204,8 +2347,7 @@ export async function replacePlaylistTracks(
   uris: string[],
 ): Promise<{
   result:
-    | { success: true; snapshotId: string }
-    | { success: false; message: string };
+    { success: true; snapshotId: string } | { success: false; message: string };
   refreshedToken: SpotifyOAuthTokenResponse | null;
 }> {
   try {
@@ -2256,7 +2398,12 @@ export async function updatePlaylistDetails(
 ): Promise<SpotifyMutationResponse> {
   try {
     const { refreshedToken } = await withSpotifyToken(async (token) => {
-      await updatePlaylistDetailsWithToken(token, playlistId, name, description);
+      await updatePlaylistDetailsWithToken(
+        token,
+        playlistId,
+        name,
+        description,
+      );
       clearSpotifyReadCachesForToken(token);
     });
     return { result: { success: true }, refreshedToken };
@@ -2264,7 +2411,10 @@ export async function updatePlaylistDetails(
     return {
       result: {
         success: false,
-        message: error instanceof Error ? error.message : "Erro ao atualizar playlist.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erro ao atualizar playlist.",
       },
       refreshedToken: null,
     };
@@ -2273,7 +2423,10 @@ export async function updatePlaylistDetails(
 
 export async function fetchPlaylistSnapshotId(
   playlistId: string,
-): Promise<{ snapshotId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
+): Promise<{
+  snapshotId: string;
+  refreshedToken: SpotifyOAuthTokenResponse | null;
+}> {
   const { data: snapshotId, refreshedToken } = await withSpotifyToken((token) =>
     fetchPlaylistSnapshotIdWithToken(token, playlistId),
   );
@@ -2306,7 +2459,9 @@ async function createPlaylistWithToken(
   );
 
   if (!response.ok) {
-    const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    const err = (await response.json().catch(() => ({}))) as {
+      error?: { message?: string };
+    };
     throw new Error(err.error?.message ?? "Erro ao criar playlist.");
   }
 
@@ -2393,35 +2548,37 @@ export async function createSpotifyPlaylist(
   isPublic: boolean,
   base64CoverJpeg: string | null,
   trackUris: string[] = [],
-): Promise<{ playlistId: string; refreshedToken: SpotifyOAuthTokenResponse | null }> {
-  const { data: playlistId, refreshedToken } = await withSpotifyToken(async (
-    token,
-    playlistItemsPath,
-  ) => {
-    const user = await fetchSpotifyCurrentUserWithToken(token);
-    const id = await createPlaylistWithToken(
-      token,
-      user.id ?? "",
-      name,
-      description,
-      isPublic,
-      playlistItemsPath,
-    );
-    if (base64CoverJpeg) {
-      await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
-    }
-    const uniqueTrackUris = Array.from(new Set(trackUris));
-    if (uniqueTrackUris.length > 0) {
-      await replacePlaylistTracksWithToken(
+): Promise<{
+  playlistId: string;
+  refreshedToken: SpotifyOAuthTokenResponse | null;
+}> {
+  const { data: playlistId, refreshedToken } = await withSpotifyToken(
+    async (token, playlistItemsPath) => {
+      const user = await fetchSpotifyCurrentUserWithToken(token);
+      const id = await createPlaylistWithToken(
         token,
-        id,
-        uniqueTrackUris,
+        user.id ?? "",
+        name,
+        description,
+        isPublic,
         playlistItemsPath,
       );
-    }
-    clearSpotifyReadCachesForToken(token);
-    return id;
-  });
+      if (base64CoverJpeg) {
+        await uploadPlaylistCoverWithToken(token, id, base64CoverJpeg);
+      }
+      const uniqueTrackUris = Array.from(new Set(trackUris));
+      if (uniqueTrackUris.length > 0) {
+        await replacePlaylistTracksWithToken(
+          token,
+          id,
+          uniqueTrackUris,
+          playlistItemsPath,
+        );
+      }
+      clearSpotifyReadCachesForToken(token);
+      return id;
+    },
+  );
 
   return { playlistId, refreshedToken };
 }

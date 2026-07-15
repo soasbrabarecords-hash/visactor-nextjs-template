@@ -109,7 +109,7 @@ function scoreTone(score: number, inverse = false) {
 export function MusicIntelligenceDashboard({
   data,
 }: MusicIntelligenceDashboardProps) {
-  const hero = data.nextBestOpportunity;
+  const hero = data.markets.BR.nextBestOpportunity;
   const baseIsReady = data.summary.status === "ready";
   const scoreRows = hero
     ? [
@@ -134,22 +134,25 @@ export function MusicIntelligenceDashboard({
     : undefined;
   const queues = [
     {
-      key: "add",
-      title: "Oportunidades para adicionar",
-      description: "Crescimento, frescor e risco controlado.",
-      items: data.addNow,
+      key: "br",
+      title: "Radar Brasil",
+      description: "O que está ganhando força no Top 200 BR.",
+      items: [...data.markets.BR.addNow, ...data.markets.BR.watch].slice(0, 6),
       accent: "emerald" as const,
       icon: Flame,
-      empty: "Nenhuma faixa atingiu o gate de adição agora.",
+      empty: "Nenhuma oportunidade brasileira atingiu o gate agora.",
     },
     {
-      key: "watch",
-      title: "Observar",
-      description: "Sinais que ainda estão ganhando base.",
-      items: data.watch,
-      accent: "amber" as const,
-      icon: Eye,
-      empty: "Nenhum sinal em formação nesta leitura.",
+      key: "global",
+      title: "Radar Global",
+      description: "Tendências internacionais calculadas separadamente.",
+      items: [
+        ...data.markets.GLOBAL.addNow,
+        ...data.markets.GLOBAL.watch,
+      ].slice(0, 6),
+      accent: "sky" as const,
+      icon: Globe2,
+      empty: "Nenhuma oportunidade global atingiu o gate agora.",
     },
     {
       key: "review",
@@ -165,8 +168,8 @@ export function MusicIntelligenceDashboard({
       title: "Crossover BR + Global",
       description: "Força combinada nos dois mercados.",
       items: data.crossover,
-      accent: "sky" as const,
-      icon: Globe2,
+      accent: "amber" as const,
+      icon: Eye,
       empty: "Nenhum crossover forte na data mais recente.",
     },
   ];
@@ -187,8 +190,8 @@ export function MusicIntelligenceDashboard({
                 Oportunidade musical, explicada.
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60 tablet:text-[15px]">
-                Sinais reais dos charts BR e Global organizados para decidir o
-                que adicionar, observar ou revisar hoje.
+                Oportunidades do Brasil e do Global calculadas em filas
+                separadas, com crossover apenas como sinal adicional.
               </p>
             </div>
 
@@ -330,7 +333,7 @@ export function MusicIntelligenceDashboard({
               <div className="relative flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300/80">
                   <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.9)]" />
-                  Próxima melhor oportunidade
+                  Melhor oportunidade no Brasil
                 </div>
                 {hero ? (
                   <span className="rounded-full bg-white/[0.055] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/55 ring-1 ring-inset ring-white/[0.08]">
@@ -493,10 +496,9 @@ export function MusicIntelligenceDashboard({
                   Leitura explicável
                 </div>
                 <p className="mt-2 max-w-4xl text-xs leading-5 text-white/60">
-                  O score combina posição atual, velocidade de subida, frescor,
-                  estabilidade, presença em BR + Global e o inverso do risco de
-                  ciclo. Nenhum gênero ou fit de playlist é inventado quando a
-                  base não possui esse dado.
+                  Cada radar usa posição, subida, frescor e estabilidade do seu
+                  próprio mercado. BR e Global não disputam mais a mesma fila; o
+                  crossover aparece apenas como contexto adicional.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 lg:justify-end">

@@ -1,28 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   ExternalLink,
   GripVertical,
   Loader2,
   Minus,
   Music2,
-  Sparkles,
-  Trash2,
-  Check,
-  X,
   Pencil,
   Save,
+  Sparkles,
+  Trash2,
+  X,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
 import { Button } from "@/components/ui/button";
 import PlaylistIntelligencePanel from "@/components/workspace/playlist-intelligence-panel";
 import ResizableTableOverlay from "@/components/workspace/resizable-table-overlay";
-import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
-import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 import { buildPlaylistIntelligence } from "@/lib/playlist-intelligence";
-import type { KworbTrackData } from "@/app/api/kworb/track/[trackId]/route";
+import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
+import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,12 @@ type ChartData = {
   positionChange: number | null;
   movement: "up" | "down" | "stable" | "new";
   streams: number | null;
+};
+
+type PopularityReading = {
+  value: number;
+  source: "spotify" | "snapshot" | "signals";
+  label: string;
 };
 
 type TimedCacheEntry<T> = {
@@ -88,13 +94,11 @@ async function getKworbTrack(trackId: string) {
     kworbCache.set(trackId, {
       value: data,
       expiresAt:
-        Date.now() +
-        (isEmpty ? KWORB_EMPTY_CACHE_TTL_MS : KWORB_CACHE_TTL_MS),
+        Date.now() + (isEmpty ? KWORB_EMPTY_CACHE_TTL_MS : KWORB_CACHE_TTL_MS),
     });
     while (kworbCache.size > MAX_KWORB_CACHE_SIZE) {
       const oldestTrackId = kworbCache.keys().next().value as
-        | string
-        | undefined;
+        string | undefined;
       if (!oldestTrackId) break;
       kworbCache.delete(oldestTrackId);
     }
@@ -134,7 +138,9 @@ async function getLatestChartMap() {
     const latestDate = datesData.dates?.[0];
     if (!latestDate) return new Map<string, ChartData>();
 
-    const snapRes = await fetch(`/api/charts/snapshot?date=${latestDate}&country=BR`);
+    const snapRes = await fetch(
+      `/api/charts/snapshot?date=${latestDate}&country=BR`,
+    );
     if (!snapRes.ok) return new Map<string, ChartData>();
 
     const snapData = (await snapRes.json()) as {
@@ -190,7 +196,13 @@ function formatStreams(n: number | null): string {
   return n.toString();
 }
 
-function ChartMovement({ movement, positionChange }: { movement: ChartData["movement"]; positionChange: number | null }) {
+function ChartMovement({
+  movement,
+  positionChange,
+}: {
+  movement: ChartData["movement"];
+  positionChange: number | null;
+}) {
   if (movement === "new") {
     return (
       <span className="inline-flex items-center gap-0.5 rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:bg-purple-950 dark:text-purple-300">
@@ -203,7 +215,9 @@ function ChartMovement({ movement, positionChange }: { movement: ChartData["move
     return (
       <span className="inline-flex items-center gap-0.5 text-green-600 dark:text-green-400">
         <ArrowUp className="h-3 w-3" strokeWidth={2.5} />
-        <span className="text-[10px] font-semibold">{Math.abs(positionChange ?? 0)}</span>
+        <span className="text-[10px] font-semibold">
+          {Math.abs(positionChange ?? 0)}
+        </span>
       </span>
     );
   }
@@ -211,7 +225,9 @@ function ChartMovement({ movement, positionChange }: { movement: ChartData["move
     return (
       <span className="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400">
         <ArrowDown className="h-3 w-3" strokeWidth={2.5} />
-        <span className="text-[10px] font-semibold">{Math.abs(positionChange ?? 0)}</span>
+        <span className="text-[10px] font-semibold">
+          {Math.abs(positionChange ?? 0)}
+        </span>
       </span>
     );
   }
@@ -222,6 +238,64 @@ function formatDelta(n: number | null, trend: KworbTrackData["trend"]): string {
   if (n === null || trend === null) return "";
   if (trend === "same" || n === 0) return "";
   return `${trend === "up" ? "+" : ""}${formatStreams(n)}`;
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getPopularityReading(
+  track: TrackWithStreams,
+  chartData: ChartData | null,
+): PopularityReading | null {
+  if (track.popularity > 0) {
+    return {
+      value: clampScore(track.popularity),
+      source: track.popularitySource === "snapshot" ? "snapshot" : "spotify",
+      label:
+        track.popularitySource === "snapshot"
+          ? "Última popularidade salva"
+          : "Popularidade Spotify",
+    };
+  }
+
+  const signalScores: number[] = [];
+
+  if (chartData?.position) {
+    const positionScore =
+      100 - ((Math.min(200, chartData.position) - 1) / 199) * 70;
+    const movementBonus =
+      chartData.movement === "new"
+        ? 8
+        : chartData.movement === "up"
+          ? Math.min(8, Math.max(0, chartData.positionChange ?? 0) * 0.25)
+          : chartData.movement === "down"
+            ? -Math.min(8, Math.abs(chartData.positionChange ?? 0) * 0.25)
+            : 0;
+    signalScores.push(clampScore(positionScore + movementBonus));
+  }
+
+  const dailyStreams = track.streams?.dailyStreams ?? null;
+  if (dailyStreams && dailyStreams > 0) {
+    signalScores.push(clampScore(35 + 25 * Math.log10(dailyStreams / 100_000)));
+  }
+
+  const totalStreams = track.streams?.totalStreams ?? null;
+  if (totalStreams && totalStreams > 0) {
+    signalScores.push(
+      clampScore(35 + 15 * Math.log10(totalStreams / 10_000_000)),
+    );
+  }
+
+  if (signalScores.length === 0) {
+    return null;
+  }
+
+  return {
+    value: Math.max(...signalScores),
+    source: "signals",
+    label: "Índice estimado por chart e streams",
+  };
 }
 
 function withEditorState(
@@ -258,7 +332,10 @@ function findVerticalScrollContainer(element: HTMLElement) {
 // ─── EditableField ────────────────────────────────────────────────────────────
 
 export function EditableField({
-  value, onSave, multiline = false, placeholder = "",
+  value,
+  onSave,
+  multiline = false,
+  placeholder = "",
 }: {
   value: string;
   onSave: (v: string) => Promise<void>;
@@ -270,10 +347,15 @@ export function EditableField({
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
 
   async function handleSave() {
-    if (draft.trim() === value) { setEditing(false); return; }
+    if (draft.trim() === value) {
+      setEditing(false);
+      return;
+    }
     setSaving(true);
     await onSave(draft.trim());
     setSaving(false);
@@ -281,33 +363,80 @@ export function EditableField({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !multiline) { e.preventDefault(); void handleSave(); }
-    if (e.key === "Escape") { setDraft(value); setEditing(false); }
+    if (e.key === "Enter" && !multiline) {
+      e.preventDefault();
+      void handleSave();
+    }
+    if (e.key === "Escape") {
+      setDraft(value);
+      setEditing(false);
+    }
   }
 
   if (!editing) {
     return (
-      <button type="button" onClick={() => { setDraft(value); setEditing(true); }}
-        className="group flex items-center gap-2 text-left hover:opacity-80">
-        <span>{value || <span className="italic text-muted-foreground">{placeholder}</span>}</span>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+        className="group flex items-center gap-2 text-left hover:opacity-80"
+      >
+        <span>
+          {value || (
+            <span className="italic text-muted-foreground">{placeholder}</span>
+          )}
+        </span>
         <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </button>
     );
   }
 
-  const cls = "w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+  const cls =
+    "w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
   return (
     <div className="flex items-start gap-2">
-      {multiline
-        ? <textarea ref={inputRef as React.Ref<HTMLTextAreaElement>} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} rows={2} placeholder={placeholder} className={cls} />
-        : <input ref={inputRef as React.Ref<HTMLInputElement>} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder={placeholder} className={cls} />
-      }
-      <button type="button" onClick={() => void handleSave()} disabled={saving}
-        className="mt-0.5 rounded-md p-1.5 text-green-500 hover:bg-green-500/10 disabled:opacity-50">
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+      {multiline ? (
+        <textarea
+          ref={inputRef as React.Ref<HTMLTextAreaElement>}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={2}
+          placeholder={placeholder}
+          className={cls}
+        />
+      ) : (
+        <input
+          ref={inputRef as React.Ref<HTMLInputElement>}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className={cls}
+        />
+      )}
+      <button
+        type="button"
+        onClick={() => void handleSave()}
+        disabled={saving}
+        className="mt-0.5 rounded-md p-1.5 text-green-500 hover:bg-green-500/10 disabled:opacity-50"
+      >
+        {saving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Check className="h-4 w-4" />
+        )}
       </button>
-      <button type="button" onClick={() => { setDraft(value); setEditing(false); }}
-        className="mt-0.5 rounded-md p-1.5 text-muted-foreground hover:bg-muted/40">
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(value);
+          setEditing(false);
+        }}
+        className="mt-0.5 rounded-md p-1.5 text-muted-foreground hover:bg-muted/40"
+      >
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -389,28 +518,33 @@ export default function PlaylistEditor({
   const saveRequest = useRef<AbortController | null>(null);
   const ignoreNextClick = useRef(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
-  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(
+    null,
+  );
 
   // Chart snapshot data
   const [chartMap, setChartMap] = useState<Map<string, ChartData>>(
     () => getCachedChartMap() ?? new Map(),
   );
-  const [chartLoading, setChartLoading] = useState(
-    () => !getCachedChartMap(),
-  );
+  const [chartLoading, setChartLoading] = useState(() => !getCachedChartMap());
 
   // Outros estados
-  const [deletingIndices, setDeletingIndices] = useState<Set<number>>(new Set());
+  const [deletingIndices, setDeletingIndices] = useState<Set<number>>(
+    new Set(),
+  );
   const [pendingReorder, setPendingReorder] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => () => {
-    if (autoScrollFrame.current !== null) {
-      window.cancelAnimationFrame(autoScrollFrame.current);
-    }
-    saveRequest.current?.abort();
-  }, []);
+  useEffect(
+    () => () => {
+      if (autoScrollFrame.current !== null) {
+        window.cancelAnimationFrame(autoScrollFrame.current);
+      }
+      saveRequest.current?.abort();
+    },
+    [],
+  );
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -435,7 +569,11 @@ export default function PlaylistEditor({
           const idx = batch.indexOf(t.id);
           if (idx === -1) return t;
           const result = results[idx];
-          return { ...t, streams: result.status === "fulfilled" ? result.value : null, streamsLoading: false };
+          return {
+            ...t,
+            streams: result.status === "fulfilled" ? result.value : null,
+            streamsLoading: false,
+          };
         });
       setTracks(update);
       setSavedTracks(update);
@@ -550,7 +688,8 @@ export default function PlaylistEditor({
     const indicator = resolveDropIndicator(clientY);
     if (indicator) {
       setDropIndicator((current) =>
-        current?.slot === indicator.slot && Math.abs(current.top - indicator.top) < 0.5
+        current?.slot === indicator.slot &&
+        Math.abs(current.top - indicator.top) < 0.5
           ? current
           : indicator,
       );
@@ -581,12 +720,14 @@ export default function PlaylistEditor({
 
       const container = scrollContainer.current;
       const pointerY = lastPointerY.current;
-      const viewportTop = container instanceof HTMLElement
-        ? container.getBoundingClientRect().top
-        : 0;
-      const viewportBottom = container instanceof HTMLElement
-        ? container.getBoundingClientRect().bottom
-        : window.innerHeight;
+      const viewportTop =
+        container instanceof HTMLElement
+          ? container.getBoundingClientRect().top
+          : 0;
+      const viewportBottom =
+        container instanceof HTMLElement
+          ? container.getBoundingClientRect().bottom
+          : window.innerHeight;
       const edge = Math.min(112, (viewportBottom - viewportTop) * 0.18);
       let speed = 0;
 
@@ -649,7 +790,9 @@ export default function PlaylistEditor({
     dragStartY.current = e.clientY;
     lastPointerY.current = e.clientY;
     dragStarted.current = false;
-    scrollContainer.current = findVerticalScrollContainer(e.currentTarget as HTMLElement);
+    scrollContainer.current = findVerticalScrollContainer(
+      e.currentTarget as HTMLElement,
+    );
     setDragFrom(index);
     setDropIndicator(null);
     startAutoScroll();
@@ -686,7 +829,8 @@ export default function PlaylistEditor({
         indicator.slot,
       );
       const orderChanged = nextTracks.some(
-        (track, trackIndex) => track.instanceKey !== tracks[trackIndex]?.instanceKey,
+        (track, trackIndex) =>
+          track.instanceKey !== tracks[trackIndex]?.instanceKey,
       );
 
       if (orderChanged) {
@@ -719,12 +863,15 @@ export default function PlaylistEditor({
 
     try {
       const uris = nextTracks.map((t) => `spotify:track:${t.id}`);
-      const res = await fetch(`/api/spotify/playlists/${playlistId}/tracks/reorder-full`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uris, snapshotId }),
-        signal: controller.signal,
-      });
+      const res = await fetch(
+        `/api/spotify/playlists/${playlistId}/tracks/reorder-full`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uris, snapshotId }),
+          signal: controller.signal,
+        },
+      );
       const responseText = await res.text();
       const data = (() => {
         try {
@@ -746,7 +893,8 @@ export default function PlaylistEditor({
         );
       }
 
-      if (!res.ok || !data.success) throw new Error(data.message ?? "Erro ao salvar ordem.");
+      if (!res.ok || !data.success)
+        throw new Error(data.message ?? "Erro ao salvar ordem.");
       if (data.snapshotId) setSnapshotId(data.snapshotId);
       setTracks([...nextTracks]);
       setSavedTracks([...nextTracks]);
@@ -814,22 +962,31 @@ export default function PlaylistEditor({
         for (const idx of sortedIndices) {
           const track = tracks[idx];
           if (!track) continue;
-          const res = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ trackUri: `spotify:track:${track.id}`, snapshotId: currentSnapshot }),
-          });
+          const res = await fetch(
+            `/api/spotify/playlists/${playlistId}/tracks`,
+            {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                trackUri: `spotify:track:${track.id}`,
+                snapshotId: currentSnapshot,
+              }),
+            },
+          );
           const data = (await res.json()) as {
             success?: boolean;
             message?: string;
             snapshotId?: string;
           };
-          if (!res.ok || !data.success) throw new Error(data.message ?? "Erro ao remover faixa.");
+          if (!res.ok || !data.success)
+            throw new Error(data.message ?? "Erro ao remover faixa.");
           deletedIndices.add(idx);
           if (data.snapshotId) currentSnapshot = data.snapshotId;
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao remover faixas.");
+        setError(
+          err instanceof Error ? err.message : "Erro ao remover faixas.",
+        );
       } finally {
         if (deletedIndices.size > 0) {
           const updated = (prev: TrackWithStreams[]) =>
@@ -850,10 +1007,16 @@ export default function PlaylistEditor({
   // ── Teclado ───────────────────────────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (document.activeElement instanceof HTMLInputElement ||
-          document.activeElement instanceof HTMLTextAreaElement) return;
+      if (
+        document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement
+      )
+        return;
 
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedSet.size > 0) {
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedSet.size > 0
+      ) {
         e.preventDefault();
         void handleDelete(selectedSet);
         return;
@@ -886,7 +1049,8 @@ export default function PlaylistEditor({
         e.preventDefault();
         if (lastClickedIndex.current !== null) {
           const anchor = lastClickedIndex.current;
-          const currentMax = selectedSet.size > 0 ? Math.max(...selectedSet) : anchor;
+          const currentMax =
+            selectedSet.size > 0 ? Math.max(...selectedSet) : anchor;
           const next = Math.min(currentMax + 1, tracks.length - 1);
           const from = Math.min(anchor, next);
           const to = Math.max(anchor, next);
@@ -898,7 +1062,8 @@ export default function PlaylistEditor({
         e.preventDefault();
         if (lastClickedIndex.current !== null) {
           const anchor = lastClickedIndex.current;
-          const currentMin = selectedSet.size > 0 ? Math.min(...selectedSet) : anchor;
+          const currentMin =
+            selectedSet.size > 0 ? Math.min(...selectedSet) : anchor;
           const next = Math.max(currentMin - 1, 0);
           const from = Math.min(anchor, next);
           const to = Math.max(anchor, next);
@@ -918,36 +1083,42 @@ export default function PlaylistEditor({
 
   const isActivelyDragging = dragFrom !== null && dropIndicator !== null;
   const intelligence = useMemo(
-    () => buildPlaylistIntelligence(
-      tracks.map((track, index) => {
-        const chartData = chartMap.get(track.id) ?? null;
+    () =>
+      buildPlaylistIntelligence(
+        tracks.map((track, index) => {
+          const chartData = chartMap.get(track.id) ?? null;
+          const popularityReading = getPopularityReading(track, chartData);
 
-        return {
-          id: track.id,
-          name: track.name,
-          artists: track.artists,
-          imageUrl: track.imageUrl,
-          currentIndex: index,
-          popularity: track.popularity,
-          chartPosition: chartData?.position ?? null,
-          chartMovement: chartData?.movement ?? null,
-          chartPositionChange: chartData?.positionChange ?? null,
-          chartStreams: chartData?.streams ?? null,
-          dailyStreams: track.streams?.dailyStreams ?? null,
-          dailyDelta: track.streams?.dailyDelta ?? null,
-          streamTrend: track.streams?.trend ?? null,
-          streamsLoading: track.streamsLoading,
-          signalsLoading: chartLoading || track.streamsLoading,
-        };
-      }),
-    ),
+          return {
+            id: track.id,
+            name: track.name,
+            artists: track.artists,
+            imageUrl: track.imageUrl,
+            currentIndex: index,
+            popularity: popularityReading?.value ?? null,
+            chartPosition: chartData?.position ?? null,
+            chartMovement: chartData?.movement ?? null,
+            chartPositionChange: chartData?.positionChange ?? null,
+            chartStreams: chartData?.streams ?? null,
+            dailyStreams: track.streams?.dailyStreams ?? null,
+            dailyDelta: track.streams?.dailyDelta ?? null,
+            streamTrend: track.streams?.trend ?? null,
+            streamsLoading: track.streamsLoading,
+            signalsLoading: chartLoading || track.streamsLoading,
+          };
+        }),
+      ),
     [chartLoading, chartMap, tracks],
   );
   const decisionByTrackKey = useMemo(
-    () => new Map(intelligence.decisions.map((decision) => [decision.trackKey, decision])),
+    () =>
+      new Map(
+        intelligence.decisions.map((decision) => [decision.trackKey, decision]),
+      ),
     [intelligence.decisions],
   );
-  const isIntelligenceEnriching = chartLoading || tracks.some((track) => track.streamsLoading);
+  const isIntelligenceEnriching =
+    chartLoading || tracks.some((track) => track.streamsLoading);
   async function handleApplySuggestedOrder() {
     const trackByKey = new Map(
       tracks.map((track, index) => [`${track.id}:${index}`, track]),
@@ -958,7 +1129,9 @@ export default function PlaylistEditor({
       .filter((track): track is TrackWithStreams => Boolean(track));
 
     if (suggestedTracks.length !== tracks.length) {
-      setError("Nao foi possivel montar a ordem sugerida. Recarregue a playlist e tente de novo.");
+      setError(
+        "Nao foi possivel montar a ordem sugerida. Recarregue a playlist e tente de novo.",
+      );
       return false;
     }
 
@@ -976,18 +1149,36 @@ export default function PlaylistEditor({
       />
 
       {/* Ações da ordenação manual — o skin posiciona este bloco no topo do editor. */}
-      <div data-playlist-order-actions className="flex flex-wrap items-center justify-between gap-3">
+      <div
+        data-playlist-order-actions
+        className="flex flex-wrap items-center justify-between gap-3"
+      >
         <div className="flex items-center gap-2">
           {pendingReorder ? (
             <>
               <span className="text-xs font-medium text-yellow-500">
                 Ordem alterada — ainda não salva
               </span>
-              <Button type="button" size="sm" variant="outline" onClick={handleCancelReorder} disabled={saving}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleCancelReorder}
+                disabled={saving}
+              >
                 <X className="h-3.5 w-3.5" /> Cancelar
               </Button>
-              <Button type="button" size="sm" onClick={() => void handleConfirmReorder()} disabled={saving}>
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleConfirmReorder()}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
                 Salvar nova ordem
               </Button>
             </>
@@ -998,9 +1189,19 @@ export default function PlaylistEditor({
       {/* Guia curto de seleção e estado atual */}
       <div className="grid gap-2 border-y border-border/70 py-2.5 text-xs text-muted-foreground tablet:grid-cols-[1fr_auto] tablet:items-center">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <span><strong className="font-semibold text-foreground">Click</strong> seleciona</span>
-          <span><strong className="font-semibold text-foreground">Shift + click</strong> cria um bloco</span>
-          <span className="inline-flex items-center gap-1"><GripVertical className="h-3.5 w-3.5" /> arraste até a linha azul</span>
+          <span>
+            <strong className="font-semibold text-foreground">Click</strong>{" "}
+            seleciona
+          </span>
+          <span>
+            <strong className="font-semibold text-foreground">
+              Shift + click
+            </strong>{" "}
+            cria um bloco
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <GripVertical className="h-3.5 w-3.5" /> arraste até a linha azul
+          </span>
         </div>
         <div className="font-medium tabular-nums text-foreground">
           {selectedSet.size > 0
@@ -1034,23 +1235,32 @@ export default function PlaylistEditor({
             <span className="absolute -left-0.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary" />
           </div>
         ) : null}
-        <table ref={tableRef} className="w-full divide-y divide-border text-left">
+        <table
+          ref={tableRef}
+          className="w-full divide-y divide-border text-left"
+        >
           <thead className="bg-muted/20">
             <tr className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
               <th className="w-[72px] px-2 py-3 text-center sm:px-4">#</th>
               <th className="px-3 py-3 sm:px-4">Música</th>
-              <th className="hidden px-3 py-3 sm:px-4 tablet:table-cell">Pop.</th>
+              <th className="hidden px-3 py-3 sm:px-4 tablet:table-cell">
+                Pop.
+              </th>
               <th className="hidden px-4 py-3 desktop:table-cell">Duração</th>
               <th className="px-3 py-3 sm:px-4">
                 <span className="flex items-center gap-1">
                   Streams
-                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">kworb</span>
+                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">
+                    kworb
+                  </span>
                 </span>
               </th>
               <th className="hidden px-4 py-3 laptop:table-cell">
                 <span className="flex items-center gap-1">
                   Chart BR
-                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">top 200</span>
+                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] normal-case tracking-normal">
+                    top 200
+                  </span>
                 </span>
               </th>
               <th className="px-3 py-3 sm:px-4">Ações</th>
@@ -1058,37 +1268,56 @@ export default function PlaylistEditor({
             </tr>
           </thead>
           <tbody ref={tbodyRef} className="divide-y divide-border">
-            {tracks.length > 0 ? tracks.map((track, index) => {
-              const isSelected = selectedSet.has(index);
-              const isDraggingThis = dragFrom === index;
-              const isDeleting = deletingIndices.has(index);
-              const decision = decisionByTrackKey.get(`${track.id}:${index}`);
+            {tracks.length > 0 ? (
+              tracks.map((track, index) => {
+                const isSelected = selectedSet.has(index);
+                const isDraggingThis = dragFrom === index;
+                const isDeleting = deletingIndices.has(index);
+                const decision = decisionByTrackKey.get(`${track.id}:${index}`);
+                const popularityReading = getPopularityReading(
+                  track,
+                  chartMap.get(track.id) ?? null,
+                );
 
-              return (
-                <tr
-                  key={track.instanceKey}
-                  data-selected={isSelected ? "true" : undefined}
-                  onClick={(e) => handleRowClick(e, index)}
-                  onPointerDown={(e) => handlePointerDown(e, index)}
-                  onPointerMove={(e) => handlePointerMove(e, index)}
-                  onPointerUp={(e) => handlePointerUp(e, index)}
-                  onPointerCancel={() => handlePointerCancel(index)}
-                  style={{
-                    opacity: isDeleting ? 0.3 : isActivelyDragging && isSelected ? 0.58 : 1,
-                    cursor: isDraggingThis && isActivelyDragging ? "grabbing" : "default",
-                    position: "relative",
-                    zIndex: isSelected && isActivelyDragging ? 20 : isActivelyDragging ? 1 : "auto",
-                  }}
-                  className={[
-                    "group h-16 select-none overflow-hidden",
-                    isDeleting ? "pointer-events-none" : "",
-                  ].filter(Boolean).join(" ")}
-                >
-                  {/* # */}
-                  <td className="h-16 w-[72px] overflow-hidden px-2 py-0 align-middle text-center text-sm tabular-nums text-muted-foreground sm:px-4">
-                    {isDeleting
-                      ? <Loader2 className="mx-auto h-4 w-4 animate-spin" />
-                      : (
+                return (
+                  <tr
+                    key={track.instanceKey}
+                    data-selected={isSelected ? "true" : undefined}
+                    onClick={(e) => handleRowClick(e, index)}
+                    onPointerDown={(e) => handlePointerDown(e, index)}
+                    onPointerMove={(e) => handlePointerMove(e, index)}
+                    onPointerUp={(e) => handlePointerUp(e, index)}
+                    onPointerCancel={() => handlePointerCancel(index)}
+                    style={{
+                      opacity: isDeleting
+                        ? 0.3
+                        : isActivelyDragging && isSelected
+                          ? 0.58
+                          : 1,
+                      cursor:
+                        isDraggingThis && isActivelyDragging
+                          ? "grabbing"
+                          : "default",
+                      position: "relative",
+                      zIndex:
+                        isSelected && isActivelyDragging
+                          ? 20
+                          : isActivelyDragging
+                            ? 1
+                            : "auto",
+                    }}
+                    className={[
+                      "group h-16 select-none overflow-hidden",
+                      isDeleting ? "pointer-events-none" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {/* # */}
+                    <td className="h-16 w-[72px] overflow-hidden px-2 py-0 text-center align-middle text-sm tabular-nums text-muted-foreground sm:px-4">
+                      {isDeleting ? (
+                        <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                      ) : (
                         <span
                           className={[
                             "inline-block w-[3ch] text-center",
@@ -1097,139 +1326,214 @@ export default function PlaylistEditor({
                         >
                           {index + 1}
                         </span>
-                      )
-                    }
-                  </td>
+                      )}
+                    </td>
 
-                  {/* Música — capa + título + artistas (estilo Spotify) */}
-                  <td className="h-16 min-w-0 overflow-hidden px-3 py-0 align-middle sm:px-4">
-                    <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-                      <div
-                        className={["flex h-11 w-11 shrink-0 items-center justify-center rounded-md border bg-muted sm:rounded-xl",
-                          isSelected ? "border-primary/40" : "border-border"].join(" ")}
-                        style={coverStyle(track.imageUrl)}
-                      />
-                      <div className="min-w-0 flex-1 overflow-hidden">
+                    {/* Música — capa + título + artistas (estilo Spotify) */}
+                    <td className="h-16 min-w-0 overflow-hidden px-3 py-0 align-middle sm:px-4">
+                      <div className="flex min-w-0 items-center gap-3 overflow-hidden">
                         <div
                           className={[
-                            "overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold leading-tight sm:text-[15px]",
-                            isSelected ? "text-primary" : "",
+                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-md border bg-muted sm:rounded-xl",
+                            isSelected ? "border-primary/40" : "border-border",
                           ].join(" ")}
-                          title={track.name}
-                        >
-                          {track.name}
-                        </div>
-                        <div
-                          className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground sm:text-[13px]"
-                          title={track.artists}
-                        >
-                          {track.artists}
-                        </div>
-                        {decision && (
-                          <div className="mt-1 flex min-w-0 items-center gap-1.5">
-                            <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                              {decision.label}
-                            </span>
-                            <span className="hidden truncate text-[10px] font-medium text-muted-foreground laptop:inline">
-                              sugerida #{decision.suggestedIndex + 1} | {decision.score}%
-                            </span>
+                          style={coverStyle(track.imageUrl)}
+                        />
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div
+                            className={[
+                              "overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold leading-tight sm:text-[15px]",
+                              isSelected ? "text-primary" : "",
+                            ].join(" ")}
+                            title={track.name}
+                          >
+                            {track.name}
                           </div>
-                        )}
+                          <div
+                            className="overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground sm:text-[13px]"
+                            title={track.artists}
+                          >
+                            {track.artists}
+                          </div>
+                          {decision && (
+                            <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                              <span className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                                {decision.label}
+                              </span>
+                              <span className="hidden truncate text-[10px] font-medium text-muted-foreground laptop:inline">
+                                sugerida #{decision.suggestedIndex + 1} |{" "}
+                                {decision.score}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Popularidade */}
-                  <td className="hidden h-16 overflow-hidden px-3 py-0 align-middle sm:px-4 tablet:table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-muted laptop:block laptop:w-20">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${track.popularity}%` }} />
+                    {/* Popularidade */}
+                    <td className="hidden h-16 overflow-hidden px-3 py-0 align-middle sm:px-4 tablet:table-cell">
+                      <div
+                        className="flex items-center gap-2"
+                        title={
+                          popularityReading?.label ??
+                          "Popularidade indisponível para este app Spotify"
+                        }
+                      >
+                        <div className="hidden h-1.5 w-14 overflow-hidden rounded-full bg-muted laptop:block laptop:w-20">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{
+                              width: `${popularityReading?.value ?? 0}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col">
+                          <span className="text-sm font-medium tabular-nums">
+                            {popularityReading?.value ?? "—"}
+                          </span>
+                          {popularityReading?.source === "signals" ? (
+                            <span className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                              sinal
+                            </span>
+                          ) : popularityReading?.source === "snapshot" ? (
+                            <span className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+                              histórico
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <span className="text-sm font-medium tabular-nums">{track.popularity}</span>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Duração — escondida em mobile */}
-                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground desktop:table-cell">
-                    {track.durationLabel}
-                  </td>
+                    {/* Duração — escondida em mobile */}
+                    <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle text-sm tabular-nums text-muted-foreground desktop:table-cell">
+                      {track.durationLabel}
+                    </td>
 
-                  {/* Streams — permanece visível */}
-                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
-                    {track.streamsLoading
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
-                      : (
+                    {/* Streams — permanece visível */}
+                    <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
+                      {track.streamsLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
+                      ) : (
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-sm font-semibold tabular-nums">
                             {formatStreams(track.streams?.dailyStreams ?? null)}
                           </span>
-                          {track.streams?.trend && track.streams.trend !== "same" && (
-                            <span className={["text-xs tabular-nums",
-                              track.streams.trend === "up" ? "text-green-500" : "text-red-400"].join(" ")}>
-                              {formatDelta(track.streams.dailyDelta ?? null, track.streams.trend)}
-                            </span>
-                          )}
+                          {track.streams?.trend &&
+                            track.streams.trend !== "same" && (
+                              <span
+                                className={[
+                                  "text-xs tabular-nums",
+                                  track.streams.trend === "up"
+                                    ? "text-green-500"
+                                    : "text-red-400",
+                                ].join(" ")}
+                              >
+                                {formatDelta(
+                                  track.streams.dailyDelta ?? null,
+                                  track.streams.trend,
+                                )}
+                              </span>
+                            )}
                         </div>
-                      )
-                    }
-                  </td>
+                      )}
+                    </td>
 
-                  {/* Chart BR — escondida em mobile/tablet */}
-                  <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle laptop:table-cell">
-                    {chartLoading ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/40" />
-                    ) : (() => {
-                      const cd = chartMap.get(track.id) ?? null;
-                      if (!cd) {
-                        return <span className="text-sm text-muted-foreground">—</span>;
-                      }
-                      return (
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold tabular-nums">#{cd.position}</span>
-                            <ChartMovement movement={cd.movement} positionChange={cd.positionChange} />
-                          </div>
-                          {cd.streams !== null && (
-                            <span className="text-[10px] tabular-nums text-muted-foreground">
-                              {formatStreams(cd.streams)}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </td>
+                    {/* Chart BR — escondida em mobile/tablet */}
+                    <td className="hidden h-16 overflow-hidden px-4 py-0 align-middle laptop:table-cell">
+                      {chartLoading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground/40" />
+                      ) : (
+                        (() => {
+                          const cd = chartMap.get(track.id) ?? null;
+                          if (!cd) {
+                            return (
+                              <span className="text-sm text-muted-foreground">
+                                —
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-semibold tabular-nums">
+                                  #{cd.position}
+                                </span>
+                                <ChartMovement
+                                  movement={cd.movement}
+                                  positionChange={cd.positionChange}
+                                />
+                              </div>
+                              {cd.streams !== null && (
+                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                  {formatStreams(cd.streams)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
+                      )}
+                    </td>
 
-                  {/* Ações */}
-                  <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <button type="button"
-                        onClick={(e) => { e.stopPropagation(); void handleDelete(isSelected ? selectedSet : new Set([index])); }}
-                        disabled={isDeleting || deletingIndices.size > 0 || pendingReorder}
-                        className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
-                        title={isSelected && selectedSet.size > 1 ? `Remover ${selectedSet.size} faixas` : "Remover da playlist"}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <a href={track.spotifyUrl} target="_blank" rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary sm:inline-flex">
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </div>
-                  </td>
+                    {/* Ações */}
+                    <td className="h-16 overflow-hidden px-3 py-0 align-middle sm:px-4">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleDelete(
+                              isSelected ? selectedSet : new Set([index]),
+                            );
+                          }}
+                          disabled={
+                            isDeleting ||
+                            deletingIndices.size > 0 ||
+                            pendingReorder
+                          }
+                          className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+                          title={
+                            isSelected && selectedSet.size > 1
+                              ? `Remover ${selectedSet.size} faixas`
+                              : "Remover da playlist"
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <a
+                          href={track.spotifyUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hidden rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-primary sm:inline-flex"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </td>
 
-                  {/* Grip (movido pro final) */}
-                  <td className="h-16 overflow-hidden px-3 py-0 align-middle">
-                    <div data-grip="true"
-                      className={`flex cursor-grab touch-none items-center transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-active:opacity-100"}`}
-                      title={selectedSet.size > 1 && isSelected ? `Arrastar ${selectedSet.size} faixas` : "Arrastar para reordenar"}>
-                      <GripVertical className="h-4 w-4 pointer-events-none text-muted-foreground/50" />
-                    </div>
-                  </td>
-                </tr>
-              );
-            }) : (
+                    {/* Grip (movido pro final) */}
+                    <td className="h-16 overflow-hidden px-3 py-0 align-middle">
+                      <div
+                        data-grip="true"
+                        className={`flex cursor-grab touch-none items-center transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-active:opacity-100"}`}
+                        title={
+                          selectedSet.size > 1 && isSelected
+                            ? `Arrastar ${selectedSet.size} faixas`
+                            : "Arrastar para reordenar"
+                        }
+                      >
+                        <GripVertical className="pointer-events-none h-4 w-4 text-muted-foreground/50" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={8}
+                  className="px-4 py-10 text-center text-sm text-muted-foreground"
+                >
                   <Music2 className="mx-auto mb-3 h-5 w-5" />
                   Nenhuma faixa nesta playlist.
                 </td>
@@ -1251,8 +1555,26 @@ export default function PlaylistEditor({
           storageKey="playlist-editor-cols-v2"
           fixedColumns={[0, 6, 7]}
           autoFit
-          columnWeights={{ 0: 0.65, 1: 3.4, 2: 0.95, 3: 0.7, 4: 1.2, 5: 1, 6: 0.6, 7: 0.3 }}
-          minWidths={{ 0: 64, 1: 240, 2: 96, 3: 74, 4: 126, 5: 100, 6: 88, 7: 32 }}
+          columnWeights={{
+            0: 0.65,
+            1: 3.4,
+            2: 0.95,
+            3: 0.7,
+            4: 1.2,
+            5: 1,
+            6: 0.6,
+            7: 0.3,
+          }}
+          minWidths={{
+            0: 64,
+            1: 240,
+            2: 96,
+            3: 74,
+            4: 126,
+            5: 100,
+            6: 88,
+            7: 32,
+          }}
           stickyLeft={[0]}
           stickyRight={[6, 7]}
         />
@@ -1266,10 +1588,14 @@ export default function PlaylistEditor({
             className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-slate-950/95 p-2.5 pl-4 text-white shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
           >
             <div className="min-w-0">
-              <p className={`truncate text-sm font-semibold ${error ? "text-red-300" : "text-white"}`}>
+              <p
+                className={`truncate text-sm font-semibold ${error ? "text-red-300" : "text-white"}`}
+              >
                 {error ? "Não foi possível salvar" : "Nova ordem pronta"}
               </p>
-              <p className={`truncate text-[11px] ${error ? "text-red-200/75" : "text-white/60"}`}>
+              <p
+                className={`truncate text-[11px] ${error ? "text-red-200/75" : "text-white/60"}`}
+              >
                 {error ?? "Revise a lista e confirme para atualizar o Spotify."}
               </p>
             </div>
@@ -1280,7 +1606,7 @@ export default function PlaylistEditor({
                 variant="ghost"
                 onClick={handleCancelReorder}
                 disabled={saving}
-                className="rounded-xl text-white/72 hover:bg-white/10 hover:text-white"
+                className="text-white/72 rounded-xl hover:bg-white/10 hover:text-white"
               >
                 <X className="h-3.5 w-3.5" /> Cancelar
               </Button>
@@ -1291,14 +1617,17 @@ export default function PlaylistEditor({
                 disabled={saving}
                 className="rounded-xl bg-blue-600 text-white shadow-sm hover:bg-blue-500 focus-visible:ring-blue-400 disabled:bg-blue-600/60 disabled:text-white/70"
               >
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
                 Confirmar nova ordem
               </Button>
             </div>
           </div>
         </div>
       ) : null}
-
     </div>
   );
 }

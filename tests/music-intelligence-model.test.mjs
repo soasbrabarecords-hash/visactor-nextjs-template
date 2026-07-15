@@ -117,6 +117,8 @@ test("empty response is stable and safe for the dashboard", () => {
   assert.equal(result.nextBestOpportunity, null);
   assert.deepEqual(result.addNow, []);
   assert.deepEqual(result.crossover, []);
+  assert.equal(result.markets.BR.nextBestOpportunity, null);
+  assert.equal(result.markets.GLOBAL.nextBestOpportunity, null);
   assert.equal(result.meta.methodologyVersion, "v1");
 });
 
@@ -145,6 +147,14 @@ test("model builds explainable add, watch, review and crossover decisions", () =
   const newEntry = result.watch.find((track) => track.id === NEW_ENTRY_ID);
   const drop = result.review.find((track) => track.id === DROP_ID);
   const crossover = result.crossover.find((track) => track.id === RISER_ID);
+  const brRiser = [
+    ...result.markets.BR.addNow,
+    ...result.markets.BR.watch,
+  ].find((track) => track.id === RISER_ID);
+  const globalRiser = [
+    ...result.markets.GLOBAL.addNow,
+    ...result.markets.GLOBAL.watch,
+  ].find((track) => track.id === RISER_ID);
 
   assert.ok(riser);
   assert.ok(riser.movement7d > 0);
@@ -152,11 +162,28 @@ test("model builds explainable add, watch, review and crossover decisions", () =
   assert.match(riser.explanation, /BR e Global|Subiu/);
   assert.ok(crossover);
   assert.ok(crossover.scores.crossoverScore >= 55);
+  assert.ok(brRiser);
+  assert.ok(globalRiser);
+  assert.equal(brRiser.primaryCountry, "BR");
+  assert.equal(globalRiser.primaryCountry, "GLOBAL");
+  assert.equal(brRiser.currentPosition, 40);
+  assert.equal(globalRiser.currentPosition, 60);
 
   assert.ok(newEntry);
   assert.equal(newEntry.isNewEntry, true);
   assert.equal(newEntry.artists, "Artista não identificado");
   assert.equal(newEntry.coverUrl, "https://images.test/new-entry.jpg");
+  assert.ok(
+    [...result.markets.BR.addNow, ...result.markets.BR.watch].some(
+      (track) => track.id === NEW_ENTRY_ID,
+    ),
+  );
+  assert.equal(
+    [...result.markets.GLOBAL.addNow, ...result.markets.GLOBAL.watch].some(
+      (track) => track.id === NEW_ENTRY_ID,
+    ),
+    false,
+  );
 
   assert.ok(drop);
   assert.ok(drop.movement7d < 0);

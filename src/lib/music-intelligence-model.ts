@@ -348,6 +348,205 @@ function buildArtistSignals(tracks: MusicIntelligenceTrack[]) {
     .slice(0, 5);
 }
 
+function buildDecisionQueue(candidates: MusicIntelligenceTrack[]) {
+  const sorted = [...candidates].sort(
+    (left, right) =>
+      right.scores.opportunityScore - left.scores.opportunityScore ||
+      right.scores.momentumScore - left.scores.momentumScore ||
+      left.currentPosition - right.currentPosition,
+  );
+  const addNow = sorted
+    .filter((track) => track.action === "add_now")
+    .slice(0, MAX_QUEUE_ITEMS);
+  const watch = sorted
+    .filter((track) => track.action === "watch")
+    .slice(0, MAX_QUEUE_ITEMS);
+  const review = [...candidates]
+    .filter((track) => track.action === "review")
+    .sort(
+      (left, right) =>
+        right.scores.saturationRisk - left.scores.saturationRisk ||
+        left.scores.momentumScore - right.scores.momentumScore,
+    )
+    .slice(0, MAX_QUEUE_ITEMS);
+
+  return {
+    sorted,
+    nextBestOpportunity:
+      addNow[0] ?? sorted.find((track) => track.action !== "review") ?? null,
+    addNow,
+    watch,
+    review,
+  };
+}
+
+function buildTrackCandidate({
+  identity,
+  history,
+  primaryCountry,
+  latestChartDate,
+  fallbackImageUrls,
+  combineMarkets,
+}: {
+  identity: string;
+  history: TrackHistory;
+  primaryCountry: MusicIntelligenceCountry;
+  latestChartDate: string;
+  fallbackImageUrls: ReadonlyMap<string, string>;
+  combineMarkets: boolean;
+}): MusicIntelligenceTrack | null {
+  const countries = COUNTRY_ORDER.filter((country) => history.current[country]);
+  const current = history.current[primaryCountry];
+  if (!current) {
+    return null;
+  }
+
+  const scoreCountries = combineMarkets ? countries : [primaryCountry];
+  const regionalHeat = scoreCountries.map((country) =>
+    rankStrength(history.current[country]?.position),
+  );
+  const regionalMomentum = scoreCountries.map((country) =>
+    momentumForRegion(
+      history.current[country]?.position ?? 200,
+      history.byCountry[country],
+      latestChartDate,
+    ),
+  );
+  const regionalFreshness = scoreCountries.map((country) =>
+    freshnessForRegion(history.byCountry[country], latestChartDate),
+  );
+  const regionalStability = scoreCountries.map((country) =>
+    stabilityForRegion(history.byCountry[country], latestChartDate),
+  );
+  const peak = getPeak(
+    scoreCountries.map((country) => history.byCountry[country]),
+    latestChartDate,
+  );
+  const heatScore = combineRegionalScores(regionalHeat);
+  const momentumScore = combineRegionalScores(regionalMomentum);
+  const freshnessScore = Math.max(...regionalFreshness);
+  const stabilityScore = average(regionalStability);
+  const currentBestPosition = Math.min(
+    ...scoreCountries.map(
+      (country) => history.current[country]?.position ?? 200,
+    ),
+  );
+  const dropFromPeakRisk = clamp(
+    ((currentBestPosition - peak.position) / 50) * 100,
+  );
+  const negativeMomentumRisk = clamp((50 - momentumScore) * 2);
+  const daysSincePeakRisk = clamp((peak.daysAgo / 30) * 100);
+  const saturationRisk =
+    0.45 * dropFromPeakRisk +
+    0.35 * negativeMomentumRisk +
+    0.2 * daysSincePeakRisk;
+  const appearedInBothRecently = COUNTRY_ORDER.every((country) =>
+    Array.from({ length: 15 }, (_, offset) =>
+      history.byCountry[country].has(subtractDays(latestChartDate, offset)),
+    ).some(Boolean),
+  );
+  const allRegionalHeat = countries.map((country) =>
+    rankStrength(history.current[country]?.position),
+  );
+  const crossoverScore =
+    countries.length === 2
+      ? clamp(25 + 0.5 * allRegionalHeat.reduce((sum, score) => sum + score, 0))
+      : appearedInBothRecently
+        ? 35
+        : 0;
+  const scores: MusicIntelligenceScores = {
+    heatScore: roundScore(heatScore),
+    momentumScore: roundScore(momentumScore),
+    freshnessScore: roundScore(freshnessScore),
+    stabilityScore: roundScore(stabilityScore),
+    saturationRisk: roundScore(saturationRisk),
+    crossoverScore: roundScore(crossoverScore),
+    opportunityScore: roundScore(
+      0.24 * heatScore +
+        0.28 * momentumScore +
+        0.16 * freshnessScore +
+        0.12 * stabilityScore +
+        0.1 * crossoverScore +
+        0.1 * (100 - saturationRisk),
+    ),
+  };
+  const action = getAction(scores);
+  const primaryHistory = history.byCountry[primaryCountry];
+  const movement24h = movementFrom(
+    current.position,
+    primaryHistory,
+    latestChartDate,
+    1,
+  );
+  const movement7d = movementFrom(
+    current.position,
+    primaryHistory,
+    latestChartDate,
+    7,
+  );
+  const isNewEntry = getFreshEntry(current, primaryHistory, latestChartDate);
+  const observedDays30 = Array.from({ length: 30 }, (_, offset) =>
+    primaryHistory.has(subtractDays(latestChartDate, offset)),
+  ).filter(Boolean).length;
+  const spotifyTrackId = normalizeSpotifyTrackId(current.spotifyTrackId);
+  const coverUrl =
+    countries
+      .map((country) => normalizeImageUrl(history.current[country]?.imageUrl))
+      .find((image): image is string => Boolean(image)) ??
+    normalizeImageUrl(
+      spotifyTrackId ? fallbackImageUrls.get(spotifyTrackId) : null,
+    );
+
+  return {
+    id: identity,
+    snapshotTrackId: current.id || null,
+    spotifyTrackId,
+    spotifyUrl: spotifyTrackId
+      ? `https://open.spotify.com/track/${spotifyTrackId}`
+      : null,
+    name: current.trackName.trim() || "Faixa não identificada",
+    artists: current.artistName?.trim() || "Artista não identificado",
+    coverUrl,
+    primaryCountry,
+    countries,
+    currentPosition: current.position,
+    positions: Object.fromEntries(
+      countries.map((country) => [country, history.current[country]?.position]),
+    ),
+    previousPosition: current.previousPosition,
+    movement24h,
+    movement7d,
+    movement14d: movementFrom(
+      current.position,
+      primaryHistory,
+      latestChartDate,
+      14,
+    ),
+    movement30d: movementFrom(
+      current.position,
+      primaryHistory,
+      latestChartDate,
+      30,
+    ),
+    peakPosition: peak.position,
+    streams: current.streams,
+    observedDays30,
+    isNewEntry,
+    action,
+    actionLabel: actionLabel(action),
+    suggestedPlaylistName: null,
+    explanation: buildExplanation(
+      action,
+      primaryCountry,
+      movement7d,
+      isNewEntry,
+      scores.crossoverScore,
+      scores.saturationRisk,
+    ),
+    scores,
+  };
+}
+
 export function createEmptyMusicIntelligenceResponse(
   status: MusicIntelligenceStatus = "empty",
   detail = "Aguardando snapshots completos para iniciar a leitura.",
@@ -379,6 +578,20 @@ export function createEmptyMusicIntelligenceResponse(
       topRisers: 0,
       biggestDrops: 0,
       ...summaryOverrides,
+    },
+    markets: {
+      BR: {
+        nextBestOpportunity: null,
+        addNow: [],
+        watch: [],
+        review: [],
+      },
+      GLOBAL: {
+        nextBestOpportunity: null,
+        addNow: [],
+        watch: [],
+        review: [],
+      },
     },
     nextBestOpportunity: null,
     addNow: [],
@@ -513,6 +726,13 @@ export function buildMusicIntelligenceModel({
   }
 
   const candidates: MusicIntelligenceTrack[] = [];
+  const marketCandidates: Record<
+    MusicIntelligenceCountry,
+    MusicIntelligenceTrack[]
+  > = {
+    BR: [],
+    GLOBAL: [],
+  };
 
   for (const [identity, history] of histories) {
     const countries = COUNTRY_ORDER.filter(
@@ -525,174 +745,40 @@ export function buildMusicIntelligenceModel({
     const primaryCountry: MusicIntelligenceCountry = history.current.BR
       ? "BR"
       : "GLOBAL";
-    const current = history.current[primaryCountry];
-    if (!current) {
-      continue;
+    const combinedCandidate = buildTrackCandidate({
+      identity,
+      history,
+      primaryCountry,
+      latestChartDate,
+      fallbackImageUrls,
+      combineMarkets: true,
+    });
+    if (combinedCandidate) {
+      candidates.push(combinedCandidate);
     }
 
-    const regionalHeat = countries.map((country) =>
-      rankStrength(history.current[country]?.position),
-    );
-    const regionalMomentum = countries.map((country) =>
-      momentumForRegion(
-        history.current[country]?.position ?? 200,
-        history.byCountry[country],
+    for (const country of countries) {
+      const marketCandidate = buildTrackCandidate({
+        identity,
+        history,
+        primaryCountry: country,
         latestChartDate,
-      ),
-    );
-    const regionalFreshness = countries.map((country) =>
-      freshnessForRegion(history.byCountry[country], latestChartDate),
-    );
-    const regionalStability = countries.map((country) =>
-      stabilityForRegion(history.byCountry[country], latestChartDate),
-    );
-    const peak = getPeak(
-      countries.map((country) => history.byCountry[country]),
-      latestChartDate,
-    );
-    const heatScore = combineRegionalScores(regionalHeat);
-    const momentumScore = combineRegionalScores(regionalMomentum);
-    const freshnessScore = Math.max(...regionalFreshness);
-    const stabilityScore = average(regionalStability);
-    const currentBestPosition = Math.min(
-      ...countries.map((country) => history.current[country]?.position ?? 200),
-    );
-    const dropFromPeakRisk = clamp(
-      ((currentBestPosition - peak.position) / 50) * 100,
-    );
-    const negativeMomentumRisk = clamp((50 - momentumScore) * 2);
-    const daysSincePeakRisk = clamp((peak.daysAgo / 30) * 100);
-    const saturationRisk =
-      0.45 * dropFromPeakRisk +
-      0.35 * negativeMomentumRisk +
-      0.2 * daysSincePeakRisk;
-    const appearedInBothRecently = COUNTRY_ORDER.every((country) =>
-      Array.from({ length: 15 }, (_, offset) =>
-        history.byCountry[country].has(subtractDays(latestChartDate, offset)),
-      ).some(Boolean),
-    );
-    const crossoverScore =
-      countries.length === 2
-        ? clamp(25 + 0.5 * regionalHeat.reduce((sum, score) => sum + score, 0))
-        : appearedInBothRecently
-          ? 35
-          : 0;
-    const scores: MusicIntelligenceScores = {
-      heatScore: roundScore(heatScore),
-      momentumScore: roundScore(momentumScore),
-      freshnessScore: roundScore(freshnessScore),
-      stabilityScore: roundScore(stabilityScore),
-      saturationRisk: roundScore(saturationRisk),
-      crossoverScore: roundScore(crossoverScore),
-      opportunityScore: roundScore(
-        0.24 * heatScore +
-          0.28 * momentumScore +
-          0.16 * freshnessScore +
-          0.12 * stabilityScore +
-          0.1 * crossoverScore +
-          0.1 * (100 - saturationRisk),
-      ),
-    };
-    const action = getAction(scores);
-    const primaryHistory = history.byCountry[primaryCountry];
-    const movement24h = movementFrom(
-      current.position,
-      primaryHistory,
-      latestChartDate,
-      1,
-    );
-    const movement7d = movementFrom(
-      current.position,
-      primaryHistory,
-      latestChartDate,
-      7,
-    );
-    const isNewEntry = getFreshEntry(current, primaryHistory, latestChartDate);
-    const observedDays30 = Array.from({ length: 30 }, (_, offset) =>
-      primaryHistory.has(subtractDays(latestChartDate, offset)),
-    ).filter(Boolean).length;
-    const spotifyTrackId = normalizeSpotifyTrackId(current.spotifyTrackId);
-    const coverUrl =
-      countries
-        .map((country) => normalizeImageUrl(history.current[country]?.imageUrl))
-        .find((image): image is string => Boolean(image)) ??
-      normalizeImageUrl(
-        spotifyTrackId ? fallbackImageUrls.get(spotifyTrackId) : null,
-      );
-
-    candidates.push({
-      id: identity,
-      snapshotTrackId: current.id || null,
-      spotifyTrackId,
-      spotifyUrl: spotifyTrackId
-        ? `https://open.spotify.com/track/${spotifyTrackId}`
-        : null,
-      name: current.trackName.trim() || "Faixa não identificada",
-      artists: current.artistName?.trim() || "Artista não identificado",
-      coverUrl,
-      primaryCountry,
-      countries,
-      currentPosition: current.position,
-      positions: Object.fromEntries(
-        countries.map((country) => [
-          country,
-          history.current[country]?.position,
-        ]),
-      ),
-      previousPosition: current.previousPosition,
-      movement24h,
-      movement7d,
-      movement14d: movementFrom(
-        current.position,
-        primaryHistory,
-        latestChartDate,
-        14,
-      ),
-      movement30d: movementFrom(
-        current.position,
-        primaryHistory,
-        latestChartDate,
-        30,
-      ),
-      peakPosition: peak.position,
-      streams: current.streams,
-      observedDays30,
-      isNewEntry,
-      action,
-      actionLabel: actionLabel(action),
-      suggestedPlaylistName: null,
-      explanation: buildExplanation(
-        action,
-        primaryCountry,
-        movement7d,
-        isNewEntry,
-        scores.crossoverScore,
-        scores.saturationRisk,
-      ),
-      scores,
-    });
+        fallbackImageUrls,
+        combineMarkets: false,
+      });
+      if (marketCandidate) {
+        marketCandidates[country].push(marketCandidate);
+      }
+    }
   }
 
-  const sorted = [...candidates].sort(
-    (left, right) =>
-      right.scores.opportunityScore - left.scores.opportunityScore ||
-      right.scores.momentumScore - left.scores.momentumScore ||
-      left.currentPosition - right.currentPosition,
-  );
-  const addNow = sorted
-    .filter((track) => track.action === "add_now")
-    .slice(0, MAX_QUEUE_ITEMS);
-  const watch = sorted
-    .filter((track) => track.action === "watch")
-    .slice(0, MAX_QUEUE_ITEMS);
-  const review = [...candidates]
-    .filter((track) => track.action === "review")
-    .sort(
-      (left, right) =>
-        right.scores.saturationRisk - left.scores.saturationRisk ||
-        left.scores.momentumScore - right.scores.momentumScore,
-    )
-    .slice(0, MAX_QUEUE_ITEMS);
+  const combinedQueue = buildDecisionQueue(candidates);
+  const sorted = combinedQueue.sorted;
+  const addNow = combinedQueue.addNow;
+  const watch = combinedQueue.watch;
+  const review = combinedQueue.review;
+  const brQueue = buildDecisionQueue(marketCandidates.BR);
+  const globalQueue = buildDecisionQueue(marketCandidates.GLOBAL);
   const crossover = [...candidates]
     .filter((track) => track.scores.crossoverScore >= 55)
     .sort(
@@ -721,8 +807,7 @@ export function buildMusicIntelligenceModel({
         (left.movement7d ?? 0) - (right.movement7d ?? 0) ||
         right.scores.saturationRisk - left.scores.saturationRisk,
     );
-  const nextBestOpportunity =
-    addNow[0] ?? sorted.find((track) => track.action !== "review") ?? null;
+  const nextBestOpportunity = combinedQueue.nextBestOpportunity;
   const totalTracksAnalyzed = tracks.length;
   const status: MusicIntelligenceStatus =
     commonDays >= 30 && maxWindow >= 30 ? "ready" : "partial";
@@ -750,6 +835,20 @@ export function buildMusicIntelligenceModel({
       newEntries: newEntries.length,
       topRisers: topRisers.length,
       biggestDrops: biggestDrops.length,
+    },
+    markets: {
+      BR: {
+        nextBestOpportunity: brQueue.nextBestOpportunity,
+        addNow: brQueue.addNow,
+        watch: brQueue.watch,
+        review: brQueue.review,
+      },
+      GLOBAL: {
+        nextBestOpportunity: globalQueue.nextBestOpportunity,
+        addNow: globalQueue.addNow,
+        watch: globalQueue.watch,
+        review: globalQueue.review,
+      },
     },
     nextBestOpportunity,
     addNow,
