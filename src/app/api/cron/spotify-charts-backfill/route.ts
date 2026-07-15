@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   approveSpotifyChartBackfillCampaign,
   getSpotifyChartBackfillCampaigns,
+  getSpotifyChartBackfillPhaseDefinition,
   getSpotifyChartBackfillRolloutAnchorEndDate,
+  isCoreSpotifyChartBackfillPhase,
   planSpotifyChartBackfillPhase,
   refreshSpotifyChartBackfillCampaignProgress,
   setSpotifyChartBackfillCampaignPaused,
@@ -177,9 +179,87 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, campaign });
     }
 
-    const campaign = phasePlan
-      ? await startSpotifyChartBackfillCampaign(phasePlan.phaseKey)
-      : null;
+    let selectedPhasePlan = phasePlan;
+    let selectedAutomatically = false;
+    let selectedReadyCampaign = false;
+
+    if (!selectedPhasePlan && !days && action === "run") {
+      await refreshSpotifyChartBackfillCampaignProgress();
+      const campaigns = await getSpotifyChartBackfillCampaigns();
+      const runningCampaigns = campaigns.filter(
+        (candidate) => candidate.status === "running",
+      );
+
+      if (runningCampaigns.length > 1) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Mais de uma campanha esta em execucao.",
+            runningPhases: runningCampaigns.map(
+              (candidate) => candidate.phase_key,
+            ),
+          },
+          { status: 409 },
+        );
+      }
+
+      const runningCampaign = runningCampaigns[0] ?? null;
+      const readyCampaign = runningCampaign
+        ? null
+        : (campaigns.find((candidate) => {
+            if (candidate.status !== "ready") return false;
+            const phase = getSpotifyChartBackfillPhaseDefinition(
+              candidate.phase_key,
+            );
+            return phase ? isCoreSpotifyChartBackfillPhase(phase) : false;
+          }) ?? null);
+      const selectedCampaign = runningCampaign ?? readyCampaign;
+
+      if (!selectedCampaign) {
+        return NextResponse.json({
+          success: true,
+          idle: true,
+          reason: "no_core_phase_running_or_ready",
+          campaigns,
+        });
+      }
+
+      const selectedPhase = getSpotifyChartBackfillPhaseDefinition(
+        selectedCampaign.phase_key,
+      );
+
+      if (!selectedPhase || !isCoreSpotifyChartBackfillPhase(selectedPhase)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A campanha em execucao nao pertence ao rollout core.",
+            runningPhase: selectedCampaign.phase_key,
+          },
+          { status: 409 },
+        );
+      }
+
+      selectedPhasePlan = planSpotifyChartBackfillPhase(
+        selectedPhase.key,
+        new Date(),
+        getSpotifyChartBackfillRolloutAnchorEndDate(campaigns),
+      );
+
+      if (!selectedPhasePlan) {
+        return NextResponse.json(
+          { success: false, error: "Nao foi possivel planejar a fase core." },
+          { status: 500 },
+        );
+      }
+
+      selectedAutomatically = true;
+      selectedReadyCampaign = selectedCampaign.status === "ready";
+    }
+
+    const campaign =
+      selectedPhasePlan && (!selectedAutomatically || selectedReadyCampaign)
+        ? await startSpotifyChartBackfillCampaign(selectedPhasePlan.phaseKey)
+        : null;
 
     if (campaign && !campaign.started) {
       return NextResponse.json(
@@ -198,7 +278,7 @@ export async function GET(request: Request) {
     await refreshSpotifyChartBackfillCampaignProgress();
     const worker = await processSpotifyChartBackfillQueue({
       limit,
-      phaseKey: phasePlan?.phaseKey,
+      phaseKey: selectedPhasePlan?.phaseKey,
     });
     const campaigns = await refreshSpotifyChartBackfillCampaignProgress();
     const seedComplete = !seed || seed.unavailableRegions.length === 0;
@@ -213,6 +293,7 @@ export async function GET(request: Request) {
       seedComplete,
       seed,
       campaign,
+      phase: selectedPhasePlan?.phaseKey ?? null,
       campaigns,
       worker,
     });
