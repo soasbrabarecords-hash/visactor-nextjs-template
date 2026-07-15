@@ -1,8 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   Check,
   ChevronRight,
@@ -12,14 +9,17 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import type { CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useSpotifyAccountPlaylistsCacheKey } from "@/hooks/use-spotify-account-playlists-cache-key";
 import {
+  type SpotifyAccountPlaylistClient,
   getSpotifyAccountPlaylistsClient,
   invalidateSpotifyAccountPlaylistsClientCache,
-  type SpotifyAccountPlaylistClient,
 } from "@/lib/spotify-account-playlists-client";
+import { cn } from "@/lib/utils";
 
 type UserPlaylist = SpotifyAccountPlaylistClient;
 
@@ -47,6 +47,7 @@ export default function SpotifyPlaylistAddButton({
   source = "playlist_add_button",
   chartSnapshotTrackId,
   label = "Adicionar agora",
+  ariaLabel,
   compact = false,
   className,
 }: {
@@ -55,6 +56,7 @@ export default function SpotifyPlaylistAddButton({
   source?: string;
   chartSnapshotTrackId?: string | null;
   label?: string;
+  ariaLabel?: string;
   compact?: boolean;
   className?: string;
 }) {
@@ -89,7 +91,8 @@ export default function SpotifyPlaylistAddButton({
     const rect = btnRef.current.getBoundingClientRect();
     const menuWidth = 288;
     const viewportPadding = 16;
-    const preferLeft = rect.right + menuWidth > window.innerWidth - viewportPadding;
+    const preferLeft =
+      rect.right + menuWidth > window.innerWidth - viewportPadding;
     const nextLeft = preferLeft ? rect.right - menuWidth : rect.left;
 
     setMenuPosition({
@@ -117,13 +120,29 @@ export default function SpotifyPlaylistAddButton({
       }
     }
 
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      menuRef.current
+        ?.querySelector<HTMLButtonElement>("button:not([disabled])")
+        ?.focus();
+    });
+
     document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
     updateMenuPosition();
 
     return () => {
       document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKeyDown);
+      window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
     };
@@ -173,8 +192,10 @@ export default function SpotifyPlaylistAddButton({
     const normalizedSuggested = suggestedPlaylistName.trim().toLowerCase();
 
     return [...scopedPlaylists].sort((left, right) => {
-      const leftSuggested = left.name.trim().toLowerCase() === normalizedSuggested;
-      const rightSuggested = right.name.trim().toLowerCase() === normalizedSuggested;
+      const leftSuggested =
+        left.name.trim().toLowerCase() === normalizedSuggested;
+      const rightSuggested =
+        right.name.trim().toLowerCase() === normalizedSuggested;
 
       if (leftSuggested === rightSuggested) {
         return right.tracksTotal - left.tracksTotal;
@@ -218,15 +239,18 @@ export default function SpotifyPlaylistAddButton({
     }));
 
     try {
-      const response = await fetch(`/api/spotify/playlists/${playlistId}/tracks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trackUri: `spotify:track:${spotifyTrackId}`,
-          source,
-          chartSnapshotTrackId,
-        }),
-      });
+      const response = await fetch(
+        `/api/spotify/playlists/${playlistId}/tracks`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trackUri: `spotify:track:${spotifyTrackId}`,
+            source,
+            chartSnapshotTrackId,
+          }),
+        },
+      );
       const data = (await response.json()) as {
         success?: boolean;
         alreadyExists?: boolean;
@@ -269,6 +293,7 @@ export default function SpotifyPlaylistAddButton({
       <Button
         type="button"
         disabled
+        aria-label={ariaLabel ?? (compact ? label : undefined)}
         className={cn(
           compact
             ? "h-9 rounded-full border-white/10 bg-white/5 px-3 text-white/55"
@@ -277,7 +302,7 @@ export default function SpotifyPlaylistAddButton({
         )}
       >
         <Plus className="h-4 w-4" />
-        {label}
+        {!compact ? label : null}
       </Button>
     );
   }
@@ -287,6 +312,9 @@ export default function SpotifyPlaylistAddButton({
       <Button
         ref={btnRef}
         type="button"
+        aria-label={ariaLabel ?? (compact ? label : undefined)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         onClick={handleOpen}
         onMouseEnter={handleWarmup}
         onFocus={handleWarmup}
@@ -297,7 +325,11 @@ export default function SpotifyPlaylistAddButton({
           className,
         )}
       >
-        {compact ? <MoreHorizontal className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+        {compact ? (
+          <MoreHorizontal className="h-4 w-4" />
+        ) : (
+          <Plus className="h-4 w-4" />
+        )}
         {!compact ? label : null}
       </Button>
 
@@ -305,6 +337,8 @@ export default function SpotifyPlaylistAddButton({
         ? createPortal(
             <div
               ref={menuRef}
+              role="dialog"
+              aria-label="Adicionar faixa a uma playlist"
               className="fixed z-[120] w-72 overflow-hidden rounded-[20px] border border-white/10 bg-[#0c1013] text-white shadow-[0_24px_64px_rgba(0,0,0,0.42)]"
               style={{
                 top: menuPosition.top,
@@ -313,16 +347,22 @@ export default function SpotifyPlaylistAddButton({
             >
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-white/60">
                     Adicionar a playlist
                   </div>
                   <div className="mt-1 text-sm font-semibold text-white/90">
-                    {suggestedPlaylistName ? `Sugestao: ${suggestedPlaylistName}` : "Escolha a playlist"}
+                    {suggestedPlaylistName
+                      ? `Sugestao: ${suggestedPlaylistName}`
+                      : "Escolha a playlist"}
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  aria-label="Fechar seletor de playlists"
+                  onClick={() => {
+                    setOpen(false);
+                    btnRef.current?.focus();
+                  }}
                   className="rounded-full border border-white/10 bg-white/5 p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -342,7 +382,9 @@ export default function SpotifyPlaylistAddButton({
                   </p>
                 ) : null}
 
-                {!loadingPlaylists && !playlistsError && orderedPlaylists.length === 0 ? (
+                {!loadingPlaylists &&
+                !playlistsError &&
+                orderedPlaylists.length === 0 ? (
                   <p className="px-4 py-5 text-center text-xs text-white/55">
                     Nenhuma playlist encontrada.
                   </p>
@@ -363,7 +405,7 @@ export default function SpotifyPlaylistAddButton({
                         type="button"
                         disabled={isLoading || isSuccess}
                         onClick={() => void handleAdd(playlist.id)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/6 disabled:opacity-70"
+                        className="hover:bg-white/6 flex w-full items-center gap-3 px-4 py-3 text-left transition disabled:opacity-70"
                       >
                         <div
                           className="h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-muted"
@@ -372,7 +414,7 @@ export default function SpotifyPlaylistAddButton({
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <div className="truncate text-sm font-semibold text-white/92">
+                            <div className="text-white/92 truncate text-sm font-semibold">
                               {playlist.name}
                             </div>
                             {isSuggested ? (
@@ -382,7 +424,7 @@ export default function SpotifyPlaylistAddButton({
                               </span>
                             ) : null}
                           </div>
-                          <div className="mt-0.5 text-[11px] text-white/45">
+                          <div className="mt-0.5 text-[11px] text-white/60">
                             {playlist.tracksTotal} faixas
                           </div>
                         </div>
@@ -394,7 +436,9 @@ export default function SpotifyPlaylistAddButton({
                             <Check
                               className={cn(
                                 "h-4 w-4",
-                                state.alreadyExists ? "text-white/45" : "text-[#1ed760]",
+                                state.alreadyExists
+                                  ? "text-white/45"
+                                  : "text-[#1ed760]",
                               )}
                             />
                           ) : state.status === "error" ? (
@@ -408,7 +452,9 @@ export default function SpotifyPlaylistAddButton({
                   })}
               </div>
 
-              {Object.values(addStates).some((state) => state.status === "error") ? (
+              {Object.values(addStates).some(
+                (state) => state.status === "error",
+              ) ? (
                 <div className="border-t border-white/10 px-4 py-2">
                   {Object.entries(addStates).map(([playlistId, state]) =>
                     state.status === "error" ? (
