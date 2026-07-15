@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSpotifyPopularitySnapshotRows } from "../src/lib/spotify-popularity-cache.ts";
+import { buildSpotifyPopularityCacheRows } from "../src/lib/spotify-popularity-cache.ts";
 
 function track(overrides = {}) {
   return {
@@ -17,7 +17,7 @@ function track(overrides = {}) {
 }
 
 test("stores only official Spotify popularity values", () => {
-  const rows = buildSpotifyPopularitySnapshotRows(
+  const rows = buildSpotifyPopularityCacheRows(
     [
       track(),
       track({
@@ -33,25 +33,20 @@ test("stores only official Spotify popularity values", () => {
 
   assert.equal(rows.length, 1);
   assert.deepEqual(rows[0], {
-    market: "spotify",
-    genre: "catalog",
     track_id: "track-1",
-    snapshot_date: "2026-07-15",
     captured_at: "2026-07-15T12:00:00.000Z",
     track_name: "Faixa real",
-    artists: "Artista",
+    artist_name: "Artista",
     album_name: "Álbum",
-    cover_url: null,
+    image_url: null,
     spotify_url: "https://open.spotify.com/track/track-1",
     popularity: 78,
-    signal_count: 1,
-    source_mode: "spotify_playlist",
-    explicit: false,
+    source: "spotify",
   });
 });
 
 test("deduplicates tracks and clamps official popularity", () => {
-  const rows = buildSpotifyPopularitySnapshotRows([
+  const rows = buildSpotifyPopularityCacheRows([
     track({ popularity: 84.4 }),
     track({ popularity: 140, name: "Versão mais recente" }),
   ]);

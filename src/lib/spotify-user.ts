@@ -1244,6 +1244,34 @@ async function hydrateSpotifyTrackPopularityWithToken(
   }));
 }
 
+async function restoreCachedSpotifyTrackPopularities(
+  tracks: SpotifyEditablePlaylistTrack[],
+) {
+  const unresolvedIds = Array.from(
+    new Set(
+      tracks.filter((track) => track.popularity === 0).map((track) => track.id),
+    ),
+  );
+
+  if (unresolvedIds.length === 0) {
+    return tracks;
+  }
+
+  const storedPopularities = await fetchStoredTrackPopularities(unresolvedIds);
+
+  if (storedPopularities.size === 0) {
+    return tracks;
+  }
+
+  return tracks.map((track) => {
+    const popularity = storedPopularities.get(track.id);
+
+    return popularity
+      ? { ...track, popularity, popularitySource: "snapshot" as const }
+      : track;
+  });
+}
+
 async function fetchSpotifyPlaylistTrackIdsWithToken(
   accessToken: string,
   playlistId: string,
@@ -1388,7 +1416,13 @@ async function fetchSpotifyEditablePlaylistWithToken(
   const cachedPlaylist = getCachedValue(spotifyEditablePlaylistCache, cacheKey);
 
   if (cachedPlaylist) {
-    return cachedPlaylist;
+    const tracks = await restoreCachedSpotifyTrackPopularities(
+      cachedPlaylist.tracks,
+    );
+
+    return tracks === cachedPlaylist.tracks
+      ? cachedPlaylist
+      : { ...cachedPlaylist, tracks };
   }
 
   const inFlight = spotifyEditablePlaylistsInFlight.get(cacheKey);

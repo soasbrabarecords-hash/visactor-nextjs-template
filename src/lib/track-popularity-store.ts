@@ -1,7 +1,7 @@
 import "server-only";
 import {
   type SpotifyPopularityCacheTrack,
-  buildSpotifyPopularitySnapshotRows,
+  buildSpotifyPopularityCacheRows,
 } from "@/lib/spotify-popularity-cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -20,28 +20,10 @@ type PopularityCandidate = {
 
 const POPULARITY_SOURCES: PopularitySource[] = [
   {
-    table: "playlist_track_snapshots",
+    table: "spotify_track_popularity_cache",
     trackIdColumn: "track_id",
     popularityColumn: "popularity",
     timestampColumn: "captured_at",
-  },
-  {
-    table: "music_chart_snapshots",
-    trackIdColumn: "spotify_track_id",
-    popularityColumn: "popularity",
-    timestampColumn: "captured_at",
-  },
-  {
-    table: "music_track_snapshots",
-    trackIdColumn: "track_id",
-    popularityColumn: "popularity",
-    timestampColumn: "captured_at",
-  },
-  {
-    table: "music_chart_movements",
-    trackIdColumn: "spotify_track_id",
-    popularityColumn: "popularity_current",
-    timestampColumn: "calculated_at",
   },
 ];
 
@@ -74,7 +56,15 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
   }
 
   await Promise.all(
-    POPULARITY_SOURCES.map(async (source) => {
+    POPULARITY_SOURCES.flatMap((source) =>
+      Array.from(
+        { length: Math.ceil(uniqueTrackIds.length / 50) },
+        (_, batchIndex) => ({
+          source,
+          trackIds: uniqueTrackIds.slice(batchIndex * 50, batchIndex * 50 + 50),
+        }),
+      ),
+    ).map(async ({ source, trackIds }) => {
       try {
         const columns = [
           source.trackIdColumn,
@@ -84,7 +74,7 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
         const { data, error } = await client
           .from(source.table)
           .select(columns)
-          .in(source.trackIdColumn, uniqueTrackIds)
+          .in(source.trackIdColumn, trackIds)
           .gt(source.popularityColumn, 0)
           .order(source.timestampColumn, { ascending: false })
           .limit(5000);
@@ -132,7 +122,7 @@ export async function fetchStoredTrackPopularities(trackIds: string[]) {
 export async function storeSpotifyTrackPopularities(
   tracks: SpotifyPopularityCacheTrack[],
 ) {
-  const rows = buildSpotifyPopularitySnapshotRows(tracks);
+  const rows = buildSpotifyPopularityCacheRows(tracks);
 
   if (rows.length === 0) {
     return;
@@ -145,9 +135,9 @@ export async function storeSpotifyTrackPopularities(
   }
 
   try {
-    const { error } = await client.from("music_track_snapshots").upsert(rows, {
-      onConflict: "market,genre,track_id,snapshot_date",
-    });
+    const { error } = await client
+      .from("spotify_track_popularity_cache")
+      .upsert(rows, { onConflict: "track_id" });
 
     if (error) {
       process.stderr.write(

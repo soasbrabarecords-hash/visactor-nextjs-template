@@ -9,21 +9,16 @@ export type SpotifyPopularityCacheTrack = {
   popularitySource: "spotify" | "snapshot" | "unavailable";
 };
 
-export type SpotifyPopularitySnapshotRow = {
-  market: "spotify";
-  genre: "catalog";
+export type SpotifyPopularityCacheRow = {
   track_id: string;
-  snapshot_date: string;
   captured_at: string;
   track_name: string;
-  artists: string;
+  artist_name: string;
   album_name: string;
-  cover_url: string | null;
+  image_url: string | null;
   spotify_url: string;
   popularity: number;
-  signal_count: 1;
-  source_mode: "spotify_playlist";
-  explicit: false;
+  source: "spotify";
 };
 
 function normalizePopularity(value: number) {
@@ -34,13 +29,12 @@ function normalizePopularity(value: number) {
   return Math.min(100, Math.round(value));
 }
 
-export function buildSpotifyPopularitySnapshotRows(
+export function buildSpotifyPopularityCacheRows(
   tracks: SpotifyPopularityCacheTrack[],
   capturedAt = new Date(),
-): SpotifyPopularitySnapshotRow[] {
+): SpotifyPopularityCacheRow[] {
   const capturedAtIso = capturedAt.toISOString();
-  const snapshotDate = capturedAtIso.slice(0, 10);
-  const rowsByTrackId = new Map<string, SpotifyPopularitySnapshotRow>();
+  const rowsByTrackId = new Map<string, SpotifyPopularityCacheRow>();
 
   for (const track of tracks) {
     const trackId = track.id.trim();
@@ -55,21 +49,16 @@ export function buildSpotifyPopularitySnapshotRows(
     }
 
     rowsByTrackId.set(trackId, {
-      market: "spotify",
-      genre: "catalog",
       track_id: trackId,
-      snapshot_date: snapshotDate,
       captured_at: capturedAtIso,
       track_name: track.name.trim() || "Faixa Spotify",
-      artists: track.artists.trim() || "Artista não informado",
+      artist_name: track.artists.trim() || "Artista não informado",
       album_name: track.albumName.trim() || "Álbum não informado",
-      cover_url: track.imageUrl?.trim() || null,
+      image_url: track.imageUrl?.trim() || null,
       spotify_url:
         track.spotifyUrl.trim() || `https://open.spotify.com/track/${trackId}`,
       popularity,
-      signal_count: 1,
-      source_mode: "spotify_playlist",
-      explicit: false,
+      source: "spotify",
     });
   }
 
