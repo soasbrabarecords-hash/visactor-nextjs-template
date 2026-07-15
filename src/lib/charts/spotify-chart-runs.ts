@@ -1,5 +1,4 @@
 import "server-only";
-
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,6 +14,7 @@ export type SpotifyChartRun = {
   error_message: string | null;
   started_at: string;
   finished_at: string | null;
+  resolved_by_complete_snapshot: boolean;
 };
 
 export async function startSpotifyChartRun(input: {
@@ -111,5 +111,25 @@ export async function getLatestSpotifyChartRun(country?: string) {
 
   const { data, error } = await query.maybeSingle();
 
-  return error || !data ? null : (data as SpotifyChartRun);
+  if (error || !data) return null;
+
+  const run = data as Omit<SpotifyChartRun, "resolved_by_complete_snapshot">;
+
+  if (run.status !== "error") {
+    return { ...run, resolved_by_complete_snapshot: false };
+  }
+
+  const { data: completeSnapshot, error: snapshotError } = await supabase
+    .from("spotify_chart_complete_snapshots")
+    .select("snapshot_id")
+    .eq("country", run.country)
+    .eq("chart_type", run.chart_type)
+    .eq("chart_date", run.chart_date)
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    ...run,
+    resolved_by_complete_snapshot: !snapshotError && Boolean(completeSnapshot),
+  };
 }

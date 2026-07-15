@@ -70,6 +70,10 @@ function formatTimestamp(value: string | null) {
   }).format(new Date(value));
 }
 
+function isAutomaticRunResolved(run: SpotifyChartRun | null) {
+  return run?.status === "error" && run.resolved_by_complete_snapshot;
+}
+
 function getMovementTone(status: "new" | "up" | "down" | "stable") {
   if (status === "new") return "purple";
   if (status === "up") return "green";
@@ -449,14 +453,18 @@ export default function SpotifyChartsClient({
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
               <StatusBadge
                 tone={
-                  latestAutomaticRun?.status === "success"
+                  latestAutomaticRun?.status === "success" ||
+                  isAutomaticRunResolved(latestAutomaticRun)
                     ? "green"
                     : latestAutomaticRun?.status === "error"
                       ? "red"
                       : "slate"
                 }
               >
-                Auto: {latestAutomaticRun?.status ?? "sem execucao"}
+                Auto:{" "}
+                {isAutomaticRunResolved(latestAutomaticRun)
+                  ? "resolvido"
+                  : (latestAutomaticRun?.status ?? "sem execucao")}
               </StatusBadge>
               <span>
                 Ultima atualizacao:{" "}
@@ -469,7 +477,13 @@ export default function SpotifyChartsClient({
               {latestAutomaticRun?.status === "success" ? (
                 <span>{latestAutomaticRun.rows_count} linhas salvas</span>
               ) : null}
+              {isAutomaticRunResolved(latestAutomaticRun) ? (
+                <span className="text-emerald-300">
+                  Snapshot Top 200 integro; erro anterior reconciliado.
+                </span>
+              ) : null}
               {latestAutomaticRun?.status === "error" &&
+              !isAutomaticRunResolved(latestAutomaticRun) &&
               latestAutomaticRun.error_message ? (
                 <span className="max-w-xl text-red-300">
                   {latestAutomaticRun.error_message}

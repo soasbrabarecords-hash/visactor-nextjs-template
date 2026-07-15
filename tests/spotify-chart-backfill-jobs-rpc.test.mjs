@@ -192,3 +192,46 @@ test("historical snapshot RPC is service-role only and enforces an atomic Top 20
   assert.match(migration, /revoke all[\s\S]*from public, anon, authenticated/);
   assert.match(migration, /grant execute[\s\S]*to service_role/);
 });
+
+test("legacy chart snapshots normalize onto the atomic worker identity", async () => {
+  const migration = await readFile(
+    new URL(
+      "../supabase/migrations/20260715021500_normalize_spotify_chart_snapshot_identity.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    migration,
+    /set chart_type = 'top-songs'[\s\S]*where chart_type = 'top_200_daily'/,
+  );
+  assert.match(
+    migration,
+    /drop constraint if exists chart_snapshots_chart_date_country_key/,
+  );
+  assert.match(
+    migration,
+    /lock table public\.chart_snapshots in share row exclusive mode/,
+  );
+  assert.match(
+    migration,
+    /drop index if exists public\.chart_snapshots_chart_date_country_key/,
+  );
+  assert.match(
+    migration,
+    /chart_snapshots_country_type_date_key[\s\S]*country, chart_type, chart_date/,
+  );
+  assert.match(migration, /alter column chart_type set default 'top-songs'/);
+  assert.match(migration, /legacy and canonical rows overlap/);
+});
+
+test("non-atomic snapshot writes cannot recreate the legacy chart identity", async () => {
+  const source = await readFile(
+    new URL("../src/lib/chart-snapshots.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /input\.chart_type \?\? "top-songs"/);
+  assert.doesNotMatch(source, /input\.chart_type \?\? "top_200_daily"/);
+});

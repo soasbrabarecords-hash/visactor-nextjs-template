@@ -154,7 +154,7 @@ export async function upsertChartSnapshot(
 
   const country = input.country ?? "BR";
   const chartDate = input.chart_date;
-  const chartType = input.chart_type ?? "top_200_daily";
+  const chartType = input.chart_type ?? "top-songs";
 
   // 1. Check if a snapshot already exists for this date + country + type
   const { data: existing } = await supabase
