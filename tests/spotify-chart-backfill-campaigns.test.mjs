@@ -49,23 +49,56 @@ const fixedNow = new Date("2026-07-13T23:45:00.000Z");
 test("rollout catalog preserves the requested gradual order", () => {
   assert.deepEqual(
     SPOTIFY_CHART_BACKFILL_PHASES.map((phase) => phase.key),
-    ["core-30d", "core-180d", "core-365d", "cities-30d", "cities-180d"],
+    [
+      "core-30d",
+      "core-60d",
+      "core-180d",
+      "core-365d",
+      "core-730d",
+      "core-1095d",
+      "cities-30d",
+      "cities-180d",
+    ],
   );
 });
 
-test("core phases plan 60, 360 and 730 identities ending yesterday UTC", () => {
-  const thirty = planSpotifyChartBackfillPhase("core-30d", fixedNow);
-  const sixMonths = planSpotifyChartBackfillPhase("core-180d", fixedNow);
-  const oneYear = planSpotifyChartBackfillPhase("core-365d", fixedNow);
+test("core phases plan every nested window through three years", () => {
+  const plans = [
+    planSpotifyChartBackfillPhase("core-30d", fixedNow),
+    planSpotifyChartBackfillPhase("core-60d", fixedNow),
+    planSpotifyChartBackfillPhase("core-180d", fixedNow),
+    planSpotifyChartBackfillPhase("core-365d", fixedNow),
+    planSpotifyChartBackfillPhase("core-730d", fixedNow),
+    planSpotifyChartBackfillPhase("core-1095d", fixedNow),
+  ];
 
-  assert.equal(thirty.expectedJobs, 60);
-  assert.equal(sixMonths.expectedJobs, 360);
-  assert.equal(oneYear.expectedJobs, 730);
-  assert.equal(thirty.endDate, "2026-07-12");
-  assert.equal(sixMonths.endDate, "2026-07-12");
-  assert.equal(oneYear.endDate, "2026-07-12");
-  assert.ok(thirty.dates.every((date) => sixMonths.dates.includes(date)));
-  assert.ok(sixMonths.dates.every((date) => oneYear.dates.includes(date)));
+  assert.deepEqual(
+    plans.map((plan) => plan.expectedJobs),
+    [60, 120, 360, 730, 1460, 2190],
+  );
+  assert.ok(plans.every((plan) => plan.endDate === "2026-07-12"));
+
+  for (let index = 1; index < plans.length; index += 1) {
+    assert.ok(
+      plans[index - 1].dates.every((date) => plans[index].dates.includes(date)),
+    );
+  }
+});
+
+test("later phases retain the persisted rollout anchor", () => {
+  const plan = planSpotifyChartBackfillPhase(
+    "core-1095d",
+    new Date("2026-07-15T23:45:00.000Z"),
+    "2026-07-12",
+  );
+
+  assert.equal(plan.endDate, "2026-07-12");
+  assert.equal(plan.startDate, "2023-07-14");
+  assert.equal(plan.dates.length, 1095);
+  assert.throws(
+    () => planSpotifyChartBackfillPhase("core-60d", fixedNow, "2026-07-13"),
+    /data ancora/,
+  );
 });
 
 test("city phases include only SP, RJ and Porto Alegre", () => {

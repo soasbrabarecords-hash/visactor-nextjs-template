@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { authorizeSpotifyChartsAdminRequest } from "@/lib/charts/spotify-chart-admin-auth";
 import {
   getSpotifyChartBackfillCampaigns,
+  getSpotifyChartBackfillPhaseDefinition,
+  isCoreSpotifyChartBackfillPhase,
   refreshSpotifyChartBackfillCampaignProgress,
 } from "@/lib/charts/spotify-chart-backfill-campaigns";
 import { peekNextSpotifyChartBackfillJobs } from "@/lib/charts/spotify-chart-backfill-jobs";
@@ -11,14 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const PHASE = "core-30d";
 const LIMIT = 3;
-const LOCKED_PHASES = [
-  "core-180d",
-  "core-365d",
-  "cities-30d",
-  "cities-180d",
-] as const;
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, {
@@ -27,18 +22,23 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function isExactRequestBody(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+function parseRequestPhase(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
   const keys = Object.keys(body).sort();
 
-  return (
-    keys.length === 2 &&
-    keys[0] === "limit" &&
-    keys[1] === "phase" &&
-    body.phase === PHASE &&
-    body.limit === LIMIT
-  );
+  if (
+    keys.length !== 2 ||
+    keys[0] !== "limit" ||
+    keys[1] !== "phase" ||
+    body.limit !== LIMIT ||
+    typeof body.phase !== "string"
+  ) {
+    return null;
+  }
+
+  const phase = getSpotifyChartBackfillPhaseDefinition(body.phase);
+  return phase && isCoreSpotifyChartBackfillPhase(phase) ? phase : null;
 }
 
 export async function POST(request: Request) {
@@ -60,12 +60,14 @@ export async function POST(request: Request) {
     return json({ success: false, requestId, error: "invalid_request" }, 400);
   }
 
-  if (!isExactRequestBody(requestBody)) {
+  const phase = parseRequestPhase(requestBody);
+
+  if (!phase) {
     return json(
       {
         success: false,
         requestId,
-        error: "Only core-30d batches of exactly 3 jobs are allowed.",
+        error: "Only cataloged core batches with limit 3 are allowed.",
       },
       400,
     );
@@ -74,28 +76,29 @@ export async function POST(request: Request) {
   try {
     await refreshSpotifyChartBackfillCampaignProgress();
     const before = await getSpotifyChartBackfillCampaigns();
-    const core = before.find((campaign) => campaign.phase_key === PHASE);
-    const unlocked = before.filter(
+    const core = before.find((campaign) => campaign.phase_key === phase.key);
+    const concurrent = before.filter(
       (campaign) =>
-        LOCKED_PHASES.includes(
-          campaign.phase_key as (typeof LOCKED_PHASES)[number],
-        ) && campaign.status !== "locked",
+        campaign.phase_key !== phase.key && campaign.status === "running",
     );
 
-    if (!core || core.status !== "running" || unlocked.length > 0) {
+    if (!core || core.status !== "running" || concurrent.length > 0) {
       return json(
         {
           success: false,
           requestId,
           error: "campaign_guard_failed",
           coreStatus: core?.status ?? null,
-          unlockedPhases: unlocked.map((campaign) => campaign.phase_key),
+          concurrentPhases: concurrent.map((campaign) => campaign.phase_key),
         },
         409,
       );
     }
 
-    const candidates = await peekNextSpotifyChartBackfillJobs({ limit: LIMIT });
+    const candidates = await peekNextSpotifyChartBackfillJobs({
+      limit: LIMIT,
+      phaseKey: phase.key,
+    });
     const invalidCandidates = candidates.filter(
       (job) =>
         !["BR", "GLOBAL"].includes(job.region_id) ||
@@ -107,7 +110,11 @@ export async function POST(request: Request) {
         job.target_date > core.target_end_date,
     );
 
-    if (candidates.length !== LIMIT || invalidCandidates.length > 0) {
+    if (
+      candidates.length < 1 ||
+      candidates.length > LIMIT ||
+      invalidCandidates.length > 0
+    ) {
       return json(
         {
           success: false,
@@ -120,23 +127,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const worker = await processSpotifyChartBackfillQueue({ limit: LIMIT });
+    const worker = await processSpotifyChartBackfillQueue({
+      limit: candidates.length,
+      phaseKey: phase.key,
+    });
     const campaigns = await refreshSpotifyChartBackfillCampaignProgress();
     const completedBatch =
-      worker.processed === LIMIT &&
-      worker.sourceValidated === LIMIT &&
+      worker.processed === candidates.length &&
+      worker.sourceValidated === candidates.length &&
       !worker.sourceBlocked &&
       worker.failed === 0 &&
       worker.retryPending === 0 &&
       worker.lostLease === 0 &&
-      worker.success + worker.skipped === LIMIT;
+      worker.success + worker.skipped === candidates.length;
 
     return json(
       {
         success: completedBatch,
         requestId,
-        phase: PHASE,
+        phase: phase.key,
         limit: LIMIT,
+        batchSize: candidates.length,
         worker,
         campaigns,
       },

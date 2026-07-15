@@ -1,5 +1,6 @@
 import "server-only";
 import { backfillSpotifyCharts } from "@/lib/charts/spotify-chart-backfill";
+import type { SpotifyChartBackfillPhaseKey } from "@/lib/charts/spotify-chart-backfill-campaigns";
 import {
   SPOTIFY_CHART_BACKFILL_DEFAULT_LIMIT,
   SPOTIFY_CHART_BACKFILL_MAX_LIMIT,
@@ -253,6 +254,7 @@ async function processClaimedJob(
 export async function processSpotifyChartBackfillQueue(
   input: {
     limit?: number;
+    phaseKey?: SpotifyChartBackfillPhaseKey;
   } = {},
 ) {
   const startedAt = Date.now();
@@ -266,18 +268,23 @@ export async function processSpotifyChartBackfillQueue(
     targetDate: string;
     error: string;
   }> = [];
-  const candidates = await peekNextSpotifyChartBackfillJobs({ limit });
+  const candidates = await peekNextSpotifyChartBackfillJobs({
+    limit,
+    phaseKey: input.phaseKey,
+  });
   const prepared: Array<{
     candidate: SpotifyChartBackfillJob;
     chart: AutomaticChart;
     downloaded: DownloadedSpotifyChart;
   }> = [];
+  let stoppedForTimeBudget = false;
 
   for (const candidate of candidates) {
     if (
       prepared.length > 0 &&
       Date.now() - startedAt >= WORKER_START_BUDGET_MS
     ) {
+      stoppedForTimeBudget = true;
       break;
     }
 
@@ -311,6 +318,7 @@ export async function processSpotifyChartBackfillQueue(
         jobId: item.candidate.id,
         workerId,
         leaseSeconds: WORKER_LEASE_SECONDS,
+        phaseKey: input.phaseKey,
       });
 
       if (!job) {
@@ -338,9 +346,7 @@ export async function processSpotifyChartBackfillQueue(
     skipped: results.filter((result) => result.status === "skipped").length,
     lostLease: results.filter((result) => result.status === "lost-lease")
       .length,
-    stoppedForTimeBudget:
-      results.length < limit &&
-      Date.now() - startedAt >= WORKER_START_BUDGET_MS,
+    stoppedForTimeBudget,
     durationMs: Date.now() - startedAt,
     results,
   };

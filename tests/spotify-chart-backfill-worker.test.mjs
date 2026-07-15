@@ -219,12 +219,16 @@ test("worker isolates a failed GLOBAL job from a successful BR job", async () =>
     makeJob({ region_id: "GLOBAL", target_date: "2026-07-11" }),
   );
 
-  const result = await processSpotifyChartBackfillQueue({ limit: 2 });
+  const result = await processSpotifyChartBackfillQueue({
+    limit: 2,
+    phaseKey: "core-60d",
+  });
 
   assert.equal(result.processed, 2);
   assert.equal(result.success, 1);
   assert.equal(result.failed, 1);
   assert.equal(result.lostLease, 0);
+  assert.ok(claimCalls.every((call) => call.phaseKey === "core-60d"));
   assert.deepEqual(
     settledJobs.map(({ outcome }) => outcome),
     ["success", "failed"],
@@ -294,6 +298,17 @@ test("worker stops cleanly when the queue is empty and clamps its limit", async 
   assert.equal(result.processed, 0);
   assert.equal(result.success, 0);
   assert.equal(result.failed, 0);
+  assert.equal(result.stoppedForTimeBudget, false);
+});
+
+test("worker does not report a natural partial tail as a time-budget stop", async () => {
+  queuedJobs.push(makeJob());
+
+  const result = await processSpotifyChartBackfillQueue({ limit: 3 });
+
+  assert.equal(result.previewed, 1);
+  assert.equal(result.processed, 1);
+  assert.equal(result.stoppedForTimeBudget, false);
 });
 
 test("worker leaves attempts untouched when source preflight fails", async () => {

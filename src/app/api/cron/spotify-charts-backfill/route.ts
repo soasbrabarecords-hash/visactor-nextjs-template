@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   approveSpotifyChartBackfillCampaign,
   getSpotifyChartBackfillCampaigns,
+  getSpotifyChartBackfillRolloutAnchorEndDate,
   planSpotifyChartBackfillPhase,
   refreshSpotifyChartBackfillCampaignProgress,
   setSpotifyChartBackfillCampaignPaused,
@@ -129,23 +130,32 @@ export async function GET(request: Request) {
     );
   }
 
-  if (dryRun) {
-    const seed = days ? planRecentSpotifyChartBackfillJobs(days) : null;
-
-    return NextResponse.json({
-      success: true,
-      dryRun: true,
-      action,
-      limit,
-      seedComplete:
-        (!seed || seed.unavailableRegions.length === 0) &&
-        (!phasePlan || phasePlan.sourceReady),
-      seed,
-      phase: phasePlan,
-    });
-  }
-
   try {
+    if (dryRun) {
+      const seed = days ? planRecentSpotifyChartBackfillJobs(days) : null;
+      const anchoredPhasePlan = phasePlan
+        ? planSpotifyChartBackfillPhase(
+            phasePlan.phaseKey,
+            new Date(),
+            getSpotifyChartBackfillRolloutAnchorEndDate(
+              await getSpotifyChartBackfillCampaigns(),
+            ),
+          )
+        : null;
+
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        action,
+        limit,
+        seedComplete:
+          (!seed || seed.unavailableRegions.length === 0) &&
+          (!anchoredPhasePlan || anchoredPhasePlan.sourceReady),
+        seed,
+        phase: anchoredPhasePlan,
+      });
+    }
+
     if (action === "status") {
       await refreshSpotifyChartBackfillCampaignProgress(phasePlan?.phaseKey);
       const campaigns = await getSpotifyChartBackfillCampaigns();
@@ -186,7 +196,10 @@ export async function GET(request: Request) {
       ? await enqueueRecentSpotifyChartBackfillJobs(days)
       : null;
     await refreshSpotifyChartBackfillCampaignProgress();
-    const worker = await processSpotifyChartBackfillQueue({ limit });
+    const worker = await processSpotifyChartBackfillQueue({
+      limit,
+      phaseKey: phasePlan?.phaseKey,
+    });
     const campaigns = await refreshSpotifyChartBackfillCampaignProgress();
     const seedComplete = !seed || seed.unavailableRegions.length === 0;
 

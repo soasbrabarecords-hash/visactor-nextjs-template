@@ -67,6 +67,7 @@ type CacheEntry<T> = {
 };
 
 const SNAPSHOT_CACHE_TTL_MS = 2 * 60 * 1000;
+const SNAPSHOT_DATES_PAGE_SIZE = 1000;
 const snapshotDatesCache = new Map<string, CacheEntry<string[]>>();
 const snapshotDatesInFlight = new Map<string, Promise<string[]>>();
 const snapshotByDateCache = new Map<string, CacheEntry<ChartSnapshot | null>>();
@@ -358,23 +359,39 @@ export async function getSnapshotDates(country = "BR"): Promise<string[]> {
 
   const supabase = await createClient();
   const request = (async () => {
-    const { data, error } = await supabase
-      .from("spotify_chart_complete_snapshots")
-      .select("chart_date")
-      .eq("country", cacheKey)
-      .order("chart_date", { ascending: false });
-
-    if (error) {
-      return [];
-    }
-
     const seen = new Set<string>();
     const unique: string[] = [];
-    for (const row of data ?? []) {
-      if (!seen.has(row.chart_date)) {
-        seen.add(row.chart_date);
-        unique.push(row.chart_date);
+    let offset = 0;
+    let totalRows: number | null = null;
+
+    while (totalRows === null || offset < totalRows) {
+      const { data, error, count } = await supabase
+        .from("spotify_chart_complete_snapshots")
+        .select("snapshot_id,chart_date", { count: "exact" })
+        .eq("country", cacheKey)
+        .order("chart_date", { ascending: false })
+        .order("snapshot_id", { ascending: true })
+        .range(offset, offset + SNAPSHOT_DATES_PAGE_SIZE - 1);
+
+      if (error) {
+        return [];
       }
+
+      const page = data ?? [];
+      totalRows = typeof count === "number" ? count : totalRows;
+
+      for (const row of page) {
+        if (!seen.has(row.chart_date)) {
+          seen.add(row.chart_date);
+          unique.push(row.chart_date);
+        }
+      }
+
+      if (page.length === 0) {
+        break;
+      }
+
+      offset += page.length;
     }
 
     return setCachedValue(snapshotDatesCache, cacheKey, unique);

@@ -86,18 +86,22 @@ test("claim preserves a real reserved job", async () => {
   assert.equal(claimed?.status, "running");
 });
 
-test("preflight peek is read-only and clamps its batch to ten", async () => {
+test("preflight peek is phase-scoped and clamps its batch to ten", async () => {
   rpcList = [
     { id: crypto.randomUUID(), region_id: "BR", status: "pending" },
     { id: null, region_id: null, status: null },
   ];
 
-  const jobs = await peekNextSpotifyChartBackfillJobs({ limit: 99 });
+  const jobs = await peekNextSpotifyChartBackfillJobs({
+    limit: 99,
+    phaseKey: "core-1095d",
+  });
 
   assert.equal(jobs.length, 1);
   assert.equal(jobs[0].region_id, "BR");
   assert.equal(lastRpc.name, "peek_spotify_chart_backfill_jobs");
   assert.equal(lastRpc.params.p_limit, 10);
+  assert.equal(lastRpc.params.p_phase_key, "core-1095d");
 });
 
 test("validated claim reserves the exact preflight job id", async () => {
@@ -107,32 +111,67 @@ test("validated claim reserves the exact preflight job id", async () => {
   const job = await claimSpotifyChartBackfillJobById({
     jobId,
     workerId: "preflight-worker",
+    phaseKey: "core-60d",
   });
 
   assert.equal(job?.id, jobId);
   assert.equal(lastRpc.name, "claim_spotify_chart_backfill_job_by_id");
   assert.equal(lastRpc.params.p_job_id, jobId);
   assert.equal(lastRpc.params.p_worker_id, "preflight-worker");
+  assert.equal(lastRpc.params.p_phase_key, "core-60d");
 });
 
-test("preflight SQL is pinned to the running core-30d campaign", async () => {
+test("preflight SQL requires the explicit running rollout phase", async () => {
   const migration = await readFile(
     new URL(
-      "../supabase/migrations/20260713235000_preflight_spotify_chart_backfill_sources.sql",
+      "../supabase/migrations/20260715013152_extend_spotify_chart_core_history.sql",
       import.meta.url,
     ),
     "utf8",
   );
 
   assert.equal(
-    (migration.match(/campaign\.phase_key = 'core-30d'/g) ?? []).length,
-    2,
-  );
-  assert.equal(
     (migration.match(/campaign\.status = 'running'/g) ?? []).length,
     2,
   );
-  assert.doesNotMatch(migration, /not exists\s*\([\s\S]*campaign_job\.job_id/);
+  assert.equal(
+    (
+      migration.match(
+        /p_phase_key is null or campaign\.phase_key = p_phase_key/g,
+      ) ?? []
+    ).length,
+    2,
+  );
+  assert.doesNotMatch(migration, /campaign\.phase_key = 'core-30d'/);
+  assert.match(migration, /p_phase_key text default null/);
+  assert.match(migration, /window_days between 1 and 1095/);
+  assert.match(migration, /snapshot\.total_tracks = 200/);
+  assert.match(migration, /integrity\.unique_track_ids = 200/);
+  assert.match(migration, /nullif\(btrim\(track\.track_name\), ''\) is null/);
+  assert.match(
+    migration,
+    /track\.chart_date is distinct from snapshot\.chart_date/,
+  );
+  assert.match(migration, /rollout_anchor_end_date/);
+  assert.match(
+    migration,
+    /spotify_chart_backfill_campaigns_exact_window_check/,
+  );
+  assert.match(migration, /immediate_successor/);
+  assert.match(migration, /retry_pending_job_count <> 0/);
+  assert.ok(
+    migration.indexOf("pg_advisory_xact_lock") <
+      migration.indexOf("do $migration$"),
+  );
+  assert.ok(
+    migration.indexOf(
+      "from public.refresh_spotify_chart_backfill_campaign_progress(null)",
+    ) < migration.indexOf("validate constraint"),
+  );
+  assert.equal(
+    (migration.match(/where campaign_job\.job_id = job\.id/g) ?? []).length,
+    2,
+  );
 });
 
 test("historical snapshot RPC is service-role only and enforces an atomic Top 200", async () => {

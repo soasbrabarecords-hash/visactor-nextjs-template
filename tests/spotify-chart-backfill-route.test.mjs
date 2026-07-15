@@ -1,5 +1,33 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { mock, test } from "node:test";
+
+const persistedCampaigns = [
+  {
+    rollout_key: "spotify-charts-historical-v1",
+    phase_key: "core-30d",
+    phase_order: 10,
+    target_end_date: "2026-07-12",
+  },
+];
+
+mock.module("@/lib/supabase/admin", {
+  exports: {
+    createAdminClient: () => ({
+      from: () => {
+        const query = {
+          select() {
+            return query;
+          },
+          eq() {
+            return query;
+          },
+          order: async () => ({ data: persistedCampaigns, error: null }),
+        };
+        return query;
+      },
+    }),
+  },
+});
 
 const { GET } =
   await import("../src/app/api/cron/spotify-charts-backfill/route.ts");
@@ -141,6 +169,42 @@ test("route dry-run plans the first gradual phase without touching the queue", a
     assert.equal(response.body.phase.phaseKey, "core-30d");
     assert.equal(response.body.phase.expectedJobs, 60);
     assert.deepEqual(response.body.phase.regionIds, ["BR", "GLOBAL"]);
+  } finally {
+    if (previousSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previousSecret;
+  }
+});
+
+test("route dry-run exposes the complete long-range core catalog", async () => {
+  const previousSecret = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "unit-test-secret";
+
+  try {
+    const expectations = [
+      ["core-60d", 120, "2026-05-14"],
+      ["core-180d", 360, "2026-01-14"],
+      ["core-365d", 730, "2025-07-13"],
+      ["core-730d", 1460, "2024-07-13"],
+      ["core-1095d", 2190, "2023-07-14"],
+    ];
+
+    for (const [phase, expectedJobs, startDate] of expectations) {
+      const response = await readJson(
+        await GET(
+          request(
+            `?dry_run=1&phase=${phase}&limit=3`,
+            "Bearer unit-test-secret",
+          ),
+        ),
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(response.body.phase.phaseKey, phase);
+      assert.equal(response.body.phase.expectedJobs, expectedJobs);
+      assert.equal(response.body.phase.startDate, startDate);
+      assert.equal(response.body.phase.endDate, "2026-07-12");
+      assert.deepEqual(response.body.phase.regionIds, ["BR", "GLOBAL"]);
+    }
   } finally {
     if (previousSecret === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = previousSecret;

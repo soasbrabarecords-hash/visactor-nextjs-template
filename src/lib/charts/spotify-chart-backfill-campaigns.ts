@@ -14,22 +14,43 @@ export const SPOTIFY_CHART_BACKFILL_PHASES = [
     regionIds: ["BR", "GLOBAL"],
   },
   {
-    key: "core-180d",
+    key: "core-60d",
     order: 20,
+    name: "BR + Global — 60 dias",
+    windowDays: 60,
+    regionIds: ["BR", "GLOBAL"],
+  },
+  {
+    key: "core-180d",
+    order: 30,
     name: "BR + Global — 6 meses",
     windowDays: 180,
     regionIds: ["BR", "GLOBAL"],
   },
   {
     key: "core-365d",
-    order: 30,
+    order: 40,
     name: "BR + Global — 1 ano",
     windowDays: 365,
     regionIds: ["BR", "GLOBAL"],
   },
   {
+    key: "core-730d",
+    order: 50,
+    name: "BR + Global — 2 anos",
+    windowDays: 730,
+    regionIds: ["BR", "GLOBAL"],
+  },
+  {
+    key: "core-1095d",
+    order: 60,
+    name: "BR + Global — 3 anos",
+    windowDays: 1095,
+    regionIds: ["BR", "GLOBAL"],
+  },
+  {
     key: "cities-30d",
-    order: 40,
+    order: 70,
     name: "SP + RJ + Porto Alegre — 30 dias",
     windowDays: 30,
     regionIds: [
@@ -40,7 +61,7 @@ export const SPOTIFY_CHART_BACKFILL_PHASES = [
   },
   {
     key: "cities-180d",
-    order: 50,
+    order: 80,
     name: "SP + RJ + Porto Alegre — 6 meses",
     windowDays: 180,
     regionIds: [
@@ -117,6 +138,14 @@ export function getSpotifyChartBackfillPhaseDefinition(value: string) {
   );
 }
 
+export function isCoreSpotifyChartBackfillPhase(
+  phase: (typeof SPOTIFY_CHART_BACKFILL_PHASES)[number],
+) {
+  return phase.regionIds.every(
+    (regionId) => regionId === "BR" || regionId === "GLOBAL",
+  );
+}
+
 function getLatestCompletedUtcDate(now: Date) {
   const latest = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
@@ -128,11 +157,26 @@ function getLatestCompletedUtcDate(now: Date) {
 export function planSpotifyChartBackfillPhase(
   phaseKey: string,
   now = new Date(),
+  anchorEndDate?: string | null,
 ) {
   const phase = getSpotifyChartBackfillPhaseDefinition(phaseKey);
   if (!phase) return null;
 
-  const end = getLatestCompletedUtcDate(now);
+  const latestCompletedDate = getLatestCompletedUtcDate(now);
+  const parsedAnchor = anchorEndDate
+    ? new Date(`${anchorEndDate}T00:00:00.000Z`)
+    : null;
+
+  if (
+    parsedAnchor &&
+    (Number.isNaN(parsedAnchor.getTime()) ||
+      parsedAnchor.toISOString().slice(0, 10) !== anchorEndDate ||
+      parsedAnchor > latestCompletedDate)
+  ) {
+    throw new Error("A data ancora do rollout deve ser um dia UTC concluido.");
+  }
+
+  const end = parsedAnchor ?? latestCompletedDate;
   const dates = Array.from({ length: phase.windowDays }, (_value, index) => {
     const date = new Date(end);
     date.setUTCDate(end.getUTCDate() - index);
@@ -174,6 +218,24 @@ export async function getSpotifyChartBackfillCampaigns() {
   return (data ?? []) as SpotifyChartBackfillCampaign[];
 }
 
+export function getSpotifyChartBackfillRolloutAnchorEndDate(
+  campaigns: readonly Pick<
+    SpotifyChartBackfillCampaign,
+    "rollout_key" | "phase_order" | "target_end_date"
+  >[],
+) {
+  return (
+    campaigns
+      .filter(
+        (campaign) =>
+          campaign.rollout_key === SPOTIFY_CHART_BACKFILL_ROLLOUT_KEY &&
+          campaign.target_end_date,
+      )
+      .sort((left, right) => left.phase_order - right.phase_order)[0]
+      ?.target_end_date ?? null
+  );
+}
+
 export async function refreshSpotifyChartBackfillCampaignProgress(
   phaseKey?: string,
 ) {
@@ -191,7 +253,16 @@ export async function refreshSpotifyChartBackfillCampaignProgress(
 }
 
 export async function startSpotifyChartBackfillCampaign(phaseKey: string) {
-  const plan = planSpotifyChartBackfillPhase(phaseKey);
+  const campaigns = await getSpotifyChartBackfillCampaigns();
+  const targetCampaign = campaigns.find(
+    (campaign) => campaign.phase_key === phaseKey.trim().toLowerCase(),
+  );
+  const anchorEndDate = getSpotifyChartBackfillRolloutAnchorEndDate(campaigns);
+  const plan = planSpotifyChartBackfillPhase(
+    phaseKey,
+    new Date(),
+    anchorEndDate,
+  );
 
   if (!plan) {
     throw new Error("Fase de backfill desconhecida.");
@@ -203,6 +274,19 @@ export async function startSpotifyChartBackfillCampaign(phaseKey: string) {
       reason: "historical_sources_not_ready" as const,
       plan,
       campaign: null,
+    };
+  }
+
+  if (
+    targetCampaign &&
+    (targetCampaign.status === "running" ||
+      targetCampaign.status === "completed")
+  ) {
+    return {
+      started: true as const,
+      reason: null,
+      plan,
+      campaign: targetCampaign,
     };
   }
 

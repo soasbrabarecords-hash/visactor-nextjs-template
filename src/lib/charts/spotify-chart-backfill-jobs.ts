@@ -1,4 +1,5 @@
 import "server-only";
+import type { SpotifyChartBackfillPhaseKey } from "@/lib/charts/spotify-chart-backfill-campaigns";
 import {
   getCurrentAutomaticSpotifyChartRegionKeys,
   normalizeSpotifyChartRegionKey,
@@ -65,7 +66,10 @@ function asSpotifyChartBackfillJob(
   return value as SpotifyChartBackfillJob;
 }
 
-function normalizeSlug(value: string, field: "chart_type" | "period") {
+function normalizeSlug(
+  value: string,
+  field: "chart_type" | "period" | "phase_key",
+) {
   const normalized = value.trim().toLowerCase();
 
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized)) {
@@ -90,6 +94,14 @@ function normalizeTargetDate(value: string) {
   }
 
   return value;
+}
+
+function normalizeOptionalPhaseKey(
+  value: SpotifyChartBackfillPhaseKey | undefined,
+) {
+  if (!value) return null;
+
+  return normalizeSlug(value, "phase_key");
 }
 
 export async function enqueueSpotifyChartBackfillJob(input: {
@@ -182,6 +194,7 @@ export async function claimNextSpotifyChartBackfillJob(input: {
 
 export async function peekNextSpotifyChartBackfillJobs(input: {
   limit?: number;
+  phaseKey?: SpotifyChartBackfillPhaseKey;
 }) {
   const admin = requireBackfillAdmin();
   const limit = Math.min(
@@ -193,6 +206,7 @@ export async function peekNextSpotifyChartBackfillJobs(input: {
   );
   const { data, error } = await admin.rpc("peek_spotify_chart_backfill_jobs", {
     p_limit: limit,
+    p_phase_key: normalizeOptionalPhaseKey(input.phaseKey),
   });
 
   if (error) {
@@ -210,6 +224,7 @@ export async function claimSpotifyChartBackfillJobById(input: {
   jobId: string;
   workerId: string;
   leaseSeconds?: number;
+  phaseKey?: SpotifyChartBackfillPhaseKey;
 }) {
   const admin = requireBackfillAdmin();
   const { data, error } = await admin
@@ -217,6 +232,7 @@ export async function claimSpotifyChartBackfillJobById(input: {
       p_job_id: input.jobId,
       p_worker_id: input.workerId,
       p_lease_seconds: input.leaseSeconds ?? 300,
+      p_phase_key: normalizeOptionalPhaseKey(input.phaseKey),
     })
     .maybeSingle();
 

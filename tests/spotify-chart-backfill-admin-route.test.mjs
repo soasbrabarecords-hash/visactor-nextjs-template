@@ -3,8 +3,23 @@ import { mock, test } from "node:test";
 
 let authorized = true;
 let workerCalls = 0;
+let workerInput = null;
+let peekInput = null;
 let campaigns = [];
 let candidates = [];
+
+const phases = new Map(
+  [
+    ["core-30d", ["BR", "GLOBAL"]],
+    ["core-60d", ["BR", "GLOBAL"]],
+    ["core-180d", ["BR", "GLOBAL"]],
+    ["core-365d", ["BR", "GLOBAL"]],
+    ["core-730d", ["BR", "GLOBAL"]],
+    ["core-1095d", ["BR", "GLOBAL"]],
+    ["cities-30d", ["BR-SP-SAO-PAULO"]],
+    ["cities-180d", ["BR-SP-SAO-PAULO"]],
+  ].map(([key, regionIds]) => [key, { key, regionIds }]),
+);
 
 function campaign(phaseKey, status) {
   return {
@@ -38,25 +53,33 @@ mock.module("@/lib/charts/spotify-chart-backfill-campaigns", {
   exports: {
     refreshSpotifyChartBackfillCampaignProgress: async () => campaigns,
     getSpotifyChartBackfillCampaigns: async () => campaigns,
+    getSpotifyChartBackfillPhaseDefinition: (value) =>
+      phases.get(value.trim().toLowerCase()) ?? null,
+    isCoreSpotifyChartBackfillPhase: (phase) =>
+      phase.regionIds.every((regionId) => ["BR", "GLOBAL"].includes(regionId)),
   },
 });
 
 mock.module("@/lib/charts/spotify-chart-backfill-jobs", {
   exports: {
-    peekNextSpotifyChartBackfillJobs: async () => candidates,
+    peekNextSpotifyChartBackfillJobs: async (input) => {
+      peekInput = input;
+      return candidates;
+    },
   },
 });
 
 mock.module("@/lib/charts/spotify-chart-backfill-worker", {
   exports: {
-    processSpotifyChartBackfillQueue: async () => {
+    processSpotifyChartBackfillQueue: async (input) => {
       workerCalls += 1;
+      workerInput = input;
       return {
-        processed: 3,
-        sourceValidated: 3,
+        processed: candidates.length,
+        sourceValidated: candidates.length,
         sourceBlocked: false,
-        success: 2,
-        skipped: 1,
+        success: candidates.length,
+        skipped: 0,
         failed: 0,
         retryPending: 0,
         lostLease: 0,
@@ -86,38 +109,71 @@ function request(body) {
 test.beforeEach(() => {
   authorized = true;
   workerCalls = 0;
+  workerInput = null;
+  peekInput = null;
   campaigns = [
-    campaign("core-30d", "running"),
+    campaign("core-30d", "completed"),
+    campaign("core-60d", "running"),
     campaign("core-180d", "locked"),
     campaign("core-365d", "locked"),
+    campaign("core-730d", "locked"),
+    campaign("core-1095d", "locked"),
     campaign("cities-30d", "locked"),
     campaign("cities-180d", "locked"),
   ];
   candidates = [job(0), job(1), job(2)];
 });
 
-test("admin trigger accepts only the fixed core-30d batch", async () => {
-  const response = await POST(request({ phase: "core-30d", limit: 10 }));
+test("admin trigger accepts only cataloged core batches with limit three", async () => {
+  const wrongLimit = await POST(request({ phase: "core-60d", limit: 10 }));
+  const city = await POST(request({ phase: "cities-30d", limit: 3 }));
 
-  assert.equal(response.status, 400);
+  assert.equal(wrongLimit.status, 400);
+  assert.equal(city.status, 400);
   assert.equal(workerCalls, 0);
 });
 
-test("admin trigger refuses to run while a later phase is unlocked", async () => {
-  campaigns[1] = campaign("core-180d", "ready");
+test("admin trigger refuses a requested phase that is not running", async () => {
+  campaigns[1] = campaign("core-60d", "ready");
 
-  const response = await POST(request({ phase: "core-30d", limit: 3 }));
+  const response = await POST(request({ phase: "core-60d", limit: 3 }));
+
+  assert.equal(response.status, 409);
+  assert.equal(workerCalls, 0);
+});
+
+test("admin trigger refuses concurrent running campaigns", async () => {
+  campaigns[2] = campaign("core-180d", "running");
+
+  const response = await POST(request({ phase: "core-60d", limit: 3 }));
 
   assert.equal(response.status, 409);
   assert.equal(workerCalls, 0);
 });
 
 test("admin trigger processes exactly three guarded core jobs", async () => {
-  const response = await POST(request({ phase: "core-30d", limit: 3 }));
+  const response = await POST(request({ phase: "core-60d", limit: 3 }));
   const body = await response.json();
 
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.limit, 3);
+  assert.equal(body.batchSize, 3);
+  assert.equal(body.phase, "core-60d");
+  assert.equal(peekInput.phaseKey, "core-60d");
+  assert.equal(workerInput.phaseKey, "core-60d");
+  assert.equal(workerCalls, 1);
+});
+
+test("admin trigger closes a phase with a final partial batch", async () => {
+  candidates = [job(0)];
+
+  const response = await POST(request({ phase: "core-60d", limit: 3 }));
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(body.batchSize, 1);
+  assert.equal(workerInput.limit, 1);
   assert.equal(workerCalls, 1);
 });
