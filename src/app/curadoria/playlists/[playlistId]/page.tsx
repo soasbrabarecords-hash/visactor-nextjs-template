@@ -1,12 +1,11 @@
 import Link from "next/link";
 import Container from "@/components/container";
 import { TopNav } from "@/components/nav";
-import { Button } from "@/components/ui/button";
 import PageIntro from "@/components/page-intro";
+import { Button } from "@/components/ui/button";
 import PlaylistActionBar from "@/components/workspace/playlist-action-bar";
 import PlaylistEditor from "@/components/workspace/playlist-editor";
 import PlaylistHeader from "@/components/workspace/playlist-header";
-import PlaylistKworbSuggestions from "@/components/workspace/playlist-kworb-suggestions";
 import PlaylistTrackSearch from "@/components/workspace/playlist-track-search";
 import { fetchSpotifyEditablePlaylist } from "@/lib/spotify-user";
 
@@ -93,13 +92,6 @@ export default async function SpotifyPlaylistEditorPage({
           existingTrackIds={playlist.tracks.map((t) => t.id)}
         />
       </Container>
-
-      <PlaylistKworbSuggestions
-        playlistId={playlistId}
-        playlistName={playlist.name}
-        playlistDescription={playlist.description}
-        currentTrackIds={playlist.tracks.map((t) => t.id)}
-      />
     </div>
   );
 }

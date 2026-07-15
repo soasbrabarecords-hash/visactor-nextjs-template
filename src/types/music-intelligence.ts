@@ -90,6 +90,11 @@ export type MusicIntelligenceResponse = {
     biggestDrops: MusicIntelligenceTrack[];
     risingArtists: MusicIntelligenceArtistSignal[];
   };
+  /**
+   * Full ranked candidate pool used server-side by playlist-specific decisions.
+   * The public dashboard endpoint omits this field to keep its payload compact.
+   */
+  candidatePool: Record<MusicIntelligenceCountry, MusicIntelligenceTrack[]>;
   meta: {
     generatedAt: string;
     methodologyVersion: "v1";

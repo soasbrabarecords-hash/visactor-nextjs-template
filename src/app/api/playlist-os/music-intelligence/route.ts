@@ -21,7 +21,8 @@ export async function GET() {
     }
 
     const data = await getMusicIntelligence();
-    return NextResponse.json(data, { headers: NO_STORE_HEADERS });
+    const { candidatePool: _candidatePool, ...publicData } = data;
+    return NextResponse.json(publicData, { headers: NO_STORE_HEADERS });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Music Intelligence API failed: ${message}\n`);

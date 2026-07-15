@@ -604,6 +604,10 @@ export function createEmptyMusicIntelligenceResponse(
       biggestDrops: [],
       risingArtists: [],
     },
+    candidatePool: {
+      BR: [],
+      GLOBAL: [],
+    },
     meta: {
       generatedAt,
       methodologyVersion: "v1",
@@ -779,6 +783,20 @@ export function buildMusicIntelligenceModel({
   const review = combinedQueue.review;
   const brQueue = buildDecisionQueue(marketCandidates.BR);
   const globalQueue = buildDecisionQueue(marketCandidates.GLOBAL);
+  const candidatePool = {
+    BR: [...marketCandidates.BR].sort(
+      (left, right) =>
+        right.scores.opportunityScore - left.scores.opportunityScore ||
+        right.scores.momentumScore - left.scores.momentumScore ||
+        left.currentPosition - right.currentPosition,
+    ),
+    GLOBAL: [...marketCandidates.GLOBAL].sort(
+      (left, right) =>
+        right.scores.opportunityScore - left.scores.opportunityScore ||
+        right.scores.momentumScore - left.scores.momentumScore ||
+        left.currentPosition - right.currentPosition,
+    ),
+  };
   const crossover = [...candidates]
     .filter((track) => track.scores.crossoverScore >= 55)
     .sort(
@@ -861,6 +879,7 @@ export function buildMusicIntelligenceModel({
       biggestDrops: biggestDrops.slice(0, MAX_QUEUE_ITEMS),
       risingArtists: buildArtistSignals([...addNow, ...watch]),
     },
+    candidatePool,
     meta: {
       generatedAt,
       methodologyVersion: "v1",

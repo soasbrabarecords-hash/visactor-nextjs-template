@@ -39,6 +39,10 @@ const responseData = {
     biggestDrops: [],
     risingArtists: [],
   },
+  candidatePool: {
+    BR: [{ id: "internal-only" }],
+    GLOBAL: [],
+  },
   meta: {
     generatedAt: "2026-07-15T00:00:00.000Z",
     methodologyVersion: "v1",
@@ -118,6 +122,7 @@ test("route returns the complete intelligence contract", async () => {
   assert.equal(serviceCalls, 1);
   assert.equal(body.summary.maxWindow, 180);
   assert.deepEqual(body.addNow, []);
+  assert.equal("candidatePool" in body, false);
   assert.equal(body.meta.methodologyVersion, "v1");
   assert.equal(
     response.headers.get("cache-control"),
