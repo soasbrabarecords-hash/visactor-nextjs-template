@@ -1230,6 +1230,13 @@ type OpenAiFunctionCall = {
   call_id: string;
 };
 
+let aiGatewayRateLimitedUntil = 0;
+
+function isAiGatewayRateLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /AI Gateway 429:/i.test(message);
+}
+
 const PLAYLISTS_AI_FUNCTIONS = [
   {
     type: "function",
@@ -1823,6 +1830,10 @@ async function runToolCallingAgent({
   requestOverride?: PlaylistsAiAgentRequest;
 }): Promise<PlaylistsAiChatResponse | null> {
   try {
+    if (!requestOverride && Date.now() < aiGatewayRateLimitedUntil) {
+      return null;
+    }
+
     const credentials = requestOverride
       ? null
       : await getEffectiveAiGatewayCredentials();
@@ -2043,6 +2054,12 @@ Regras de trabalho:
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Playlists IA agent loop fallback: ${message}\n`);
+    if (isAiGatewayRateLimitError(error)) {
+      if (!requestOverride) {
+        aiGatewayRateLimitedUntil = Date.now() + 90_000;
+      }
+      return null;
+    }
     return unavailableAgentResponse({
       brief,
       intent: fallbackIntent,

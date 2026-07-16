@@ -278,6 +278,24 @@ test("never replaces an unavailable conversational agent with fake recommendatio
   assert.match(result.text, /Nenhuma recomendação foi gerada/i);
 });
 
+test("keeps real chart intelligence available when the AI Gateway rate limits", async () => {
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 10 músicas de trap dos últimos 180 dias." },
+    {
+      tools: buildTools(),
+      agentRequest: async () => {
+        throw new Error("AI Gateway 429: free tier rate limited");
+      },
+    },
+  );
+
+  assert.equal(result.meta.execution, "fallback");
+  assert.equal(result.cards.length, 10);
+  assert.equal(result.meta.returnedCount, 10);
+  assert.equal(result.confidence > 0, true);
+  assert.doesNotMatch(result.text, /Nenhuma recomendação foi gerada/i);
+});
+
 test("answers a methodology follow-up from the verified conversation context", async () => {
   const result = await runPlaylistsAiAgent(
     {
