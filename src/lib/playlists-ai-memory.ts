@@ -206,15 +206,16 @@ function requiredFields(
   intent: PlaylistsAiIntent | null,
   playlistMode: PlaylistsAiPlaylistMode | null,
 ): PlaylistsAiCurationBriefField[] {
-  if (intent === "playlist_recommendations" || intent === "playlist_review") {
-    return ["playlistName", "goal", "market"];
-  }
-  if (intent === "playlist_description") return ["playlistName", "goal"];
+  if (intent === "playlist_recommendations") return ["playlistName"];
+  if (intent === "playlist_review") return [];
+  if (intent === "playlist_description") return ["playlistName"];
   if (intent === "playlist_idea" || playlistMode === "new") {
-    return ["genre", "goal", "market"];
+    return ["genre"];
   }
-  if (intent === "chart_opportunities") return ["market"];
-  return ["goal", "market"];
+  if (intent === "chart_opportunities" || intent === "track_presence") {
+    return [];
+  }
+  return ["goal"];
 }
 
 function finalizeBrief(brief: PlaylistsAiCurationBrief) {
@@ -311,7 +312,6 @@ export function shouldAskForCurationContext({
   if (intent === "track_presence") return false;
   if (isDirectCurationRequest(message)) return false;
   if (intent === "general") return true;
-  if (intent === "chart_opportunities" && !brief.market) return true;
   if (
     (STRATEGIC_LANGUAGE.test(normalized) ||
       intent === "playlist_idea" ||

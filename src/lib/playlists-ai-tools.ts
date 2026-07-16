@@ -537,13 +537,13 @@ async function getHistoricalChartRankings({
   market,
   limit,
   windowDays,
-  genre,
+  genres,
   excludeTrackIds,
 }: {
   market: PlaylistsAiCurationMarket;
   limit: number;
   windowDays: number;
-  genre: TrackProfileGenre | null;
+  genres: TrackProfileGenre[];
   excludeTrackIds: ReadonlySet<string>;
 }): Promise<ChartOpportunitiesToolResult> {
   const admin = createAdminClient();
@@ -562,24 +562,77 @@ async function getHistoricalChartRankings({
   const countries: MusicIntelligenceCountry[] =
     market === "BOTH" ? ["BR", "GLOBAL"] : [market];
   const requestedLimit = clamp(limit + excludeTrackIds.size, 1, 50);
-  const { data, error } = await admin.rpc(
-    "get_spotify_chart_history_rankings",
-    {
-      p_window_days: clamp(windowDays, 1, 365),
-      p_countries: countries,
-      p_primary_genre: genre,
-      p_limit: requestedLimit,
-    },
+  const genreFilters: Array<TrackProfileGenre | null> = genres.length
+    ? [...genres, null]
+    : [null];
+  const results = await Promise.all(
+    genreFilters.map((primaryGenre) =>
+      admin.rpc("get_spotify_chart_history_rankings", {
+        p_window_days: clamp(windowDays, 1, 365),
+        p_countries: countries,
+        p_primary_genre: primaryGenre,
+        // The unfiltered pass recovers chart tracks whose profile has not been
+        // enriched yet. It remains bounded to the RPC's protected maximum.
+        p_limit: genres.length ? 50 : requestedLimit,
+      }),
+    ),
   );
-
-  if (error) {
-    throw new Error(`Historical chart ranking failed: ${error.message}`);
+  const failed = results.find((result) => result.error)?.error;
+  if (failed) {
+    throw new Error(`Historical chart ranking failed: ${failed.message}`);
   }
 
-  const rows = ((data ?? []) as HistoricalChartRankingRow[]).filter(
-    (row) => !excludeTrackIds.has(row.spotify_track_id),
-  );
-  const selected = rows.slice(0, clamp(limit, 1, 20));
+  const merged = new Map<string, HistoricalChartRankingRow>();
+  for (const result of results) {
+    for (const row of (result.data ?? []) as HistoricalChartRankingRow[]) {
+      const existing = merged.get(row.spotify_track_id);
+      if (!existing || row.total_streams > existing.total_streams) {
+        merged.set(row.spotify_track_id, row);
+      }
+    }
+  }
+
+  const resolvedGenres = new Map<string, TrackProfileGenre>();
+  const rows = [...merged.values()]
+    .filter((row) => !excludeTrackIds.has(row.spotify_track_id))
+    .filter((row) => {
+      if (genres.length === 0) return true;
+      const detected = mapLegacyGenre(
+        detectGenre(row.artist_name, row.track_name),
+      );
+      const resolved =
+        detected !== "desconhecido" ? detected : row.primary_genre;
+      if (!resolved || !genres.includes(resolved)) return false;
+      resolvedGenres.set(row.spotify_track_id, resolved);
+      return true;
+    })
+    .sort(
+      (left, right) =>
+        right.total_streams - left.total_streams ||
+        right.chart_days - left.chart_days ||
+        left.best_position - right.best_position,
+    );
+
+  const selectionLimit = clamp(limit, 1, 20);
+  const selected: HistoricalChartRankingRow[] = [];
+  if (genres.length <= 1) {
+    selected.push(...rows.slice(0, selectionLimit));
+  } else {
+    const buckets = genres.map((genre) =>
+      rows.filter((row) => resolvedGenres.get(row.spotify_track_id) === genre),
+    );
+    let cursor = 0;
+    while (
+      selected.length < selectionLimit &&
+      buckets.some((bucket) => cursor < bucket.length)
+    ) {
+      for (const bucket of buckets) {
+        const row = bucket[cursor];
+        if (row && selected.length < selectionLimit) selected.push(row);
+      }
+      cursor += 1;
+    }
+  }
   const selection = await getCurrentWorkspaceSelection();
   const profiles = await getTrackGenreProfiles(
     selected.map((row) => ({
@@ -622,9 +675,14 @@ async function getHistoricalChartRankings({
       coverageScore + positionScore + recencyScore,
     );
     const profile = profiles.get(row.spotify_track_id);
-    const genreLabel = profile
-      ? `${profile.primaryGenre === "desconhecido" ? "gênero em análise" : TRACK_PROFILE_GENRE_LABELS[profile.primaryGenre]} (${profile.genreConfidence}% de confiança)`
-      : "gênero sem perfil";
+    const resolvedGenre = resolvedGenres.get(row.spotify_track_id) ?? null;
+    const effectiveGenre =
+      profile?.primaryGenre && profile.primaryGenre !== "desconhecido"
+        ? profile.primaryGenre
+        : resolvedGenre;
+    const genreLabel = effectiveGenre
+      ? `${TRACK_PROFILE_GENRE_LABELS[effectiveGenre]} (${profile?.primaryGenre === effectiveGenre ? profile.genreConfidence : 38}% de confiança)`
+      : "gênero em análise";
     const marketNames = (row.countries ?? countries)
       .map((country) => (country === "BR" ? "BR" : "Global"))
       .join(" + ");
@@ -644,7 +702,18 @@ async function getHistoricalChartRankings({
       statusLabel: "Resultado histórico",
       suggestedAction: "Avaliar para curadoria",
       playlistNames: [],
-      genreProfile: genreCardProfile(profile),
+      genreProfile:
+        profile?.primaryGenre && profile.primaryGenre !== "desconhecido"
+          ? genreCardProfile(profile)
+          : effectiveGenre
+            ? {
+                primaryGenre: effectiveGenre,
+                label: TRACK_PROFILE_GENRE_LABELS[effectiveGenre],
+                genreConfidence: 38,
+                confidenceLabel: "baixa",
+                manualOverride: false,
+              }
+            : null,
       playlistFit: null,
       historicalMetrics: {
         windowDays,
@@ -678,6 +747,7 @@ export async function getChartOpportunities({
   mode = "opportunity",
   windowDays,
   genre = null,
+  genres,
 }: {
   market?: PlaylistsAiCurationMarket;
   limit?: number;
@@ -685,13 +755,17 @@ export async function getChartOpportunities({
   mode?: "opportunity" | "heat" | "riser" | "review" | "historical";
   windowDays?: number;
   genre?: TrackProfileGenre | null;
+  genres?: TrackProfileGenre[];
 } = {}): Promise<ChartOpportunitiesToolResult> {
+  const requestedGenres = [
+    ...new Set([...(genres ?? []), ...(genre ? [genre] : [])]),
+  ];
   if (mode === "historical") {
     return getHistoricalChartRankings({
       market,
       limit,
       windowDays: windowDays ?? 30,
-      genre,
+      genres: requestedGenres,
       excludeTrackIds,
     });
   }
@@ -744,17 +818,25 @@ export async function getChartOpportunities({
     return right.scores.opportunityScore - left.scores.opportunityScore;
   });
 
-  const profileCandidates = genre
-    ? sorted
-    : sorted.slice(0, clamp(limit, 1, 20));
+  const profileCandidates =
+    requestedGenres.length > 0 ? sorted : sorted.slice(0, clamp(limit, 1, 20));
   const profiles = await loadProfilesForIntelligenceTracks(profileCandidates);
-  const genreFiltered = genre
-    ? sorted.filter(
-        (track) =>
-          track.spotifyTrackId &&
-          profiles.get(track.spotifyTrackId)?.primaryGenre === genre,
-      )
-    : sorted;
+  const genreFiltered =
+    requestedGenres.length > 0
+      ? sorted.filter((track) => {
+          if (!track.spotifyTrackId) return false;
+          const detected = mapLegacyGenre(
+            detectGenre(track.artists, track.name),
+          );
+          const resolved =
+            detected !== "desconhecido"
+              ? detected
+              : (profiles.get(track.spotifyTrackId)?.primaryGenre ??
+                "desconhecido");
+          if (!requestedGenres.includes(resolved)) return false;
+          return true;
+        })
+      : sorted;
   const selected = genreFiltered.slice(0, clamp(limit, 1, 20));
 
   return {

@@ -152,7 +152,60 @@ test("understands a strict genre and a full historical window", () => {
   assert.equal(intent.mode, "historical");
   assert.equal(intent.windowDays, 180);
   assert.equal(intent.genre, "trap");
+  assert.deepEqual(intent.genres, ["trap"]);
   assert.equal(intent.limit, 10);
+});
+
+test("keeps trap and rap together instead of collapsing the request", () => {
+  const intent = classifyPlaylistAiIntent(
+    "Me entrega uma lista de músicas de trap e rap dos últimos 180 dias.",
+  );
+
+  assert.equal(intent.name, "chart_opportunities");
+  assert.equal(intent.mode, "historical");
+  assert.equal(intent.windowDays, 180);
+  assert.deepEqual(intent.genres, ["trap", "rap"]);
+});
+
+test("does not mistake a historical window for the requested track count", () => {
+  const intent = classifyPlaylistAiIntent(
+    "Quais faixas de trap mais tocaram nos últimos 30 dias?",
+  );
+
+  assert.equal(intent.windowDays, 30);
+  assert.equal(intent.limit, 10);
+  assert.equal(intent.targetSize, 50);
+});
+
+test("treats a natural genre correction as a data request", async () => {
+  const tools = buildTools();
+  let receivedOptions = null;
+  tools.getChartOpportunities = async (options) => {
+    receivedOptions = options;
+    return {
+      cards: [card(1, "BR"), card(2, "BR")],
+      latestChartDate: "2026-07-12",
+      maxWindow: 365,
+      status: "ready",
+      historical: true,
+      windowDays: 180,
+      windowStartDate: "2026-01-14",
+    };
+  };
+
+  const result = await runPlaylistsAiAgent(
+    {
+      message:
+        "Isso ficou genérico. Quero músicas de trap e rap que realmente tocaram nos últimos 180 dias.",
+    },
+    { tools, polish: false },
+  );
+
+  assert.equal(result.meta.mode, "recommendation");
+  assert.deepEqual(receivedOptions.genres, ["trap", "rap"]);
+  assert.equal(receivedOptions.mode, "historical");
+  assert.equal(result.cards.length, 2);
+  assert.match(result.text, /Trap \+ Rap/i);
 });
 
 test("passes historical genre filters to the database tool without broad fallback", async () => {
@@ -267,7 +320,7 @@ test("builds a read-only playlist idea from weekly risers", async () => {
   assert.match(result.text, /Ideia:/);
 });
 
-test("asks for strategic context before changing a broad playlist direction", async () => {
+test("uses the real playlist immediately instead of asking a generic questionnaire", async () => {
   let recommendationCalls = 0;
   const tools = buildTools();
   tools.recommendTracksForPlaylist = async (...args) => {
@@ -281,11 +334,11 @@ test("asks for strategic context before changing a broad playlist direction", as
   );
 
   assert.equal(result.meta.intent, "playlist_recommendations");
-  assert.equal(result.meta.mode, "question");
-  assert.equal(result.cards.length, 0);
+  assert.equal(result.meta.mode, "recommendation");
+  assert.equal(result.cards.length, 10);
   assert.equal(result.brief.playlistName, "FUNK 2026");
-  assert.match(result.text, /objetivo|prioridade|crescimento/i);
-  assert.equal(recommendationCalls, 0);
+  assert.match(result.text, /FUNK 2026/i);
+  assert.equal(recommendationCalls, 1);
 });
 
 test("remembers the brief and recommends after the user supplies context", async () => {

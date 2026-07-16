@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { classifyTrackGenre, createGenreEvidence } =
+const { classifyTrackGenre, createGenreEvidence, genresFromTerms } =
   await import("../src/lib/track-genre-taxonomy.ts");
 
 function evidence(source, tags, external = true) {
@@ -88,4 +88,10 @@ test("manual evidence has absolute precedence", () => {
   assert.equal(profile.primaryGenre, "sertanejo");
   assert.equal(profile.genreConfidence, 100);
   assert.equal(profile.manualOverride, true);
+});
+
+test("does not infer rap from words or artist names that only contain rap", () => {
+  assert.deepEqual(genresFromTerms(["Eu Não Sou Terapia - Ao Vivo"]), []);
+  assert.deepEqual(genresFromTerms(["O Rappa"]), []);
+  assert.deepEqual(genresFromTerms(["rap nacional", "boom bap"]), ["rap"]);
 });

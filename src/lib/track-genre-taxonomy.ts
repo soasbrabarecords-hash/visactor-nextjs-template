@@ -231,14 +231,19 @@ function unique<T>(values: T[]) {
   return [...new Set(values)];
 }
 
+function containsNormalizedTerm(value: string, term: string) {
+  const normalizedValue = normalizeGenreText(value);
+  const normalizedTerm = normalizeGenreText(term);
+  if (!normalizedValue || !normalizedTerm) return false;
+  return ` ${normalizedValue} `.includes(` ${normalizedTerm} `);
+}
+
 export function genresFromTerms(values: string[]) {
   const normalizedValues = values.map(normalizeGenreText).filter(Boolean);
   return unique(
     GENRE_RULES.flatMap(({ genre, terms }) =>
       terms.some((term) =>
-        normalizedValues.some((value) =>
-          value.includes(normalizeGenreText(term)),
-        ),
+        normalizedValues.some((value) => containsNormalizedTerm(value, term)),
       )
         ? [genre]
         : [],
@@ -311,9 +316,7 @@ function tagsFromEvidence(evidence: TrackGenreEvidence[]) {
 
 function matchLabels(tags: string[], rules: Record<string, string[]>) {
   return Object.entries(rules).flatMap(([label, terms]) =>
-    terms.some((term) =>
-      tags.some((tag) => tag.includes(normalizeGenreText(term))),
-    )
+    terms.some((term) => tags.some((tag) => containsNormalizedTerm(tag, term)))
       ? [label]
       : [],
   );
@@ -417,7 +420,7 @@ export function classifyTrackGenre(
     .filter((genre) => genre !== "desconhecido")
     .slice(0, 3);
   const subgenres = SUBGENRE_TERMS.filter((term) =>
-    allTags.some((tag) => tag.includes(normalizeGenreText(term))),
+    allTags.some((tag) => containsNormalizedTerm(tag, term)),
   ).slice(0, 6);
   const sourceIds = new Set(evidence.map((item) => item.source));
   const suppliedSources = input.sources ?? [];
