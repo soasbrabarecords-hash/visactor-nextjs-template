@@ -2069,6 +2069,90 @@ Regras de trabalho:
   }
 }
 
+async function polishVerifiedSystemResult({
+  prompt,
+  conversation,
+  brief,
+  intent,
+  workspace,
+  result,
+  requestOverride,
+}: {
+  prompt: string;
+  conversation: PlaylistsAiConversationMessage[];
+  brief: PlaylistsAiCurationBrief;
+  intent: DetectedPlaylistsAiIntent;
+  workspace: WorkspacePlaylistsToolResult;
+  result: PlaylistsAiChatResponse;
+  requestOverride?: PlaylistsAiAgentRequest;
+}) {
+  try {
+    if (!requestOverride && Date.now() < aiGatewayRateLimitedUntil) {
+      return null;
+    }
+
+    const credentials = requestOverride
+      ? null
+      : await getEffectiveAiGatewayCredentials();
+    if (!requestOverride && !credentials) return null;
+
+    const request: PlaylistsAiAgentRequest =
+      requestOverride ??
+      ((body) => requestAiGatewayAgent(credentials?.authToken ?? "", body));
+    const verifiedResult = modelResult(result, intent.limit);
+    const payload = await request({
+      model: credentials?.model ?? "test-model",
+      instructions: `Você é o Sol, copiloto de curadoria musical do Playlist OS. O sistema já consultou as fontes reais antes de chamar você. Sua função agora é interpretar o resultado verificado, conversar naturalmente em português brasileiro e ajudar o usuário a decidir.
+
+Regras:
+- O bloco DADOS_VERIFICADOS é a única verdade sobre faixas, charts, histórico, gênero e playlists. Nunca adicione números, nomes ou fatos que não estejam nele.
+- Responda diretamente ao pedido mais recente, considerando a conversa e a memória da curadoria. A mensagem mais recente corrige as anteriores.
+- Se houver menos resultados que o usuário pediu, explique a limitação em uma frase; não complete com outro gênero ou dado inventado.
+- Para uma consulta de músicas, comece pela conclusão, cite no máximo quatro faixas e resuma o critério decisivo.
+- Para uma pergunta sobre método, explique como os dados verificados foram cruzados sem transformar a resposta em um relatório técnico.
+- Seja natural, específico e objetivo. Use no máximo dois parágrafos curtos e 110 palavras.
+- Não comece com "Ideia:", "Estas são" ou fórmulas repetitivas. Não ofereça um menu de opções e não faça uma pergunta quando o pedido já estiver resolvido.
+- Todas as ações são assistidas pelo sistema; nunca afirme que alterou o Spotify sem confirmação explícita do produto.`,
+      input: [
+        ...conversation.slice(-10).map((item) => ({
+          role: item.role,
+          content: item.content.slice(0, 1800),
+        })),
+        {
+          role: "user",
+          content: [
+            `PEDIDO_ATUAL: ${prompt}`,
+            `MEMORIA_DA_CURADORIA: ${JSON.stringify(brief)}`,
+            `PLAYLISTS_DO_WORKSPACE: ${JSON.stringify(workspace.playlists.map((playlist) => playlist.name))}`,
+            `DADOS_VERIFICADOS: ${JSON.stringify(verifiedResult)}`,
+          ].join("\n\n"),
+        },
+      ],
+      reasoning: { effort: "low" },
+      max_output_tokens: 520,
+      store: false,
+    });
+    const generatedText = extractOpenAIText(payload).slice(0, 4000);
+    if (!generatedText) return null;
+
+    return compactAgentText(
+      evidenceLedText({
+        text: generatedText,
+        result,
+        intent,
+        conversation,
+      }),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Playlists IA grounded response fallback: ${message}\n`);
+    if (isAiGatewayRateLimitError(error) && !requestOverride) {
+      aiGatewayRateLimitedUntil = Date.now() + 90_000;
+    }
+    return null;
+  }
+}
+
 export async function runPlaylistsAiAgent(
   {
     message,
@@ -2084,13 +2168,15 @@ export async function runPlaylistsAiAgent(
     polish = true,
     planning = polish,
     agentRequest,
+    responseRequest,
   }: {
     tools?: PlaylistsAiAgentTools;
     polish?: boolean;
     planning?: boolean;
     agentRequest?: PlaylistsAiAgentRequest;
+    responseRequest?: PlaylistsAiAgentRequest;
   } = {},
-) {
+): Promise<PlaylistsAiChatResponse> {
   const workspace = await tools.getWorkspacePlaylists();
   const playlistNames = workspace.playlists.map((playlist) => playlist.name);
   const fallbackIntent = classifyPlaylistAiIntent(message, playlistNames);
@@ -2101,7 +2187,7 @@ export async function runPlaylistsAiAgent(
     intent: fallbackIntent.name,
     playlistReference: fallbackIntent.playlistReference,
   });
-  if (polish) {
+  if (polish && agentRequest) {
     const agentResult = await runToolCallingAgent({
       prompt: message,
       conversation: messages,
@@ -2233,6 +2319,28 @@ export async function runPlaylistsAiAgent(
       returnedCount: result.cards.length,
     },
   };
+
+  if (polish) {
+    const polishedText = await polishVerifiedSystemResult({
+      prompt: message,
+      conversation: messages,
+      brief: result.brief,
+      intent,
+      workspace,
+      result,
+      requestOverride: responseRequest,
+    });
+    if (polishedText) {
+      return {
+        ...result,
+        text: polishedText,
+        meta: {
+          ...result.meta,
+          execution: "agent",
+        },
+      };
+    }
+  }
 
   return result;
 }

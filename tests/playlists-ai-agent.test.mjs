@@ -296,6 +296,60 @@ test("keeps real chart intelligence available when the AI Gateway rate limits", 
   assert.doesNotMatch(result.text, /Nenhuma recomendação foi gerada/i);
 });
 
+test("queries verified system data before asking the model to explain it", async () => {
+  const requests = [];
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 10 músicas de trap dos últimos 180 dias." },
+    {
+      tools: buildTools(),
+      responseRequest: async (body) => {
+        requests.push(body);
+        return {
+          id: "resp-grounded",
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: "A seleção de trap começa por Faixa 0, Faixa 1 e Faixa 2 porque elas sustentaram os sinais históricos mais fortes da janela.",
+                },
+              ],
+            },
+          ],
+        };
+      },
+    },
+  );
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].tools, undefined);
+  assert.match(
+    requests[0].input.at(-1).content,
+    /DADOS_VERIFICADOS:[\s\S]*Faixa 0/,
+  );
+  assert.equal(result.meta.execution, "agent");
+  assert.equal(result.cards.length, 10);
+  assert.match(result.text, /Faixa 0/);
+});
+
+test("preserves verified recommendations when the final model pass is limited", async () => {
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 10 músicas de trap dos últimos 180 dias." },
+    {
+      tools: buildTools(),
+      responseRequest: async () => {
+        throw new Error("AI Gateway 429: free tier rate limited");
+      },
+    },
+  );
+
+  assert.equal(result.meta.execution, "fallback");
+  assert.equal(result.cards.length, 10);
+  assert.equal(result.meta.returnedCount, 10);
+  assert.doesNotMatch(result.text, /Nenhuma recomendação foi gerada/i);
+});
+
 test("answers a methodology follow-up from the verified conversation context", async () => {
   const result = await runPlaylistsAiAgent(
     {
