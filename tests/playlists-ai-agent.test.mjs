@@ -177,6 +177,89 @@ test("does not mistake a historical window for the requested track count", () =>
   assert.equal(intent.targetSize, 50);
 });
 
+test("respects an explicit request for fifty tracks", async () => {
+  const intent = classifyPlaylistAiIntent(
+    "Quero 50 músicas de funk no Brasil.",
+  );
+  assert.equal(intent.limit, 50);
+  assert.deepEqual(intent.genres, ["funk"]);
+
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 50 músicas de funk no Brasil." },
+    { tools: buildTools(), polish: false },
+  );
+
+  assert.equal(result.cards.length, 50);
+  assert.equal(result.meta.requestedCount, 50);
+  assert.equal(result.meta.returnedCount, 50);
+  assert.equal(result.brief.lastRequestedCount, 50);
+  assert.equal(result.brief.lastShownTrackIds.length, 50);
+});
+
+test("uses a real tool loop and grounds the answer in returned tracks", async () => {
+  const requests = [];
+  const agentRequest = async (body) => {
+    requests.push(body);
+    if (requests.length === 1) {
+      return {
+        id: "resp-tool-call",
+        output: [
+          {
+            type: "function_call",
+            name: "get_chart_opportunities",
+            call_id: "call-chart",
+            arguments: JSON.stringify({
+              purpose: "opportunities",
+              market: "BR",
+              genres: ["funk"],
+              mode: "heat",
+              windowDays: null,
+              limit: 50,
+              targetSize: 50,
+              playlistReference: null,
+              excludeWorkspaceTracks: false,
+              excludePreviouslyShown: false,
+            }),
+          },
+        ],
+      };
+    }
+    return {
+      id: "resp-final",
+      output: [
+        {
+          type: "message",
+          content: [
+            {
+              type: "output_text",
+              text: "Fechei 50 faixas de funk. Faixa 0, Faixa 1 e Faixa 2 abrem a seleção porque combinam força atual e movimento recente.",
+            },
+          ],
+        },
+      ],
+    };
+  };
+
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 50 músicas de funk." },
+    { tools: buildTools(), agentRequest },
+  );
+
+  assert.equal(requests.length, 2);
+  assert.equal(result.meta.execution, "agent");
+  assert.deepEqual(result.meta.toolCalls, ["get_chart_opportunities"]);
+  assert.equal(result.cards.length, 50);
+  assert.match(result.text, /Faixa 0/);
+  assert.match(result.text, /50 faixas de funk/i);
+  assert.equal(
+    requests[1].input.some(
+      (item) =>
+        item.type === "function_call_output" && item.call_id === "call-chart",
+    ),
+    true,
+  );
+});
+
 test("treats a natural genre correction as a data request", async () => {
   const tools = buildTools();
   let receivedOptions = null;

@@ -85,6 +85,27 @@ export function normalizeCurationBrief(
       : null;
   const activeIntent =
     typeof record.activeIntent === "string" ? record.activeIntent : null;
+  const requestedGenres = Array.isArray(record.requestedGenres)
+    ? record.requestedGenres
+        .filter((genre): genre is string => typeof genre === "string")
+        .map((genre) => genre.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    : [];
+  const lastShownTrackIds = Array.isArray(record.lastShownTrackIds)
+    ? record.lastShownTrackIds
+        .filter((trackId): trackId is string => typeof trackId === "string")
+        .map((trackId) => trackId.trim())
+        .filter(Boolean)
+        .slice(-100)
+    : [];
+  const lastRequestedCount =
+    typeof record.lastRequestedCount === "number" &&
+    Number.isInteger(record.lastRequestedCount) &&
+    record.lastRequestedCount >= 1 &&
+    record.lastRequestedCount <= 50
+      ? record.lastRequestedCount
+      : null;
   const intents = new Set<PlaylistsAiIntent>([
     "chart_opportunities",
     "playlist_recommendations",
@@ -110,6 +131,9 @@ export function normalizeCurationBrief(
         : null,
     completeness: 0,
     missingFields: [],
+    requestedGenres,
+    lastRequestedCount,
+    lastShownTrackIds,
   };
 }
 

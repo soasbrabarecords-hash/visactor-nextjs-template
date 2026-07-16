@@ -36,7 +36,7 @@ function parseMessages(value: unknown): PlaylistsAiConversationMessage[] {
       if (!role || !content) return [];
       return [{ role, content: content.slice(0, 1600) }];
     })
-    .slice(-10);
+    .slice(-30);
 }
 
 export async function POST(request: Request) {
@@ -76,9 +76,7 @@ export async function POST(request: Request) {
 
     const conversationIdValue = body?.conversationId;
     const conversationId =
-      typeof conversationIdValue === "string"
-        ? conversationIdValue.trim()
-        : "";
+      typeof conversationIdValue === "string" ? conversationIdValue.trim() : "";
     if (conversationId && !UUID_PATTERN.test(conversationId)) {
       return NextResponse.json(
         { success: false, message: "Conversa inválida." },
@@ -105,7 +103,7 @@ export async function POST(request: Request) {
 
     const conversationMessages = storedConversation
       ? storedConversation.messages
-          .slice(-10)
+          .slice(-30)
           .map(({ role, content }) => ({ role, content }))
       : parseMessages(body?.messages);
 

@@ -44,6 +44,9 @@ export type PlaylistsAiCurationBrief = {
   activeIntent: PlaylistsAiIntent | null;
   completeness: number;
   missingFields: PlaylistsAiCurationBriefField[];
+  requestedGenres?: string[];
+  lastRequestedCount?: number | null;
+  lastShownTrackIds?: string[];
 };
 
 export type PlaylistsAiTrackStatus =
@@ -124,6 +127,10 @@ export type PlaylistsAiChatResponse = {
     contextComplete: boolean;
     readOnly: true;
     generatedAt: string;
+    execution?: "agent" | "fallback" | "deterministic";
+    toolCalls?: string[];
+    requestedCount?: number;
+    returnedCount?: number;
   };
 };
 

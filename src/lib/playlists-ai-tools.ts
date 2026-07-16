@@ -613,7 +613,7 @@ async function getHistoricalChartRankings({
         left.best_position - right.best_position,
     );
 
-  const selectionLimit = clamp(limit, 1, 20);
+  const selectionLimit = clamp(limit, 1, 50);
   const selected: HistoricalChartRankingRow[] = [];
   if (genres.length <= 1) {
     selected.push(...rows.slice(0, selectionLimit));
@@ -819,7 +819,7 @@ export async function getChartOpportunities({
   });
 
   const profileCandidates =
-    requestedGenres.length > 0 ? sorted : sorted.slice(0, clamp(limit, 1, 20));
+    requestedGenres.length > 0 ? sorted : sorted.slice(0, clamp(limit, 1, 50));
   const profiles = await loadProfilesForIntelligenceTracks(profileCandidates);
   const genreFiltered =
     requestedGenres.length > 0
@@ -837,7 +837,7 @@ export async function getChartOpportunities({
           return true;
         })
       : sorted;
-  const selected = genreFiltered.slice(0, clamp(limit, 1, 20));
+  const selected = genreFiltered.slice(0, clamp(limit, 1, 50));
 
   return {
     cards: selected.map((track) =>
@@ -1081,7 +1081,7 @@ export async function recommendTracksForPlaylist(
         right.track.scores.opportunityScore -
           left.track.scores.opportunityScore,
     )
-    .slice(0, clamp(limit, 1, 20));
+    .slice(0, clamp(limit, 1, 50));
 
   return {
     playlist,
