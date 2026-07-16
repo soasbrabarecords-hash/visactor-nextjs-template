@@ -7,20 +7,21 @@ import {
   BookmarkCheck,
   Bot,
   CheckCircle2,
-  ChevronRight,
   Database,
   ExternalLink,
   Eye,
   EyeOff,
   FileText,
+  Folder,
   Globe2,
   History,
   ListMusic,
   Loader2,
-  LockKeyhole,
   MapPin,
+  Menu,
   MessageSquarePlus,
   Music2,
+  PanelLeftClose,
   Pencil,
   Pin,
   PinOff,
@@ -32,9 +33,9 @@ import {
   SlidersHorizontal,
   Sparkles,
   Tags,
+  Trash2,
   TrendingDown,
   TrendingUp,
-  UserRound,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -94,56 +95,6 @@ function createEmptyBrief(): PlaylistsAiCurationBrief {
     missingFields: [],
   };
 }
-
-function goalLabel(value: PlaylistsAiCurationBrief["goal"]) {
-  if (value === "growth") return "Crescimento";
-  if (value === "editorial") return "Editorial";
-  if (value === "discovery") return "Descoberta";
-  if (value === "hits") return "Hits";
-  if (value === "retention") return "Retenção";
-  if (value === "balanced") return "Equilíbrio";
-  return null;
-}
-
-function marketLabel(value: PlaylistsAiCurationBrief["market"]) {
-  if (value === "BR") return "Brasil";
-  if (value === "GLOBAL") return "Global";
-  if (value === "BOTH") return "BR + Global";
-  return null;
-}
-
-function strategyLabel(value: PlaylistsAiCurationBrief["strategy"]) {
-  if (value === "retention") return "Retenção";
-  if (value === "discovery") return "Descoberta";
-  if (value === "renewal") return "Renovação";
-  if (value === "hits") return "Hits";
-  if (value === "balanced") return "Equilíbrio";
-  return null;
-}
-
-function briefChips(brief: PlaylistsAiCurationBrief) {
-  const chips = [
-    brief.playlistName ? `Playlist · ${brief.playlistName}` : null,
-    brief.genre ? `Gênero · ${brief.genre}` : null,
-    goalLabel(brief.goal) ? `Objetivo · ${goalLabel(brief.goal)}` : null,
-    marketLabel(brief.market) ? `Mercado · ${marketLabel(brief.market)}` : null,
-    strategyLabel(brief.strategy)
-      ? `Estratégia · ${strategyLabel(brief.strategy)}`
-      : null,
-    brief.audience ? `Público · ${brief.audience}` : null,
-    brief.targetSize ? `${brief.targetSize} faixas` : null,
-  ].filter((item): item is string => Boolean(item));
-
-  return chips.length > 0 ? chips.slice(0, 6) : ["Objetivo em construção"];
-}
-
-const QUICK_QUESTIONS = [
-  "Quero melhorar uma playlist existente.",
-  "Quero criar uma nova playlist.",
-  "Quais músicas estão mais quentes no BR hoje?",
-  "Quais oportunidades globais ainda não estão nas minhas playlists?",
-  "Quero revisar faixas que perderam tração.",
-];
 
 const ACTION_ICONS: Record<PlaylistsAiPreparedActionType, typeof Plus> = {
   add_to_playlist: Plus,
@@ -647,115 +598,157 @@ function TrackCard({
   );
 }
 
+function conversationProjectLabel(
+  conversation: PlaylistsAiConversationSummary,
+) {
+  if (conversation.brief.playlistName) return conversation.brief.playlistName;
+  if (conversation.brief.genre) return conversation.brief.genre;
+  return "Geral";
+}
+
 function ConversationRail({
   conversations,
   activeConversationId,
+  deletingConversationId,
   isBusy,
   isLoading,
   notice,
+  onClose,
+  onDeleteConversation,
   onNewConversation,
   onSelectConversation,
 }: {
   conversations: PlaylistsAiConversationSummary[];
   activeConversationId: string | null;
+  deletingConversationId: string | null;
   isBusy: boolean;
   isLoading: boolean;
   notice: string | null;
+  onClose: () => void;
+  onDeleteConversation: (conversation: PlaylistsAiConversationSummary) => void;
   onNewConversation: () => void;
   onSelectConversation: (conversationId: string) => void;
 }) {
-  return (
-    <aside className="hidden h-full min-h-0 flex-col rounded-[24px] border border-border/50 bg-card/35 p-2.5 dark:border-white/[0.08] dark:bg-white/[0.012] desktop:flex">
-      <button
-        type="button"
-        onClick={onNewConversation}
-        disabled={isBusy}
-        className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-background/65 px-3 text-xs font-black text-foreground transition hover:border-primary/30 hover:bg-background disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.035]"
-      >
-        <MessageSquarePlus className="h-4 w-4" />
-        Nova conversa
-      </button>
+  const projects = conversations.reduce<
+    Array<{ label: string; conversations: PlaylistsAiConversationSummary[] }>
+  >((groups, conversation) => {
+    const label = conversationProjectLabel(conversation);
+    const project = groups.find((group) => group.label === label);
+    if (project) project.conversations.push(conversation);
+    else groups.push({ label, conversations: [conversation] });
+    return groups;
+  }, []);
 
-      <div className="mt-6 px-2 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-        Conversas
+  return (
+    <aside className="flex h-full min-h-0 w-[272px] shrink-0 flex-col border-r border-border/45 bg-background/80 px-2.5 py-2 backdrop-blur-xl dark:border-white/[0.07]">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onNewConversation}
+          disabled={isBusy}
+          className="flex h-10 flex-1 items-center gap-2 rounded-xl px-2.5 text-xs font-bold text-foreground transition hover:bg-muted/55 disabled:opacity-50"
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+          Nova conversa
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground"
+          aria-label="Ocultar conversas"
+          title="Ocultar conversas"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-1 pb-4">
         {isLoading ? (
-          <div className="flex items-center gap-2 px-3 py-4 text-[10px] font-semibold text-muted-foreground">
+          <div className="flex items-center gap-2 px-2 py-4 text-[11px] font-medium text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Carregando histórico...
+            Carregando...
           </div>
-        ) : conversations.length > 0 ? (
-          conversations.map((conversation) => {
-            const active = conversation.id === activeConversationId;
-            return (
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => onSelectConversation(conversation.id)}
-                disabled={isBusy}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition disabled:opacity-55",
-                  active
-                    ? "bg-foreground/[0.075] dark:bg-white/[0.07]"
-                    : "hover:bg-foreground/[0.04] dark:hover:bg-white/[0.035]",
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl",
-                    active
-                      ? "bg-foreground text-background"
-                      : "border border-border/60 text-muted-foreground dark:border-white/10",
-                  )}
-                >
-                  <Bot className="h-3.5 w-3.5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-black text-foreground">
-                    {conversation.title}
-                  </span>
-                  <span className="mt-0.5 block text-[9px] font-semibold text-muted-foreground">
-                    {conversationActivityLabel(conversation.lastMessageAt)}
-                  </span>
-                </span>
-                {active ? (
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                ) : null}
-              </button>
-            );
-          })
+        ) : projects.length > 0 ? (
+          <div className="space-y-5">
+            {projects.map((project) => (
+              <section key={project.label}>
+                <div className="flex items-center gap-2 px-2 text-[10px] font-semibold text-muted-foreground">
+                  <Folder className="h-3.5 w-3.5" />
+                  <span className="truncate">{project.label}</span>
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {project.conversations.map((conversation) => {
+                    const active = conversation.id === activeConversationId;
+                    const deleting = conversation.id === deletingConversationId;
+                    return (
+                      <div
+                        key={conversation.id}
+                        className={cn(
+                          "group flex items-center rounded-xl transition",
+                          active
+                            ? "bg-muted/70 dark:bg-white/[0.065]"
+                            : "hover:bg-muted/45 dark:hover:bg-white/[0.035]",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectConversation(conversation.id)}
+                          disabled={isBusy}
+                          className="min-w-0 flex-1 px-2.5 py-2 text-left disabled:opacity-55"
+                        >
+                          <span className="block truncate text-[12px] font-medium text-foreground">
+                            {conversation.title}
+                          </span>
+                          <span className="mt-0.5 block text-[9px] text-muted-foreground">
+                            {conversationActivityLabel(
+                              conversation.lastMessageAt,
+                            )}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteConversation(conversation)}
+                          disabled={isBusy || deleting}
+                          className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 disabled:opacity-50 group-hover:opacity-100 dark:hover:text-rose-300"
+                          aria-label={`Apagar ${conversation.title}`}
+                          title="Apagar conversa"
+                        >
+                          {deleting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
         ) : (
-          <p className="px-3 py-4 text-[10px] font-medium leading-4 text-muted-foreground">
-            {notice ?? "Nenhuma conversa salva ainda."}
+          <p className="px-2 py-4 text-[11px] font-medium leading-5 text-muted-foreground">
+            {notice ?? "As conversas aparecerão aqui por projeto."}
           </p>
         )}
       </div>
 
-      <div className="mt-2 rounded-2xl border border-border/45 px-3 py-2.5 dark:border-white/[0.08]">
-        <div className="flex items-center gap-2 text-[10px] font-black text-foreground">
-          <History className="h-3.5 w-3.5 text-muted-foreground" />
-          Memória privada
-        </div>
-        <p className="mt-1.5 text-[9px] font-medium leading-4 text-muted-foreground">
-          {notice ??
-            "Cada conversa fica salva somente para sua conta neste workspace."}
-        </p>
-      </div>
+      <p className="px-3 pb-2 text-[9px] leading-4 text-muted-foreground/70">
+        Histórico privado deste workspace.
+      </p>
     </aside>
   );
 }
 
 function DecisionBoard({
   result,
-  brief,
   marketFilter,
+  onClose,
   onMarketFilterChange,
 }: {
-  result: PlaylistsAiChatResponse | null;
-  brief: PlaylistsAiCurationBrief;
+  result: PlaylistsAiChatResponse;
   marketFilter: DecisionMarketFilter;
+  onClose: () => void;
   onMarketFilterChange: (filter: DecisionMarketFilter) => void;
 }) {
   const [pinnedTrackIds, setPinnedTrackIds] = useState<Set<string>>(
@@ -767,7 +760,7 @@ function DecisionBoard({
   const [ignoredTrackIds, setIgnoredTrackIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const resultKey = result?.meta.generatedAt ?? "empty";
+  const resultKey = result.meta.generatedAt;
 
   useEffect(() => {
     setPinnedTrackIds(new Set());
@@ -775,7 +768,7 @@ function DecisionBoard({
     setIgnoredTrackIds(new Set());
   }, [resultKey]);
 
-  const cards = result?.cards ?? [];
+  const cards = result.cards;
   const cardKey = (card: PlaylistsAiTrackCard) =>
     card.spotifyTrackId ?? card.id;
   const toggleSetValue = (
@@ -807,24 +800,29 @@ function DecisionBoard({
   ];
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/50 bg-card/35 dark:border-white/[0.08] dark:bg-white/[0.015]">
-      <header className="border-b border-border/45 px-4 py-3.5 dark:border-white/[0.08]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-              <Sparkles className="h-3.5 w-3.5" />
-              Decisões vivas
-            </div>
-            <h2 className="mt-1.5 text-lg font-black tracking-[-0.035em] text-foreground">
-              Painel de músicas
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-l border-border/45 bg-background/45 dark:border-white/[0.07]">
+      <header className="border-b border-border/45 px-4 py-3 dark:border-white/[0.07]">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+            <h2 className="text-sm font-semibold tracking-[-0.02em] text-foreground">
+              Seleção
             </h2>
-            <p className="mt-1 text-[10px] font-medium text-muted-foreground">
-              A seleção acompanha o raciocínio da conversa.
-            </p>
           </div>
-          <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-foreground px-2.5 py-1.5 text-[10px] font-black text-background">
-            {cards.length - ignoredTrackIds.size}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-foreground px-2.5 py-1.5 text-[10px] font-black text-background">
+              {cards.length - ignoredTrackIds.size}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label="Fechar seleção"
+              title="Fechar seleção"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
@@ -847,11 +845,7 @@ function DecisionBoard({
           </div>
           <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground">
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            {result
-              ? `Confiança ${result.confidence}%`
-              : brief.completeness > 0
-                ? `Contexto ${brief.completeness}%`
-                : "Aguardando contexto"}
+            Confiança {result.confidence}%
           </div>
         </div>
         {ignoredTrackIds.size > 0 ? (
@@ -875,21 +869,7 @@ function DecisionBoard({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {!result ? (
-          <div className="flex min-h-[520px] flex-col items-center justify-center px-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-[20px] border border-border/60 bg-background/55 text-muted-foreground dark:border-white/10 dark:bg-white/[0.025]">
-              <ListMusic className="h-5 w-5" />
-            </div>
-            <h3 className="mt-5 text-base font-black tracking-[-0.03em] text-foreground">
-              Primeiro, defina a direção.
-            </h3>
-            <p className="mt-2 max-w-[300px] text-xs font-medium leading-5 text-muted-foreground">
-              {brief.missingFields.length > 0
-                ? "A IA está alinhando objetivo e mercado antes de consultar as faixas."
-                : "Conforme a conversa evoluir, oportunidades, riscos e faixas para observar aparecerão aqui."}
-            </p>
-          </div>
-        ) : visibleCards.length > 0 ? (
+        {visibleCards.length > 0 ? (
           <div className="space-y-2.5">
             {visibleCards.map((card) => (
               <TrackCard
@@ -924,27 +904,25 @@ function DecisionBoard({
         )}
       </div>
 
-      {result ? (
-        <footer className="border-t border-border/60 px-4 py-3 dark:border-white/10">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Database className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
-            {result.dataSources.slice(0, 4).map((dataSource) => (
-              <span
-                key={`${dataSource.id}-${dataSource.detail}`}
-                title={dataSource.detail}
-                className={cn(
-                  "rounded-full px-2 py-1 text-[8px] font-black",
-                  dataSource.status === "used"
-                    ? "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
-                    : "bg-muted/60 text-muted-foreground",
-                )}
-              >
-                {dataSource.label}
-              </span>
-            ))}
-          </div>
-        </footer>
-      ) : null}
+      <footer className="border-t border-border/50 px-4 py-2.5 dark:border-white/[0.07]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Database className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
+          {result.dataSources.slice(0, 4).map((dataSource) => (
+            <span
+              key={`${dataSource.id}-${dataSource.detail}`}
+              title={dataSource.detail}
+              className={cn(
+                "rounded-full px-2 py-1 text-[8px] font-black",
+                dataSource.status === "used"
+                  ? "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                  : "bg-muted/60 text-muted-foreground",
+              )}
+            >
+              {dataSource.label}
+            </span>
+          ))}
+        </div>
+      </footer>
     </aside>
   );
 }
@@ -1015,14 +993,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       )}
     >
       {assistant ? (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-700 shadow-sm dark:text-emerald-300">
-          <Bot className="h-4 w-4" />
+        <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
+          <Bot className="h-3.5 w-3.5" />
         </div>
       ) : null}
 
       <div
         className={cn(
-          "max-w-[min(100%,760px)] px-1 py-2",
+          "max-w-[min(100%,760px)] px-1 py-1.5",
           assistant
             ? "text-foreground"
             : "rounded-[20px] bg-muted/80 px-4 text-foreground dark:bg-white/[0.075]",
@@ -1033,19 +1011,60 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         </p>
         {message.result ? <ResponseDetails result={message.result} /> : null}
       </div>
-
-      {!assistant ? (
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background">
-          <UserRound className="h-4 w-4" />
-        </div>
-      ) : null}
     </article>
+  );
+}
+
+function ChatComposer({
+  input,
+  isBusy,
+  onChange,
+  onKeyDown,
+  onSubmit,
+}: {
+  input: string;
+  isBusy: boolean;
+  onChange: (value: string) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="w-full">
+      <div className="flex items-end gap-2 rounded-[26px] border border-border/70 bg-background px-3 py-2 shadow-[0_10px_35px_rgba(0,0,0,0.08)] transition focus-within:border-foreground/25 dark:border-white/10 dark:bg-[#202123]">
+        <textarea
+          value={input}
+          disabled={isBusy}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={onKeyDown}
+          maxLength={1600}
+          rows={1}
+          placeholder="Pergunte sobre músicas, playlists ou uma decisão..."
+          className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-2 py-3 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/65"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isBusy}
+          className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
+          aria-label="Enviar"
+        >
+          {isBusy ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+      <p className="mt-2 text-center text-[9px] text-muted-foreground/65">
+        A IA cruza dados reais e não altera o Spotify sem sua confirmação.
+      </p>
+    </form>
   );
 }
 
 export default function PlaylistsAiWorkbench() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
+  const [conversationRailOpen, setConversationRailOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
@@ -1059,12 +1078,21 @@ export default function PlaylistsAiWorkbench() {
     null,
   );
   const [conversationTitle, setConversationTitle] = useState("Nova curadoria");
+  const [deletingConversationId, setDeletingConversationId] = useState<
+    string | null
+  >(null);
   const [decisionResult, setDecisionResult] =
     useState<PlaylistsAiChatResponse | null>(null);
   const [curationBrief, setCurationBrief] =
     useState<PlaylistsAiCurationBrief>(createEmptyBrief);
   const [marketFilter, setMarketFilter] = useState<DecisionMarketFilter>("ALL");
   const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setConversationRailOpen(
+      window.localStorage.getItem("playlists-ai-history") === "open",
+    );
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1111,6 +1139,14 @@ export default function PlaylistsAiWorkbench() {
       conversation,
       ...current.filter((item) => item.id !== conversation.id),
     ]);
+  }
+
+  function setHistoryOpen(open: boolean) {
+    setConversationRailOpen(open);
+    window.localStorage.setItem(
+      "playlists-ai-history",
+      open ? "open" : "closed",
+    );
   }
 
   async function selectConversation(conversationId: string) {
@@ -1164,6 +1200,47 @@ export default function PlaylistsAiWorkbench() {
       );
     } finally {
       setIsLoadingConversation(false);
+    }
+  }
+
+  async function deleteConversation(
+    conversation: PlaylistsAiConversationSummary,
+  ) {
+    if (isThinking || isLoadingConversation || deletingConversationId) return;
+    const confirmed = window.confirm(
+      `Apagar a conversa “${conversation.title}”? Ela sairá do seu histórico.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingConversationId(conversation.id);
+    setConversationNotice(null);
+    try {
+      const response = await fetch(
+        `/api/playlists-ia/conversations/${encodeURIComponent(conversation.id)}`,
+        { method: "DELETE" },
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        message?: string;
+      } | null;
+      if (!response.ok || !payload?.success) {
+        throw new Error(
+          payload?.message ?? "Não foi possível apagar a conversa.",
+        );
+      }
+
+      setSavedConversations((current) =>
+        current.filter((item) => item.id !== conversation.id),
+      );
+      if (conversation.id === activeConversationId) startNewConversation();
+    } catch (error) {
+      setConversationNotice(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível apagar a conversa.",
+      );
+    } finally {
+      setDeletingConversationId(null);
     }
   }
 
@@ -1273,153 +1350,148 @@ export default function PlaylistsAiWorkbench() {
     }
   }
 
-  return (
-    <div className="mx-auto grid h-full min-h-0 max-w-[1760px] gap-2.5 overflow-y-auto laptop:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] laptop:overflow-hidden desktop:grid-cols-[190px_minmax(0,1.12fr)_minmax(380px,0.88fr)]">
-      <ConversationRail
-        conversations={savedConversations}
-        activeConversationId={activeConversationId}
-        isBusy={isThinking || isLoadingConversation}
-        isLoading={isLoadingConversations}
-        notice={conversationNotice}
-        onNewConversation={startNewConversation}
-        onSelectConversation={(conversationId) =>
-          void selectConversation(conversationId)
-        }
-      />
+  const isBusy = isThinking || isLoadingConversation;
+  const freshConversation =
+    activeConversationId === null &&
+    messages.length === 1 &&
+    messages[0]?.id === WELCOME_MESSAGE.id;
+  const visibleMessages = messages.filter(
+    (message) => message.id !== WELCOME_MESSAGE.id,
+  );
+  const showDecisionBoard = Boolean(decisionResult?.cards.length);
 
-      <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/50 bg-card/35 dark:border-white/[0.08] dark:bg-white/[0.015]">
-        <header className="border-b border-border/45 px-5 py-3 dark:border-white/[0.08]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[15px] bg-foreground text-background">
-                <Bot className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-sm font-black tracking-[-0.025em] text-foreground">
-                  {conversationTitle}
-                </h1>
-                <p className="text-[10px] font-medium text-muted-foreground">
-                  Copiloto de curadoria musical
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="hidden items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300 tablet:inline-flex">
-                <LockKeyhole className="h-3 w-3" /> Planejamento seguro
-              </span>
+  return (
+    <div className="relative mx-auto flex h-full min-h-0 max-w-[1760px] overflow-hidden bg-background">
+      {conversationRailOpen ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(false)}
+            className="absolute inset-0 z-30 bg-black/35 backdrop-blur-[2px] desktop:hidden"
+            aria-label="Fechar histórico"
+          />
+          <div className="absolute inset-y-0 left-0 z-40 desktop:static desktop:z-auto">
+            <ConversationRail
+              conversations={savedConversations}
+              activeConversationId={activeConversationId}
+              deletingConversationId={deletingConversationId}
+              isBusy={isBusy}
+              isLoading={isLoadingConversations}
+              notice={conversationNotice}
+              onClose={() => setHistoryOpen(false)}
+              onDeleteConversation={(conversation) =>
+                void deleteConversation(conversation)
+              }
+              onNewConversation={startNewConversation}
+              onSelectConversation={(conversationId) =>
+                void selectConversation(conversationId)
+              }
+            />
+          </div>
+        </>
+      ) : null}
+
+      <section className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between px-3 tablet:px-5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {!conversationRailOpen ? (
               <button
                 type="button"
-                onClick={startNewConversation}
-                disabled={isThinking || isLoadingConversation}
-                aria-label="Iniciar nova conversa"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-border/65 text-muted-foreground transition hover:text-foreground disabled:opacity-50 dark:border-white/10 desktop:hidden"
+                onClick={() => setHistoryOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground"
+                aria-label="Mostrar conversas"
+                title="Mostrar conversas"
               >
-                <MessageSquarePlus className="h-4 w-4" />
+                <Menu className="h-[18px] w-[18px]" />
               </button>
-            </div>
+            ) : null}
+            {!freshConversation ? (
+              <h1 className="truncate px-2 text-xs font-semibold text-foreground">
+                {conversationTitle}
+              </h1>
+            ) : null}
           </div>
-
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {briefChips(curationBrief)
-              .slice(0, 3)
-              .map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-muted/45 px-2.5 py-1 text-[8px] font-black text-muted-foreground"
-                >
-                  {item}
-                </span>
-              ))}
-            <span className="rounded-full border border-border/55 px-2.5 py-1 text-[8px] font-black text-muted-foreground dark:border-white/10">
-              Contexto {curationBrief.completeness}%
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={startNewConversation}
+            disabled={isBusy}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground disabled:opacity-40"
+            aria-label="Nova conversa"
+            title="Nova conversa"
+          >
+            <MessageSquarePlus className="h-[18px] w-[18px]" />
+          </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-          <div className="mx-auto max-w-[800px] space-y-6">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-
-            {activeConversationId === null && messages.length === 1 ? (
-              <div className="ml-12 space-y-2">
-                <div className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-                  Comece por uma decisão
+        {freshConversation ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-5 pb-16">
+            <div className="w-full max-w-[760px]">
+              <div className="mb-8 text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background">
+                  <Bot className="h-[18px] w-[18px]" />
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_QUESTIONS.slice(0, 4).map((question) => (
-                    <button
-                      key={question}
-                      type="button"
-                      onClick={() => void submitMessage(question)}
-                      disabled={isThinking || isLoadingConversation}
-                      className="rounded-full border border-border/60 bg-background/35 px-3 py-2 text-left text-[9px] font-bold text-muted-foreground transition hover:border-primary/25 hover:text-foreground disabled:opacity-50 dark:border-white/10"
-                    >
-                      {question}
-                    </button>
-                  ))}
-                </div>
+                <h1 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-foreground tablet:text-[30px]">
+                  O que vamos decidir hoje?
+                </h1>
+                <p className="mx-auto mt-2 max-w-[520px] text-sm text-muted-foreground">
+                  Converse naturalmente. As músicas e ações só aparecem quando
+                  forem relevantes para a decisão.
+                </p>
               </div>
-            ) : null}
-
-            {isThinking ? (
-              <article className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-700 dark:text-emerald-300">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="rounded-[20px] border border-border/60 bg-background/45 px-4 py-3 text-xs font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/[0.025]">
-                  <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                  entendendo o contexto e cruzando os sinais...
-                </div>
-              </article>
-            ) : null}
-            <div ref={endRef} />
-          </div>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="shrink-0 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-3 pt-2"
-        >
-          <div className="mx-auto max-w-[800px] rounded-[22px] border border-border/70 bg-background/95 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.08)] transition focus-within:border-primary/35 dark:border-white/10 dark:bg-[#111318]">
-            <textarea
-              value={input}
-              disabled={isLoadingConversation}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleKeyDown}
-              maxLength={1600}
-              rows={2}
-              placeholder="Converse sobre o objetivo, a estratégia ou uma decisão de curadoria..."
-              className="min-h-[62px] w-full resize-none bg-transparent px-3 py-2 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/60"
-            />
-            <div className="flex items-center justify-between gap-3 px-2 pt-1">
-              <p className="text-[9px] font-semibold text-muted-foreground">
-                Enter envia · Shift + Enter quebra linha
-              </p>
-              <button
-                type="submit"
-                disabled={!input.trim() || isThinking || isLoadingConversation}
-                className="inline-flex h-9 items-center gap-2 rounded-full bg-foreground px-4 text-[10px] font-black text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
-              >
-                {isThinking ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Send className="h-3.5 w-3.5" />
-                )}
-                Enviar
-              </button>
+              <ChatComposer
+                input={input}
+                isBusy={isBusy}
+                onChange={setInput}
+                onKeyDown={handleKeyDown}
+                onSubmit={handleSubmit}
+              />
             </div>
           </div>
-        </form>
+        ) : (
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 tablet:px-8">
+              <div className="mx-auto max-w-[780px] space-y-7">
+                {visibleMessages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
+
+                {isThinking ? (
+                  <article className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    </div>
+                    Cruzando contexto, histórico e sinais...
+                  </article>
+                ) : null}
+                <div ref={endRef} />
+              </div>
+            </div>
+
+            <div className="shrink-0 bg-gradient-to-t from-background via-background to-transparent px-4 pb-3 pt-2 tablet:px-8">
+              <div className="mx-auto max-w-[780px]">
+                <ChatComposer
+                  input={input}
+                  isBusy={isBusy}
+                  onChange={setInput}
+                  onKeyDown={handleKeyDown}
+                  onSubmit={handleSubmit}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
-      <DecisionBoard
-        result={decisionResult}
-        brief={curationBrief}
-        marketFilter={marketFilter}
-        onMarketFilterChange={setMarketFilter}
-      />
+      {showDecisionBoard && decisionResult ? (
+        <div className="hidden h-full w-[420px] min-w-[360px] shrink-0 desktop:block">
+          <DecisionBoard
+            result={decisionResult}
+            marketFilter={marketFilter}
+            onClose={() => setDecisionResult(null)}
+            onMarketFilterChange={setMarketFilter}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

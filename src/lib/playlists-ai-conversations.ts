@@ -6,8 +6,8 @@ import type {
   PlaylistsAiConversationDetail,
   PlaylistsAiConversationStatus,
   PlaylistsAiConversationSummary,
-  PlaylistsAiCurationBriefField,
   PlaylistsAiCurationBrief,
+  PlaylistsAiCurationBriefField,
   PlaylistsAiPersistedMessage,
 } from "@/types/playlists-ai";
 
@@ -109,9 +109,7 @@ export async function listPlaylistAiConversations({
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("playlist_ai_conversations")
-    .select(
-      "id,title,status,brief,last_message_at,created_at,updated_at",
-    )
+    .select("id,title,status,brief,last_message_at,created_at,updated_at")
     .eq("workspace_id", workspaceId)
     .eq("user_id", userId)
     .eq("status", "active")
@@ -203,7 +201,9 @@ export async function createPlaylistAiConversation({
     .single();
 
   if (error) {
-    throw new Error(`Playlists IA conversation create failed: ${error.message}`);
+    throw new Error(
+      `Playlists IA conversation create failed: ${error.message}`,
+    );
   }
   return mapConversation(data as ConversationRow);
 }
@@ -247,7 +247,9 @@ export async function appendPlaylistAiExchange({
     ]);
 
   if (messageError) {
-    throw new Error(`Playlists IA message append failed: ${messageError.message}`);
+    throw new Error(
+      `Playlists IA message append failed: ${messageError.message}`,
+    );
   }
 
   const update: Record<string, unknown> = {
@@ -273,4 +275,33 @@ export async function appendPlaylistAiExchange({
     );
   }
   return mapConversation(data as ConversationRow);
+}
+
+export async function archivePlaylistAiConversation({
+  conversationId,
+  workspaceId,
+  userId,
+}: {
+  conversationId: string;
+  workspaceId: string;
+  userId: string;
+}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("playlist_ai_conversations")
+    .update({ status: "archived" })
+    .eq("id", conversationId)
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Playlists IA conversation archive failed: ${error.message}`,
+    );
+  }
+
+  return Boolean(data);
 }
