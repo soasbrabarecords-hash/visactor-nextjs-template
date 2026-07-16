@@ -1529,6 +1529,50 @@ function evidenceLedText({
   return text;
 }
 
+function compactAgentText(text: string, maxCharacters = 760) {
+  const paragraphs = text
+    .trim()
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+  const compact = paragraphs.join("\n\n");
+  if (compact.length <= maxCharacters) return compact;
+
+  const clipped = compact.slice(0, maxCharacters);
+  const lastStop = Math.max(
+    clipped.lastIndexOf("."),
+    clipped.lastIndexOf("!"),
+    clipped.lastIndexOf("?"),
+  );
+  return lastStop >= Math.floor(maxCharacters * 0.55)
+    ? clipped.slice(0, lastStop + 1)
+    : `${clipped.trimEnd()}…`;
+}
+
+function isContextualMethodologyFollowUp(
+  prompt: string,
+  conversation: PlaylistsAiConversationMessage[],
+) {
+  if (!conversation.some((item) => item.role === "assistant")) return false;
+
+  const normalized = normalizePlaylistAiText(prompt);
+  const refersToPreviousResult =
+    /\b(essa|esta|isso|resultado|resposta|pesquisa|consulta|lista|selecao|analise)\b/.test(
+      normalized,
+    );
+  const asksAboutMethod =
+    /\b(como|porque|por que|criterio|fonte|dados|banco|charts?|historico|janela|periodo|dias|todos|considerou|usou|pesquisou|calculou|feita|feito)\b/.test(
+      normalized,
+    );
+  const requestsNewSelection =
+    /\b(quero|traz|mostra|liste|lista de|sugere|recomenda|cria|monte|adiciona|remove|mais faixas|outras faixas|novas faixas)\b/.test(
+      normalized,
+    );
+
+  return refersToPreviousResult && asksAboutMethod && !requestsNewSelection;
+}
+
 async function executeAgentFunction({
   call,
   fallbackIntent,
@@ -1817,8 +1861,10 @@ Regras de trabalho:
 - A mensagem mais recente corrige as anteriores. Se o usuário mudar para funk, descarte o gênero anterior. Se pedir mais faixas ou disser para não repetir, preserve o restante do contexto e consulte novamente.
 - Respeite exatamente mercado, gênero, janela e quantidade. O limite por consulta é 50. Se a base retornar menos, diga quantas encontrou e não complete com outro gênero.
 - Para períodos como 7, 30 ou 180 dias, use modo historical. Para "bombando hoje", use heat. Para crescimento, use riser.
+- Se o usuário perguntar como a resposta anterior foi pesquisada, calculada ou filtrada, explique usando somente as evidências já presentes na conversa. Nesse caso não repita uma tool apenas para explicar o método.
 - Só faça uma pergunta quando faltar uma identidade indispensável, como o nome da playlist ou da música. Faça uma única pergunta específica, nunca um questionário.
-- Depois das tools, responda em até três parágrafos curtos. Cite nominalmente de três a cinco faixas quando houver cards, explique o principal critério editorial e proponha um próximo passo útil.
+- Depois das tools, responda em no máximo dois parágrafos curtos e 110 palavras. Comece pela conclusão, cite de duas a quatro faixas quando houver cards e explique apenas o critério decisivo.
+- Não comece com "Ideia:", "Estas são" ou outra fórmula pronta. Não ofereça um menu de caminhos e não termine com pergunta quando o pedido já estiver resolvido. Sugira só o melhor próximo passo quando ele realmente ajudar.
 - Não repita frases prontas nem a resposta anterior. Não diga apenas "estas são as decisões mais fortes". Traga uma leitura específica do resultado.
 - Nunca invente posição, streams, gênero, presença em playlist, causalidade ou ação executada. Todas as ações permanecem preparadas e read-only.`,
         input,
@@ -1826,7 +1872,7 @@ Regras de trabalho:
         tool_choice: "auto",
         parallel_tool_calls: false,
         reasoning: { effort: "medium" },
-        max_output_tokens: 1400,
+        max_output_tokens: 700,
         store: true,
       });
       finalPayload = payload;
@@ -1901,12 +1947,14 @@ Regras de trabalho:
       );
       return {
         ...selectedResult,
-        text: evidenceLedText({
-          text: generatedText,
-          result: selectedResult,
-          intent: selectedIntent,
-          conversation,
-        }),
+        text: compactAgentText(
+          evidenceLedText({
+            text: generatedText,
+            result: selectedResult,
+            intent: selectedIntent,
+            conversation,
+          }),
+        ),
         brief: rememberedBrief,
         meta: {
           ...selectedResult.meta,
@@ -1926,7 +1974,9 @@ Regras de trabalho:
       };
     }
 
-    if (!generatedText || fallbackIntent.name !== "general") {
+    const contextualMethodologyFollowUp =
+      generatedText && isContextualMethodologyFollowUp(prompt, conversation);
+    if (!generatedText) {
       return unavailableAgentResponse({
         brief,
         intent: selectedIntent,
@@ -1935,21 +1985,61 @@ Regras de trabalho:
         reason: "incomplete_run",
       });
     }
-    return response(
-      "general",
+    if (fallbackIntent.name !== "general" && !contextualMethodologyFollowUp) {
+      return unavailableAgentResponse({
+        brief,
+        intent: selectedIntent,
+        workspace,
+        toolCalls,
+        reason: "incomplete_run",
+      });
+    }
+
+    const contextualIntent = contextualMethodologyFollowUp
+      ? (brief.activeIntent ?? fallbackIntent.name)
+      : "general";
+    const contextualResponse = response(
+      contextualIntent,
       {
-        text: generatedText,
+        text: compactAgentText(generatedText),
         cards: [],
         actions: [],
-        confidence: 72,
-        dataSources: [buildWorkspaceSource(workspace)],
+        confidence: contextualMethodologyFollowUp ? 84 : 72,
+        dataSources: contextualMethodologyFollowUp
+          ? [
+              buildWorkspaceSource(workspace),
+              source(
+                "spotify_charts",
+                "Spotify Charts",
+                "Explicação baseada na consulta histórica já verificada nesta conversa.",
+              ),
+              source(
+                "music_intelligence",
+                "Music Intelligence",
+                "Critérios e cobertura reaproveitados do resultado anterior.",
+              ),
+            ]
+          : [buildWorkspaceSource(workspace)],
       },
       {
         brief,
-        mode: generatedText.includes("?") ? "question" : "analysis",
+        mode:
+          !contextualMethodologyFollowUp && generatedText.includes("?")
+            ? "question"
+            : "analysis",
         contextComplete: brief.missingFields.length === 0,
       },
     );
+    return {
+      ...contextualResponse,
+      meta: {
+        ...contextualResponse.meta,
+        execution: "agent",
+        toolCalls,
+        requestedCount: fallbackIntent.limit,
+        returnedCount: 0,
+      },
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Playlists IA agent loop fallback: ${message}\n`);

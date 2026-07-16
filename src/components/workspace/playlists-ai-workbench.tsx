@@ -6,7 +6,6 @@ import {
   Bookmark,
   BookmarkCheck,
   Bot,
-  CheckCircle2,
   Database,
   ExternalLink,
   Eye,
@@ -22,7 +21,6 @@ import {
   MessageSquarePlus,
   Music2,
   PanelLeftClose,
-  Pencil,
   Pin,
   PinOff,
   Plus,
@@ -47,6 +45,7 @@ import {
   useRef,
   useState,
 } from "react";
+import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
 import { cn } from "@/lib/utils";
 import type {
   PlaylistsAiChatApiResponse,
@@ -156,8 +155,9 @@ function MovementIcon({ value }: { value: number | null }) {
   );
 }
 
-function TrackCard({
+function TrackRow({
   card,
+  rank,
   isPinned,
   isSaved,
   onTogglePin,
@@ -165,6 +165,7 @@ function TrackCard({
   onIgnore,
 }: {
   card: PlaylistsAiTrackCard;
+  rank: number;
   isPinned: boolean;
   isSaved: boolean;
   onTogglePin: () => void;
@@ -245,124 +246,77 @@ function TrackCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-[18px] border bg-background/40 p-3 transition duration-200 hover:border-primary/20 hover:bg-background/60 dark:bg-white/[0.018] dark:hover:bg-white/[0.032]",
-        isPinned
-          ? "border-emerald-400/35 ring-1 ring-emerald-400/10"
-          : "border-border/65 dark:border-white/10",
+        "group border-b border-border/45 transition last:border-b-0 hover:bg-muted/25 dark:border-white/[0.07] dark:hover:bg-white/[0.025]",
+        isPinned ? "bg-emerald-400/[0.045] dark:bg-emerald-400/[0.035]" : "",
       )}
     >
-      <div className="flex gap-3">
-        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-muted">
+      <div className="flex min-w-0 items-center gap-2.5 px-2 py-3">
+        <span className="w-5 shrink-0 text-right text-[10px] font-semibold tabular-nums text-muted-foreground/70">
+          {rank}
+        </span>
+
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-muted">
           {card.coverUrl ? (
             <Image
               src={card.coverUrl}
               alt=""
               fill
-              sizes="56px"
+              sizes="44px"
               className="object-cover"
               unoptimized
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-400/25 to-sky-400/20 text-muted-foreground">
-              <Music2 className="h-5 w-5" />
+              <Music2 className="h-4 w-4" />
             </div>
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h4 className="truncate text-sm font-black tracking-[-0.02em] text-foreground">
-                {card.name}
-              </h4>
-              <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                {card.artists}
-              </p>
-            </div>
-            {card.opportunityScore !== null ? (
-              <div className="shrink-0 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-center">
-                <div className="text-sm font-black text-emerald-700 dark:text-emerald-300">
-                  {card.opportunityScore}
-                </div>
-                <div className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700/70 dark:text-emerald-300/70">
-                  score
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <h4 className="truncate text-[13px] font-semibold tracking-[-0.015em] text-foreground">
+            {card.name}
+          </h4>
+          <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground">
+            {card.artists}
+          </p>
 
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black">
+          <div className="mt-1.5 flex min-w-0 items-center gap-2 overflow-hidden text-[9px] font-semibold text-muted-foreground">
             {genreProfile ? (
               <span
                 title={`Confiança ${genreProfile.confidenceLabel}: ${genreProfile.genreConfidence}%${genreProfile.manualOverride ? " · correção manual" : ""}`}
-                className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-1 text-violet-700 dark:text-violet-300"
+                className="shrink-0 text-violet-700 dark:text-violet-300"
               >
-                <Tags className="h-3 w-3" /> {genreProfile.label}
-                <span className="opacity-65">
-                  {genreProfile.genreConfidence}%
-                </span>
-              </span>
-            ) : null}
-            {card.spotifyTrackId ? (
-              <button
-                type="button"
-                disabled={genreBusy}
-                onClick={() => setGenreEditorOpen((current) => !current)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/45 px-2 py-1 text-muted-foreground transition hover:text-foreground disabled:opacity-50 dark:border-white/10"
-                title="Atualizar ou corrigir o gênero desta faixa"
-              >
-                {genreBusy ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Pencil className="h-3 w-3" />
-                )}
-                Gênero
-              </button>
-            ) : null}
-            {card.playlistFit ? (
-              <span
-                title={card.playlistFit.reason}
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2 py-1",
-                  card.playlistFit.label === "alto"
-                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
-                    : card.playlistFit.label === "baixo"
-                      ? "border-rose-400/20 bg-rose-400/10 text-rose-700 dark:text-rose-300"
-                      : "border-amber-400/20 bg-amber-400/10 text-amber-700 dark:text-amber-300",
-                )}
-              >
-                Fit {card.playlistFit.score}%
+                {genreProfile.label}
               </span>
             ) : null}
             {typeof card.positions.BR === "number" ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-muted-foreground dark:border-white/[0.08]">
-                <MapPin className="h-3 w-3" /> BR{" "}
+              <span className="inline-flex shrink-0 items-center gap-1">
+                <MapPin className="h-2.5 w-2.5" /> BR{" "}
                 {formatPosition(card.positions.BR)}
               </span>
             ) : null}
             {typeof card.positions.GLOBAL === "number" ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1 text-muted-foreground dark:border-white/[0.08]">
-                <Globe2 className="h-3 w-3" /> Global{" "}
+              <span className="inline-flex shrink-0 items-center gap-1">
+                <Globe2 className="h-2.5 w-2.5" /> Global{" "}
                 {formatPosition(card.positions.GLOBAL)}
               </span>
             ) : null}
             {card.historicalMetrics ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-400/10 px-2 py-1 text-sky-700 dark:text-sky-300">
-                <History className="h-3 w-3" />{" "}
+              <span className="inline-flex min-w-0 items-center gap-1 truncate text-sky-700 dark:text-sky-300">
+                <History className="h-2.5 w-2.5 shrink-0" />
                 {card.historicalMetrics.chartDays}/
-                {card.historicalMetrics.windowDays} dias ·{" "}
-                {formatCompactNumber(card.historicalMetrics.totalStreams)}{" "}
-                streams
+                {card.historicalMetrics.windowDays}d ·{" "}
+                {formatCompactNumber(card.historicalMetrics.totalStreams)}
               </span>
             ) : (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-1",
+                  "inline-flex shrink-0 items-center gap-1",
                   (card.movement7d ?? 0) > 0
-                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
+                    ? "text-emerald-700 dark:text-emerald-300"
                     : (card.movement7d ?? 0) < 0
-                      ? "border-rose-400/25 bg-rose-400/10 text-rose-700 dark:text-rose-300"
-                      : "border-border/70 bg-muted/45 text-muted-foreground dark:border-white/10",
+                      ? "text-rose-700 dark:text-rose-300"
+                      : "text-muted-foreground",
                 )}
               >
                 <MovementIcon value={card.movement7d} />
@@ -371,14 +325,44 @@ function TrackCard({
             )}
           </div>
         </div>
+
+        {card.opportunityScore !== null ? (
+          <div className="w-8 shrink-0 text-center">
+            <div className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+              {card.opportunityScore}
+            </div>
+            <div className="text-[7px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              score
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSignalsOpen((current) => !current)}
+            title="Ver sinais e ações"
+            aria-label="Ver sinais e ações"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground",
+              signalsOpen && "bg-muted text-foreground",
+            )}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+          </button>
+          <SpotifyPlaylistAddButton
+            spotifyTrackId={card.spotifyTrackId}
+            suggestedPlaylistName={card.playlistNames[0] ?? null}
+            source="playlists_ai_selection"
+            label="Adicionar"
+            ariaLabel={`Adicionar ${card.name} a uma playlist`}
+            className="h-8 rounded-full bg-foreground px-3 text-[10px] font-semibold text-background shadow-none hover:bg-foreground/85"
+          />
+        </div>
       </div>
 
-      <p className="mt-3 text-xs font-medium leading-5 text-muted-foreground">
-        {card.reason}
-      </p>
-
       {genreEditorOpen ? (
-        <div className="mt-3 rounded-2xl border border-violet-400/20 bg-violet-400/[0.055] p-3">
+        <div className="mx-9 mb-3 rounded-xl border border-violet-400/20 bg-violet-400/[0.055] p-3">
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={selectedGenre}
@@ -433,167 +417,88 @@ function TrackCard({
       ) : null}
 
       {signalsOpen ? (
-        <div className="mt-3 rounded-2xl border border-border/60 bg-muted/[0.24] p-3 dark:border-white/10 dark:bg-white/[0.025]">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl bg-background/65 px-2.5 py-2 dark:bg-black/15">
-              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                Oportunidade
-              </div>
-              <div className="mt-1 text-sm font-black text-foreground">
-                {card.opportunityScore ?? "—"}
-              </div>
-            </div>
-            <div className="rounded-xl bg-background/65 px-2.5 py-2 dark:bg-black/15">
-              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                Movimento 7d
-              </div>
-              <div
-                className={cn(
-                  "mt-1 text-sm font-black",
-                  (card.movement7d ?? 0) > 0
-                    ? "text-emerald-700 dark:text-emerald-300"
-                    : (card.movement7d ?? 0) < 0
-                      ? "text-rose-700 dark:text-rose-300"
-                      : "text-foreground",
-                )}
-              >
-                {card.movement7d === null
-                  ? "—"
-                  : `${card.movement7d > 0 ? "+" : ""}${card.movement7d}`}
-              </div>
-            </div>
-            <div className="rounded-xl bg-background/65 px-2.5 py-2 dark:bg-black/15">
-              <div className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-                Fit playlist
-              </div>
-              <div className="mt-1 text-sm font-black text-foreground">
-                {card.playlistFit ? `${card.playlistFit.score}%` : "—"}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2.5 grid grid-cols-2 gap-2 text-[10px] font-semibold text-muted-foreground">
-            <div className="rounded-xl border border-border/45 px-2.5 py-2 dark:border-white/10">
-              Chart BR{" "}
-              <strong className="text-foreground">
-                {formatPosition(card.positions.BR)}
-              </strong>
-            </div>
-            <div className="rounded-xl border border-border/45 px-2.5 py-2 dark:border-white/10">
-              Chart Global{" "}
-              <strong className="text-foreground">
-                {formatPosition(card.positions.GLOBAL)}
-              </strong>
-            </div>
-          </div>
-          <p className="mt-2.5 text-[10px] font-medium leading-4 text-muted-foreground">
+        <div className="mx-9 mb-3 rounded-xl border border-border/55 bg-muted/[0.18] p-3 dark:border-white/10 dark:bg-white/[0.02]">
+          <p className="text-[11px] font-medium leading-5 text-muted-foreground">
             {card.playlistFit?.reason ?? card.reason}
           </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span
+              className={cn(
+                "rounded-full px-2 py-1 text-[8px] font-bold uppercase tracking-[0.07em]",
+                card.status === "already_in_playlist"
+                  ? "bg-sky-400/10 text-sky-700 dark:text-sky-300"
+                  : card.status === "watch"
+                    ? "bg-amber-400/10 text-amber-700 dark:text-amber-300"
+                    : "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+              )}
+            >
+              {card.statusLabel}
+            </span>
+            <button
+              type="button"
+              onClick={onTogglePin}
+              className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {isPinned ? (
+                <PinOff className="h-3 w-3" />
+              ) : (
+                <Pin className="h-3 w-3" />
+              )}
+              {isPinned ? "Desafixar" : "Fixar"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleSaved}
+              className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {isSaved ? (
+                <BookmarkCheck className="h-3 w-3" />
+              ) : (
+                <Bookmark className="h-3 w-3" />
+              )}
+              {isSaved ? "Salva" : "Salvar"}
+            </button>
+            {card.spotifyTrackId ? (
+              <button
+                type="button"
+                disabled={genreBusy}
+                onClick={() => setGenreEditorOpen((current) => !current)}
+                className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+              >
+                {genreBusy ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Tags className="h-3 w-3" />
+                )}
+                Gênero
+              </button>
+            ) : null}
+            <Link
+              href="/spotify-charts"
+              className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <TrendingUp className="h-3 w-3" /> Charts
+            </Link>
+            {card.spotifyUrl ? (
+              <a
+                href={card.spotifyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ExternalLink className="h-3 w-3" /> Spotify
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={onIgnore}
+              className="ml-auto inline-flex h-7 items-center gap-1 rounded-full px-2 text-[9px] font-semibold text-muted-foreground hover:bg-rose-400/10 hover:text-rose-600"
+            >
+              <EyeOff className="h-3 w-3" /> Ignorar
+            </button>
+          </div>
         </div>
       ) : null}
-
-      <div className="mt-3 flex items-center gap-2 border-t border-border/45 pt-2.5 dark:border-white/[0.08]">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em]",
-            card.status === "already_in_playlist"
-              ? "bg-sky-400/10 text-sky-700 dark:text-sky-300"
-              : card.status === "watch"
-                ? "bg-amber-400/10 text-amber-700 dark:text-amber-300"
-                : "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
-          )}
-        >
-          <CheckCircle2 className="h-3 w-3" />
-          {card.statusLabel}
-        </span>
-        <button
-          type="button"
-          onClick={onTogglePin}
-          title={isPinned ? "Desafixar" : "Fixar"}
-          aria-label={isPinned ? "Desafixar" : "Fixar"}
-          className={cn(
-            "ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
-            isPinned
-              ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-700 dark:text-emerald-300"
-              : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
-          )}
-        >
-          {isPinned ? (
-            <PinOff className="h-3 w-3" />
-          ) : (
-            <Pin className="h-3 w-3" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleSaved}
-          title="Pré-seleção visual desta resposta; não altera o Spotify."
-          aria-label={isSaved ? "Remover da pré-seleção" : "Pré-selecionar"}
-          className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
-            isSaved
-              ? "border-sky-400/25 bg-sky-400/10 text-sky-700 dark:text-sky-300"
-              : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
-          )}
-        >
-          {isSaved ? (
-            <BookmarkCheck className="h-3 w-3" />
-          ) : (
-            <Bookmark className="h-3 w-3" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSignalsOpen((current) => !current)}
-          title="Ver sinais e detalhes"
-          aria-label="Ver sinais e detalhes"
-          className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-black transition",
-            signalsOpen
-              ? "border-violet-400/25 bg-violet-400/10 text-violet-700 dark:text-violet-300"
-              : "border-border/60 text-muted-foreground hover:text-foreground dark:border-white/10",
-          )}
-        >
-          <BarChart3 className="h-3 w-3" />
-        </button>
-        <Link
-          href="/spotify-charts"
-          title="Abrir Spotify Charts"
-          aria-label="Abrir Spotify Charts"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-[9px] font-black text-muted-foreground transition hover:text-foreground dark:border-white/10"
-        >
-          <TrendingUp className="h-3 w-3" />
-        </Link>
-        {card.spotifyUrl ? (
-          <a
-            href={card.spotifyUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground dark:border-white/10"
-            aria-label={`Abrir ${card.name} no Spotify`}
-            title="Abrir no Spotify"
-          >
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        ) : null}
-        <button
-          type="button"
-          disabled
-          title="Ação preparada; nenhuma alteração no Spotify nesta versão."
-          className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-full bg-foreground px-2.5 text-[9px] font-black text-background opacity-45"
-        >
-          <Plus className="h-3 w-3" />
-          {card.status === "already_in_playlist" ? "Remover" : "Adicionar"}
-        </button>
-        <button
-          type="button"
-          onClick={onIgnore}
-          title="Ignorar nesta seleção"
-          aria-label="Ignorar nesta seleção"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[9px] font-black text-muted-foreground transition hover:bg-rose-400/10 hover:text-rose-700 dark:hover:text-rose-300"
-        >
-          <EyeOff className="h-3 w-3" />
-        </button>
-      </div>
     </article>
   );
 }
@@ -868,13 +773,14 @@ function DecisionBoard({
         ) : null}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
         {visibleCards.length > 0 ? (
-          <div className="space-y-2.5">
-            {visibleCards.map((card) => (
-              <TrackCard
+          <div className="overflow-hidden rounded-xl border border-border/45 dark:border-white/[0.07]">
+            {visibleCards.map((card, index) => (
+              <TrackRow
                 key={`${card.id}-${card.statusLabel}`}
                 card={card}
+                rank={index + 1}
                 isPinned={pinnedTrackIds.has(cardKey(card))}
                 isSaved={savedTrackIds.has(cardKey(card))}
                 onTogglePin={() =>

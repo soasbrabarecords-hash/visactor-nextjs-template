@@ -278,6 +278,80 @@ test("never replaces an unavailable conversational agent with fake recommendatio
   assert.match(result.text, /Nenhuma recomendação foi gerada/i);
 });
 
+test("answers a methodology follow-up from the verified conversation context", async () => {
+  const result = await runPlaylistsAiAgent(
+    {
+      message:
+        "Essa pesquisa está sendo feita em todos os dias do banco de dados dos charts?",
+      messages: [
+        {
+          role: "assistant",
+          content:
+            "Pesquisei todos os snapshots diários dos últimos 180 dias e encontrei 12 faixas de trap.",
+        },
+      ],
+      brief: {
+        goal: null,
+        market: "BR",
+        playlistMode: "new",
+        playlistName: null,
+        genre: "Trap",
+        audience: null,
+        strategy: null,
+        targetSize: 50,
+        activeIntent: "chart_opportunities",
+        completeness: 0,
+        missingFields: [],
+      },
+    },
+    {
+      tools: buildTools(),
+      agentRequest: async () => ({
+        id: "resp-contextual-answer",
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: "Sim. A consulta percorreu os 180 snapshots diários completos disponíveis na janela pedida.",
+              },
+            ],
+          },
+        ],
+      }),
+    },
+  );
+
+  assert.equal(result.meta.execution, "agent");
+  assert.equal(result.meta.intent, "chart_opportunities");
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.confidence, 84);
+  assert.match(result.text, /180 snapshots diários completos/i);
+});
+
+test("still rejects a concrete music request when the agent skips tools", async () => {
+  const result = await runPlaylistsAiAgent(
+    { message: "Mostra as 10 músicas mais quentes nos charts do Brasil." },
+    {
+      tools: buildTools(),
+      agentRequest: async () => ({
+        id: "resp-ungrounded-list",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: "Aqui estão dez músicas." }],
+          },
+        ],
+      }),
+    },
+  );
+
+  assert.equal(result.meta.execution, "unavailable");
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.confidence, 0);
+});
+
 test("treats a natural genre correction as a data request", async () => {
   const tools = buildTools();
   let receivedOptions = null;
