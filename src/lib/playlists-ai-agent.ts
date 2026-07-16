@@ -25,7 +25,7 @@ import {
   searchSpotifyTrack,
   searchTrackInPlaylists,
 } from "@/lib/playlists-ai-tools";
-import { getEffectiveOpenAICredentials } from "@/lib/workspaces";
+import { getEffectiveAiGatewayCredentials } from "@/lib/workspaces";
 import type {
   PlaylistsAiChatResponse,
   PlaylistsAiConversationMessage,
@@ -406,108 +406,94 @@ async function planPlaylistAiRequest({
   fallback: DetectedPlaylistsAiIntent;
 }): Promise<PlaylistAiPlannerDecision | null> {
   try {
-    const credentials = await getEffectiveOpenAICredentials();
+    const credentials = await getEffectiveAiGatewayCredentials();
     if (!credentials) return null;
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${credentials.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: credentials.model,
-        instructions:
-          "Você planeja consultas read-only para um copiloto profissional de curadoria musical. Interprete a intenção real usando a conversa inteira, sem imitar um formulário. Um pedido concreto de músicas, charts, histórico, gênero ou playlist deve virar consulta imediatamente: não pergunte objetivo, público ou estratégia quando esses dados não mudam a resposta pedida. Faça uma pergunta somente quando faltar uma identidade indispensável, como o nome da playlist ou da faixa. Preserve todos os gêneros citados, inclusive combinações como trap + rap. Para pedidos em português sem mercado explícito, use BR. Para 'mais tocaram' ou qualquer período, use historical. Nunca invente uma playlist que não esteja na lista disponível. A pergunta de esclarecimento deve mencionar o contexto já conhecido e soar como um curador humano, nunca repetir opções genéricas. Retorne somente o JSON do schema.",
-        input: JSON.stringify({
-          userMessage: prompt,
-          conversation: conversation.slice(-8),
-          savedBrief: brief,
-          workspacePlaylistNames: playlistNames,
-          deterministicFallback: fallback,
-        }),
-        text: {
-          format: {
-            type: "json_schema",
-            name: "playlist_os_curation_plan",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                intent: {
-                  type: "string",
-                  enum: [
-                    "chart_opportunities",
-                    "playlist_recommendations",
-                    "track_presence",
-                    "playlist_review",
-                    "playlist_idea",
-                    "playlist_description",
-                    "general",
-                  ],
-                },
-                market: { type: "string", enum: ["BR", "GLOBAL", "BOTH"] },
-                genres: {
-                  type: "array",
-                  items: { type: "string", enum: PLANNER_GENRES },
-                  maxItems: 4,
-                },
-                mode: {
-                  type: "string",
-                  enum: [
-                    "opportunity",
-                    "heat",
-                    "riser",
-                    "review",
-                    "historical",
-                  ],
-                },
-                windowDays: {
-                  anyOf: [
-                    { type: "integer", minimum: 1, maximum: 365 },
-                    { type: "null" },
-                  ],
-                },
-                limit: { type: "integer", minimum: 1, maximum: 50 },
-                targetSize: { type: "integer", minimum: 10, maximum: 500 },
-                playlistReference: {
-                  anyOf: [{ type: "string" }, { type: "null" }],
-                },
-                trackQuery: {
-                  anyOf: [{ type: "string" }, { type: "null" }],
-                },
-                excludeWorkspaceTracks: { type: "boolean" },
-                needsClarification: { type: "boolean" },
-                clarificationQuestion: {
-                  anyOf: [{ type: "string" }, { type: "null" }],
-                },
-                clarificationReason: {
-                  anyOf: [{ type: "string" }, { type: "null" }],
-                },
-                confidence: { type: "integer", minimum: 0, maximum: 100 },
+    const response = await requestAiGatewayAgent(credentials.authToken, {
+      model: credentials.model,
+      instructions:
+        "Você planeja consultas read-only para um copiloto profissional de curadoria musical. Interprete a intenção real usando a conversa inteira, sem imitar um formulário. Um pedido concreto de músicas, charts, histórico, gênero ou playlist deve virar consulta imediatamente: não pergunte objetivo, público ou estratégia quando esses dados não mudam a resposta pedida. Faça uma pergunta somente quando faltar uma identidade indispensável, como o nome da playlist ou da faixa. Preserve todos os gêneros citados, inclusive combinações como trap + rap. Para pedidos em português sem mercado explícito, use BR. Para 'mais tocaram' ou qualquer período, use historical. Nunca invente uma playlist que não esteja na lista disponível. A pergunta de esclarecimento deve mencionar o contexto já conhecido e soar como um curador humano, nunca repetir opções genéricas. Retorne somente o JSON do schema.",
+      input: JSON.stringify({
+        userMessage: prompt,
+        conversation: conversation.slice(-8),
+        savedBrief: brief,
+        workspacePlaylistNames: playlistNames,
+        deterministicFallback: fallback,
+      }),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "playlist_os_curation_plan",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              intent: {
+                type: "string",
+                enum: [
+                  "chart_opportunities",
+                  "playlist_recommendations",
+                  "track_presence",
+                  "playlist_review",
+                  "playlist_idea",
+                  "playlist_description",
+                  "general",
+                ],
               },
-              required: [
-                "intent",
-                "market",
-                "genres",
-                "mode",
-                "windowDays",
-                "limit",
-                "targetSize",
-                "playlistReference",
-                "trackQuery",
-                "excludeWorkspaceTracks",
-                "needsClarification",
-                "clarificationQuestion",
-                "clarificationReason",
-                "confidence",
-              ],
+              market: { type: "string", enum: ["BR", "GLOBAL", "BOTH"] },
+              genres: {
+                type: "array",
+                items: { type: "string", enum: PLANNER_GENRES },
+                maxItems: 4,
+              },
+              mode: {
+                type: "string",
+                enum: ["opportunity", "heat", "riser", "review", "historical"],
+              },
+              windowDays: {
+                anyOf: [
+                  { type: "integer", minimum: 1, maximum: 365 },
+                  { type: "null" },
+                ],
+              },
+              limit: { type: "integer", minimum: 1, maximum: 50 },
+              targetSize: { type: "integer", minimum: 10, maximum: 500 },
+              playlistReference: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              trackQuery: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              excludeWorkspaceTracks: { type: "boolean" },
+              needsClarification: { type: "boolean" },
+              clarificationQuestion: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              clarificationReason: {
+                anyOf: [{ type: "string" }, { type: "null" }],
+              },
+              confidence: { type: "integer", minimum: 0, maximum: 100 },
             },
+            required: [
+              "intent",
+              "market",
+              "genres",
+              "mode",
+              "windowDays",
+              "limit",
+              "targetSize",
+              "playlistReference",
+              "trackQuery",
+              "excludeWorkspaceTracks",
+              "needsClarification",
+              "clarificationQuestion",
+              "clarificationReason",
+              "confidence",
+            ],
           },
         },
-        max_output_tokens: 650,
-      }),
-      cache: "no-store",
+      },
+      max_output_tokens: 650,
     });
     if (!response.ok) return null;
     const payload = await response.json();
@@ -1699,24 +1685,80 @@ async function executeAgentFunction({
   throw new Error(`Tool desconhecida: ${call.name}`);
 }
 
-async function requestOpenAiAgent(
-  apiKey: string,
+async function requestAiGatewayAgent(
+  authToken: string,
   body: Record<string, unknown>,
 ) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch("https://ai-gateway.vercel.sh/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${authToken}`,
       "Content-Type": "application/json",
+      "X-Vercel-AI-App-Name": "Playlist OS",
+      "X-Vercel-AI-App-Url": "https://system.soasbraba.com/playlists-ia",
     },
     body: JSON.stringify(body),
     cache: "no-store",
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 600);
-    throw new Error(`OpenAI ${response.status}: ${detail}`);
+    throw new Error(`AI Gateway ${response.status}: ${detail}`);
   }
   return response.json();
+}
+
+function unavailableAgentResponse({
+  brief,
+  intent,
+  workspace,
+  toolCalls = [],
+  reason = "missing_credentials",
+}: {
+  brief: PlaylistsAiCurationBrief;
+  intent: DetectedPlaylistsAiIntent;
+  workspace: WorkspacePlaylistsToolResult;
+  toolCalls?: string[];
+  reason?: "missing_credentials" | "agent_failed" | "incomplete_run";
+}): PlaylistsAiChatResponse {
+  const result = response(
+    intent.name,
+    {
+      text:
+        reason === "missing_credentials"
+          ? "A inteligência do Playlist OS ainda não foi ativada pelo administrador. Nenhuma recomendação foi gerada."
+          : "Não consegui concluir esta consulta com segurança agora. Nenhuma recomendação foi gerada; tente novamente em instantes.",
+      cards: [],
+      actions: [],
+      confidence: 0,
+      dataSources: [
+        buildWorkspaceSource(workspace),
+        source(
+          "music_intelligence",
+          "Agente Sol",
+          reason === "missing_credentials"
+            ? "Inteligência global ainda não configurada no servidor."
+            : "Execução do agente não concluída.",
+          "unavailable",
+        ),
+      ],
+    },
+    {
+      brief,
+      mode: "analysis",
+      contextComplete: brief.missingFields.length === 0,
+    },
+  );
+
+  return {
+    ...result,
+    meta: {
+      ...result.meta,
+      execution: "unavailable",
+      toolCalls,
+      requestedCount: intent.limit,
+      returnedCount: 0,
+    },
+  };
 }
 
 async function runToolCallingAgent({
@@ -1739,11 +1781,17 @@ async function runToolCallingAgent({
   try {
     const credentials = requestOverride
       ? null
-      : await getEffectiveOpenAICredentials();
-    if (!requestOverride && !credentials) return null;
+      : await getEffectiveAiGatewayCredentials();
+    if (!requestOverride && !credentials) {
+      return unavailableAgentResponse({
+        brief,
+        intent: fallbackIntent,
+        workspace,
+      });
+    }
     const request: PlaylistsAiAgentRequest =
       requestOverride ??
-      ((body) => requestOpenAiAgent(credentials?.apiKey ?? "", body));
+      ((body) => requestAiGatewayAgent(credentials?.authToken ?? "", body));
     const input: unknown[] = [
       ...conversation.slice(-30).map((item) => ({
         role: item.role,
@@ -1878,7 +1926,15 @@ Regras de trabalho:
       };
     }
 
-    if (!generatedText || fallbackIntent.name !== "general") return null;
+    if (!generatedText || fallbackIntent.name !== "general") {
+      return unavailableAgentResponse({
+        brief,
+        intent: selectedIntent,
+        workspace,
+        toolCalls,
+        reason: "incomplete_run",
+      });
+    }
     return response(
       "general",
       {
@@ -1897,7 +1953,12 @@ Regras de trabalho:
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`Playlists IA agent loop fallback: ${message}\n`);
-    return null;
+    return unavailableAgentResponse({
+      brief,
+      intent: fallbackIntent,
+      workspace,
+      reason: "agent_failed",
+    });
   }
 }
 

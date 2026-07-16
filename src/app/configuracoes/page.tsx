@@ -34,7 +34,10 @@ export default async function ConfiguracoesPage() {
     (workspace.spotifyIntegration.hasAccessToken ||
       workspace.spotifyIntegration.hasRefreshToken),
   );
-  const openaiReady = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const openaiReady = Boolean(
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+    process.env.VERCEL_OIDC_TOKEN?.trim(),
+  );
   const spotifyRedirectUri = getSpotifyRedirectUri(
     process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://system.soasbraba.com",
   );

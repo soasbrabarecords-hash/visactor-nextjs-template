@@ -1,16 +1,15 @@
-import "server-only";
-
-import { cache } from "react";
 import { cookies } from "next/headers";
+import { cache } from "react";
+import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACTIVE_WORKSPACE_COOKIE,
-  canUseGlobalSpotifyApp,
-  selectCurrentWorkspace,
   type ModuleRole,
   type WorkspaceRole,
   type WorkspaceSummary,
+  canUseGlobalSpotifyApp,
+  selectCurrentWorkspace,
 } from "@/lib/workspace-access";
 
 type WorkspaceRow = {
@@ -108,12 +107,6 @@ export type WorkspaceSettingsInput = {
   prioritizeTopTracks: boolean;
 };
 
-export type WorkspaceOpenAIIntegrationInput = {
-  appMode: "global_app" | "workspace_app";
-  apiKey?: string | null;
-  model?: string | null;
-};
-
 export type EffectiveSpotifyCredentials = {
   clientId: string;
   clientSecret: string;
@@ -121,10 +114,10 @@ export type EffectiveSpotifyCredentials = {
   workspaceId: string | null;
 };
 
-export type EffectiveOpenAICredentials = {
-  apiKey: string;
+export type EffectiveAiGatewayCredentials = {
+  authToken: string;
   model: string;
-  source: "global_app" | "workspace_app";
+  source: "gateway_key" | "vercel_oidc";
   workspaceId: string | null;
 };
 
@@ -183,7 +176,7 @@ function getEffectiveSpotifyAppMode(
   storedMode: WorkspaceIntegrationRow["app_mode"] | null | undefined,
 ) {
   return canUseGlobalSpotifyApp(workspace)
-    ? storedMode ?? "global_app"
+    ? (storedMode ?? "global_app")
     : "workspace_app";
 }
 
@@ -195,7 +188,10 @@ async function getWorkspaceDbClient(): Promise<WorkspaceDbClient> {
   return createAdminClient() ?? (await createClient());
 }
 
-async function ensureWorkspaceDefaults(workspaceId: string, workspaceSlug: string) {
+async function ensureWorkspaceDefaults(
+  workspaceId: string,
+  workspaceSlug: string,
+) {
   const supabase = await getWorkspaceDbClient();
   const spotifyAppMode = getDefaultSpotifyAppMode({ slug: workspaceSlug });
 
@@ -235,11 +231,12 @@ async function ensureWorkspaceDefaults(workspaceId: string, workspaceSlug: strin
     { error: settingsError },
     { error: spotifyIntegrationError },
     { error: openaiIntegrationError },
-  ] =
-    await runUpserts(supabase);
+  ] = await runUpserts(supabase);
 
   if (settingsError) {
-    throw new Error(`ensureWorkspaceDefaults(settings): ${settingsError.message}`);
+    throw new Error(
+      `ensureWorkspaceDefaults(settings): ${settingsError.message}`,
+    );
   }
 
   if (spotifyIntegrationError) {
@@ -255,7 +252,9 @@ async function ensureWorkspaceDefaults(workspaceId: string, workspaceSlug: strin
   }
 }
 
-function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole {
+function normalizeWorkspaceRole(
+  role: string | null | undefined,
+): WorkspaceRole {
   if (role === "owner" || role === "admin" || role === "viewer") {
     return role;
   }
@@ -263,8 +262,13 @@ function normalizeWorkspaceRole(role: string | null | undefined): WorkspaceRole 
   return "member";
 }
 
-async function canManagePlaylistOsWorkspaceSettings(workspace: WorkspaceContext) {
-  if (workspace.membership.role === "owner" || workspace.membership.role === "admin") {
+async function canManagePlaylistOsWorkspaceSettings(
+  workspace: WorkspaceContext,
+) {
+  if (
+    workspace.membership.role === "owner" ||
+    workspace.membership.role === "admin"
+  ) {
     return true;
   }
 
@@ -306,312 +310,311 @@ async function canManagePlaylistOsWorkspaceSettings(workspace: WorkspaceContext)
   return role ? PLAYLIST_OS_INTEGRATION_MANAGER_ROLES.has(role) : false;
 }
 
-const getCurrentWorkspaceSelectionUncached = async (): Promise<CurrentWorkspaceSelection | null> => {
-  const supabase = await createClient();
-  const dataClient = createAdminClient() ?? supabase;
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
+const getCurrentWorkspaceSelectionUncached =
+  async (): Promise<CurrentWorkspaceSelection | null> => {
+    const supabase = await createClient();
+    const dataClient = createAdminClient() ?? supabase;
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const userId = claimsData?.claims?.sub;
 
-  if (!userId) {
-    return null;
-  }
+    if (!userId) {
+      return null;
+    }
 
-  const { data: accessRows, error: accessError } = await dataClient
-    .from("workspace_users")
-    .select("workspace_id, role, status, created_at")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: true });
-
-  if (accessError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(access): ${accessError.message}`,
-    );
-  }
-
-  let workspaceAccessRows = (accessRows ?? []) as Array<{
-    workspace_id: string;
-    role: string | null;
-  }>;
-
-  if (workspaceAccessRows.length === 0) {
-    const { data: membershipRows, error: membershipError } = await dataClient
-      .from("workspace_memberships")
-      .select("workspace_id, role, created_at")
+    const { data: accessRows, error: accessError } = await dataClient
+      .from("workspace_users")
+      .select("workspace_id, role, status, created_at")
       .eq("user_id", userId)
+      .eq("status", "active")
       .order("created_at", { ascending: true });
 
-    if (membershipError) {
+    if (accessError) {
       throw new Error(
-        `getCurrentWorkspaceContext(membership): ${membershipError.message}`,
+        `getCurrentWorkspaceContext(access): ${accessError.message}`,
       );
     }
 
-    workspaceAccessRows = ((membershipRows ?? []) as Array<{
+    let workspaceAccessRows = (accessRows ?? []) as Array<{
       workspace_id: string;
       role: string | null;
-    }>).map((row) => ({
-      workspace_id: row.workspace_id,
-      role: normalizeWorkspaceRole(row.role),
-    }));
-  }
+    }>;
 
-  if (workspaceAccessRows.length === 0) {
-    return null;
-  }
+    if (workspaceAccessRows.length === 0) {
+      const { data: membershipRows, error: membershipError } = await dataClient
+        .from("workspace_memberships")
+        .select("workspace_id, role, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
 
-  const workspaceIds = Array.from(
-    new Set(workspaceAccessRows.map((row) => row.workspace_id)),
-  );
-
-  const { data: workspaceRows, error: workspaceError } = await dataClient
-    .from("workspaces")
-    .select("id, name, slug, type, status, owner_user_id")
-    .in("id", workspaceIds);
-
-  if (workspaceError) {
-    throw new Error(
-      `getCurrentWorkspaceContext(workspace): ${workspaceError.message}`,
-    );
-  }
-
-  const accessRoleByWorkspaceId = new Map(
-    workspaceAccessRows.map((row) => [
-      row.workspace_id,
-      normalizeWorkspaceRole(row.role),
-    ]),
-  );
-
-  const accessibleWorkspaces = ((workspaceRows ?? []) as WorkspaceRow[])
-    .map((workspaceRow): WorkspaceSummary | null => {
-      const role = accessRoleByWorkspaceId.get(workspaceRow.id);
-
-      if (!role) {
-        return null;
+      if (membershipError) {
+        throw new Error(
+          `getCurrentWorkspaceContext(membership): ${membershipError.message}`,
+        );
       }
 
-      return {
-        id: workspaceRow.id,
-        name: workspaceRow.name,
-        slug: workspaceRow.slug,
-        type: workspaceRow.type,
-        status: workspaceRow.status ?? "active",
-        role,
-      };
-    })
-    .filter(Boolean) as WorkspaceSummary[];
+      workspaceAccessRows = (
+        (membershipRows ?? []) as Array<{
+          workspace_id: string;
+          role: string | null;
+        }>
+      ).map((row) => ({
+        workspace_id: row.workspace_id,
+        role: normalizeWorkspaceRole(row.role),
+      }));
+    }
 
-  const cookieStore = await cookies();
-  const activeWorkspaceId =
-    cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? null;
-  const selectedWorkspace = selectCurrentWorkspace(
-    accessibleWorkspaces,
-    activeWorkspaceId,
-  );
+    if (workspaceAccessRows.length === 0) {
+      return null;
+    }
 
-  if (!selectedWorkspace) {
-    return null;
-  }
+    const workspaceIds = Array.from(
+      new Set(workspaceAccessRows.map((row) => row.workspace_id)),
+    );
 
-  const workspace = ((workspaceRows ?? []) as WorkspaceRow[]).find(
-    (row) => row.id === selectedWorkspace.id,
-  );
+    const { data: workspaceRows, error: workspaceError } = await dataClient
+      .from("workspaces")
+      .select("id, name, slug, type, status, owner_user_id")
+      .in("id", workspaceIds);
 
-  if (!workspace) {
-    return null;
-  }
+    if (workspaceError) {
+      throw new Error(
+        `getCurrentWorkspaceContext(workspace): ${workspaceError.message}`,
+      );
+    }
 
-  return {
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-      slug: workspace.slug,
-    },
-    membership: {
-      role: selectedWorkspace.role,
-    },
+    const accessRoleByWorkspaceId = new Map(
+      workspaceAccessRows.map((row) => [
+        row.workspace_id,
+        normalizeWorkspaceRole(row.role),
+      ]),
+    );
+
+    const accessibleWorkspaces = ((workspaceRows ?? []) as WorkspaceRow[])
+      .map((workspaceRow): WorkspaceSummary | null => {
+        const role = accessRoleByWorkspaceId.get(workspaceRow.id);
+
+        if (!role) {
+          return null;
+        }
+
+        return {
+          id: workspaceRow.id,
+          name: workspaceRow.name,
+          slug: workspaceRow.slug,
+          type: workspaceRow.type,
+          status: workspaceRow.status ?? "active",
+          role,
+        };
+      })
+      .filter(Boolean) as WorkspaceSummary[];
+
+    const cookieStore = await cookies();
+    const activeWorkspaceId =
+      cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value ?? null;
+    const selectedWorkspace = selectCurrentWorkspace(
+      accessibleWorkspaces,
+      activeWorkspaceId,
+    );
+
+    if (!selectedWorkspace) {
+      return null;
+    }
+
+    const workspace = ((workspaceRows ?? []) as WorkspaceRow[]).find(
+      (row) => row.id === selectedWorkspace.id,
+    );
+
+    if (!workspace) {
+      return null;
+    }
+
+    return {
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+      },
+      membership: {
+        role: selectedWorkspace.role,
+      },
+    };
   };
-};
 
 export const getCurrentWorkspaceSelection = cache(
   getCurrentWorkspaceSelectionUncached,
 );
 
-const getCurrentWorkspaceContextUncached = async (): Promise<WorkspaceContext | null> => {
-  const selection = await getCurrentWorkspaceSelection();
+const getCurrentWorkspaceContextUncached =
+  async (): Promise<WorkspaceContext | null> => {
+    const selection = await getCurrentWorkspaceSelection();
 
-  if (!selection) {
-    return null;
-  }
-
-  const dataClient = await getWorkspaceDbClient();
-  const { workspace, membership } = selection;
-
-  const readWorkspaceConfiguration = () =>
-    Promise.all([
-      dataClient
-        .from("workspace_settings")
-        .select(
-          "workspace_id, default_market, release_window_days, suggestion_score_threshold, prioritize_followed_artists, prioritize_top_tracks",
-        )
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
-      dataClient
-        .from("workspace_integrations")
-        .select(
-          "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret, provider_account_id, provider_account_label, access_token, refresh_token, token_expires_at, granted_scopes",
-        )
-        .eq("workspace_id", workspace.id)
-        .eq("provider", "spotify")
-        .maybeSingle(),
-      dataClient
-        .from("workspace_integrations")
-        .select(
-          "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret",
-        )
-        .eq("workspace_id", workspace.id)
-        .eq("provider", "openai")
-        .maybeSingle(),
-    ]);
-
-  let [
-    settingsResult,
-    spotifyIntegrationResult,
-    openaiIntegrationResult,
-  ] = await readWorkspaceConfiguration();
-
-  const assertWorkspaceConfiguration = () => {
-    if (settingsResult.error) {
-      throw new Error(
-        `getCurrentWorkspaceContext(settings): ${settingsResult.error.message}`,
-      );
+    if (!selection) {
+      return null;
     }
 
-    if (spotifyIntegrationResult.error) {
-      throw new Error(
-        `getCurrentWorkspaceContext(spotify): ${spotifyIntegrationResult.error.message}`,
-      );
-    }
+    const dataClient = await getWorkspaceDbClient();
+    const { workspace, membership } = selection;
 
-    if (openaiIntegrationResult.error) {
-      throw new Error(
-        `getCurrentWorkspaceContext(openai): ${openaiIntegrationResult.error.message}`,
-      );
-    }
-  };
+    const readWorkspaceConfiguration = () =>
+      Promise.all([
+        dataClient
+          .from("workspace_settings")
+          .select(
+            "workspace_id, default_market, release_window_days, suggestion_score_threshold, prioritize_followed_artists, prioritize_top_tracks",
+          )
+          .eq("workspace_id", workspace.id)
+          .maybeSingle(),
+        dataClient
+          .from("workspace_integrations")
+          .select(
+            "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret, provider_account_id, provider_account_label, access_token, refresh_token, token_expires_at, granted_scopes",
+          )
+          .eq("workspace_id", workspace.id)
+          .eq("provider", "spotify")
+          .maybeSingle(),
+        dataClient
+          .from("workspace_integrations")
+          .select(
+            "workspace_id, provider, app_mode, connection_status, app_client_id, app_client_secret",
+          )
+          .eq("workspace_id", workspace.id)
+          .eq("provider", "openai")
+          .maybeSingle(),
+      ]);
 
-  assertWorkspaceConfiguration();
+    let [settingsResult, spotifyIntegrationResult, openaiIntegrationResult] =
+      await readWorkspaceConfiguration();
 
-  const canBootstrapDefaults =
-    membership.role === "owner" || membership.role === "admin";
-  const isConfigurationMissing =
-    !settingsResult.data ||
-    !spotifyIntegrationResult.data ||
-    !openaiIntegrationResult.data;
+    const assertWorkspaceConfiguration = () => {
+      if (settingsResult.error) {
+        throw new Error(
+          `getCurrentWorkspaceContext(settings): ${settingsResult.error.message}`,
+        );
+      }
 
-  if (canBootstrapDefaults && isConfigurationMissing) {
-    await ensureWorkspaceDefaults(workspace.id, workspace.slug);
-    [
-      settingsResult,
-      spotifyIntegrationResult,
-      openaiIntegrationResult,
-    ] = await readWorkspaceConfiguration();
+      if (spotifyIntegrationResult.error) {
+        throw new Error(
+          `getCurrentWorkspaceContext(spotify): ${spotifyIntegrationResult.error.message}`,
+        );
+      }
+
+      if (openaiIntegrationResult.error) {
+        throw new Error(
+          `getCurrentWorkspaceContext(openai): ${openaiIntegrationResult.error.message}`,
+        );
+      }
+    };
+
     assertWorkspaceConfiguration();
-  }
 
-  const settings = settingsResult.data as WorkspaceSettingsRow | null;
-  const spotifyIntegration = spotifyIntegrationResult.data as WorkspaceIntegrationRow | null;
-  const openaiIntegration = openaiIntegrationResult.data as WorkspaceIntegrationRow | null;
-  const spotifyAppMode = getEffectiveSpotifyAppMode(
-    workspace,
-    spotifyIntegration?.app_mode,
-  );
-  const spotifyStoredSessionBelongsToMode =
-    canUseGlobalSpotifyApp(workspace) ||
-    spotifyIntegration?.app_mode === "workspace_app";
-  const spotifyConnectionStatus =
-    spotifyStoredSessionBelongsToMode
-      ? spotifyIntegration?.connection_status ??
-        DEFAULT_SPOTIFY_INTEGRATION.connectionStatus
+    const canBootstrapDefaults =
+      membership.role === "owner" || membership.role === "admin";
+    const isConfigurationMissing =
+      !settingsResult.data ||
+      !spotifyIntegrationResult.data ||
+      !openaiIntegrationResult.data;
+
+    if (canBootstrapDefaults && isConfigurationMissing) {
+      await ensureWorkspaceDefaults(workspace.id, workspace.slug);
+      [settingsResult, spotifyIntegrationResult, openaiIntegrationResult] =
+        await readWorkspaceConfiguration();
+      assertWorkspaceConfiguration();
+    }
+
+    const settings = settingsResult.data as WorkspaceSettingsRow | null;
+    const spotifyIntegration =
+      spotifyIntegrationResult.data as WorkspaceIntegrationRow | null;
+    const openaiIntegration =
+      openaiIntegrationResult.data as WorkspaceIntegrationRow | null;
+    const spotifyAppMode = getEffectiveSpotifyAppMode(
+      workspace,
+      spotifyIntegration?.app_mode,
+    );
+    const spotifyStoredSessionBelongsToMode =
+      canUseGlobalSpotifyApp(workspace) ||
+      spotifyIntegration?.app_mode === "workspace_app";
+    const spotifyConnectionStatus = spotifyStoredSessionBelongsToMode
+      ? (spotifyIntegration?.connection_status ??
+        DEFAULT_SPOTIFY_INTEGRATION.connectionStatus)
       : "not_connected";
 
-  return {
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-      slug: workspace.slug,
-    },
-    membership: {
-      role: membership.role,
-    },
-    settings: {
-      defaultMarket:
-        settings?.default_market ?? DEFAULT_WORKSPACE_SETTINGS.defaultMarket,
-      releaseWindowDays:
-        settings?.release_window_days ??
-        DEFAULT_WORKSPACE_SETTINGS.releaseWindowDays,
-      suggestionScoreThreshold:
-        settings?.suggestion_score_threshold ??
-        DEFAULT_WORKSPACE_SETTINGS.suggestionScoreThreshold,
-      prioritizeFollowedArtists:
-        settings?.prioritize_followed_artists ??
-        DEFAULT_WORKSPACE_SETTINGS.prioritizeFollowedArtists,
-      prioritizeTopTracks:
-        settings?.prioritize_top_tracks ??
-        DEFAULT_WORKSPACE_SETTINGS.prioritizeTopTracks,
-    },
-    spotifyIntegration: {
-      appMode: spotifyAppMode,
-      connectionStatus: spotifyConnectionStatus,
-      appClientId:
-        spotifyIntegration?.app_client_id ??
-        DEFAULT_SPOTIFY_INTEGRATION.appClientId,
-      hasAppClientSecret:
-        spotifyIntegration?.app_client_secret != null
-          ? Boolean(spotifyIntegration.app_client_secret)
-          : DEFAULT_SPOTIFY_INTEGRATION.hasAppClientSecret,
-      hasAccessToken:
-        spotifyStoredSessionBelongsToMode && spotifyIntegration?.access_token != null
-          ? Boolean(spotifyIntegration.access_token)
-          : DEFAULT_SPOTIFY_INTEGRATION.hasAccessToken,
-      hasRefreshToken:
-        spotifyStoredSessionBelongsToMode && spotifyIntegration?.refresh_token != null
-          ? Boolean(spotifyIntegration.refresh_token)
-          : DEFAULT_SPOTIFY_INTEGRATION.hasRefreshToken,
-      tokenExpiresAt:
-        spotifyStoredSessionBelongsToMode
-          ? spotifyIntegration?.token_expires_at ??
-            DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt
+    return {
+      workspace: {
+        id: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+      },
+      membership: {
+        role: membership.role,
+      },
+      settings: {
+        defaultMarket:
+          settings?.default_market ?? DEFAULT_WORKSPACE_SETTINGS.defaultMarket,
+        releaseWindowDays:
+          settings?.release_window_days ??
+          DEFAULT_WORKSPACE_SETTINGS.releaseWindowDays,
+        suggestionScoreThreshold:
+          settings?.suggestion_score_threshold ??
+          DEFAULT_WORKSPACE_SETTINGS.suggestionScoreThreshold,
+        prioritizeFollowedArtists:
+          settings?.prioritize_followed_artists ??
+          DEFAULT_WORKSPACE_SETTINGS.prioritizeFollowedArtists,
+        prioritizeTopTracks:
+          settings?.prioritize_top_tracks ??
+          DEFAULT_WORKSPACE_SETTINGS.prioritizeTopTracks,
+      },
+      spotifyIntegration: {
+        appMode: spotifyAppMode,
+        connectionStatus: spotifyConnectionStatus,
+        appClientId:
+          spotifyIntegration?.app_client_id ??
+          DEFAULT_SPOTIFY_INTEGRATION.appClientId,
+        hasAppClientSecret:
+          spotifyIntegration?.app_client_secret != null
+            ? Boolean(spotifyIntegration.app_client_secret)
+            : DEFAULT_SPOTIFY_INTEGRATION.hasAppClientSecret,
+        hasAccessToken:
+          spotifyStoredSessionBelongsToMode &&
+          spotifyIntegration?.access_token != null
+            ? Boolean(spotifyIntegration.access_token)
+            : DEFAULT_SPOTIFY_INTEGRATION.hasAccessToken,
+        hasRefreshToken:
+          spotifyStoredSessionBelongsToMode &&
+          spotifyIntegration?.refresh_token != null
+            ? Boolean(spotifyIntegration.refresh_token)
+            : DEFAULT_SPOTIFY_INTEGRATION.hasRefreshToken,
+        tokenExpiresAt: spotifyStoredSessionBelongsToMode
+          ? (spotifyIntegration?.token_expires_at ??
+            DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt)
           : DEFAULT_SPOTIFY_INTEGRATION.tokenExpiresAt,
-      providerAccountId:
-        spotifyStoredSessionBelongsToMode
-          ? spotifyIntegration?.provider_account_id ??
-            DEFAULT_SPOTIFY_INTEGRATION.providerAccountId
+        providerAccountId: spotifyStoredSessionBelongsToMode
+          ? (spotifyIntegration?.provider_account_id ??
+            DEFAULT_SPOTIFY_INTEGRATION.providerAccountId)
           : DEFAULT_SPOTIFY_INTEGRATION.providerAccountId,
-      providerAccountLabel:
-        spotifyStoredSessionBelongsToMode
-          ? spotifyIntegration?.provider_account_label ??
-            DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel
+        providerAccountLabel: spotifyStoredSessionBelongsToMode
+          ? (spotifyIntegration?.provider_account_label ??
+            DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel)
           : DEFAULT_SPOTIFY_INTEGRATION.providerAccountLabel,
-      grantedScopes:
-        spotifyStoredSessionBelongsToMode
-          ? spotifyIntegration?.granted_scopes ??
-            DEFAULT_SPOTIFY_INTEGRATION.grantedScopes
+        grantedScopes: spotifyStoredSessionBelongsToMode
+          ? (spotifyIntegration?.granted_scopes ??
+            DEFAULT_SPOTIFY_INTEGRATION.grantedScopes)
           : DEFAULT_SPOTIFY_INTEGRATION.grantedScopes,
-    },
-    openaiIntegration: {
-      appMode: openaiIntegration?.app_mode ?? DEFAULT_OPENAI_INTEGRATION.appMode,
-      connectionStatus:
-        openaiIntegration?.connection_status ??
-        DEFAULT_OPENAI_INTEGRATION.connectionStatus,
-      model: openaiIntegration?.app_client_id ?? DEFAULT_OPENAI_INTEGRATION.model,
-      hasApiKey:
-        openaiIntegration?.app_client_secret != null
-          ? Boolean(openaiIntegration.app_client_secret)
-          : DEFAULT_OPENAI_INTEGRATION.hasApiKey,
-    },
+      },
+      openaiIntegration: {
+        appMode:
+          openaiIntegration?.app_mode ?? DEFAULT_OPENAI_INTEGRATION.appMode,
+        connectionStatus:
+          openaiIntegration?.connection_status ??
+          DEFAULT_OPENAI_INTEGRATION.connectionStatus,
+        model:
+          openaiIntegration?.app_client_id ?? DEFAULT_OPENAI_INTEGRATION.model,
+        hasApiKey:
+          openaiIntegration?.app_client_secret != null
+            ? Boolean(openaiIntegration.app_client_secret)
+            : DEFAULT_OPENAI_INTEGRATION.hasApiKey,
+      },
+    };
   };
-};
 
 export const getCurrentWorkspaceContext = cache(
   getCurrentWorkspaceContextUncached,
@@ -686,65 +689,9 @@ export async function updateCurrentWorkspaceSpotifyIntegration(
     .upsert(payload, { onConflict: "workspace_id,provider" });
 
   if (error) {
-    throw new Error(`updateCurrentWorkspaceSpotifyIntegration: ${error.message}`);
-  }
-
-  return getCurrentWorkspaceContext();
-}
-
-export async function updateCurrentWorkspaceOpenAIIntegration(
-  input: WorkspaceOpenAIIntegrationInput,
-) {
-  const workspace = await getCurrentWorkspaceContext();
-
-  if (!workspace) {
-    throw new Error("Workspace indisponivel.");
-  }
-
-  if (!(await canManagePlaylistOsWorkspaceSettings(workspace))) {
-    throw new Error("Sem permissao para editar a integracao.");
-  }
-
-  const dataClient = await getWorkspaceDbClient();
-  const normalizedApiKey = input.apiKey?.trim() || null;
-  const normalizedModel = input.model?.trim() || "gpt-5.5";
-  const currentHasApiKey = workspace.openaiIntegration.hasApiKey;
-
-  if (
-    input.appMode === "workspace_app" &&
-    !normalizedApiKey &&
-    !currentHasApiKey
-  ) {
-    throw new Error("Para usar a chave do workspace, preencha a API key.");
-  }
-
-  const payload: Record<string, unknown> = {
-    app_mode: input.appMode,
-    app_client_id: normalizedModel,
-    connection_status:
-      input.appMode === "workspace_app" || process.env.OPENAI_API_KEY?.trim()
-        ? "connected"
-        : "not_connected",
-    updated_at: new Date().toISOString(),
-  };
-
-  if (normalizedApiKey !== null) {
-    payload.app_client_secret = normalizedApiKey;
-  }
-
-  const { error } = await dataClient
-    .from("workspace_integrations")
-    .upsert(
-      {
-        workspace_id: workspace.workspace.id,
-        provider: "openai",
-        ...payload,
-      },
-      { onConflict: "workspace_id,provider" },
+    throw new Error(
+      `updateCurrentWorkspaceSpotifyIntegration: ${error.message}`,
     );
-
-  if (error) {
-    throw new Error(`updateCurrentWorkspaceOpenAIIntegration: ${error.message}`);
   }
 
   return getCurrentWorkspaceContext();
@@ -798,11 +745,15 @@ export async function updateCurrentWorkspaceSettings(
     ]);
 
   if (workspaceError) {
-    throw new Error(`updateCurrentWorkspaceSettings(workspace): ${workspaceError.message}`);
+    throw new Error(
+      `updateCurrentWorkspaceSettings(workspace): ${workspaceError.message}`,
+    );
   }
 
   if (settingsError) {
-    throw new Error(`updateCurrentWorkspaceSettings(settings): ${settingsError.message}`);
+    throw new Error(
+      `updateCurrentWorkspaceSettings(settings): ${settingsError.message}`,
+    );
   }
 
   return getCurrentWorkspaceContext();
@@ -857,54 +808,22 @@ export async function getEffectiveSpotifyCredentials(): Promise<EffectiveSpotify
   };
 }
 
-export async function getEffectiveOpenAICredentials(): Promise<EffectiveOpenAICredentials | null> {
-  const globalApiKey = process.env.OPENAI_API_KEY?.trim() || "";
-  const globalModel =
-    process.env.OPENAI_PLAYLISTS_MODEL?.trim() ||
-    process.env.OPENAI_MODEL?.trim() ||
-    "gpt-5.5";
+export async function getEffectiveAiGatewayCredentials(): Promise<EffectiveAiGatewayCredentials | null> {
+  const gatewayApiKey = process.env.AI_GATEWAY_API_KEY?.trim() || "";
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN?.trim() || "";
+  const authToken = gatewayApiKey || oidcToken;
+  const model =
+    process.env.PLAYLISTS_AI_MODEL?.trim() || "alibaba/qwen3.5-flash";
   const workspace = await getCurrentWorkspaceContext().catch(() => null);
-  const workspaceModel = workspace?.openaiIntegration.model?.trim() || globalModel;
 
-  if (
-    workspace?.openaiIntegration.appMode === "workspace_app" &&
-    workspace.openaiIntegration.hasApiKey
-  ) {
-    const supabase = await getWorkspaceDbClient();
-    const { data, error } = await supabase
-      .from("workspace_integrations")
-      .select("workspace_id, app_client_id, app_client_secret")
-      .eq("workspace_id", workspace.workspace.id)
-      .eq("provider", "openai")
-      .single();
-
-    if (error) {
-      throw new Error(`getEffectiveOpenAICredentials: ${error.message}`);
-    }
-
-    const row = data as Pick<
-      WorkspaceIntegrationRow,
-      "workspace_id" | "app_client_id" | "app_client_secret"
-    >;
-
-    if (row.app_client_secret) {
-      return {
-        apiKey: row.app_client_secret,
-        model: row.app_client_id?.trim() || workspaceModel,
-        source: "workspace_app",
-        workspaceId: row.workspace_id,
-      };
-    }
-  }
-
-  if (!globalApiKey) {
+  if (!authToken) {
     return null;
   }
 
   return {
-    apiKey: globalApiKey,
-    model: workspaceModel,
-    source: "global_app",
+    authToken,
+    model,
+    source: gatewayApiKey ? "gateway_key" : "vercel_oidc",
     workspaceId: workspace?.workspace.id ?? null,
   };
 }
@@ -938,7 +857,10 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
     (workspace.membership.role === "owner" ||
       workspace.membership.role === "admin")
   ) {
-    await ensureWorkspaceDefaults(workspace.workspace.id, workspace.workspace.slug);
+    await ensureWorkspaceDefaults(
+      workspace.workspace.id,
+      workspace.workspace.slug,
+    );
     ({ data, error } = await readStoredAuth());
 
     if (error) {
@@ -951,12 +873,10 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
   }
 
   const row = data as WorkspaceIntegrationRow;
-  const appMode = getEffectiveSpotifyAppMode(
-    workspace.workspace,
-    row.app_mode,
-  );
+  const appMode = getEffectiveSpotifyAppMode(workspace.workspace, row.app_mode);
   const storedSessionBelongsToMode =
-    canUseGlobalSpotifyApp(workspace.workspace) || row.app_mode === "workspace_app";
+    canUseGlobalSpotifyApp(workspace.workspace) ||
+    row.app_mode === "workspace_app";
 
   return {
     workspaceId: row.workspace_id,
@@ -965,10 +885,12 @@ export async function getCurrentWorkspaceSpotifyStoredAuth(): Promise<WorkspaceS
     connectionStatus: storedSessionBelongsToMode
       ? row.connection_status
       : "not_connected",
-    accessToken: storedSessionBelongsToMode ? row.access_token ?? null : null,
-    refreshToken: storedSessionBelongsToMode ? row.refresh_token ?? null : null,
+    accessToken: storedSessionBelongsToMode ? (row.access_token ?? null) : null,
+    refreshToken: storedSessionBelongsToMode
+      ? (row.refresh_token ?? null)
+      : null,
     tokenExpiresAt: storedSessionBelongsToMode
-      ? row.token_expires_at ?? null
+      ? (row.token_expires_at ?? null)
       : null,
     providerAccountId: storedSessionBelongsToMode
       ? row.provider_account_id

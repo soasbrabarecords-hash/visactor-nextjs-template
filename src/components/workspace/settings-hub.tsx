@@ -12,7 +12,6 @@ import type { ReactNode } from "react";
 import Container from "@/components/container";
 import AccountProfileForm from "@/components/settings/account-profile-form";
 import StatusBadge from "@/components/workspace/status-badge";
-import WorkspaceOpenAIIntegrationForm from "@/components/workspace/workspace-openai-integration-form";
 import WorkspaceSettingsForm from "@/components/workspace/workspace-settings-form";
 import WorkspaceSpotifyIntegrationForm from "@/components/workspace/workspace-spotify-integration-form";
 import type { WorkspaceContext } from "@/lib/workspaces";
@@ -81,15 +80,8 @@ export default function SettingsHub({
   account,
 }: SettingsHubProps) {
   const workspaceName = workspace?.workspace.name ?? "Acesso pendente";
-  const openaiMode = workspace?.openaiIntegration.appMode ?? "global_app";
   const openaiModel =
-    workspace?.openaiIntegration.model ??
-    process.env.OPENAI_PLAYLISTS_MODEL ??
-    process.env.OPENAI_MODEL ??
-    "gpt-5.5";
-  const hasOpenAIWorkspaceKey = workspace?.openaiIntegration.hasApiKey ?? false;
-  const effectiveOpenAIReady =
-    openaiMode === "workspace_app" ? hasOpenAIWorkspaceKey : openaiReady;
+    process.env.PLAYLISTS_AI_MODEL ?? "alibaba/qwen3.5-flash";
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-background">
@@ -211,20 +203,39 @@ export default function SettingsHub({
 
               <SettingsSection
                 icon={<Bot className="h-4 w-4" />}
-                title="Playlists com IA"
-                description={`Modelo ${openaiModel}`}
+                title="Inteligência do Playlist OS"
+                description="Agente nativo, seguro e separado por workspace"
                 status={
-                  <StatusBadge tone={effectiveOpenAIReady ? "green" : "yellow"}>
-                    {effectiveOpenAIReady ? "Ativo" : "Configurar"}
+                  <StatusBadge tone={openaiReady ? "green" : "yellow"}>
+                    {openaiReady ? "Ativo" : "Ativação interna"}
                   </StatusBadge>
                 }
+                open={!openaiReady}
               >
-                <WorkspaceOpenAIIntegrationForm
-                  initialAppMode={openaiMode}
-                  initialModel={openaiModel}
-                  hasApiKey={hasOpenAIWorkspaceKey}
-                  globalOpenAIReady={openaiReady}
-                />
+                <div className="rounded-2xl border border-border/70 bg-background/55 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-400/20">
+                      <Bot className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {openaiReady
+                          ? "Agente Sol disponível"
+                          : "Ativação do agente pendente"}
+                      </p>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                        {openaiReady
+                          ? "O Playlist OS usa a inteligência central do sistema e consulta somente os dados permitidos deste workspace. Nenhuma chave ou conexão individual é necessária."
+                          : "O agente será autenticado automaticamente pelo AI Gateway da Vercel. Usuários e workspaces não precisam cadastrar chave, escolher modelo ou conectar uma conta do ChatGPT."}
+                      </p>
+                      {openaiReady ? (
+                        <p className="mt-2 text-xs text-muted-foreground/75">
+                          Modelo operacional: {openaiModel}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </SettingsSection>
             </>
           ) : (

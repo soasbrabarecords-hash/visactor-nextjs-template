@@ -260,6 +260,24 @@ test("uses a real tool loop and grounds the answer in returned tracks", async ()
   );
 });
 
+test("never replaces an unavailable conversational agent with fake recommendations", async () => {
+  const result = await runPlaylistsAiAgent(
+    { message: "Quero 50 músicas de trap dos últimos 180 dias." },
+    {
+      tools: buildTools(),
+      agentRequest: async () => {
+        throw new Error("provider unavailable");
+      },
+    },
+  );
+
+  assert.equal(result.meta.execution, "unavailable");
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.meta.returnedCount, 0);
+  assert.doesNotMatch(result.text, /^Ideia:/);
+  assert.match(result.text, /Nenhuma recomendação foi gerada/i);
+});
+
 test("treats a natural genre correction as a data request", async () => {
   const tools = buildTools();
   let receivedOptions = null;

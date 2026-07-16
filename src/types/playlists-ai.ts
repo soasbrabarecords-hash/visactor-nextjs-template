@@ -127,7 +127,7 @@ export type PlaylistsAiChatResponse = {
     contextComplete: boolean;
     readOnly: true;
     generatedAt: string;
-    execution?: "agent" | "fallback" | "deterministic";
+    execution?: "agent" | "fallback" | "deterministic" | "unavailable";
     toolCalls?: string[];
     requestedCount?: number;
     returnedCount?: number;
