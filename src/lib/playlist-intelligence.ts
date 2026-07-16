@@ -17,6 +17,8 @@ export type PlaylistIntelligenceTrackInput = {
   streamTrend: PlaylistStreamTrend;
   streamsLoading: boolean;
   signalsLoading: boolean;
+  personalAffinityScore?: number | null;
+  listeningSignal?: string | null;
 };
 
 export type PlaylistDecisionAction =
@@ -43,6 +45,7 @@ export type PlaylistIntelligenceSummary = {
   averageScore: number;
   chartMatches: number;
   streamMatches: number;
+  accountMatches: number;
   orderChangesCount: number;
   priorityCount: number;
   raiseCount: number;
@@ -109,6 +112,16 @@ function getStreamTrendScore(track: PlaylistIntelligenceTrackInput) {
 function getSignals(track: PlaylistIntelligenceTrackInput, score: number) {
   const signals: string[] = [];
 
+  if (
+    track.personalAffinityScore !== null &&
+    track.personalAffinityScore !== undefined
+  ) {
+    signals.push(
+      track.listeningSignal ||
+        `afinidade ${Math.round(track.personalAffinityScore)} na conta`,
+    );
+  }
+
   if (track.chartPosition) {
     signals.push(`#${track.chartPosition} no Spotify BR`);
   }
@@ -157,7 +170,10 @@ function getDecisionAction(
 ): Pick<PlaylistTrackDecision, "action" | "label" | "tone" | "reason"> {
   const shift = track.currentIndex - suggestedIndex;
   const hasMarketSignal = Boolean(
-    track.popularity !== null || track.chartPosition || track.dailyStreams,
+    track.popularity !== null ||
+    track.chartPosition ||
+    track.dailyStreams ||
+    track.personalAffinityScore != null,
   );
 
   if (!hasMarketSignal && !track.signalsLoading) {
@@ -218,8 +234,19 @@ export function buildPlaylistIntelligence(
 ): PlaylistIntelligenceResult {
   const scoredTracks = tracks.map((track) => {
     const popularityScore = clamp(track.popularity ?? 0, 0, 100) * 0.32;
-    const score = clamp(
+    const marketScore = clamp(
       popularityScore + getChartScore(track) + getStreamTrendScore(track),
+      0,
+      100,
+    );
+    const hasAccountSignal =
+      track.personalAffinityScore !== null &&
+      track.personalAffinityScore !== undefined;
+    const score = clamp(
+      hasAccountSignal
+        ? marketScore * 0.7 +
+            clamp(track.personalAffinityScore as number, 0, 100) * 0.3
+        : marketScore,
       0,
       100,
     );
@@ -266,6 +293,11 @@ export function buildPlaylistIntelligence(
   const streamMatches = tracks.filter((track) =>
     Boolean(track.dailyStreams),
   ).length;
+  const accountMatches = tracks.filter(
+    (track) =>
+      track.personalAffinityScore !== null &&
+      track.personalAffinityScore !== undefined,
+  ).length;
   const readyStreams = tracks.filter((track) => !track.streamsLoading).length;
   const orderChangesCount = decisions.filter(
     (decision) => decision.currentIndex !== decision.suggestedIndex,
@@ -288,6 +320,7 @@ export function buildPlaylistIntelligence(
       averageScore,
       chartMatches,
       streamMatches,
+      accountMatches,
       orderChangesCount,
       priorityCount: decisions.filter(
         (decision) => decision.action === "priority",

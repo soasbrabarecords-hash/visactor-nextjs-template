@@ -193,6 +193,9 @@ export default function PlaylistIntelligencePanel({
             </div>
             <p className="truncate text-xs text-muted-foreground">
               {summary.orderChangesCount} ajustes sugeridos · {summary.priorityCount + summary.raiseCount} faixas para subir
+              {summary.accountMatches > 0
+                ? ` · ${summary.accountMatches} sinais da conta`
+                : ""}
             </p>
           </div>
         </div>

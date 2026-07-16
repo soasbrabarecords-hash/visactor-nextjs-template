@@ -84,6 +84,8 @@ export type TrackGenreCardProfile = Pick<
   "primaryGenre" | "genreConfidence" | "confidenceLabel" | "manualOverride"
 > & {
   label: string;
+  moodTags?: string[];
+  energyTags?: string[];
 };
 
 export type PlaylistGenreProfile = {

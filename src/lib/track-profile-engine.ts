@@ -714,7 +714,9 @@ export async function getPlaylistGenreProfile(
   };
 }
 
-function cardProfile(profile: TrackGenreProfile | undefined) {
+export function toTrackGenreCardProfile(
+  profile: TrackGenreProfile | undefined,
+) {
   if (!profile) return null;
   return {
     primaryGenre: profile.primaryGenre,
@@ -733,6 +735,8 @@ function cardProfile(profile: TrackGenreProfile | undefined) {
     genreConfidence: profile.genreConfidence,
     confidenceLabel: profile.confidenceLabel,
     manualOverride: profile.manualOverride,
+    moodTags: profile.moodTags,
+    energyTags: profile.energyTags,
   };
 }
 
@@ -772,7 +776,7 @@ export async function attachTrackProfilesToMusicIntelligence(
   ): MusicIntelligenceTrack => ({
     ...track,
     genreProfile: track.spotifyTrackId
-      ? cardProfile(profiles.get(track.spotifyTrackId))
+      ? toTrackGenreCardProfile(profiles.get(track.spotifyTrackId))
       : null,
   });
   const optional = (track: MusicIntelligenceTrack | null) =>

@@ -60,11 +60,44 @@ function intelligence() {
   return response;
 }
 
+function listeningCandidate({
+  id,
+  name = "Faixa pessoal",
+  artists = "Chefin",
+  market = "BR",
+  affinity = 86,
+  genre = "trap",
+}) {
+  return {
+    id,
+    name,
+    artists,
+    albumName: "Álbum pessoal",
+    imageUrl: null,
+    durationLabel: "2:48",
+    spotifyUrl: `https://open.spotify.com/track/${id}`,
+    popularity: 60,
+    market,
+    personalAffinityScore: affinity,
+    recentPlayCount: 3,
+    lastPlayedAt: "2026-07-16T10:00:00.000Z",
+    listeningSignal: "ouvida 3x nas reproduções recentes",
+    genreProfile: {
+      primaryGenre: genre,
+      genreConfidence: 86,
+      confidenceLabel: "alta",
+      manualOverride: false,
+      label: genre === "funk" ? "Funk" : genre === "rap" ? "Rap" : "Trap",
+    },
+  };
+}
+
 test("separates BR and Global suggestions, excludes existing tracks and rejects unrelated genres", () => {
   const data = intelligence();
   const existingId = "AAAAAAAAAAAAAAAAAAAAAA";
   const brTrapId = "BBBBBBBBBBBBBBBBBBBBBB";
   const brSertanejoId = "CCCCCCCCCCCCCCCCCCCCCC";
+  const brFunkId = "IIIIIIIIIIIIIIIIIIIIII";
   const globalTrapId = "DDDDDDDDDDDDDDDDDDDDDD";
   const existing = candidate({
     id: existingId,
@@ -91,8 +124,21 @@ test("separates BR and Global suggestions, excludes existing tracks and rejects 
     country: "GLOBAL",
     action: "watch",
   });
+  const brFunk = candidate({
+    id: brFunkId,
+    name: "Automotivo novo",
+    artists: "DJ Japa NK, MC Menor K",
+    country: "BR",
+    genreProfile: {
+      primaryGenre: "funk",
+      genreConfidence: 86,
+      confidenceLabel: "alta",
+      manualOverride: false,
+      label: "Funk",
+    },
+  });
 
-  data.candidatePool.BR = [existing, brTrap, brSertanejo];
+  data.candidatePool.BR = [existing, brTrap, brSertanejo, brFunk];
   data.candidatePool.GLOBAL = [globalTrap];
 
   const result = buildPlaylistSuggestionIntelligence({
@@ -209,4 +255,154 @@ test("prioritizes enriched genre evidence over a raw candidate-pool duplicate", 
     [funkId],
   );
   assert.equal(result.markets.GLOBAL.items.length, 0);
+});
+
+test("keeps funk out of a trap playlist even when the artist is already present", () => {
+  const data = intelligence();
+  const funkId = "JJJJJJJJJJJJJJJJJJJJJJ";
+  data.markets.BR.addNow = [
+    candidate({
+      id: funkId,
+      name: "Faixa de funk",
+      artists: "Artista Crossover",
+      country: "BR",
+      genreProfile: {
+        primaryGenre: "funk",
+        genreConfidence: 92,
+        confidenceLabel: "alta",
+        manualOverride: false,
+        label: "Funk",
+      },
+    }),
+  ];
+
+  const result = buildPlaylistSuggestionIntelligence({
+    playlist: {
+      name: "TRAP 2027",
+      description: "Trap e rap nacional",
+      tracks: [
+        {
+          id: "KKKKKKKKKKKKKKKKKKKKKK",
+          name: "Faixa trap",
+          artists: "Artista Crossover",
+          genreProfile: {
+            primaryGenre: "trap",
+            genreConfidence: 90,
+            confidenceLabel: "alta",
+            manualOverride: false,
+            label: "Trap",
+          },
+        },
+      ],
+    },
+    intelligence: data,
+  });
+
+  assert.equal(result.markets.BR.items.length, 0);
+});
+
+test("allows account listening behavior to surface a compatible track outside charts", () => {
+  const data = intelligence();
+  const personalId = "LLLLLLLLLLLLLLLLLLLLLL";
+  const result = buildPlaylistSuggestionIntelligence({
+    playlist: {
+      name: "TRAP 2027",
+      description: "Trap e rap nacional",
+      tracks: [],
+    },
+    intelligence: data,
+    listening: {
+      available: true,
+      recentHistoryAvailable: true,
+      candidates: [listeningCandidate({ id: personalId })],
+    },
+  });
+
+  assert.deepEqual(
+    result.markets.BR.items.map((track) => track.id),
+    [personalId],
+  );
+  assert.equal(result.markets.BR.items[0].source, "listening");
+  assert.equal(result.markets.BR.items[0].currentPosition, null);
+  assert.equal(result.markets.BR.items[0].recommendation, "add_now");
+  assert.equal(result.summary.personalizedCandidates, 1);
+});
+
+test("turns a chart watch into add now when account affinity is strong", () => {
+  const data = intelligence();
+  const hybridId = "MMMMMMMMMMMMMMMMMMMMMM";
+  const chartTrack = candidate({
+    id: hybridId,
+    name: "Faixa híbrida",
+    artists: "Chefin",
+    country: "BR",
+    action: "watch",
+    opportunityScore: 62,
+  });
+  data.markets.BR.watch = [chartTrack];
+
+  const chartOnly = buildPlaylistSuggestionIntelligence({
+    playlist: { name: "TRAP 2027", description: "Trap nacional", tracks: [] },
+    intelligence: data,
+  });
+  const personalized = buildPlaylistSuggestionIntelligence({
+    playlist: { name: "TRAP 2027", description: "Trap nacional", tracks: [] },
+    intelligence: data,
+    listening: {
+      available: true,
+      recentHistoryAvailable: true,
+      candidates: [
+        listeningCandidate({
+          id: hybridId,
+          name: chartTrack.name,
+          affinity: 95,
+        }),
+      ],
+    },
+  });
+
+  assert.equal(chartOnly.markets.BR.items[0].recommendation, "watch");
+  assert.equal(personalized.markets.BR.items[0].source, "hybrid");
+  assert.equal(personalized.markets.BR.items[0].recommendation, "add_now");
+  assert.ok(
+    personalized.markets.BR.items[0].playlistFitScore >
+      chartOnly.markets.BR.items[0].playlistFitScore,
+  );
+});
+
+test("keeps trap out of a funk playlist", () => {
+  const data = intelligence();
+  const trapId = "NNNNNNNNNNNNNNNNNNNNNN";
+  const funkId = "OOOOOOOOOOOOOOOOOOOOOO";
+  data.candidatePool.BR = [
+    candidate({
+      id: trapId,
+      name: "Trap novo",
+      artists: "Chefin",
+      country: "BR",
+    }),
+    candidate({
+      id: funkId,
+      name: "Funk novo",
+      artists: "DJ Japa NK",
+      country: "BR",
+      genreProfile: {
+        primaryGenre: "funk",
+        genreConfidence: 90,
+        confidenceLabel: "alta",
+        manualOverride: false,
+        label: "Funk",
+      },
+    }),
+  ];
+
+  const result = buildPlaylistSuggestionIntelligence({
+    playlist: { name: "FUNK 2027", description: "Baile funk", tracks: [] },
+    intelligence: data,
+  });
+
+  assert.deepEqual(
+    result.markets.BR.items.map((track) => track.id),
+    [funkId],
+  );
 });

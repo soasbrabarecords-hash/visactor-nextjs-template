@@ -50,3 +50,30 @@ test("chart and stream signals still produce a useful decision without popularit
   assert.notEqual(decision.label, "Sem leitura");
   assert.ok(decision.signals.some((signal) => signal.includes("Spotify BR")));
 });
+
+test("account listening affinity is a real signal for playlist ordering", () => {
+  const result = buildPlaylistIntelligence([
+    track({
+      id: "AAAAAAAAAAAAAAAAAAAAAA",
+      currentIndex: 0,
+      personalAffinityScore: 40,
+      listeningSignal: "top pessoal em 6 meses",
+    }),
+    track({
+      id: "BBBBBBBBBBBBBBBBBBBBBB",
+      currentIndex: 1,
+      personalAffinityScore: 94,
+      listeningSignal: "ouvida 4x nas reproduções recentes",
+    }),
+  ]);
+
+  assert.deepEqual(result.suggestedOrderTrackIds, [
+    "BBBBBBBBBBBBBBBBBBBBBB",
+    "AAAAAAAAAAAAAAAAAAAAAA",
+  ]);
+  assert.equal(result.summary.accountMatches, 2);
+  assert.ok(
+    result.decisions[1].signals.some((signal) => signal.includes("ouvida 4x")),
+  );
+  assert.notEqual(result.decisions[1].label, "Sem leitura");
+});

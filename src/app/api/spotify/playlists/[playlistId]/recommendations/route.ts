@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { getMusicIntelligence } from "@/lib/music-intelligence";
 import { getPlaylistOsReadAccess } from "@/lib/playlist-os-read-access";
 import { buildPlaylistSuggestionIntelligence } from "@/lib/playlist-suggestion-intelligence";
+import { getSpotifyListeningSignals } from "@/lib/spotify-listening-signals";
 import {
   fetchSpotifyEditablePlaylist,
   setSpotifyAuthCookies,
 } from "@/lib/spotify-user";
-import { attachTrackProfilesToMusicIntelligence } from "@/lib/track-profile-engine";
+import {
+  attachTrackProfilesToMusicIntelligence,
+  getTrackGenreProfiles,
+  toTrackGenreCardProfile,
+} from "@/lib/track-profile-engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,26 +48,43 @@ export async function GET(
       );
     }
 
-    const intelligence = await attachTrackProfilesToMusicIntelligence(
-      await getMusicIntelligence(),
-      access.workspaceId,
-    );
+    const playlistTracks = result.playlist.tracks;
+    const baseIntelligence = await getMusicIntelligence();
+    const [intelligence, playlistProfiles, listening] = await Promise.all([
+      attachTrackProfilesToMusicIntelligence(
+        baseIntelligence,
+        access.workspaceId,
+      ),
+      getTrackGenreProfiles(
+        playlistTracks.map((track) => ({
+          spotifyTrackId: track.id,
+          name: track.name,
+          artists: track.artists,
+          albumName: track.albumName,
+        })),
+        { workspaceId: access.workspaceId, persistFallbacks: true },
+      ),
+      getSpotifyListeningSignals(access.workspaceId),
+    ]);
     const data = buildPlaylistSuggestionIntelligence({
       playlist: {
         name: result.playlist.name,
         description: result.playlist.description,
-        tracks: result.playlist.tracks.map((track) => ({
+        tracks: playlistTracks.map((track) => ({
           id: track.id,
           name: track.name,
           artists: track.artists,
+          genreProfile: toTrackGenreCardProfile(playlistProfiles.get(track.id)),
         })),
       },
       intelligence,
+      listening,
     });
     const response = NextResponse.json(data, { headers: NO_STORE_HEADERS });
 
-    if (refreshedToken) {
-      setSpotifyAuthCookies(response, refreshedToken);
+    const latestRefreshedToken = listening.refreshedToken ?? refreshedToken;
+    if (latestRefreshedToken) {
+      setSpotifyAuthCookies(response, latestRefreshedToken);
     }
 
     return response;

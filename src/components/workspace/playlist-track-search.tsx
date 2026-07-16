@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getPlaylistRecommendationsClient } from "@/lib/playlist-recommendations-client";
 import type {
   PlaylistDecisionSuggestion,
   PlaylistSuggestionResponse,
@@ -35,10 +36,10 @@ type Props = {
 
 const MARKET_COPY = {
   BR: {
-    description: "Força e movimento no Top 200 brasileiro.",
+    description: "Afinidade da conta + força no mercado brasileiro.",
   },
   GLOBAL: {
-    description: "Faixas globais compatíveis com este repertório.",
+    description: "Afinidade da conta + faixas globais compatíveis.",
   },
 } as const;
 
@@ -121,35 +122,29 @@ export default function PlaylistTrackSearch({
     };
   }, [query]);
 
-  const loadSuggestions = useCallback(async () => {
-    setLoadingSuggestions(true);
-    setSuggestionsError(null);
-    try {
-      const response = await fetch(
-        `/api/spotify/playlists/${playlistId}/recommendations`,
-        { cache: "no-store" },
-      );
-      const data = (await response.json()) as PlaylistSuggestionResponse & {
-        message?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          data.message ?? "Não foi possível atualizar a inteligência.",
+  const loadSuggestions = useCallback(
+    async ({ force = false } = {}) => {
+      setLoadingSuggestions(true);
+      setSuggestionsError(null);
+      try {
+        const data = await getPlaylistRecommendationsClient(playlistId, {
+          force,
+        });
+        setSuggestions(data);
+        setSelectedIds(new Set());
+      } catch (error) {
+        setSuggestionsError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível atualizar a inteligência.",
         );
+        setSuggestions(null);
+      } finally {
+        setLoadingSuggestions(false);
       }
-      setSuggestions(data);
-      setSelectedIds(new Set());
-    } catch (error) {
-      setSuggestionsError(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível atualizar a inteligência.",
-      );
-      setSuggestions(null);
-    } finally {
-      setLoadingSuggestions(false);
-    }
-  }, [playlistId]);
+    },
+    [playlistId],
+  );
 
   useEffect(() => {
     void loadSuggestions();
@@ -352,18 +347,35 @@ export default function PlaylistTrackSearch({
               {track.recommendationLabel}
             </span>
             <span>·</span>
-            <span>{track.signals[1] ?? track.signals[0]}</span>
+            <span>{track.sourceLabel}</span>
+            {track.signals[0] ? (
+              <>
+                <span>·</span>
+                <span className="truncate">{track.signals[0]}</span>
+              </>
+            ) : null}
           </div>
         </div>
         <div className="hidden text-right tablet:block">
-          <div className="text-xs font-semibold tabular-nums">
-            #{track.currentPosition} {marketLabel}
-          </div>
-          <div className="mt-0.5 text-[10px] text-muted-foreground">
-            {track.movement7d === null
-              ? "7d sem leitura"
-              : `${track.movement7d > 0 ? "+" : ""}${track.movement7d} em 7d`}
-          </div>
+          {track.currentPosition === null ? (
+            <>
+              <div className="text-xs font-semibold">Fora do chart</div>
+              <div className="mt-0.5 text-[10px] text-violet-400">
+                sinal da conta
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs font-semibold tabular-nums">
+                #{track.currentPosition} {marketLabel}
+              </div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                {track.movement7d === null
+                  ? "7d sem leitura"
+                  : `${track.movement7d > 0 ? "+" : ""}${track.movement7d} em 7d`}
+              </div>
+            </>
+          )}
         </div>
         <div className="hidden text-center tablet:block">
           <div className="text-sm font-semibold tabular-nums">
@@ -469,7 +481,7 @@ export default function PlaylistTrackSearch({
               Próximas oportunidades
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Faixas fora da playlist, ordenadas por mercado e aderência.
+              DNA da playlist, comportamento da conta e força nos charts.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -480,6 +492,11 @@ export default function PlaylistTrackSearch({
                     Perfil {suggestions.summary.playlistGenreLabel}
                   </span>
                 ) : null}
+                {suggestions.summary.listeningSignalsAvailable ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+                    Conta ativa · {suggestions.summary.personalizedCandidates}
+                  </span>
+                ) : null}
                 <span className="rounded-full bg-muted px-2.5 py-1.5 text-[10px] text-muted-foreground">
                   {formatDate(suggestions.summary.latestChartDate)} ·{" "}
                   {suggestions.summary.maxWindow}d
@@ -488,7 +505,7 @@ export default function PlaylistTrackSearch({
             ) : null}
             <button
               type="button"
-              onClick={() => void loadSuggestions()}
+              onClick={() => void loadSuggestions({ force: true })}
               disabled={loadingSuggestions}
               className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-background/50 px-3 text-[10px] font-semibold text-muted-foreground transition hover:text-foreground disabled:opacity-50"
             >
@@ -509,7 +526,7 @@ export default function PlaylistTrackSearch({
         {loadingSuggestions && !suggestions ? (
           <div className="flex items-center justify-center px-5 py-12 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Cruzando o perfil da playlist com os charts…
+            Cruzando DNA, histórico da conta e charts…
           </div>
         ) : suggestions && activeQueue ? (
           <div>
@@ -574,7 +591,7 @@ export default function PlaylistTrackSearch({
                   <span />
                   <span>Faixa</span>
                   <span>Motivo</span>
-                  <span className="text-right">Chart</span>
+                  <span className="text-right">Sinal</span>
                   <span className="text-center">Fit</span>
                   <span className="text-right">Ação</span>
                 </div>
@@ -600,7 +617,7 @@ export default function PlaylistTrackSearch({
               {suggestions.summary.compatibleCandidates} compatíveis entre{" "}
               {suggestions.summary.candidatesEvaluated} candidatas avaliadas
             </span>
-            <span>Score = oportunidade de mercado + aderência à playlist</span>
+            <span>Score = 55% gênero/vibe + 30% conta + 15% charts</span>
           </footer>
         ) : null}
       </section>

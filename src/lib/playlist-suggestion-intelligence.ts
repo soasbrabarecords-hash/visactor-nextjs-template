@@ -10,11 +10,37 @@ import type {
   MusicIntelligenceResponse,
   MusicIntelligenceTrack,
 } from "@/types/music-intelligence";
+import type { TrackGenreCardProfile } from "@/types/track-profile";
 
 export type PlaylistSuggestionProfileTrack = {
   id: string;
   name: string;
   artists: string;
+  genreProfile?: TrackGenreCardProfile | null;
+};
+
+export type PlaylistListeningCandidate = {
+  id: string;
+  name: string;
+  artists: string;
+  albumName: string;
+  imageUrl: string | null;
+  durationLabel: string;
+  spotifyUrl: string;
+  popularity: number;
+  market: MusicIntelligenceCountry;
+  personalAffinityScore: number;
+  recentPlayCount: number;
+  lastPlayedAt: string | null;
+  listeningSignal: string;
+  genreProfile?: TrackGenreCardProfile | null;
+};
+
+export type PlaylistSuggestionSource = "chart" | "listening" | "hybrid";
+
+export type PlaylistAccountSignal = {
+  personalAffinityScore: number;
+  listeningSignal: string;
 };
 
 export type PlaylistDecisionSuggestion = {
@@ -27,12 +53,15 @@ export type PlaylistDecisionSuggestion = {
   spotifyUrl: string;
   popularity: number;
   market: MusicIntelligenceCountry;
-  currentPosition: number;
+  currentPosition: number | null;
   movement7d: number | null;
-  opportunityScore: number;
+  opportunityScore: number | null;
+  personalAffinityScore: number | null;
   playlistFitScore: number;
   saturationRisk: number;
   isNewEntry: boolean;
+  source: PlaylistSuggestionSource;
+  sourceLabel: "Chart" | "Sua conta" | "Conta + chart";
   recommendation: "add_now" | "watch";
   recommendationLabel: "Adicionar agora" | "Observar";
   explanation: string;
@@ -55,21 +84,44 @@ export type PlaylistSuggestionResponse = {
     playlistGenreLabel: string;
     candidatesEvaluated: number;
     compatibleCandidates: number;
+    listeningSignalsAvailable: boolean;
+    recentHistoryAvailable: boolean;
+    personalizedCandidates: number;
+    sourceMix: Record<PlaylistSuggestionSource, number>;
   };
   markets: Record<MusicIntelligenceCountry, PlaylistSuggestionMarketQueue>;
+  playlistAccountSignals: Record<string, PlaylistAccountSignal>;
+};
+
+type PlaylistVibe = {
+  moodTags: Set<string>;
+  energyTags: Set<string>;
+};
+
+type CompatibleCandidate = {
+  name: string;
+  artists: string;
+  genreProfile?: TrackGenreCardProfile | null;
 };
 
 const MARKET_ORDER: MusicIntelligenceCountry[] = ["BR", "GLOBAL"];
 const MAX_ITEMS_PER_MARKET = 10;
 
-const ADJACENT_GENRES: Partial<Record<TrackGenre, TrackGenre[]>> = {
-  trap: ["rap", "funk"],
-  rap: ["trap"],
-  funk: ["trap", "pagodao"],
-  pagode: ["pagodao"],
-  pagodao: ["pagode", "funk"],
-  sertanejo: ["piseiro"],
-  piseiro: ["sertanejo"],
+/**
+ * Gênero é um portão de entrada, não um bônus de score. Funk fica isolado;
+ * Trap e Rap compartilham o mesmo universo editorial.
+ */
+const ALLOWED_GENRES: Partial<Record<TrackGenre, TrackGenre[]>> = {
+  trap: ["trap", "rap"],
+  rap: ["rap", "trap"],
+  funk: ["funk"],
+  pagode: ["pagode", "pagodao"],
+  pagodao: ["pagodao", "pagode"],
+  sertanejo: ["sertanejo", "piseiro"],
+  piseiro: ["piseiro", "sertanejo"],
+  pop: ["pop"],
+  rock: ["rock"],
+  reggae: ["reggae"],
 };
 
 function clamp(value: number, min = 0, max = 100) {
@@ -101,13 +153,13 @@ function inferPlaylistGenre(
   tracks: PlaylistSuggestionProfileTrack[],
 ) {
   const explicitGenre = detectPlaylistGenre(name, description);
-  if (explicitGenre !== "unknown") {
-    return explicitGenre;
-  }
+  if (explicitGenre !== "unknown") return explicitGenre;
 
   const counts = new Map<TrackGenre, number>();
   for (const track of tracks) {
-    const genre = detectGenre(track.artists, track.name);
+    const genre =
+      getProfileGenre(track.genreProfile) ??
+      detectGenre(track.artists, track.name);
     if (genre !== "unknown") {
       counts.set(genre, (counts.get(genre) ?? 0) + 1);
     }
@@ -154,12 +206,10 @@ function collectMarketCandidates(
   return [...candidates.values()];
 }
 
-function getProfileGenre(candidate: MusicIntelligenceTrack): TrackGenre | null {
-  const profile = candidate.genreProfile;
-
-  if (!profile || profile.genreConfidence < 30) {
-    return null;
-  }
+function getProfileGenre(
+  profile: TrackGenreCardProfile | null | undefined,
+): TrackGenre | null {
+  if (!profile || profile.genreConfidence < 30) return null;
 
   const mapping = {
     funk: "funk",
@@ -173,134 +223,225 @@ function getProfileGenre(candidate: MusicIntelligenceTrack): TrackGenre | null {
     dance_eletronico: "pop",
     afro_latin: "unknown",
     desconhecido: "unknown",
-  } satisfies Record<
-    NonNullable<MusicIntelligenceTrack["genreProfile"]>["primaryGenre"],
-    TrackGenre
-  >;
+  } satisfies Record<TrackGenreCardProfile["primaryGenre"], TrackGenre>;
 
   return mapping[profile.primaryGenre];
+}
+
+function buildPlaylistVibe(
+  tracks: PlaylistSuggestionProfileTrack[],
+): PlaylistVibe {
+  const moodCounts = new Map<string, number>();
+  const energyCounts = new Map<string, number>();
+
+  for (const track of tracks) {
+    for (const mood of track.genreProfile?.moodTags ?? []) {
+      moodCounts.set(mood, (moodCounts.get(mood) ?? 0) + 1);
+    }
+    for (const energy of track.genreProfile?.energyTags ?? []) {
+      energyCounts.set(energy, (energyCounts.get(energy) ?? 0) + 1);
+    }
+  }
+
+  const strongest = (counts: Map<string, number>) =>
+    new Set(
+      [...counts.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .filter(([, count], _index, values) =>
+          values[0]?.[1] && values[0][1] > 1 ? count > 1 : true,
+        )
+        .slice(0, 4)
+        .map(([tag]) => tag),
+    );
+
+  return {
+    moodTags: strongest(moodCounts),
+    energyTags: strongest(energyCounts),
+  };
+}
+
+function vibeCompatibility(
+  profile: TrackGenreCardProfile | null | undefined,
+  playlistVibe: PlaylistVibe,
+) {
+  const playlistTags = new Set([
+    ...playlistVibe.moodTags,
+    ...playlistVibe.energyTags,
+  ]);
+  const candidateTags = new Set([
+    ...(profile?.moodTags ?? []),
+    ...(profile?.energyTags ?? []),
+  ]);
+
+  if (playlistTags.size === 0 || candidateTags.size === 0) {
+    return { score: null, sharedTags: [] as string[] };
+  }
+
+  const sharedTags = [...candidateTags].filter((tag) => playlistTags.has(tag));
+  return {
+    score:
+      sharedTags.length > 0 ? Math.min(100, 78 + sharedTags.length * 11) : 55,
+    sharedTags,
+  };
 }
 
 function getCompatibility({
   candidate,
   playlistGenre,
   playlistArtists,
+  playlistVibe,
 }: {
-  candidate: MusicIntelligenceTrack;
+  candidate: CompatibleCandidate;
   playlistGenre: TrackGenre;
   playlistArtists: Set<string>;
+  playlistVibe: PlaylistVibe;
 }) {
   const candidateArtists = artistNames(candidate.artists);
   const sharedArtist = candidateArtists.find((artist) =>
     playlistArtists.has(artist),
   );
   const candidateGenre =
-    getProfileGenre(candidate) ??
+    getProfileGenre(candidate.genreProfile) ??
     detectGenre(candidate.artists, candidate.name);
-
-  if (sharedArtist) {
-    return {
-      score: 100,
-      candidateGenre,
-      sharedArtist,
-      reason: "Artista já presente no repertório da playlist.",
-    };
-  }
+  const vibe = vibeCompatibility(candidate.genreProfile, playlistVibe);
 
   if (playlistGenre === "unknown") {
     return {
-      score: 62,
+      compatible: Boolean(sharedArtist),
+      score: sharedArtist ? 80 : 0,
       candidateGenre,
-      sharedArtist: null,
-      reason: "Compatibilidade inicial baseada na força dos sinais.",
+      reason: sharedArtist
+        ? "Artista já presente no repertório da playlist."
+        : "O universo musical da playlist ainda não está confirmado.",
     };
   }
 
-  if (candidateGenre === playlistGenre) {
+  const allowed = ALLOWED_GENRES[playlistGenre] ?? [playlistGenre];
+  if (candidateGenre === "unknown" || !allowed.includes(candidateGenre)) {
     return {
-      score: 100,
+      compatible: false,
+      score: 0,
       candidateGenre,
-      sharedArtist: null,
-      reason: `Compatível com o perfil ${GENRE_LABEL[playlistGenre]} da playlist.`,
+      reason:
+        "Faixa bloqueada por não pertencer ao universo musical da playlist.",
     };
   }
 
-  if (ADJACENT_GENRES[playlistGenre]?.includes(candidateGenre)) {
-    return {
-      score: 76,
-      candidateGenre,
-      sharedArtist: null,
-      reason: `Gênero próximo ao perfil ${GENRE_LABEL[playlistGenre]} da playlist.`,
-    };
-  }
+  const exactGenre = candidateGenre === playlistGenre;
+  const genreScore = exactGenre ? 100 : 88;
+  const score = Math.round(
+    vibe.score === null ? genreScore : genreScore * 0.85 + vibe.score * 0.15,
+  );
+  const genreReason = exactGenre
+    ? `Compatível com o perfil ${GENRE_LABEL[playlistGenre]} da playlist.`
+    : `Pertence ao mesmo universo ${GENRE_LABEL[playlistGenre]} da playlist.`;
+  const vibeReason = vibe.sharedTags.length
+    ? `Vibe alinhada em ${vibe.sharedTags.slice(0, 2).join(" e ")}.`
+    : "";
+  const artistReason = sharedArtist ? "Artista já presente no repertório." : "";
 
   return {
-    score: candidateGenre === "unknown" ? 42 : 24,
+    compatible: true,
+    score,
     candidateGenre,
-    sharedArtist: null,
-    reason: "Compatibilidade de repertório ainda não confirmada.",
+    reason: [genreReason, vibeReason, artistReason].filter(Boolean).join(" "),
   };
 }
 
-function buildSuggestion(
-  candidate: MusicIntelligenceTrack,
-  market: MusicIntelligenceCountry,
-  compatibility: ReturnType<typeof getCompatibility>,
-): PlaylistDecisionSuggestion {
-  const opportunityScore = candidate.scores.opportunityScore;
+function buildSuggestion({
+  chart,
+  listening,
+  market,
+  compatibility,
+}: {
+  chart?: MusicIntelligenceTrack;
+  listening?: PlaylistListeningCandidate;
+  market: MusicIntelligenceCountry;
+  compatibility: ReturnType<typeof getCompatibility>;
+}): PlaylistDecisionSuggestion {
+  const source: PlaylistSuggestionSource =
+    chart && listening ? "hybrid" : listening ? "listening" : "chart";
+  const opportunityScore = chart?.scores.opportunityScore ?? null;
+  const personalAffinityScore = listening?.personalAffinityScore ?? null;
   const playlistFitScore = Math.round(
-    clamp(opportunityScore * 0.68 + compatibility.score * 0.32),
+    clamp(
+      compatibility.score * 0.55 +
+        (personalAffinityScore ?? 50) * 0.3 +
+        (opportunityScore ?? 50) * 0.15,
+    ),
   );
+  const saturationRisk = chart?.scores.saturationRisk ?? 0;
+  const sourceSupportsAdd =
+    chart?.action === "add_now" || (personalAffinityScore ?? 0) >= 65;
   const recommendation =
-    candidate.action === "add_now" &&
-    playlistFitScore >= 65 &&
-    candidate.scores.saturationRisk < 55
+    sourceSupportsAdd && playlistFitScore >= 78 && saturationRisk < 55
       ? "add_now"
       : "watch";
   const marketLabel = market === "BR" ? "BR" : "Global";
-  const signals = [`#${candidate.currentPosition} no ${marketLabel}`];
+  const signals: string[] = [];
 
-  if (candidate.isNewEntry) {
-    signals.push("entrada recente");
-  } else if ((candidate.movement7d ?? 0) > 0) {
-    signals.push(`+${candidate.movement7d} posições em 7d`);
-  } else if ((candidate.movement7d ?? 0) < 0) {
-    signals.push(`${candidate.movement7d} posições em 7d`);
+  if (listening) signals.push(listening.listeningSignal);
+
+  if (chart) {
+    signals.push(`#${chart.currentPosition} no ${marketLabel}`);
+    if (chart.isNewEntry) {
+      signals.push("entrada recente");
+    } else if ((chart.movement7d ?? 0) > 0) {
+      signals.push(`+${chart.movement7d} posições em 7d`);
+    } else if ((chart.movement7d ?? 0) < 0) {
+      signals.push(`${chart.movement7d} posições em 7d`);
+    }
+    if (chart.streams)
+      signals.push(`${compactNumber(chart.streams)} streams/dia`);
   }
 
-  if (candidate.streams) {
-    signals.push(`${compactNumber(candidate.streams)} streams/dia`);
-  }
+  const behaviorReason = listening
+    ? `Comportamento da conta: ${listening.listeningSignal}.`
+    : "";
+  const chartReason =
+    chart?.explanation ?? "Fora dos charts monitorados agora.";
 
   return {
-    id: candidate.spotifyTrackId as string,
-    name: candidate.name,
-    artists: candidate.artists,
-    albumName: "",
-    imageUrl: candidate.coverUrl,
-    durationLabel: "",
+    id: (chart?.spotifyTrackId ?? listening?.id) as string,
+    name: chart?.name ?? (listening?.name as string),
+    artists: chart?.artists ?? (listening?.artists as string),
+    albumName: listening?.albumName ?? "",
+    imageUrl: chart?.coverUrl ?? listening?.imageUrl ?? null,
+    durationLabel: listening?.durationLabel ?? "",
     spotifyUrl:
-      candidate.spotifyUrl ??
-      `https://open.spotify.com/track/${candidate.spotifyTrackId}`,
-    popularity: 0,
+      chart?.spotifyUrl ??
+      listening?.spotifyUrl ??
+      `https://open.spotify.com/track/${chart?.spotifyTrackId}`,
+    popularity: listening?.popularity ?? 0,
     market,
-    currentPosition: candidate.currentPosition,
-    movement7d: candidate.movement7d,
+    currentPosition: chart?.currentPosition ?? null,
+    movement7d: chart?.movement7d ?? null,
     opportunityScore,
+    personalAffinityScore,
     playlistFitScore,
-    saturationRisk: candidate.scores.saturationRisk,
-    isNewEntry: candidate.isNewEntry,
+    saturationRisk,
+    isNewEntry: chart?.isNewEntry ?? false,
+    source,
+    sourceLabel:
+      source === "hybrid"
+        ? "Conta + chart"
+        : source === "listening"
+          ? "Sua conta"
+          : "Chart",
     recommendation,
     recommendationLabel:
       recommendation === "add_now" ? "Adicionar agora" : "Observar",
-    explanation: `${compatibility.reason} ${candidate.explanation}`,
-    signals: signals.slice(0, 3),
+    explanation: [compatibility.reason, behaviorReason, chartReason]
+      .filter(Boolean)
+      .join(" "),
+    signals: signals.slice(0, 4),
   };
 }
 
 export function buildPlaylistSuggestionIntelligence({
   playlist,
   intelligence,
+  listening,
 }: {
   playlist: {
     name: string;
@@ -308,6 +449,11 @@ export function buildPlaylistSuggestionIntelligence({
     tracks: PlaylistSuggestionProfileTrack[];
   };
   intelligence: MusicIntelligenceResponse;
+  listening?: {
+    available: boolean;
+    recentHistoryAvailable: boolean;
+    candidates: PlaylistListeningCandidate[];
+  };
 }): PlaylistSuggestionResponse {
   const existingTrackIds = new Set(
     playlist.tracks.map((track) => track.id.trim()).filter(Boolean),
@@ -320,6 +466,48 @@ export function buildPlaylistSuggestionIntelligence({
     playlist.description,
     playlist.tracks,
   );
+  const playlistVibe = buildPlaylistVibe(playlist.tracks);
+  const allListeningById = new Map(
+    (listening?.candidates ?? []).map((candidate) => [candidate.id, candidate]),
+  );
+  const listeningById = new Map(
+    [...allListeningById.values()]
+      .filter((candidate) => !existingTrackIds.has(candidate.id))
+      .map((candidate) => [candidate.id, candidate]),
+  );
+  const playlistAccountSignals = Object.fromEntries(
+    playlist.tracks.flatMap((track) => {
+      const signal = allListeningById.get(track.id);
+      return signal
+        ? [
+            [
+              track.id,
+              {
+                personalAffinityScore: signal.personalAffinityScore,
+                listeningSignal: signal.listeningSignal,
+              },
+            ] as const,
+          ]
+        : [];
+    }),
+  );
+  const chartCandidatesByMarket = new Map(
+    MARKET_ORDER.map((market) => [
+      market,
+      collectMarketCandidates(intelligence, market).filter(
+        (candidate) =>
+          candidate.spotifyTrackId &&
+          !existingTrackIds.has(candidate.spotifyTrackId),
+      ),
+    ]),
+  );
+  const allChartIds = new Set(
+    [...chartCandidatesByMarket.values()].flatMap((candidates) =>
+      candidates.flatMap((candidate) =>
+        candidate.spotifyTrackId ? [candidate.spotifyTrackId] : [],
+      ),
+    ),
+  );
   const markets = {} as Record<
     MusicIntelligenceCountry,
     PlaylistSuggestionMarketQueue
@@ -328,37 +516,58 @@ export function buildPlaylistSuggestionIntelligence({
   let compatibleCandidates = 0;
 
   for (const market of MARKET_ORDER) {
-    const candidates = collectMarketCandidates(intelligence, market).filter(
-      (candidate) =>
-        candidate.spotifyTrackId &&
-        !existingTrackIds.has(candidate.spotifyTrackId),
+    const chartById = new Map(
+      (chartCandidatesByMarket.get(market) ?? []).map((candidate) => [
+        candidate.spotifyTrackId as string,
+        candidate,
+      ]),
     );
-    candidatesEvaluated += candidates.length;
+    const personalOnlyIds = [...listeningById.values()]
+      .filter(
+        (candidate) =>
+          candidate.market === market && !allChartIds.has(candidate.id),
+      )
+      .map((candidate) => candidate.id);
+    const candidateIds = [
+      ...new Set([...chartById.keys(), ...personalOnlyIds]),
+    ];
+    candidatesEvaluated += candidateIds.length;
 
-    const suggestions = candidates
-      .map((candidate) => {
+    const suggestions = candidateIds
+      .map((id) => {
+        const chart = chartById.get(id);
+        const personal = listeningById.get(id);
+        const candidate = {
+          name: chart?.name ?? (personal?.name as string),
+          artists: chart?.artists ?? (personal?.artists as string),
+          genreProfile: chart?.genreProfile ?? personal?.genreProfile ?? null,
+        };
         const compatibility = getCompatibility({
           candidate,
           playlistGenre,
           playlistArtists,
+          playlistVibe,
         });
-        return {
-          compatibility,
-          suggestion: buildSuggestion(candidate, market, compatibility),
-        };
+        return compatibility.compatible
+          ? buildSuggestion({
+              chart,
+              listening: personal,
+              market,
+              compatibility,
+            })
+          : null;
       })
-      .filter(({ compatibility }) =>
-        playlistGenre === "unknown"
-          ? compatibility.score >= 60
-          : compatibility.score >= 70,
+      .filter((suggestion): suggestion is PlaylistDecisionSuggestion =>
+        Boolean(suggestion),
       )
-      .map(({ suggestion }) => suggestion)
       .sort(
         (left, right) =>
           (left.recommendation === "add_now" ? 0 : 1) -
             (right.recommendation === "add_now" ? 0 : 1) ||
           right.playlistFitScore - left.playlistFitScore ||
-          right.opportunityScore - left.opportunityScore,
+          (right.personalAffinityScore ?? 0) -
+            (left.personalAffinityScore ?? 0) ||
+          (right.opportunityScore ?? 0) - (left.opportunityScore ?? 0),
       );
 
     compatibleCandidates += suggestions.length;
@@ -374,6 +583,17 @@ export function buildPlaylistSuggestionIntelligence({
     };
   }
 
+  const visibleItems = MARKET_ORDER.flatMap((market) => markets[market].items);
+  const sourceMix = visibleItems.reduce<
+    Record<PlaylistSuggestionSource, number>
+  >(
+    (counts, suggestion) => {
+      counts[suggestion.source] += 1;
+      return counts;
+    },
+    { chart: 0, listening: 0, hybrid: 0 },
+  );
+
   return {
     summary: {
       latestChartDate: intelligence.summary.latestChartDate,
@@ -384,7 +604,12 @@ export function buildPlaylistSuggestionIntelligence({
       playlistGenreLabel: GENRE_LABEL[playlistGenre],
       candidatesEvaluated,
       compatibleCandidates,
+      listeningSignalsAvailable: listening?.available ?? false,
+      recentHistoryAvailable: listening?.recentHistoryAvailable ?? false,
+      personalizedCandidates: sourceMix.listening + sourceMix.hybrid,
+      sourceMix,
     },
     markets,
+    playlistAccountSignals,
   };
 }

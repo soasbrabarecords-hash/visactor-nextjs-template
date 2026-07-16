@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import PlaylistIntelligencePanel from "@/components/workspace/playlist-intelligence-panel";
 import ResizableTableOverlay from "@/components/workspace/resizable-table-overlay";
 import { buildPlaylistIntelligence } from "@/lib/playlist-intelligence";
+import type { PlaylistAccountSignal } from "@/lib/playlist-suggestion-intelligence";
+import { getPlaylistRecommendationsClient } from "@/lib/playlist-recommendations-client";
 import { invalidateSpotifyAccountPlaylistsClientCache } from "@/lib/spotify-account-playlists-client";
 import type { SpotifyEditablePlaylistTrack } from "@/lib/spotify-user";
 
@@ -488,6 +490,10 @@ export default function PlaylistEditor({
     () => getCachedChartMap() ?? new Map(),
   );
   const [chartLoading, setChartLoading] = useState(() => !getCachedChartMap());
+  const [accountSignals, setAccountSignals] = useState<
+    Record<string, PlaylistAccountSignal>
+  >({});
+  const [accountSignalsLoading, setAccountSignalsLoading] = useState(true);
 
   // Outros estados
   const [deletingIndices, setDeletingIndices] = useState<Set<number>>(
@@ -506,6 +512,23 @@ export default function PlaylistEditor({
     },
     [],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getPlaylistRecommendationsClient(playlistId)
+      .then((data) => {
+        if (!cancelled) setAccountSignals(data.playlistAccountSignals);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setAccountSignalsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playlistId]);
 
   // ── Kworb ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1049,6 +1072,7 @@ export default function PlaylistEditor({
         tracks.map((track, index) => {
           const chartData = chartMap.get(track.id) ?? null;
           const popularityReading = getPopularityReading(track);
+          const accountSignal = accountSignals[track.id];
 
           return {
             id: track.id,
@@ -1065,11 +1089,21 @@ export default function PlaylistEditor({
             dailyDelta: track.streams?.dailyDelta ?? null,
             streamTrend: track.streams?.trend ?? null,
             streamsLoading: track.streamsLoading,
-            signalsLoading: chartLoading || track.streamsLoading,
+            signalsLoading:
+              chartLoading || track.streamsLoading || accountSignalsLoading,
+            personalAffinityScore:
+              accountSignal?.personalAffinityScore ?? null,
+            listeningSignal: accountSignal?.listeningSignal ?? null,
           };
         }),
       ),
-    [chartLoading, chartMap, tracks],
+    [
+      accountSignals,
+      accountSignalsLoading,
+      chartLoading,
+      chartMap,
+      tracks,
+    ],
   );
   const decisionByTrackKey = useMemo(
     () =>
@@ -1079,7 +1113,9 @@ export default function PlaylistEditor({
     [intelligence.decisions],
   );
   const isIntelligenceEnriching =
-    chartLoading || tracks.some((track) => track.streamsLoading);
+    accountSignalsLoading ||
+    chartLoading ||
+    tracks.some((track) => track.streamsLoading);
   async function handleApplySuggestedOrder() {
     const trackByKey = new Map(
       tracks.map((track, index) => [`${track.id}:${index}`, track]),
