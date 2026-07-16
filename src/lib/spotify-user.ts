@@ -4,6 +4,7 @@ import { Buffer } from "node:buffer";
 import "server-only";
 import { buildSpotifyOfficialChartUrl } from "@/lib/charts/spotify-chart-source-resolver";
 import { fetchSpotifyOEmbedCoverUrls } from "@/lib/spotify-cover-images";
+import { shouldRefreshSpotifyPopularity } from "@/lib/spotify-popularity-cache";
 import {
   fetchStoredTrackPopularities,
   storeSpotifyTrackPopularities,
@@ -294,6 +295,7 @@ const SPOTIFY_WORKSPACE_REQUIRED_MESSAGE =
 const CURRENT_USER_CACHE_TTL_MS = 5 * 60 * 1000;
 const ACCOUNT_PLAYLISTS_CACHE_TTL_MS = 90 * 1000;
 const EDITABLE_PLAYLIST_CACHE_TTL_MS = 3 * 60 * 1000;
+const POPULARITY_REFRESH_COOLDOWN_MS = 60 * 1000;
 const PLAYLIST_TRACK_IDS_TTL_MS = 2 * 60 * 1000;
 
 const spotifyCurrentUserCache = new Map<
@@ -309,6 +311,7 @@ const spotifyEditablePlaylistCache = new Map<
   CacheEntry<SpotifyEditablePlaylist>
 >();
 const spotifyPlaylistTrackIdsCache = new Map<string, CacheEntry<string[]>>();
+const spotifyPopularityRefreshAttemptAt = new Map<string, number>();
 const spotifyPlaylistsInFlight = new Map<
   string,
   Promise<SpotifyAccountPlaylist[]>
@@ -393,6 +396,7 @@ function clearSpotifyReadCachesForToken(accessToken: string) {
   for (const editableKey of spotifyEditablePlaylistCache.keys()) {
     if (editableKey.startsWith(`${cacheKey}:`)) {
       spotifyEditablePlaylistCache.delete(editableKey);
+      spotifyPopularityRefreshAttemptAt.delete(editableKey);
     }
   }
 }
@@ -435,6 +439,7 @@ function clearSpotifyEditablePlaylistCache(
 ) {
   const cacheKey = `${buildTokenCacheKey(accessToken)}:${playlistId}`;
   spotifyEditablePlaylistCache.delete(cacheKey);
+  spotifyPopularityRefreshAttemptAt.delete(cacheKey);
 }
 
 function clearSpotifyAccountPlaylistCache(accessToken: string) {
@@ -1083,7 +1088,7 @@ async function hydrateSpotifyTrackPopularityWithToken(
 ) {
   const idsToHydrate = Array.from(
     new Set(
-      tracks.filter((track) => track.popularity === 0).map((track) => track.id),
+      tracks.filter(shouldRefreshSpotifyPopularity).map((track) => track.id),
     ),
   );
 
@@ -1118,6 +1123,9 @@ async function hydrateSpotifyTrackPopularityWithToken(
       );
 
       if (!response.ok) {
+        process.stderr.write(
+          `[spotify:popularity] ${requestScope} returned HTTP ${response.status}.\n`,
+        );
         if (response.status === 429) {
           registerRateLimit(requestScope, response.headers.get("Retry-After"));
         }
@@ -1416,13 +1424,35 @@ async function fetchSpotifyEditablePlaylistWithToken(
   const cachedPlaylist = getCachedValue(spotifyEditablePlaylistCache, cacheKey);
 
   if (cachedPlaylist) {
-    const tracks = await restoreCachedSpotifyTrackPopularities(
+    let tracks = await restoreCachedSpotifyTrackPopularities(
       cachedPlaylist.tracks,
     );
 
-    return tracks === cachedPlaylist.tracks
-      ? cachedPlaylist
-      : { ...cachedPlaylist, tracks };
+    const shouldRefresh = tracks.some(shouldRefreshSpotifyPopularity);
+    const lastAttemptAt = spotifyPopularityRefreshAttemptAt.get(cacheKey) ?? 0;
+
+    if (
+      shouldRefresh &&
+      Date.now() - lastAttemptAt >= POPULARITY_REFRESH_COOLDOWN_MS
+    ) {
+      spotifyPopularityRefreshAttemptAt.set(cacheKey, Date.now());
+      tracks = await hydrateSpotifyTrackPopularityWithToken(
+        accessToken,
+        tracks,
+      );
+      await storeSpotifyTrackPopularities(tracks);
+    }
+
+    if (tracks === cachedPlaylist.tracks) {
+      return cachedPlaylist;
+    }
+
+    return setCachedValue(
+      spotifyEditablePlaylistCache,
+      cacheKey,
+      { ...cachedPlaylist, tracks },
+      EDITABLE_PLAYLIST_CACHE_TTL_MS,
+    );
   }
 
   const inFlight = spotifyEditablePlaylistsInFlight.get(cacheKey);
@@ -1501,7 +1531,7 @@ async function fetchSpotifyEditablePlaylistWithToken(
       tracks = embeddedTracks;
     }
 
-    if (tracks.some((track) => track.popularity === 0)) {
+    if (tracks.some(shouldRefreshSpotifyPopularity)) {
       tracks = await hydrateSpotifyTrackPopularityWithToken(
         accessToken,
         tracks,

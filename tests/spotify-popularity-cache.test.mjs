@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildSpotifyPopularityCacheRows } from "../src/lib/spotify-popularity-cache.ts";
+import {
+  buildSpotifyPopularityCacheRows,
+  shouldRefreshSpotifyPopularity,
+} from "../src/lib/spotify-popularity-cache.ts";
 
 function track(overrides = {}) {
   return {
@@ -54,4 +57,20 @@ test("deduplicates tracks and clamps official popularity", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].track_name, "Versão mais recente");
   assert.equal(rows[0].popularity, 100);
+});
+
+test("refreshes unavailable and snapshot values while trusting live Spotify values", () => {
+  assert.equal(shouldRefreshSpotifyPopularity(track()), false);
+  assert.equal(
+    shouldRefreshSpotifyPopularity(
+      track({ popularity: 84, popularitySource: "snapshot" }),
+    ),
+    true,
+  );
+  assert.equal(
+    shouldRefreshSpotifyPopularity(
+      track({ popularity: 0, popularitySource: "unavailable" }),
+    ),
+    true,
+  );
 });

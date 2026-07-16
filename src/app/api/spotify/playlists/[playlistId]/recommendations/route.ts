@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { getMusicIntelligence } from "@/lib/music-intelligence";
+import { getPlaylistOsReadAccess } from "@/lib/playlist-os-read-access";
 import { buildPlaylistSuggestionIntelligence } from "@/lib/playlist-suggestion-intelligence";
 import {
   fetchSpotifyEditablePlaylist,
   setSpotifyAuthCookies,
 } from "@/lib/spotify-user";
+import { attachTrackProfilesToMusicIntelligence } from "@/lib/track-profile-engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,15 @@ export async function GET(
   { params }: { params: Promise<{ playlistId: string }> },
 ) {
   try {
+    const access = await getPlaylistOsReadAccess();
+
+    if (!access.allowed) {
+      return NextResponse.json(
+        { success: false, message: access.message },
+        { status: access.status, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const { playlistId } = await params;
     const { result, refreshedToken } =
       await fetchSpotifyEditablePlaylist(playlistId);
@@ -32,7 +43,10 @@ export async function GET(
       );
     }
 
-    const intelligence = await getMusicIntelligence();
+    const intelligence = await attachTrackProfilesToMusicIntelligence(
+      await getMusicIntelligence(),
+      access.workspaceId,
+    );
     const data = buildPlaylistSuggestionIntelligence({
       playlist: {
         name: result.playlist.name,

@@ -60,7 +60,7 @@ export type PlaylistSuggestionResponse = {
 };
 
 const MARKET_ORDER: MusicIntelligenceCountry[] = ["BR", "GLOBAL"];
-const MAX_ITEMS_PER_MARKET = 4;
+const MAX_ITEMS_PER_MARKET = 10;
 
 const ADJACENT_GENRES: Partial<Record<TrackGenre, TrackGenre[]>> = {
   trap: ["rap", "funk"],
@@ -127,7 +127,6 @@ function collectMarketCandidates(
 ) {
   const marketQueue = intelligence.markets[market];
   const sources = [
-    ...(intelligence.candidatePool?.[market] ?? []),
     marketQueue.nextBestOpportunity,
     ...marketQueue.addNow,
     ...marketQueue.watch,
@@ -137,6 +136,7 @@ function collectMarketCandidates(
     ...intelligence.signals.newEntries.filter(
       (track) => track.primaryCountry === market,
     ),
+    ...(intelligence.candidatePool?.[market] ?? []),
   ];
   const candidates = new Map<string, MusicIntelligenceTrack>();
 
@@ -154,6 +154,33 @@ function collectMarketCandidates(
   return [...candidates.values()];
 }
 
+function getProfileGenre(candidate: MusicIntelligenceTrack): TrackGenre | null {
+  const profile = candidate.genreProfile;
+
+  if (!profile || profile.genreConfidence < 30) {
+    return null;
+  }
+
+  const mapping = {
+    funk: "funk",
+    trap: "trap",
+    rap: "rap",
+    sertanejo: "sertanejo",
+    piseiro_forro: "piseiro",
+    pop: "pop",
+    pop_global: "pop",
+    rock: "rock",
+    dance_eletronico: "pop",
+    afro_latin: "unknown",
+    desconhecido: "unknown",
+  } satisfies Record<
+    NonNullable<MusicIntelligenceTrack["genreProfile"]>["primaryGenre"],
+    TrackGenre
+  >;
+
+  return mapping[profile.primaryGenre];
+}
+
 function getCompatibility({
   candidate,
   playlistGenre,
@@ -167,7 +194,9 @@ function getCompatibility({
   const sharedArtist = candidateArtists.find((artist) =>
     playlistArtists.has(artist),
   );
-  const candidateGenre = detectGenre(candidate.artists, candidate.name);
+  const candidateGenre =
+    getProfileGenre(candidate) ??
+    detectGenre(candidate.artists, candidate.name);
 
   if (sharedArtist) {
     return {

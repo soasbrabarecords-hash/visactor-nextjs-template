@@ -1,14 +1,13 @@
 "use client";
 
 import {
-  Eye,
+  Check,
   Loader2,
   Music2,
   Plus,
   RefreshCw,
   Search,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -36,13 +35,9 @@ type Props = {
 
 const MARKET_COPY = {
   BR: {
-    eyebrow: "Radar Brasil",
-    title: "Oportunidades no BR",
     description: "Força e movimento no Top 200 brasileiro.",
   },
   GLOBAL: {
-    eyebrow: "Radar Global",
-    title: "Sinais internacionais",
     description: "Faixas globais compatíveis com este repertório.",
   },
 } as const;
@@ -82,6 +77,9 @@ export default function PlaylistTrackSearch({
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const [activeMarket, setActiveMarket] = useState<"BR" | "GLOBAL">("BR");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkAdding, setBulkAdding] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -140,6 +138,7 @@ export default function PlaylistTrackSearch({
         );
       }
       setSuggestions(data);
+      setSelectedIds(new Set());
     } catch (error) {
       setSuggestionsError(
         error instanceof Error
@@ -156,27 +155,36 @@ export default function PlaylistTrackSearch({
     void loadSuggestions();
   }, [loadSuggestions]);
 
+  async function addTrackToPlaylist(trackId: string) {
+    const response = await fetch(
+      `/api/spotify/playlists/${playlistId}/tracks`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackUri: `spotify:track:${trackId}` }),
+      },
+    );
+    const data = (await response.json()) as {
+      success?: boolean;
+      message?: string;
+    };
+    if (!data.success) {
+      throw new Error(data.message ?? "Erro ao adicionar faixa.");
+    }
+  }
+
   async function handleAdd(track: Pick<Track, "id">) {
-    if (addingId) return;
+    if (addingId || bulkAdding) return;
     setAddingId(track.id);
     setActionError(null);
     try {
-      const response = await fetch(
-        `/api/spotify/playlists/${playlistId}/tracks`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trackUri: `spotify:track:${track.id}` }),
-        },
-      );
-      const data = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-      };
-      if (!data.success) {
-        throw new Error(data.message ?? "Erro ao adicionar faixa.");
-      }
+      await addTrackToPlaylist(track.id);
       setAddedIds((previous) => new Set(previous).add(track.id));
+      setSelectedIds((previous) => {
+        const next = new Set(previous);
+        next.delete(track.id);
+        return next;
+      });
       invalidateSpotifyAccountPlaylistsClientCache();
       onAdded?.();
     } catch (error) {
@@ -185,6 +193,41 @@ export default function PlaylistTrackSearch({
       );
     } finally {
       setAddingId(null);
+    }
+  }
+
+  async function handleAddSelected() {
+    if (!suggestions || addingId || bulkAdding) return;
+    const tracks = suggestions.markets[activeMarket].items.filter(
+      (track) => selectedIds.has(track.id) && !isOnPlaylist(track.id),
+    );
+
+    if (tracks.length === 0) return;
+    setBulkAdding(true);
+    setActionError(null);
+    const completed: string[] = [];
+
+    try {
+      for (const track of tracks) {
+        await addTrackToPlaylist(track.id);
+        completed.push(track.id);
+      }
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "Erro ao adicionar faixas.",
+      );
+    } finally {
+      if (completed.length > 0) {
+        setAddedIds((previous) => new Set([...previous, ...completed]));
+        setSelectedIds((previous) => {
+          const next = new Set(previous);
+          completed.forEach((trackId) => next.delete(trackId));
+          return next;
+        });
+        invalidateSpotifyAccountPlaylistsClientCache();
+        onAdded?.();
+      }
+      setBulkAdding(false);
     }
   }
 
@@ -243,96 +286,136 @@ export default function PlaylistTrackSearch({
     );
   }
 
-  function renderDecisionCard(track: PlaylistDecisionSuggestion) {
+  function toggleSelected(trackId: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  }
+
+  function renderDecisionRow(track: PlaylistDecisionSuggestion, index: number) {
     const onPlaylist = isOnPlaylist(track.id);
-    const isAdding = addingId === track.id;
+    const isAdding = addingId === track.id || bulkAdding;
     const addNow = track.recommendation === "add_now";
+    const selected = selectedIds.has(track.id);
+    const marketLabel = track.market === "BR" ? "BR" : "Global";
 
     return (
-      <article
+      <div
         key={`${track.market}-${track.id}`}
-        className="rounded-2xl border border-white/[0.08] bg-black/15 p-3 shadow-[0_18px_50px_-38px_rgba(0,0,0,0.9)]"
+        className={`group grid min-h-16 grid-cols-[28px_40px_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-3 py-2.5 transition last:border-b-0 hover:bg-muted/25 tablet:grid-cols-[28px_28px_40px_minmax(180px,1.2fr)_minmax(150px,1fr)_80px_48px_auto] ${
+          selected ? "bg-primary/[0.06]" : ""
+        }`}
       >
-        <div className="flex items-start gap-3">
+        <button
+          type="button"
+          aria-label={
+            selected ? `Desmarcar ${track.name}` : `Selecionar ${track.name}`
+          }
+          aria-pressed={selected}
+          onClick={() => toggleSelected(track.id)}
+          disabled={onPlaylist || isAdding}
+          className={`flex h-5 w-5 items-center justify-center rounded border transition ${
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border text-transparent hover:border-primary/60"
+          } disabled:opacity-30`}
+        >
+          <Check className="h-3 w-3" />
+        </button>
+        <span className="hidden text-center text-xs tabular-nums text-muted-foreground tablet:block">
+          {index + 1}
+        </span>
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-muted-foreground ring-1 ring-inset ring-border"
+          style={coverStyle(track.imageUrl)}
+        >
+          {track.imageUrl ? null : <Music2 className="h-4 w-4" />}
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">{track.name}</div>
+          <div className="truncate text-xs text-muted-foreground">
+            {track.artists}
+          </div>
+        </div>
+        <div className="hidden min-w-0 tablet:block">
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/25 ring-1 ring-inset ring-white/10"
-            style={coverStyle(track.imageUrl)}
+            className="truncate text-xs text-muted-foreground"
+            title={track.explanation}
           >
-            {track.imageUrl ? null : <Music2 className="h-4 w-4" />}
+            {track.explanation}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h4 className="truncate text-sm font-semibold text-white">
-                  {track.name}
-                </h4>
-                <p className="mt-0.5 truncate text-[11px] text-white/50">
-                  {track.artists}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="text-[9px] uppercase tracking-[0.12em] text-white/40">
-                  decisão
-                </div>
-                <div className="mt-0.5 text-lg font-semibold leading-none text-white">
-                  {track.playlistFitScore}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span
-                className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset ${
-                  addNow
-                    ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/20"
-                    : "bg-sky-400/10 text-sky-300 ring-sky-400/20"
-                }`}
-              >
-                {track.recommendationLabel}
-              </span>
-              {track.signals.map((signal) => (
-                <span
-                  key={signal}
-                  className="rounded-full bg-white/[0.045] px-2 py-1 text-[9px] text-white/55 ring-1 ring-inset ring-white/[0.07]"
-                >
-                  {signal}
-                </span>
-              ))}
-            </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className={addNow ? "text-emerald-500" : "text-sky-500"}>
+              {track.recommendationLabel}
+            </span>
+            <span>·</span>
+            <span>{track.signals[1] ?? track.signals[0]}</span>
           </div>
         </div>
-
-        <p className="mt-3 line-clamp-2 min-h-10 text-[11px] leading-5 text-white/55">
-          {track.explanation}
-        </p>
-
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
-          <div className="text-[10px] text-white/40">
-            Oportunidade {track.opportunityScore} · risco {track.saturationRisk}
+        <div className="hidden text-right tablet:block">
+          <div className="text-xs font-semibold tabular-nums">
+            #{track.currentPosition} {marketLabel}
           </div>
-          <button
-            type="button"
-            onClick={() => void handleAdd(track)}
-            disabled={onPlaylist || isAdding}
-            className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold transition disabled:opacity-60 ${
-              onPlaylist
-                ? "bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/20"
-                : "bg-primary text-primary-foreground hover:brightness-110"
-            }`}
-          >
-            {isAdding ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : onPlaylist ? (
-              "Adicionada"
-            ) : (
-              <>
-                <Plus className="h-3 w-3" /> Adicionar
-              </>
-            )}
-          </button>
+          <div className="mt-0.5 text-[10px] text-muted-foreground">
+            {track.movement7d === null
+              ? "7d sem leitura"
+              : `${track.movement7d > 0 ? "+" : ""}${track.movement7d} em 7d`}
+          </div>
         </div>
-      </article>
+        <div className="hidden text-center tablet:block">
+          <div className="text-sm font-semibold tabular-nums">
+            {track.playlistFitScore}
+          </div>
+          <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+            fit
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleAdd(track)}
+          disabled={onPlaylist || isAdding}
+          className={`inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full px-3 text-[11px] font-semibold transition disabled:opacity-60 ${
+            onPlaylist
+              ? "bg-emerald-500/10 text-emerald-500"
+              : "bg-primary text-primary-foreground hover:brightness-110"
+          }`}
+        >
+          {addingId === track.id ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : onPlaylist ? (
+            "Adicionada"
+          ) : (
+            <>
+              <Plus className="h-3 w-3" /> Adicionar
+            </>
+          )}
+        </button>
+      </div>
     );
+  }
+
+  const activeQueue = suggestions?.markets[activeMarket];
+  const selectableItems =
+    activeQueue?.items.filter((track) => !isOnPlaylist(track.id)) ?? [];
+  const allSelected =
+    selectableItems.length > 0 &&
+    selectableItems.every((track) => selectedIds.has(track.id));
+  const selectedCount = selectableItems.filter((track) =>
+    selectedIds.has(track.id),
+  ).length;
+
+  function toggleAllVisible() {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      selectableItems.forEach((track) => {
+        if (allSelected) next.delete(track.id);
+        else next.add(track.id);
+      });
+      return next;
+    });
   }
 
   return (
@@ -375,30 +458,29 @@ export default function PlaylistTrackSearch({
         ) : null}
       </section>
 
-      <section className="overflow-hidden rounded-[26px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(8,12,20,0.94))] shadow-[0_28px_90px_-56px_rgba(37,99,235,0.55)]">
-        <header className="flex flex-col gap-4 border-b border-white/[0.07] px-5 py-4 tablet:flex-row tablet:items-center tablet:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card/35">
+        <header className="flex flex-col gap-3 border-b border-border/70 px-4 py-3 tablet:flex-row tablet:items-center tablet:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.17em] text-sky-300/80">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
               <Sparkles className="h-3.5 w-3.5" />
               Curadoria assistida
             </div>
-            <h2 className="mt-2 text-lg font-semibold tracking-[-0.025em] text-white">
-              Decisões para esta playlist
+            <h2 className="mt-1 text-base font-semibold tracking-tight">
+              Próximas oportunidades
             </h2>
-            <p className="mt-1 text-xs leading-5 text-white/50">
-              Apenas faixas fora da playlist, ordenadas por aderência e sinais
-              reais de mercado.
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Faixas fora da playlist, ordenadas por mercado e aderência.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {suggestions ? (
               <>
                 {suggestions.summary.playlistGenre !== "unknown" ? (
-                  <span className="rounded-full bg-violet-400/10 px-2.5 py-1.5 text-[10px] font-semibold text-violet-200 ring-1 ring-inset ring-violet-400/20">
+                  <span className="rounded-full bg-violet-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-violet-400 ring-1 ring-inset ring-violet-500/20">
                     Perfil {suggestions.summary.playlistGenreLabel}
                   </span>
                 ) : null}
-                <span className="rounded-full bg-white/[0.045] px-2.5 py-1.5 text-[10px] text-white/55 ring-1 ring-inset ring-white/[0.07]">
+                <span className="rounded-full bg-muted px-2.5 py-1.5 text-[10px] text-muted-foreground">
                   {formatDate(suggestions.summary.latestChartDate)} ·{" "}
                   {suggestions.summary.maxWindow}d
                 </span>
@@ -408,7 +490,7 @@ export default function PlaylistTrackSearch({
               type="button"
               onClick={() => void loadSuggestions()}
               disabled={loadingSuggestions}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white/[0.055] px-3 text-[10px] font-semibold text-white/60 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-background/50 px-3 text-[10px] font-semibold text-muted-foreground transition hover:text-foreground disabled:opacity-50"
             >
               <RefreshCw
                 className={`h-3 w-3 ${loadingSuggestions ? "animate-spin" : ""}`}
@@ -419,65 +501,101 @@ export default function PlaylistTrackSearch({
         </header>
 
         {actionError || suggestionsError ? (
-          <div className="mx-5 mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <div className="mx-4 mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-400">
             {actionError ?? suggestionsError}
           </div>
         ) : null}
 
         {loadingSuggestions && !suggestions ? (
-          <div className="flex items-center justify-center px-5 py-12 text-sm text-white/45">
+          <div className="flex items-center justify-center px-5 py-12 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Cruzando o perfil da playlist com os charts…
           </div>
-        ) : suggestions ? (
-          <div className="grid gap-px bg-white/[0.07] xl:grid-cols-2">
-            {(["BR", "GLOBAL"] as const).map((market) => {
-              const queue = suggestions.markets[market];
-              const copy = MARKET_COPY[market];
-              const MarketIcon = market === "BR" ? TrendingUp : Eye;
-
-              return (
-                <div key={market} className="bg-[#0b1019] p-4 tablet:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-white/40">
-                        <MarketIcon className="h-3 w-3" /> {copy.eyebrow}
-                      </div>
-                      <h3 className="mt-1.5 text-sm font-semibold text-white">
-                        {copy.title}
-                      </h3>
-                      <p className="mt-0.5 text-[11px] text-white/45">
-                        {copy.description}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white/[0.05] px-2 py-1 text-[10px] tabular-nums text-white/50 ring-1 ring-inset ring-white/[0.07]">
-                      {queue.items.length}
+        ) : suggestions && activeQueue ? (
+          <div>
+            <div className="flex flex-col gap-3 border-b border-border/60 px-3 py-3 tablet:flex-row tablet:items-center tablet:justify-between">
+              <div className="flex w-fit rounded-full border border-border bg-background/40 p-1">
+                {(["BR", "GLOBAL"] as const).map((market) => (
+                  <button
+                    key={market}
+                    type="button"
+                    onClick={() => setActiveMarket(market)}
+                    aria-pressed={activeMarket === market}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      activeMarket === market
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {market === "BR" ? "Brasil" : "Global"}{" "}
+                    <span className="ml-1 tabular-nums opacity-60">
+                      {suggestions.markets[market].items.length}
                     </span>
-                  </div>
+                  </button>
+                ))}
+              </div>
 
-                  {queue.items.length > 0 ? (
-                    <div className="mt-4 grid gap-2.5">
-                      {queue.items.map(renderDecisionCard)}
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center text-xs leading-5 text-white/45">
-                      Nenhuma faixa com aderência forte e risco controlado neste
-                      mercado agora.
-                    </div>
-                  )}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="hidden text-xs text-muted-foreground tablet:inline">
+                  {MARKET_COPY[activeMarket].description}
+                </span>
+                {selectableItems.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={toggleAllVisible}
+                    className="h-8 rounded-full px-3 text-[11px] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  >
+                    {allSelected ? "Limpar seleção" : "Selecionar todas"}
+                  </button>
+                ) : null}
+                {selectedCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleAddSelected()}
+                    disabled={bulkAdding || Boolean(addingId)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-[11px] font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
+                  >
+                    {bulkAdding ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    Adicionar {selectedCount}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {activeQueue.items.length > 0 ? (
+              <div>
+                <div className="hidden grid-cols-[28px_28px_40px_minmax(180px,1.2fr)_minmax(150px,1fr)_80px_48px_auto] items-center gap-3 border-b border-border/60 px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground tablet:grid">
+                  <span />
+                  <span className="text-center">#</span>
+                  <span />
+                  <span>Faixa</span>
+                  <span>Motivo</span>
+                  <span className="text-right">Chart</span>
+                  <span className="text-center">Fit</span>
+                  <span className="text-right">Ação</span>
                 </div>
-              );
-            })}
+                {activeQueue.items.map(renderDecisionRow)}
+              </div>
+            ) : (
+              <div className="px-4 py-10 text-center text-xs leading-5 text-muted-foreground">
+                Nenhuma faixa com aderência forte e risco controlado neste
+                mercado agora.
+              </div>
+            )}
           </div>
         ) : !loadingSuggestions ? (
-          <div className="px-5 py-10 text-center text-sm text-white/45">
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             <Music2 className="mx-auto mb-2 h-5 w-5" />A inteligência ainda não
             pôde montar sugestões para esta playlist.
           </div>
         ) : null}
 
         {suggestions ? (
-          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.07] px-5 py-3 text-[10px] text-white/40">
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-2.5 text-[10px] text-muted-foreground">
             <span>
               {suggestions.summary.compatibleCandidates} compatíveis entre{" "}
               {suggestions.summary.candidatesEvaluated} candidatas avaliadas

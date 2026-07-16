@@ -29,6 +29,12 @@ function normalizePopularity(value: number) {
   return Math.min(100, Math.round(value));
 }
 
+export function shouldRefreshSpotifyPopularity(
+  track: Pick<SpotifyPopularityCacheTrack, "popularity" | "popularitySource">,
+) {
+  return track.popularity <= 0 || track.popularitySource !== "spotify";
+}
+
 export function buildSpotifyPopularityCacheRows(
   tracks: SpotifyPopularityCacheTrack[],
   capturedAt = new Date(),

@@ -12,6 +12,7 @@ function candidate({
   movement7d = 20,
   action = "add_now",
   opportunityScore = 78,
+  genreProfile,
 }) {
   return {
     id,
@@ -47,6 +48,7 @@ function candidate({
       crossoverScore: 0,
       opportunityScore,
     },
+    genreProfile,
   };
 }
 
@@ -148,4 +150,63 @@ test("uses artist affinity when the candidate genre is not classified", () => {
   assert.equal(result.markets.BR.items.length, 1);
   assert.equal(result.markets.BR.items[0].playlistFitScore >= 70, true);
   assert.match(result.markets.BR.items[0].explanation, /já presente/);
+});
+
+test("prioritizes enriched genre evidence over a raw candidate-pool duplicate", () => {
+  const data = intelligence();
+  const popId = "GGGGGGGGGGGGGGGGGGGGGG";
+  const funkId = "HHHHHHHHHHHHHHHHHHHHHH";
+  const rawPop = candidate({
+    id: popId,
+    name: "Faixa sem pista textual",
+    artists: "Artista Global",
+    country: "GLOBAL",
+  });
+  const profiledPop = candidate({
+    id: popId,
+    name: rawPop.name,
+    artists: rawPop.artists,
+    country: "GLOBAL",
+    genreProfile: {
+      primaryGenre: "pop_global",
+      genreConfidence: 86,
+      confidenceLabel: "alta",
+      manualOverride: false,
+      label: "Pop Global",
+    },
+  });
+  const profiledFunk = candidate({
+    id: funkId,
+    name: "Outra faixa sem pista textual",
+    artists: "Artista Novo",
+    country: "BR",
+    genreProfile: {
+      primaryGenre: "funk",
+      genreConfidence: 82,
+      confidenceLabel: "alta",
+      manualOverride: false,
+      label: "Funk",
+    },
+  });
+
+  data.candidatePool.GLOBAL = [rawPop];
+  data.markets.GLOBAL.watch = [profiledPop];
+  data.markets.GLOBAL.nextBestOpportunity = profiledPop;
+  data.markets.BR.addNow = [profiledFunk];
+  data.markets.BR.nextBestOpportunity = profiledFunk;
+
+  const result = buildPlaylistSuggestionIntelligence({
+    playlist: {
+      name: "FUNK 2027",
+      description: "Funk brasileiro em alta",
+      tracks: [],
+    },
+    intelligence: data,
+  });
+
+  assert.deepEqual(
+    result.markets.BR.items.map((track) => track.id),
+    [funkId],
+  );
+  assert.equal(result.markets.GLOBAL.items.length, 0);
 });

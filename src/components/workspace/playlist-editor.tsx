@@ -46,7 +46,6 @@ type ChartData = {
 
 type PopularityReading = {
   value: number;
-  source: "spotify" | "snapshot";
   label: string;
 };
 
@@ -250,10 +249,9 @@ function getPopularityReading(
   if (track.popularity > 0) {
     return {
       value: clampScore(track.popularity),
-      source: track.popularitySource === "snapshot" ? "snapshot" : "spotify",
       label:
         track.popularitySource === "snapshot"
-          ? "Última popularidade salva"
+          ? "Popularidade Spotify — última leitura oficial disponível"
           : "Popularidade Spotify",
     };
   }
@@ -1347,16 +1345,9 @@ export default function PlaylistEditor({
                             }}
                           />
                         </div>
-                        <div className="flex min-w-0 flex-col">
-                          <span className="text-sm font-medium tabular-nums">
-                            {popularityReading?.value ?? "—"}
-                          </span>
-                          {popularityReading?.source === "snapshot" ? (
-                            <span className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
-                              histórico
-                            </span>
-                          ) : null}
-                        </div>
+                        <span className="text-sm font-medium tabular-nums">
+                          {popularityReading?.value ?? "—"}
+                        </span>
                       </div>
                     </td>
 
