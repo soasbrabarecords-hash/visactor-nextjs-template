@@ -71,6 +71,13 @@ test("enriches profiles that only contain the old internal fallback", () => {
   );
   assert.equal(
     shouldEnrichSpotifyChartGenreProfile(storedProfile(), now),
+    true,
+  );
+  assert.equal(
+    shouldEnrichSpotifyChartGenreProfile(
+      storedProfile({ source: "deezer_catalog" }),
+      now,
+    ),
     false,
   );
   assert.equal(

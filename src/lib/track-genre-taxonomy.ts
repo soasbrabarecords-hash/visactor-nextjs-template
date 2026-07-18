@@ -19,6 +19,8 @@ const SOURCE_LABELS: Record<TrackGenreSourceId, string> = {
   musicbrainz: "MusicBrainz",
   lastfm_track: "Last.fm track tags",
   lastfm_artist: "Last.fm artist tags",
+  deezer_catalog: "Deezer track catalog",
+  apple_catalog: "Apple track catalog",
   workspace_context: "Contexto do workspace",
   internal_taxonomy: "Taxonomia interna",
 };
@@ -210,6 +212,8 @@ const DEFAULT_WEIGHTS: Record<TrackGenreSourceId, number> = {
   manual_override: 1000,
   musicbrainz: 34,
   lastfm_track: 32,
+  deezer_catalog: 30,
+  apple_catalog: 28,
   spotify_artist_genres: 26,
   lastfm_artist: 24,
   workspace_context: 20,

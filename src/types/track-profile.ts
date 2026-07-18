@@ -23,6 +23,8 @@ export type TrackGenreSourceId =
   | "musicbrainz"
   | "lastfm_track"
   | "lastfm_artist"
+  | "deezer_catalog"
+  | "apple_catalog"
   | "workspace_context"
   | "internal_taxonomy";
 

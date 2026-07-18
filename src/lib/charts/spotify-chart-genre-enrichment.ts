@@ -18,7 +18,10 @@ const EXTERNAL_SOURCE_IDS = new Set([
   "musicbrainz",
   "lastfm_track",
   "lastfm_artist",
+  "deezer_catalog",
+  "apple_catalog",
 ]);
+const CURRENT_ENRICHMENT_SOURCE_ID = "deezer_catalog";
 
 type ChartCountry = (typeof CHART_COUNTRIES)[number];
 
@@ -80,6 +83,14 @@ export function shouldEnrichSpotifyChartGenreProfile(
   retryDays = SPOTIFY_CHART_GENRE_ENRICHMENT_RETRY_DAYS,
 ) {
   if (!profile || !hasAutomaticEnrichmentAttempt(profile.genre_sources)) {
+    return true;
+  }
+
+  if (
+    !(profile.genre_sources ?? []).some(
+      (item) => item.id === CURRENT_ENRICHMENT_SOURCE_ID,
+    )
+  ) {
     return true;
   }
 
@@ -290,6 +301,7 @@ export async function processSpotifyChartGenreCandidates(
     success: boolean;
     error?: string;
   }> = [];
+  const sourceStatusCounts: Record<string, number> = {};
   let nextIndex = 0;
 
   async function worker() {
@@ -300,6 +312,10 @@ export async function processSpotifyChartGenreCandidates(
 
       try {
         const profile = await enrich(candidate);
+        for (const item of profile.genreSources) {
+          const key = `${item.id}:${item.status}`;
+          sourceStatusCounts[key] = (sourceStatusCounts[key] ?? 0) + 1;
+        }
         results.push({
           spotifyTrackId: candidate.spotifyTrackId,
           primaryGenre: profile.primaryGenre,
@@ -340,6 +356,7 @@ export async function processSpotifyChartGenreCandidates(
     failed: results.filter((result) => !result.success).length,
     stoppedForTimeBudget: nextIndex < selected.length,
     durationMs: now() - startedAt,
+    sourceStatusCounts,
     results,
   };
 }

@@ -63,6 +63,29 @@ export async function GET(request: Request) {
           remainingBudgetMs,
         };
 
+  process.stdout.write(
+    `[spotify-charts:ingest] ${JSON.stringify({
+      genresOnly,
+      ingestionSuccess: ingestion?.success ?? null,
+      genreEnrichment:
+        "processed" in genreEnrichment
+          ? {
+              eligible: genreEnrichment.eligible,
+              selected: genreEnrichment.selected,
+              processed: genreEnrichment.processed,
+              classified: genreEnrichment.classified,
+              unknown: genreEnrichment.unknown,
+              failed: genreEnrichment.failed,
+              remaining: genreEnrichment.remaining,
+              stoppedForTimeBudget: genreEnrichment.stoppedForTimeBudget,
+              durationMs: genreEnrichment.durationMs,
+              sourceStatusCounts: genreEnrichment.sourceStatusCounts,
+            }
+          : genreEnrichment,
+      durationMs: Date.now() - startedAt,
+    })}\n`,
+  );
+
   return NextResponse.json({
     success: ingestion?.success ?? true,
     genresOnly,

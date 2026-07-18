@@ -1,4 +1,5 @@
 import "server-only";
+import { getSpotifyChartsServiceAccessToken } from "@/lib/charts/spotify-chart-service-auth";
 import {
   fetchSpotifyEditablePlaylist,
   withSpotifyToken,
@@ -8,6 +9,7 @@ import {
   classifyTrackGenre,
   confidenceLabel,
   createGenreEvidence,
+  normalizeGenreText,
 } from "@/lib/track-genre-taxonomy";
 import type {
   MusicIntelligenceMarketQueue,
@@ -100,6 +102,33 @@ type LastFmPayload = {
   message?: string;
 };
 
+type DeezerSearchPayload = {
+  data?: Array<{
+    title?: string;
+    title_short?: string;
+    isrc?: string;
+    artist?: { name?: string };
+    album?: { id?: number };
+  }>;
+  error?: { message?: string };
+};
+
+type DeezerAlbumPayload = {
+  genres?: {
+    data?: Array<{ name?: string }>;
+  };
+  error?: { message?: string };
+};
+
+type AppleSearchPayload = {
+  results?: Array<{
+    kind?: string;
+    trackName?: string;
+    artistName?: string;
+    primaryGenreName?: string;
+  }>;
+};
+
 export type SaveGenreOverrideInput = {
   workspaceId: string;
   userId: string;
@@ -121,12 +150,17 @@ const OVERRIDE_SELECT =
   "entity_type,entity_id,primary_genre,secondary_genres,subgenres,mood_tags,energy_tags,language_signal,country_signal,note,updated_at";
 const MUSICBRAINZ_BASE_URL = "https://musicbrainz.org/ws/2";
 const LASTFM_BASE_URL = "https://ws.audioscrobbler.com/2.0/";
+const DEEZER_BASE_URL = "https://api.deezer.com";
+const APPLE_SEARCH_URL = "https://itunes.apple.com/search";
 const MUSICBRAINZ_MIN_INTERVAL_MS = 1100;
+const APPLE_MIN_INTERVAL_MS = 3100;
 const EXTERNAL_TIMEOUT_MS = 7000;
 const PROFILE_BATCH_SIZE = 100;
 
 let musicBrainzQueue: Promise<unknown> = Promise.resolve();
 let musicBrainzNextRequestAt = 0;
+let appleQueue: Promise<unknown> = Promise.resolve();
+let appleNextRequestAt = 0;
 
 function unique<T>(values: T[]) {
   return [...new Set(values)];
@@ -196,6 +230,22 @@ async function fetchMusicBrainzJson<T>(url: string): Promise<T> {
   return task;
 }
 
+async function fetchAppleJson<T>(url: string): Promise<T> {
+  const task = appleQueue.then(async () => {
+    const wait = Math.max(0, appleNextRequestAt - Date.now());
+    if (wait > 0) await sleep(wait);
+    try {
+      return await fetchJson<T>(url, {
+        headers: { Accept: "application/json" },
+      });
+    } finally {
+      appleNextRequestAt = Date.now() + APPLE_MIN_INTERVAL_MS;
+    }
+  });
+  appleQueue = task.catch(() => undefined);
+  return task;
+}
+
 function source(
   id: TrackGenreSource["id"],
   label: string,
@@ -248,7 +298,7 @@ function profileToRow(profile: TrackGenreProfile) {
     genre_confidence: profile.genreConfidence,
     genre_sources: profile.genreSources,
     genre_evidence: profile.genreEvidence,
-    enrichment_version: "v1",
+    enrichment_version: "v2",
     last_enriched_at: profile.lastEnrichedAt,
     updated_at: timestamp,
   };
@@ -357,9 +407,10 @@ async function persistProfiles(profiles: TrackGenreProfile[]) {
 
 async function loadSpotifyProfile(input: TrackProfileInput) {
   try {
-    const { data } = await withSpotifyToken(async (token) => {
+    const loadWithToken = async (token: string) => {
+      const market = input.chartCountry === "GLOBAL" ? "US" : "BR";
       const track = await fetchJson<SpotifyTrackPayload>(
-        `https://api.spotify.com/v1/tracks/${encodeURIComponent(input.spotifyTrackId)}?market=BR`,
+        `https://api.spotify.com/v1/tracks/${encodeURIComponent(input.spotifyTrackId)}?market=${market}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const artistIds = unique(
@@ -382,7 +433,16 @@ async function loadSpotifyProfile(input: TrackProfileInput) {
         );
       }
       return { track, artists };
-    });
+    };
+    let data: Awaited<ReturnType<typeof loadWithToken>>;
+
+    try {
+      data = await loadWithToken(await getSpotifyChartsServiceAccessToken());
+    } catch {
+      data = (await withSpotifyToken(async (token) => loadWithToken(token)))
+        .data;
+    }
+
     const artistGenres = unique(
       (data.artists ?? []).flatMap((artist) => artist.genres ?? []),
     );
@@ -418,6 +478,172 @@ async function loadSpotifyProfile(input: TrackProfileInput) {
         source("spotify_metadata", "Spotify metadata", "unavailable"),
         source("spotify_artist_genres", "Spotify artist genres", "unavailable"),
       ],
+    };
+  }
+}
+
+function firstArtistName(input: TrackProfileInput) {
+  return input.artists?.split(",")[0]?.trim() || input.artists?.trim() || "";
+}
+
+function comparableTrackTitle(value: string | null | undefined) {
+  return normalizeGenreText(value ?? "")
+    .replace(
+      /\b(ao vivo|live|remaster(?:ed)?|radio edit|sped up|slowed|explicit)\b/g,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchesCatalogTrack(
+  input: TrackProfileInput,
+  candidateTitle: string | null | undefined,
+  candidateArtist: string | null | undefined,
+) {
+  const expectedTitle = comparableTrackTitle(input.name);
+  const actualTitle = comparableTrackTitle(candidateTitle);
+  const expectedArtist = normalizeGenreText(firstArtistName(input));
+  const actualArtist = normalizeGenreText(candidateArtist ?? "");
+  const titleMatches =
+    expectedTitle.length >= 4 &&
+    actualTitle.length >= 4 &&
+    (expectedTitle === actualTitle ||
+      expectedTitle.includes(actualTitle) ||
+      actualTitle.includes(expectedTitle));
+  const artistMatches =
+    expectedArtist.length >= 2 &&
+    actualArtist.length >= 2 &&
+    (expectedArtist.includes(actualArtist) ||
+      actualArtist.includes(expectedArtist));
+
+  return titleMatches && artistMatches;
+}
+
+async function loadDeezerEvidence(input: TrackProfileInput) {
+  try {
+    const firstArtist = firstArtistName(input);
+    if (!input.name || !firstArtist) {
+      return {
+        input,
+        evidence: null,
+        source: source("deezer_catalog", "Deezer track catalog", "empty"),
+      };
+    }
+
+    const searchParams = new URLSearchParams({
+      q: `track:"${input.name}" artist:"${firstArtist}"`,
+      limit: "5",
+    });
+    const payload = await fetchJson<DeezerSearchPayload>(
+      `${DEEZER_BASE_URL}/search?${searchParams.toString()}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (payload.error) {
+      throw new Error(payload.error.message ?? "Deezer search failed.");
+    }
+
+    const match = (payload.data ?? []).find((candidate) =>
+      matchesCatalogTrack(
+        input,
+        candidate.title ?? candidate.title_short,
+        candidate.artist?.name,
+      ),
+    );
+    if (!match) {
+      return {
+        input,
+        evidence: null,
+        source: source("deezer_catalog", "Deezer track catalog", "empty"),
+      };
+    }
+
+    const album = match.album?.id
+      ? await fetchJson<DeezerAlbumPayload>(
+          `${DEEZER_BASE_URL}/album/${encodeURIComponent(String(match.album.id))}`,
+          { headers: { Accept: "application/json" } },
+        )
+      : null;
+    if (album?.error) {
+      throw new Error(album.error.message ?? "Deezer album lookup failed.");
+    }
+
+    const tags = (album?.genres?.data ?? [])
+      .map((genre) => genre.name ?? "")
+      .filter(Boolean);
+    const evidence = createGenreEvidence({
+      source: "deezer_catalog",
+      tags,
+      detail: `Deezer encontrou a faixa exata ${match.title ?? input.name}${match.isrc ? ` pelo ISRC ${match.isrc}` : ""}.`,
+      external: true,
+    });
+
+    return {
+      input: {
+        ...input,
+        isrc: match.isrc?.trim().toUpperCase() || input.isrc,
+      },
+      evidence,
+      source: source(
+        "deezer_catalog",
+        "Deezer track catalog",
+        evidence ? "used" : "empty",
+      ),
+    };
+  } catch {
+    return {
+      input,
+      evidence: null,
+      source: source("deezer_catalog", "Deezer track catalog", "unavailable"),
+    };
+  }
+}
+
+async function loadAppleEvidence(input: TrackProfileInput) {
+  try {
+    const firstArtist = firstArtistName(input);
+    if (!input.name || !firstArtist) {
+      return {
+        evidence: null,
+        source: source("apple_catalog", "Apple track catalog", "empty"),
+      };
+    }
+
+    const searchParams = new URLSearchParams({
+      term: `${input.name} ${firstArtist}`,
+      country: input.chartCountry === "BR" ? "BR" : "US",
+      media: "music",
+      entity: "song",
+      limit: "10",
+    });
+    const payload = await fetchAppleJson<AppleSearchPayload>(
+      `${APPLE_SEARCH_URL}?${searchParams.toString()}`,
+    );
+    const match = (payload.results ?? []).find(
+      (candidate) =>
+        candidate.kind === "song" &&
+        matchesCatalogTrack(input, candidate.trackName, candidate.artistName),
+    );
+    const tags = match?.primaryGenreName ? [match.primaryGenreName] : [];
+    const evidence = createGenreEvidence({
+      source: "apple_catalog",
+      tags,
+      detail: `Apple encontrou a faixa exata ${match?.trackName ?? input.name}.`,
+      external: true,
+    });
+
+    return {
+      evidence,
+      source: source(
+        "apple_catalog",
+        "Apple track catalog",
+        evidence ? "used" : "empty",
+      ),
+    };
+  } catch {
+    return {
+      evidence: null,
+      source: source("apple_catalog", "Apple track catalog", "unavailable"),
     };
   }
 }
@@ -535,17 +761,27 @@ export async function enrichTrackProfile(
   options: { workspaceId?: string | null } = {},
 ): Promise<TrackGenreProfile> {
   const spotify = await loadSpotifyProfile(track);
-  const [musicBrainz, lastFm] = await Promise.all([
-    loadMusicBrainzEvidence(spotify.input),
-    loadLastFmEvidence(spotify.input),
+  const deezer = await loadDeezerEvidence(spotify.input);
+  const [musicBrainz, lastFm, apple] = await Promise.all([
+    loadMusicBrainzEvidence(deezer.input),
+    loadLastFmEvidence(deezer.input),
+    loadAppleEvidence(deezer.input),
   ]);
   const profile = classifyTrackGenre({
-    ...spotify.input,
+    ...deezer.input,
     evidence: [
       ...(musicBrainz.evidence ? [musicBrainz.evidence] : []),
       ...lastFm.evidence,
+      ...(deezer.evidence ? [deezer.evidence] : []),
+      ...(apple.evidence ? [apple.evidence] : []),
     ],
-    sources: [...spotify.sources, musicBrainz.source, ...lastFm.sources],
+    sources: [
+      ...spotify.sources,
+      deezer.source,
+      musicBrainz.source,
+      ...lastFm.sources,
+      apple.source,
+    ],
   });
   await persistProfiles([profile]);
   const overrides = await loadOverrides(options.workspaceId, [profile]);
