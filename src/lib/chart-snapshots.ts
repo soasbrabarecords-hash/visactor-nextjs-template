@@ -29,6 +29,9 @@ export type ChartSnapshotTrack = {
   streams: number | null;
   kworb_streams_24h: number | null;
   genre: string | null;
+  subgenres?: string[];
+  genre_confidence?: number | null;
+  genre_enriched?: boolean;
   image_url: string | null;
   created_at: string;
 };
@@ -592,6 +595,25 @@ export async function getSnapshotWithComparison(
     }
 
     const rawTracks = await getSnapshotTracks(snapshot.id);
+    const { getTrackGenreProfiles } =
+      await import("@/lib/track-profile-engine");
+    const genreProfiles = await getTrackGenreProfiles(
+      rawTracks.flatMap((track) =>
+        track.spotify_track_id
+          ? [
+              {
+                spotifyTrackId: track.spotify_track_id,
+                name: track.track_name,
+                artists: track.artist_name,
+                chartCountry:
+                  country.trim().toUpperCase() === "GLOBAL"
+                    ? ("GLOBAL" as const)
+                    : ("BR" as const),
+              },
+            ]
+          : [],
+      ),
+    ).catch(() => new Map());
     const supabase = await createClient();
     const trackIds = rawTracks
       .map((track) => track.spotify_track_id)
@@ -691,14 +713,28 @@ export async function getSnapshotWithComparison(
       }
     }
 
-    const currentTracks: ChartSnapshotTrack[] = rawTracks.map((track) => ({
-      ...track,
-      image_url:
-        track.image_url ??
-        (track.spotify_track_id
-          ? imageUrlMap.get(track.spotify_track_id) ?? null
-          : null),
-    }));
+    const currentTracks: ChartSnapshotTrack[] = rawTracks.map((track) => {
+      const profile = track.spotify_track_id
+        ? genreProfiles.get(track.spotify_track_id)
+        : undefined;
+      const automaticGenre =
+        profile && profile.primaryGenre !== "desconhecido"
+          ? profile.primaryGenre
+          : null;
+
+      return {
+        ...track,
+        genre: automaticGenre ?? track.genre,
+        subgenres: profile?.subgenres ?? [],
+        genre_confidence: profile?.genreConfidence ?? null,
+        genre_enriched: (profile?.genreConfidence ?? 0) >= 60,
+        image_url:
+          track.image_url ??
+          (track.spotify_track_id
+            ? (imageUrlMap.get(track.spotify_track_id) ?? null)
+            : null),
+      };
+    });
 
     const { data: previousSnapshot } = await supabase
       .from("chart_snapshots")

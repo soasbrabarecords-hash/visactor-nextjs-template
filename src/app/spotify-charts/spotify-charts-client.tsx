@@ -20,6 +20,10 @@ import type {
   ChartSnapshotTrackWithMovement,
 } from "@/lib/chart-snapshots";
 import type { SpotifyChartRun } from "@/lib/charts/spotify-chart-runs";
+import {
+  TRACK_PROFILE_GENRE_LABELS,
+  isTrackProfileGenre,
+} from "@/types/track-profile";
 
 type SnapshotData = {
   snapshot: ChartSnapshot | null;
@@ -151,6 +155,47 @@ function StreamsCell({
       ) : (
         <span className="text-[10px] text-muted-foreground">Sem hist.</span>
       )}
+    </span>
+  );
+}
+
+function GenreCell({
+  genre,
+  subgenres,
+  confidence,
+  enriched,
+}: {
+  genre: string | null;
+  subgenres?: string[];
+  confidence?: number | null;
+  enriched?: boolean;
+}) {
+  const label =
+    genre && isTrackProfileGenre(genre)
+      ? TRACK_PROFILE_GENRE_LABELS[genre]
+      : genre?.trim() || "Em análise";
+  const subgenre = subgenres?.[0]?.trim() || null;
+  const confidenceText =
+    confidence !== null && confidence !== undefined
+      ? `${confidence}% de confiança`
+      : "Aguardando enriquecimento automático";
+
+  return (
+    <span
+      className="inline-flex max-w-full flex-col items-start gap-1"
+      title={`${enriched ? "Classificação automática" : "Classificação provisória"} · ${confidenceText}`}
+    >
+      <StatusBadge
+        tone={enriched ? "purple" : genre ? "slate" : "blue"}
+        className="max-w-full truncate normal-case tracking-[0.04em]"
+      >
+        {label}
+      </StatusBadge>
+      {subgenre ? (
+        <span className="max-w-full truncate text-[10px] text-muted-foreground">
+          {subgenre}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -623,7 +668,7 @@ export default function SpotifyChartsClient({
                   <col className="w-[76px]" />
                   <col />
                   <col className="w-[126px]" />
-                  <col className="hidden w-[136px] laptop:table-column" />
+                  <col className="hidden w-[152px] laptop:table-column" />
                   <col className="w-16" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-card">
@@ -686,16 +731,12 @@ export default function SpotifyChartsClient({
                         />
                       </td>
                       <td className="hidden px-3 py-3 align-top laptop:table-cell">
-                        {track.genre ? (
-                          <StatusBadge
-                            tone="slate"
-                            className="max-w-[120px] truncate normal-case tracking-[0.04em]"
-                          >
-                            {track.genre}
-                          </StatusBadge>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <GenreCell
+                          genre={track.genre}
+                          subgenres={track.subgenres}
+                          confidence={track.genre_confidence}
+                          enriched={track.genre_enriched}
+                        />
                       </td>
                       <td className="px-2 py-3 text-center align-top">
                         {track.spotify_track_id ? (

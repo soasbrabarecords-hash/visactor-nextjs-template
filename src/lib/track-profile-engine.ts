@@ -65,12 +65,10 @@ type SpotifyTrackPayload = {
   album?: { name?: string };
 };
 
-type SpotifyArtistsPayload = {
-  artists?: Array<{
-    id?: string;
-    name?: string;
-    genres?: string[];
-  } | null>;
+type SpotifyArtistPayload = {
+  id?: string;
+  name?: string;
+  genres?: string[];
 };
 
 type MusicBrainzTag = { name?: string; count?: number };
@@ -367,18 +365,26 @@ async function loadSpotifyProfile(input: TrackProfileInput) {
       const artistIds = unique(
         (track.artists ?? []).map((artist) => artist.id ?? "").filter(Boolean),
       );
-      let artists: SpotifyArtistsPayload["artists"] = [];
+      let artists: SpotifyArtistPayload[] = [];
       if (artistIds.length > 0) {
-        const payload = await fetchJson<SpotifyArtistsPayload>(
-          `https://api.spotify.com/v1/artists?ids=${encodeURIComponent(artistIds.slice(0, 50).join(","))}`,
-          { headers: { Authorization: `Bearer ${token}` } },
+        const artistResults = await Promise.allSettled(
+          artistIds
+            .slice(0, 10)
+            .map((artistId) =>
+              fetchJson<SpotifyArtistPayload>(
+                `https://api.spotify.com/v1/artists/${encodeURIComponent(artistId)}`,
+                { headers: { Authorization: `Bearer ${token}` } },
+              ),
+            ),
         );
-        artists = payload.artists ?? [];
+        artists = artistResults.flatMap((result) =>
+          result.status === "fulfilled" ? [result.value] : [],
+        );
       }
       return { track, artists };
     });
     const artistGenres = unique(
-      (data.artists ?? []).flatMap((artist) => artist?.genres ?? []),
+      (data.artists ?? []).flatMap((artist) => artist.genres ?? []),
     );
     return {
       input: {
@@ -418,14 +424,9 @@ async function loadSpotifyProfile(input: TrackProfileInput) {
 
 function musicBrainzTags(recording: MusicBrainzRecording | undefined) {
   if (!recording) return [];
-  const artistTags = (recording["artist-credit"] ?? []).flatMap((credit) => [
-    ...(credit.artist?.genres ?? []).map((genre) => genre.name ?? ""),
-    ...(credit.artist?.tags ?? []).map((tag) => tag.name ?? ""),
-  ]);
   return unique([
     ...(recording.genres ?? []).map((genre) => genre.name ?? ""),
     ...(recording.tags ?? []).map((tag) => tag.name ?? ""),
-    ...artistTags,
   ]).filter(Boolean);
 }
 

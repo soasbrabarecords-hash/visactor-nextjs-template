@@ -43,6 +43,19 @@ test("assigns medium confidence to external evidence plus workspace context", ()
   assert.ok(profile.genreConfidence >= 60 && profile.genreConfidence < 80);
 });
 
+test("keeps artist-only genres provisional at track level", () => {
+  const profile = classifyTrackGenre({
+    spotifyTrackId: "2734567890123456789012",
+    name: "Faixa crossover",
+    artists: "Artista multigênero",
+    artistGenres: ["sertanejo"],
+  });
+
+  assert.equal(profile.primaryGenre, "sertanejo");
+  assert.equal(profile.confidenceLabel, "baixa");
+  assert.ok(profile.genreConfidence < 60);
+});
+
 test("keeps textual-only inference low and explainable", () => {
   const profile = classifyTrackGenre({
     spotifyTrackId: "3234567890123456789012",

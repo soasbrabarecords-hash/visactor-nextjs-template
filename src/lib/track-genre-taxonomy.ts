@@ -402,13 +402,20 @@ export function classifyTrackGenre(
       .map((item) => item.source),
   ).size;
   const hasExternal = primaryEvidence.some((item) => item.external);
+  const hasTrackLevelExternal = primaryEvidence.some(
+    (item) => item.source === "musicbrainz" || item.source === "lastfm_track",
+  );
   const hasContext = primarySources.has("workspace_context");
   let genreConfidence = 15;
   if (manual) genreConfidence = 100;
-  else if (reliableAgreement >= 2) genreConfidence = 88;
-  else if (hasExternal && hasContext) genreConfidence = 76;
-  else if (hasExternal && primarySources.size >= 2) genreConfidence = 68;
-  else if (hasExternal) genreConfidence = 60;
+  else if (hasTrackLevelExternal && reliableAgreement >= 2)
+    genreConfidence = 88;
+  else if (hasTrackLevelExternal && hasContext) genreConfidence = 76;
+  else if (hasTrackLevelExternal && primarySources.size >= 2)
+    genreConfidence = 68;
+  else if (hasTrackLevelExternal) genreConfidence = 60;
+  else if (hasExternal && reliableAgreement >= 2) genreConfidence = 56;
+  else if (hasExternal) genreConfidence = 48;
   else if (hasContext && primarySources.size >= 2) genreConfidence = 52;
   else if (primaryGenre !== "desconhecido") genreConfidence = 38;
 
