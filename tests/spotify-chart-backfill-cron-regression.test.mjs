@@ -10,7 +10,7 @@ test("the daily ingest and historical worker crons remain configured", async () 
   assert.deepEqual(config.crons, [
     {
       path: "/api/jobs/spotify-charts/ingest",
-      schedule: "0 10 * * *",
+      schedule: "0 22 * * *",
     },
     {
       path: "/api/cron/spotify-charts-backfill",
