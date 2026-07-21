@@ -10,6 +10,7 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/spotify/auth") ||
     pathname === "/api/import/spotify-charts" ||
+    pathname === "/api/cron/playlists-ai-learning" ||
     pathname === "/api/cron/spotify-charts-backfill" ||
     pathname === "/api/jobs/spotify-charts/ingest" ||
     pathname === "/api/jobs/spotify-charts/backfill" ||
@@ -78,6 +79,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],

@@ -3,6 +3,7 @@ import { mock, test } from "node:test";
 
 let ingestionCalls = 0;
 let enrichmentInput = null;
+let maintenanceCalls = 0;
 
 mock.module("@/lib/charts/spotify-chart-daily-ingestion", {
   exports: {
@@ -24,6 +25,15 @@ mock.module("@/lib/charts/spotify-chart-genre-enrichment", {
   },
 });
 
+mock.module("@/lib/playlists-ai-python-client", {
+  exports: {
+    runPlaylistAiMaintenance: async () => {
+      maintenanceCalls += 1;
+      return { ok: true, value: { promoted: 0 } };
+    },
+  },
+});
+
 const route =
   await import("../src/app/api/jobs/spotify-charts/ingest/route.ts");
 
@@ -31,6 +41,7 @@ test.beforeEach(() => {
   process.env.CRON_SECRET = "test-secret";
   ingestionCalls = 0;
   enrichmentInput = null;
+  maintenanceCalls = 0;
 });
 
 test("keeps genre enrichment behind the existing cron secret", async () => {
@@ -43,6 +54,7 @@ test("keeps genre enrichment behind the existing cron secret", async () => {
   assert.equal(response.status, 401);
   assert.equal(ingestionCalls, 0);
   assert.equal(enrichmentInput, null);
+  assert.equal(maintenanceCalls, 0);
 });
 
 test("supports a protected genre-only drain without rerunning chart ingestion", async () => {
@@ -57,6 +69,7 @@ test("supports a protected genre-only drain without rerunning chart ingestion", 
   assert.equal(response.status, 200);
   assert.equal(payload.genresOnly, true);
   assert.equal(ingestionCalls, 0);
+  assert.equal(maintenanceCalls, 0);
   assert.equal(enrichmentInput.limit, 80);
   assert.equal(payload.genreEnrichment.classified, 80);
 });
@@ -71,6 +84,11 @@ test("runs genre enrichment after the normal daily repair", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(ingestionCalls, 1);
+  assert.equal(maintenanceCalls, 1);
   assert.equal(enrichmentInput.limit, 60);
   assert.equal(payload.success, true);
+  assert.deepEqual(payload.playlistsAiLearning, {
+    ok: true,
+    value: { promoted: 0 },
+  });
 });

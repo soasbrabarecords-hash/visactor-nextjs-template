@@ -50,7 +50,8 @@ export type DetectedPlaylistsAiIntent = {
   playlistReference: string | null;
   trackQuery: string | null;
   excludeWorkspaceTracks: boolean;
-  mode: "opportunity" | "heat" | "riser" | "review" | "historical";
+  mode:
+    "opportunity" | "discovery" | "heat" | "riser" | "review" | "historical";
   windowDays: number | null;
   genre: TrackProfileGenre | null;
   genres: TrackProfileGenre[];
@@ -262,6 +263,16 @@ export function classifyPlaylistAiIntent(
   const rising = /maiores? subidas|subindo|crescendo|acelerando/.test(
     normalized,
   );
+  const discovery =
+    /descobrir|descoberta|novidades?|novas?|emergentes?|apostas?|lancamentos?|pouco saturad|baixa saturacao/.test(
+      normalized,
+    );
+  const explicitDiscoveryRequest =
+    /descobrir|novidades?|novas?|emergentes?|apostas?|lancamentos?|pouco saturad|baixa saturacao/.test(
+      normalized,
+    ) ||
+    (/descoberta/.test(normalized) &&
+      /musicas|faixas|lista|radar|procura|buscar|encontrar/.test(normalized));
   const base = {
     market,
     limit: inferLimit(prompt),
@@ -271,14 +282,16 @@ export function classifyPlaylistAiIntent(
     excludeWorkspaceTracks:
       /ainda nao|nao estao|fora das|minhas playlists|nenhuma playlist/.test(
         normalized,
-      ),
-    mode: rising
-      ? ("riser" as const)
-      : historical
-        ? ("historical" as const)
-        : /quentes|bombando|mais fortes|forca atual/.test(normalized)
-          ? ("heat" as const)
-          : ("opportunity" as const),
+      ) || discovery,
+    mode: discovery
+      ? ("discovery" as const)
+      : rising
+        ? ("riser" as const)
+        : historical
+          ? ("historical" as const)
+          : /quentes|bombando|mais fortes|forca atual/.test(normalized)
+            ? ("heat" as const)
+            : ("opportunity" as const),
     windowDays,
     genre: genres[0] ?? null,
     genres,
@@ -334,7 +347,8 @@ export function classifyPlaylistAiIntent(
   if (
     /chart|quentes|bombando|subindo|oportunidades|entradas|crossover|br hoje|global/.test(
       normalized,
-    )
+    ) ||
+    explicitDiscoveryRequest
   ) {
     return { ...base, name: "chart_opportunities" };
   }
@@ -448,7 +462,14 @@ async function planPlaylistAiRequest({
               },
               mode: {
                 type: "string",
-                enum: ["opportunity", "heat", "riser", "review", "historical"],
+                enum: [
+                  "opportunity",
+                  "discovery",
+                  "heat",
+                  "riser",
+                  "review",
+                  "historical",
+                ],
               },
               windowDays: {
                 anyOf: [
@@ -712,9 +733,13 @@ async function answerChartOpportunities({
   const text = chart.cards.length
     ? chart.historical && chart.windowDays
       ? `Pesquisei todos os snapshots diários de ${chart.windowStartDate ?? "início da janela"} a ${chart.latestChartDate ?? "hoje"}. Estas são as ${chart.cards.length} faixas${requestedGenre ? ` classificadas como ${requestedGenre}` : ""} com maior volume acumulado no Top 200 ${marketLabel(intent.market)} em ${chart.windowDays} dias${exclusions}${historyExclusion}. Não misturei outros gêneros para completar a lista.`
-      : `Estas são as ${chart.cards.length} decisões mais fortes de ${marketLabel(intent.market)} agora${exclusions}${historyExclusion}. A ordem considera força atual, movimento, frescor, estabilidade e risco de saturação.`
+      : intent.mode === "discovery"
+        ? `Encontrei ${chart.cards.length} ${chart.cards.length === 1 ? "descoberta" : "descobertas"}${requestedGenre ? ` de ${requestedGenre}` : ""} no radar ${marketLabel(intent.market)}${exclusions}${historyExclusion}. A ordem prioriza entradas novas ou recentes nos charts, baixo risco de saturação e força de crescimento. “Nova” aqui significa nova no chart, não necessariamente um lançamento.`
+        : `Estas são as ${chart.cards.length} decisões mais fortes de ${marketLabel(intent.market)} agora${exclusions}${historyExclusion}. A ordem considera força atual, movimento, frescor, estabilidade e risco de saturação.`
     : requestedGenre
-      ? `Não encontrei faixas classificadas como ${requestedGenre} com evidência suficiente no Top 200 ${marketLabel(intent.market)} para a janela pedida. Mantive a resposta vazia para não misturar outros gêneros.`
+      ? intent.mode === "discovery"
+        ? `Não encontrei descobertas de ${requestedGenre} no Top 200 ${marketLabel(intent.market)} que combinassem entrada recente, baixo risco de saturação e ausência nas playlists verificadas. Mantive a resposta vazia para não completar com faixas maduras ou de outro gênero.`
+        : `Não encontrei faixas classificadas como ${requestedGenre} com evidência suficiente no Top 200 ${marketLabel(intent.market)} para a janela pedida. Mantive a resposta vazia para não misturar outros gêneros.`
       : `Não encontrei oportunidades de ${marketLabel(intent.market)} que atendam aos filtros com dados suficientes agora.`;
   const dataSources = [...buildChartSources(chart)];
   if (intent.excludeWorkspaceTracks) {
@@ -814,7 +839,7 @@ async function answerPlaylistRecommendations({
     maxWindow: result.maxWindow,
     status: result.cards.length ? "ready" : "partial",
   };
-  return response("playlist_recommendations", {
+  const recommendationResponse = response("playlist_recommendations", {
     text: result.cards.length
       ? `Cruzei o repertório real de ${result.playlist.name} com os charts BR e Global. Estas ${result.cards.length} faixas ainda não estão nela e tiveram o melhor equilíbrio entre oportunidade e aderência ao perfil ${GENRE_LABEL[result.playlistGenre]}.`
       : (result.message ??
@@ -851,6 +876,15 @@ async function answerPlaylistRecommendations({
       ...buildChartSources(chartResult),
     ],
   });
+  return result.ranking
+    ? {
+        ...recommendationResponse,
+        meta: {
+          ...recommendationResponse.meta,
+          ranking: result.ranking,
+        },
+      }
+    : recommendationResponse;
 }
 
 async function answerTrackPresence({
@@ -1290,7 +1324,14 @@ const PLAYLISTS_AI_FUNCTIONS = [
         },
         mode: {
           type: "string",
-          enum: ["opportunity", "heat", "riser", "review", "historical"],
+          enum: [
+            "opportunity",
+            "discovery",
+            "heat",
+            "riser",
+            "review",
+            "historical",
+          ],
         },
         windowDays: {
           anyOf: [
@@ -1414,6 +1455,7 @@ function agentIntent(
       : base.market;
   const mode =
     values.mode === "opportunity" ||
+    values.mode === "discovery" ||
     values.mode === "heat" ||
     values.mode === "riser" ||
     values.mode === "review" ||
@@ -1506,7 +1548,7 @@ function evidenceLedText({
   intent: DetectedPlaylistsAiIntent;
   conversation: PlaylistsAiConversationMessage[];
 }) {
-  if (result.cards.length === 0) return text || result.text;
+  if (result.cards.length === 0) return result.text;
   const recentAssistant = conversation
     .filter((item) => item.role === "assistant")
     .slice(-1)[0]?.content;
@@ -1750,6 +1792,7 @@ async function requestAiGatewayAgent(
     },
     body: JSON.stringify(body),
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 600);
@@ -1871,7 +1914,8 @@ Regras de trabalho:
 - Use as tools para qualquer afirmação sobre músicas, charts, histórico, gênero, popularidade ou playlists. Nunca responda uma consulta concreta só com memória ou texto genérico.
 - A mensagem mais recente corrige as anteriores. Se o usuário mudar para funk, descarte o gênero anterior. Se pedir mais faixas ou disser para não repetir, preserve o restante do contexto e consulte novamente.
 - Respeite exatamente mercado, gênero, janela e quantidade. O limite por consulta é 50. Se a base retornar menos, diga quantas encontrou e não complete com outro gênero.
-- Para períodos como 7, 30 ou 180 dias, use modo historical. Para "bombando hoje", use heat. Para crescimento, use riser.
+- Para períodos como 7, 30 ou 180 dias, use modo historical. Para "bombando hoje", use heat. Para crescimento, use riser. Para descobrir faixas novas nos charts, emergentes ou pouco saturadas, use discovery e exclua as músicas já presentes no workspace.
+- No modo discovery, "nova" significa entrada recente nos charts, não data de lançamento. Nunca apresente esse sinal como lançamento sem uma fonte de catálogo que confirme a data.
 - Se o usuário perguntar como a resposta anterior foi pesquisada, calculada ou filtrada, explique usando somente as evidências já presentes na conversa. Nesse caso não repita uma tool apenas para explicar o método.
 - Só faça uma pergunta quando faltar uma identidade indispensável, como o nome da playlist ou da música. Faça uma única pergunta específica, nunca um questionário.
 - Depois das tools, responda em no máximo dois parágrafos curtos e 110 palavras. Comece pela conclusão, cite de duas a quatro faixas quando houver cards e explique apenas o critério decisivo.
@@ -1884,7 +1928,7 @@ Regras de trabalho:
         parallel_tool_calls: false,
         reasoning: { effort: "medium" },
         max_output_tokens: 700,
-        store: true,
+        store: false,
       });
       finalPayload = payload;
       const output = recordValue(payload).output;
@@ -2145,7 +2189,9 @@ Regras:
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`Playlists IA grounded response fallback: ${message}\n`);
+    process.stderr.write(
+      `Playlists IA grounded response fallback: ${message}\n`,
+    );
     if (isAiGatewayRateLimitError(error) && !requestOverride) {
       aiGatewayRateLimitedUntil = Date.now() + 90_000;
     }
@@ -2187,7 +2233,7 @@ export async function runPlaylistsAiAgent(
     intent: fallbackIntent.name,
     playlistReference: fallbackIntent.playlistReference,
   });
-  if (polish && agentRequest) {
+  if (polish) {
     const agentResult = await runToolCallingAgent({
       prompt: message,
       conversation: messages,
@@ -2197,7 +2243,12 @@ export async function runPlaylistsAiAgent(
       tools,
       requestOverride: agentRequest,
     });
-    if (agentResult) return agentResult;
+    if (
+      agentResult &&
+      (agentRequest || agentResult.meta.execution !== "unavailable")
+    ) {
+      return agentResult;
+    }
   }
 
   const planner =

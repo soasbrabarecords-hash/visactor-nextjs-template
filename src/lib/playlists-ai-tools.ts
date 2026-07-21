@@ -5,6 +5,7 @@ import {
   detectPlaylistGenre,
 } from "@/lib/genre-detection";
 import { getMusicIntelligence } from "@/lib/music-intelligence";
+import { rankPlaylistCandidates } from "@/lib/playlists-ai-python-client";
 import {
   type SpotifyAccountPlaylist,
   type SpotifyEditablePlaylist,
@@ -22,6 +23,7 @@ import type {
 } from "@/types/music-intelligence";
 import type {
   PlaylistsAiCurationMarket,
+  PlaylistsAiRankingMetadata,
   PlaylistsAiTrackCard,
 } from "@/types/playlists-ai";
 import {
@@ -92,6 +94,7 @@ export type PlaylistRecommendationToolResult = {
   latestChartDate: string | null;
   maxWindow: number;
   message: string | null;
+  ranking?: PlaylistsAiRankingMetadata;
 };
 
 type SpotifySearchPayload = {
@@ -752,7 +755,8 @@ export async function getChartOpportunities({
   market?: PlaylistsAiCurationMarket;
   limit?: number;
   excludeTrackIds?: ReadonlySet<string>;
-  mode?: "opportunity" | "heat" | "riser" | "review" | "historical";
+  mode?:
+    "opportunity" | "discovery" | "heat" | "riser" | "review" | "historical";
   windowDays?: number;
   genre?: TrackProfileGenre | null;
   genres?: TrackProfileGenre[];
@@ -799,10 +803,27 @@ export async function getChartOpportunities({
   }
   const pool = [...uniqueTracks.values()];
 
-  const filtered = pool.filter((track) =>
-    mode === "review" ? track.action === "review" : track.action !== "review",
-  );
+  const filtered = pool.filter((track) => {
+    if (mode === "review") return track.action === "review";
+    if (mode === "discovery") {
+      return (
+        track.action !== "review" &&
+        track.scores.saturationRisk < 50 &&
+        (track.isNewEntry || track.scores.freshnessScore >= 60)
+      );
+    }
+    return track.action !== "review";
+  });
   const sorted = filtered.sort((left, right) => {
+    if (mode === "discovery") {
+      return (
+        Number(right.isNewEntry) - Number(left.isNewEntry) ||
+        right.scores.freshnessScore - left.scores.freshnessScore ||
+        left.scores.saturationRisk - right.scores.saturationRisk ||
+        right.scores.momentumScore - left.scores.momentumScore ||
+        right.scores.opportunityScore - left.scores.opportunityScore
+      );
+    }
     if (mode === "heat") {
       return right.scores.heatScore - left.scores.heatScore;
     }
@@ -843,9 +864,22 @@ export async function getChartOpportunities({
     cards: selected.map((track) =>
       trackToCard(track, {
         status: mode === "review" ? "already_in_playlist" : undefined,
-        statusLabel: mode === "review" ? "Revisar presença" : undefined,
+        statusLabel:
+          mode === "review"
+            ? "Revisar presença"
+            : mode === "discovery"
+              ? "Descoberta em formação"
+              : undefined,
         suggestedAction:
-          mode === "review" ? "Revisar antes de remover" : undefined,
+          mode === "review"
+            ? "Revisar antes de remover"
+            : mode === "discovery"
+              ? "Testar cedo e observar 7 dias"
+              : undefined,
+        reasonPrefix:
+          mode === "discovery"
+            ? `Radar de descoberta: ${track.isNewEntry ? "entrada nova no chart" : "sinal recente"}, frescor ${track.scores.freshnessScore}% e risco de saturação ${track.scores.saturationRisk}%.`
+            : undefined,
         genreProfile: track.spotifyTrackId
           ? profiles.get(track.spotifyTrackId)
           : null,
@@ -1056,7 +1090,7 @@ export async function recommendTracksForPlaylist(
     eligible.map(({ track }) => track),
     { playlistContext },
   );
-  const ranked = eligible
+  const baselineRanked = eligible
     .map(({ market, track }) => {
       const profile = track.spotifyTrackId
         ? candidateProfiles.get(track.spotifyTrackId)
@@ -1070,7 +1104,14 @@ export async function recommendTracksForPlaylist(
       const score = Math.round(
         clamp(track.scores.opportunityScore * 0.68 + fit.score * 0.32),
       );
-      return { market, track, profile, fit, score };
+      return {
+        market,
+        track,
+        profile,
+        fit,
+        score,
+        ranking: null as PlaylistsAiTrackCard["ranking"],
+      };
     })
     .filter(
       ({ fit }) => playlistProfileGenre === "desconhecido" || fit.score >= 70,
@@ -1080,24 +1121,146 @@ export async function recommendTracksForPlaylist(
         right.score - left.score ||
         right.track.scores.opportunityScore -
           left.track.scores.opportunityScore,
-    )
-    .slice(0, clamp(limit, 1, 50));
+    );
+  const selectedLimit = clamp(limit, 1, 50);
+  let ranked = baselineRanked.slice(0, selectedLimit);
+  let ranking: PlaylistsAiRankingMetadata = {
+    provider: "baseline",
+    status: selection?.workspace.id ? "empty_response" : "missing_context",
+    requestId: null,
+    modelVersion: null,
+    personalized: false,
+    coldStart: true,
+  };
+
+  if (selection?.workspace.id && baselineRanked.length > 0) {
+    const candidateMarkets = new Set(
+      baselineRanked.map((candidate) => candidate.market),
+    );
+    const pythonResult = await rankPlaylistCandidates({
+      workspace_id: selection.workspace.id,
+      playlist_id: playlist.id,
+      playlist_name: playlist.name,
+      genre:
+        playlistProfileGenre === "desconhecido" ? null : playlistProfileGenre,
+      market:
+        candidateMarkets.size > 1
+          ? "BOTH"
+          : (baselineRanked[0]?.market ?? "BR"),
+      as_of: new Date().toISOString(),
+      limit: selectedLimit,
+      candidates: baselineRanked.map(
+        ({ market, track, profile, fit, score }) => ({
+          track_id: track.spotifyTrackId as string,
+          name: track.name,
+          artists: track.artists,
+          market,
+          current_position: track.currentPosition,
+          positions: track.positions,
+          movement_7d: track.movement7d,
+          opportunity_score: track.scores.opportunityScore,
+          heat_score: track.scores.heatScore,
+          momentum_score: track.scores.momentumScore,
+          freshness_score: track.scores.freshnessScore,
+          stability_score: track.scores.stabilityScore,
+          saturation_risk: track.scores.saturationRisk,
+          crossover_score: track.scores.crossoverScore,
+          genre:
+            profile?.primaryGenre === "desconhecido"
+              ? null
+              : (profile?.primaryGenre ?? null),
+          genre_confidence: profile?.genreConfidence ?? null,
+          playlist_fit: fit.score,
+          observed_days_30: track.observedDays30,
+          is_new_entry: track.isNewEntry,
+          baseline_fit_score: fit.score,
+          baseline_score: score,
+        }),
+      ),
+    });
+
+    if (pythonResult.ok && pythonResult.value.items.length > 0) {
+      const baselineById = new Map(
+        baselineRanked.map((candidate) => [
+          candidate.track.spotifyTrackId as string,
+          candidate,
+        ]),
+      );
+      const pythonTrackIds = new Set(
+        pythonResult.value.items.map((item) => item.track_id),
+      );
+      const pythonRanked = pythonResult.value.items.flatMap((item) => {
+        const candidate = baselineById.get(item.track_id);
+        return candidate
+          ? [
+              {
+                ...candidate,
+                score: Math.round(item.score),
+                ranking: {
+                  requestId: pythonResult.value.request_id,
+                  modelVersion: pythonResult.value.model_version,
+                  rank: item.rank,
+                  baseScore: item.base_score,
+                  learnedScore: item.learned_score,
+                  reasonCodes: item.reason_codes,
+                  propensity: item.propensity,
+                },
+              },
+            ]
+          : [];
+      });
+      ranked = [
+        ...pythonRanked,
+        ...baselineRanked.filter(
+          (candidate) =>
+            !pythonTrackIds.has(candidate.track.spotifyTrackId as string),
+        ),
+      ].slice(0, selectedLimit);
+      ranking = {
+        provider: "python",
+        status: "ranked",
+        requestId: pythonResult.value.request_id,
+        modelVersion: pythonResult.value.model_version,
+        personalized: pythonResult.value.personalized,
+        coldStart: pythonResult.value.cold_start,
+      };
+    } else if (pythonResult.ok) {
+      ranking = {
+        provider: "baseline",
+        status: "empty_response",
+        requestId: pythonResult.value.request_id,
+        modelVersion: pythonResult.value.model_version,
+        personalized: pythonResult.value.personalized,
+        coldStart: pythonResult.value.cold_start,
+      };
+    } else {
+      ranking = {
+        ...ranking,
+        status: pythonResult.reason,
+      };
+    }
+  }
 
   return {
     playlist,
-    cards: ranked.map(({ track, profile, fit, score }) =>
-      trackToCard(track, {
-        status: track.action === "watch" ? "watch" : "not_in_playlist",
-        statusLabel:
-          track.action === "watch" ? "Observar" : `Fora de ${playlist.name}`,
-        suggestedAction:
-          track.action === "watch"
-            ? "Observar por 7 dias"
-            : `Avaliar para ${playlist.name}`,
-        reasonPrefix: `${fit.reason} Fit ${score}/100.`,
-        opportunityScore: score,
-        genreProfile: profile,
-        playlistFit: fit,
+    cards: ranked.map(
+      ({ track, profile, fit, score, ranking: cardRanking }) => ({
+        ...trackToCard(track, {
+          status: track.action === "watch" ? "watch" : "not_in_playlist",
+          statusLabel:
+            track.action === "watch" ? "Observar" : `Fora de ${playlist.name}`,
+          suggestedAction:
+            track.action === "watch"
+              ? "Observar por 7 dias"
+              : `Avaliar para ${playlist.name}`,
+          reasonPrefix: cardRanking
+            ? `${fit.reason} Score adaptativo ${score}/100.`
+            : `${fit.reason} Fit ${score}/100.`,
+          opportunityScore: score,
+          genreProfile: profile,
+          playlistFit: fit,
+        }),
+        ranking: cardRanking,
       }),
     ),
     playlistGenre,
@@ -1107,5 +1270,6 @@ export async function recommendTracksForPlaylist(
       ranked.length > 0
         ? null
         : "Não encontrei candidatas com afinidade e sinais suficientes para recomendar agora.",
+    ranking,
   };
 }

@@ -36,16 +36,34 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  type Dispatch,
   type FormEvent,
   type KeyboardEvent,
+  type SetStateAction,
   useEffect,
   useRef,
   useState,
 } from "react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import { SpeechInput } from "@/components/ai-elements/speech-input";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import SpotifyPlaylistAddButton from "@/components/workspace/spotify-playlist-add-button";
+import {
+  type PlaylistsAiFeedbackDeliveryState,
+  sendPlaylistsAiFeedback,
+} from "@/lib/playlists-ai-feedback-client";
+import {
+  appendVoiceTranscript,
+  speechInputErrorMessage,
+} from "@/lib/playlists-ai-voice";
 import { cn } from "@/lib/utils";
 import type {
   PlaylistsAiChatApiResponse,
@@ -78,6 +96,27 @@ const WELCOME_MESSAGE: ChatMessage = {
   content:
     "Vamos pensar essa curadoria juntos. Conte o que você quer construir, revisar ou descobrir. Eu posso primeiro entender o objetivo e, quando fizer sentido, cruzar charts, playlists, histórico e gênero sem executar nenhuma alteração.",
 };
+
+const SUGGESTED_PROMPTS = [
+  "Descubra 15 faixas novas de trap pouco saturadas no Brasil",
+  "Quais músicas de funk estão crescendo e ainda não estão nas minhas playlists?",
+  "Sugira 10 faixas para renovar uma playlist minha",
+  "Quais oportunidades globais apareceram nos charts?",
+] as const;
+
+const MessageResponse = dynamic(
+  () =>
+    import("@/components/ai-elements/message").then(
+      (module) => module.MessageResponse,
+    ),
+  {
+    loading: () => (
+      <span className="text-sm text-muted-foreground">
+        Formatando resposta…
+      </span>
+    ),
+  },
+);
 
 function createEmptyBrief(): PlaylistsAiCurationBrief {
   return {
@@ -163,6 +202,7 @@ function TrackRow({
   onTogglePin,
   onToggleSaved,
   onIgnore,
+  onAdded,
 }: {
   card: PlaylistsAiTrackCard;
   rank: number;
@@ -171,6 +211,7 @@ function TrackRow({
   onTogglePin: () => void;
   onToggleSaved: () => void;
   onIgnore: () => void;
+  onAdded: (targetPlaylistId: string, alreadyExists: boolean) => void;
 }) {
   const [genreProfile, setGenreProfile] =
     useState<TrackGenreCardProfile | null>(card.genreProfile ?? null);
@@ -357,6 +398,9 @@ function TrackRow({
             label="Adicionar"
             ariaLabel={`Adicionar ${card.name} a uma playlist`}
             className="h-8 rounded-full bg-foreground px-3 text-[10px] font-semibold text-background shadow-none hover:bg-foreground/85"
+            onAddSuccess={({ playlistId, alreadyExists }) => {
+              onAdded(playlistId, alreadyExists);
+            }}
           />
         </div>
       </div>
@@ -665,12 +709,16 @@ function DecisionBoard({
   const [ignoredTrackIds, setIgnoredTrackIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const feedbackDeliveryStatesRef = useRef(
+    new Map<string, PlaylistsAiFeedbackDeliveryState>(),
+  );
   const resultKey = result.meta.generatedAt;
 
   useEffect(() => {
     setPinnedTrackIds(new Set());
     setSavedTrackIds(new Set());
     setIgnoredTrackIds(new Set());
+    feedbackDeliveryStatesRef.current.clear();
   }, [resultKey]);
 
   const cards = result.cards;
@@ -705,7 +753,7 @@ function DecisionBoard({
   ];
 
   return (
-    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-l border-border/45 bg-background/45 dark:border-white/[0.07]">
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden bg-background/95 desktop:border-l desktop:border-border/45 desktop:bg-background/45 desktop:dark:border-white/[0.07]">
       <header className="border-b border-border/45 px-4 py-3 dark:border-white/[0.07]">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -783,15 +831,45 @@ function DecisionBoard({
                 rank={index + 1}
                 isPinned={pinnedTrackIds.has(cardKey(card))}
                 isSaved={savedTrackIds.has(cardKey(card))}
-                onTogglePin={() =>
-                  toggleSetValue(setPinnedTrackIds, cardKey(card))
-                }
-                onToggleSaved={() =>
-                  toggleSetValue(setSavedTrackIds, cardKey(card))
-                }
-                onIgnore={() =>
+                onTogglePin={() => {
+                  const key = cardKey(card);
+                  const willPin = !pinnedTrackIds.has(key);
+                  toggleSetValue(setPinnedTrackIds, key);
+                  if (willPin)
+                    void sendPlaylistsAiFeedback(
+                      card,
+                      "pin",
+                      feedbackDeliveryStatesRef.current,
+                    );
+                }}
+                onToggleSaved={() => {
+                  const key = cardKey(card);
+                  const willSave = !savedTrackIds.has(key);
+                  toggleSetValue(setSavedTrackIds, key);
+                  if (willSave)
+                    void sendPlaylistsAiFeedback(
+                      card,
+                      "save",
+                      feedbackDeliveryStatesRef.current,
+                    );
+                }}
+                onIgnore={() => {
+                  void sendPlaylistsAiFeedback(
+                    card,
+                    "ignore",
+                    feedbackDeliveryStatesRef.current,
+                  );
                   setIgnoredTrackIds((current) =>
                     new Set(current).add(cardKey(card)),
+                  );
+                }}
+                onAdded={(targetPlaylistId, alreadyExists) =>
+                  void sendPlaylistsAiFeedback(
+                    card,
+                    "add",
+                    feedbackDeliveryStatesRef.current,
+                    targetPlaylistId,
+                    alreadyExists,
                   )
                 }
               />
@@ -833,7 +911,54 @@ function DecisionBoard({
   );
 }
 
-function ResponseDetails({ result }: { result: PlaylistsAiChatResponse }) {
+function rankingDisplay(result: PlaylistsAiChatResponse) {
+  const ranking = result.meta.ranking;
+  if (!ranking) return null;
+
+  if (
+    ranking.provider === "python" &&
+    ranking.status === "ranked" &&
+    ranking.personalized
+  ) {
+    return {
+      label: "Ranking personalizado",
+      detail: `Aprendeu com os feedbacks deste workspace${ranking.modelVersion ? ` · ${ranking.modelVersion}` : ""}.`,
+      className: "bg-emerald-400/10 text-emerald-700 dark:text-emerald-300",
+    };
+  }
+  if (
+    ranking.provider === "python" &&
+    ranking.status === "ranked" &&
+    ranking.coldStart
+  ) {
+    return {
+      label: "Aprendendo preferências",
+      detail: "Ainda há pouco feedback para personalização completa.",
+      className: "bg-amber-400/10 text-amber-700 dark:text-amber-300",
+    };
+  }
+  if (ranking.provider === "python" && ranking.status === "ranked") {
+    return {
+      label: "Ranking inteligente",
+      detail: "Ordenação produzida pelo agente Python.",
+      className: "bg-violet-400/10 text-violet-700 dark:text-violet-300",
+    };
+  }
+  return {
+    label: "Ranking base",
+    detail: "Seleção segura baseada nos sinais disponíveis.",
+    className: "bg-muted/55 text-muted-foreground",
+  };
+}
+
+function ResponseDetails({
+  result,
+  onOpenDecisionPanel,
+}: {
+  result: PlaylistsAiChatResponse;
+  onOpenDecisionPanel: (result: PlaylistsAiChatResponse) => void;
+}) {
+  const ranking = rankingDisplay(result);
   return (
     <div className="mt-3 space-y-2.5 border-t border-border/55 pt-3 dark:border-white/10">
       <div className="flex flex-wrap items-center gap-2 text-[9px] font-black text-muted-foreground">
@@ -843,15 +968,28 @@ function ResponseDetails({ result }: { result: PlaylistsAiChatResponse }) {
           </span>
         ) : null}
         {result.cards.length > 0 ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-emerald-700 dark:text-emerald-300">
+          <button
+            type="button"
+            onClick={() => onOpenDecisionPanel(result)}
+            aria-label={`Abrir seleção com ${result.cards.length} ${result.cards.length === 1 ? "faixa" : "faixas"}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1.5 text-emerald-700 transition hover:bg-emerald-400/20 dark:text-emerald-300"
+          >
             <ListMusic className="h-3 w-3" />
-            {result.cards.length}{" "}
-            {result.cards.length === 1 ? "faixa" : "faixas"} no painel
-          </span>
+            Ver {result.cards.length}{" "}
+            {result.cards.length === 1 ? "faixa" : "faixas"}
+          </button>
         ) : null}
         <span className="rounded-full bg-muted/55 px-2.5 py-1.5">
-          Confiança {result.confidence}%
+          Confiança dos sinais {result.confidence}%
         </span>
+        {ranking ? (
+          <span
+            title={ranking.detail}
+            className={cn("rounded-full px-2.5 py-1.5", ranking.className)}
+          >
+            {ranking.label}
+          </span>
+        ) : null}
         {result.dataSources
           .filter((dataSource) => dataSource.status === "used")
           .slice(0, 2)
@@ -889,7 +1027,13 @@ function ResponseDetails({ result }: { result: PlaylistsAiChatResponse }) {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  onOpenDecisionPanel,
+}: {
+  message: ChatMessage;
+  onOpenDecisionPanel: (result: PlaylistsAiChatResponse) => void;
+}) {
   const assistant = message.role === "assistant";
   return (
     <article
@@ -912,10 +1056,21 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : "rounded-[20px] bg-muted/80 px-4 text-foreground dark:bg-white/[0.075]",
         )}
       >
-        <p className="whitespace-pre-wrap text-sm font-medium leading-6">
-          {message.content}
-        </p>
-        {message.result ? <ResponseDetails result={message.result} /> : null}
+        {assistant ? (
+          <MessageResponse className="text-sm font-medium leading-6">
+            {message.content}
+          </MessageResponse>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm font-medium leading-6">
+            {message.content}
+          </p>
+        )}
+        {message.result ? (
+          <ResponseDetails
+            result={message.result}
+            onOpenDecisionPanel={onOpenDecisionPanel}
+          />
+        ) : null}
       </div>
     </article>
   );
@@ -930,26 +1085,92 @@ function ChatComposer({
 }: {
   input: string;
   isBusy: boolean;
-  onChange: (value: string) => void;
+  onChange: Dispatch<SetStateAction<string>>;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const voiceStartedRef = useRef(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 144)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    if (!isBusy) textareaRef.current?.focus();
+  }, [isBusy]);
+
+  function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
+    if (voiceListening) {
+      event.preventDefault();
+      return;
+    }
+    onSubmit(event);
+  }
+
   return (
-    <form onSubmit={onSubmit} className="w-full">
+    <form onSubmit={handleComposerSubmit} className="w-full">
       <div className="flex items-end gap-2 rounded-[26px] border border-border/70 bg-background px-3 py-2 shadow-[0_10px_35px_rgba(0,0,0,0.08)] transition focus-within:border-foreground/25 dark:border-white/10 dark:bg-[#202123]">
         <textarea
+          id="playlists-ai-message"
+          ref={textareaRef}
           value={input}
           disabled={isBusy}
+          readOnly={voiceListening}
           onChange={(event) => onChange(event.target.value)}
-          onKeyDown={onKeyDown}
+          onKeyDown={(event) => {
+            if (voiceListening && event.key === "Enter") {
+              event.preventDefault();
+              return;
+            }
+            onKeyDown(event);
+          }}
           maxLength={1600}
           rows={1}
+          aria-label="Mensagem para o Playlists IA"
           placeholder="Pergunte sobre músicas, playlists ou uma decisão..."
-          className="max-h-36 min-h-11 flex-1 resize-none bg-transparent px-2 py-3 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/65"
+          className="max-h-36 min-h-11 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-3 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/65"
+        />
+        <SpeechInput
+          lang="pt-BR"
+          size="icon"
+          disabled={isBusy}
+          aria-label="Ditar mensagem em português"
+          title="Ditar mensagem em português"
+          className="mb-1 shrink-0"
+          onListeningChange={(listening) => {
+            const wasListening = voiceStartedRef.current;
+            voiceStartedRef.current = listening;
+            setVoiceListening(listening);
+            if (listening) {
+              setVoiceStatus(
+                "Ouvindo em português… clique novamente para parar.",
+              );
+            } else if (wasListening) {
+              setVoiceStatus(
+                "Ditado finalizado. Revise o texto antes de enviar.",
+              );
+            }
+          }}
+          onTranscriptionChange={(transcript) => {
+            onChange((current) => appendVoiceTranscript(current, transcript));
+            setVoiceStatus("Trecho de voz adicionado. Revise antes de enviar.");
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          }}
+          onError={(errorCode) => {
+            voiceStartedRef.current = false;
+            setVoiceListening(false);
+            setVoiceStatus(speechInputErrorMessage(errorCode));
+          }}
         />
         <button
           type="submit"
-          disabled={!input.trim() || isBusy}
+          disabled={!input.trim() || isBusy || voiceListening}
           className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-25"
           aria-label="Enviar"
         >
@@ -960,8 +1181,13 @@ function ChatComposer({
           )}
         </button>
       </div>
-      <p className="mt-2 text-center text-[9px] text-muted-foreground/65">
-        A IA cruza dados reais e não altera o Spotify sem sua confirmação.
+      <p
+        className="mt-2 min-h-4 text-center text-[9px] text-muted-foreground/65"
+        role="status"
+        aria-live="polite"
+      >
+        {voiceStatus ??
+          "A IA cruza dados reais e não altera o Spotify sem sua confirmação."}
       </p>
     </form>
   );
@@ -989,10 +1215,10 @@ export default function PlaylistsAiWorkbench() {
   >(null);
   const [decisionResult, setDecisionResult] =
     useState<PlaylistsAiChatResponse | null>(null);
+  const [decisionPanelOpen, setDecisionPanelOpen] = useState(false);
   const [curationBrief, setCurationBrief] =
     useState<PlaylistsAiCurationBrief>(createEmptyBrief);
   const [marketFilter, setMarketFilter] = useState<DecisionMarketFilter>("ALL");
-  const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setConversationRailOpen(
@@ -1035,10 +1261,6 @@ export default function PlaylistsAiWorkbench() {
       mounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isThinking]);
 
   function upsertConversation(conversation: PlaylistsAiConversationSummary) {
     setSavedConversations((current) => [
@@ -1096,6 +1318,7 @@ export default function PlaylistsAiWorkbench() {
       );
       setCurationBrief(conversation.brief);
       setDecisionResult(conversation.latestResponse);
+      setDecisionPanelOpen(Boolean(conversation.latestResponse?.cards.length));
       setMarketFilter("ALL");
       upsertConversation(conversation);
     } catch (error) {
@@ -1214,6 +1437,7 @@ export default function PlaylistsAiWorkbench() {
       setCurationBrief(payload.brief);
       if (payload.cards.length > 0) {
         setDecisionResult(payload);
+        setDecisionPanelOpen(true);
         setMarketFilter("ALL");
       }
     } catch (error) {
@@ -1240,6 +1464,7 @@ export default function PlaylistsAiWorkbench() {
     setInput("");
     setConversationTitle("Nova curadoria");
     setDecisionResult(null);
+    setDecisionPanelOpen(false);
     setCurationBrief(createEmptyBrief());
     setMarketFilter("ALL");
   }
@@ -1250,10 +1475,25 @@ export default function PlaylistsAiWorkbench() {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
       event.preventDefault();
       void submitMessage(input);
     }
+  }
+
+  function openDecisionPanel(result?: PlaylistsAiChatResponse) {
+    const nextResult = result ?? decisionResult;
+    if (!nextResult?.cards.length) return;
+
+    if (nextResult.meta.generatedAt !== decisionResult?.meta.generatedAt) {
+      setDecisionResult(nextResult);
+      setMarketFilter("ALL");
+    }
+    setDecisionPanelOpen(true);
   }
 
   const isBusy = isThinking || isLoadingConversation;
@@ -1264,7 +1504,8 @@ export default function PlaylistsAiWorkbench() {
   const visibleMessages = messages.filter(
     (message) => message.id !== WELCOME_MESSAGE.id,
   );
-  const showDecisionBoard = Boolean(decisionResult?.cards.length);
+  const hasDecisionResult = Boolean(decisionResult?.cards.length);
+  const showDecisionPanel = hasDecisionResult && decisionPanelOpen;
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 max-w-[1760px] overflow-hidden bg-background">
@@ -1317,20 +1558,33 @@ export default function PlaylistsAiWorkbench() {
               </h1>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={startNewConversation}
-            disabled={isBusy}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground disabled:opacity-40"
-            aria-label="Nova conversa"
-            title="Nova conversa"
-          >
-            <MessageSquarePlus className="h-[18px] w-[18px]" />
-          </button>
+          <div className="flex items-center gap-1">
+            {hasDecisionResult && !decisionPanelOpen ? (
+              <button
+                type="button"
+                onClick={() => openDecisionPanel()}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground"
+                aria-label="Reabrir seleção de músicas"
+                title="Reabrir seleção"
+              >
+                <ListMusic className="h-[18px] w-[18px]" />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={startNewConversation}
+              disabled={isBusy}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/55 hover:text-foreground disabled:opacity-40"
+              aria-label="Nova conversa"
+              title="Nova conversa"
+            >
+              <MessageSquarePlus className="h-[18px] w-[18px]" />
+            </button>
+          </div>
         </header>
 
         {freshConversation ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center px-5 pb-16">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 pb-16">
             <div className="w-full max-w-[760px]">
               <div className="mb-8 text-center">
                 <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background">
@@ -1345,37 +1599,67 @@ export default function PlaylistsAiWorkbench() {
                 </p>
               </div>
               <ChatComposer
+                key="new-conversation"
                 input={input}
                 isBusy={isBusy}
                 onChange={setInput}
                 onKeyDown={handleKeyDown}
                 onSubmit={handleSubmit}
               />
+              <Suggestions className="mt-4 pb-1">
+                {SUGGESTED_PROMPTS.map((suggestion) => (
+                  <Suggestion
+                    key={suggestion}
+                    suggestion={suggestion}
+                    onClick={(value) => {
+                      setInput(value);
+                      requestAnimationFrame(() =>
+                        document
+                          .getElementById("playlists-ai-message")
+                          ?.focus(),
+                      );
+                    }}
+                    className="border-border/60 bg-background/65 text-[11px] text-muted-foreground hover:text-foreground"
+                  />
+                ))}
+              </Suggestions>
             </div>
           </div>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 tablet:px-8">
-              <div className="mx-auto max-w-[780px] space-y-7">
+            <Conversation className="min-h-0 flex-1">
+              <ConversationContent className="mx-auto w-full max-w-[844px] gap-7 px-4 py-6 tablet:px-8">
                 {visibleMessages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    onOpenDecisionPanel={openDecisionPanel}
+                  />
                 ))}
 
                 {isThinking ? (
-                  <article className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <article
+                    className="flex items-center gap-3 text-sm text-muted-foreground"
+                    role="status"
+                    aria-live="polite"
+                  >
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-700 dark:text-emerald-300">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
                     </div>
                     Cruzando contexto, histórico e sinais...
                   </article>
                 ) : null}
-                <div ref={endRef} />
-              </div>
-            </div>
+              </ConversationContent>
+              <ConversationScrollButton
+                className="bottom-3"
+                aria-label="Ir para a mensagem mais recente"
+              />
+            </Conversation>
 
             <div className="shrink-0 bg-gradient-to-t from-background via-background to-transparent px-4 pb-3 pt-2 tablet:px-8">
               <div className="mx-auto max-w-[780px]">
                 <ChatComposer
+                  key={activeConversationId ?? "conversation-draft"}
                   input={input}
                   isBusy={isBusy}
                   onChange={setInput}
@@ -1388,15 +1672,33 @@ export default function PlaylistsAiWorkbench() {
         )}
       </section>
 
-      {showDecisionBoard && decisionResult ? (
-        <div className="hidden h-full w-[420px] min-w-[360px] shrink-0 desktop:block">
-          <DecisionBoard
-            result={decisionResult}
-            marketFilter={marketFilter}
-            onClose={() => setDecisionResult(null)}
-            onMarketFilterChange={setMarketFilter}
-          />
-        </div>
+      {hasDecisionResult && decisionResult ? (
+        <>
+          {showDecisionPanel ? (
+            <button
+              type="button"
+              onClick={() => setDecisionPanelOpen(false)}
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] desktop:hidden"
+              aria-label="Fechar seleção"
+            />
+          ) : null}
+          <div
+            className={cn(
+              showDecisionPanel
+                ? "fixed inset-x-0 bottom-0 z-50 h-[min(88dvh,760px)] overflow-hidden rounded-t-[28px] bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl desktop:static desktop:z-auto desktop:h-full desktop:w-[420px] desktop:min-w-[360px] desktop:shrink-0 desktop:rounded-none desktop:pb-0 desktop:shadow-none"
+                : "hidden",
+            )}
+            role="region"
+            aria-label="Seleção de músicas"
+          >
+            <DecisionBoard
+              result={decisionResult}
+              marketFilter={marketFilter}
+              onClose={() => setDecisionPanelOpen(false)}
+              onMarketFilterChange={setMarketFilter}
+            />
+          </div>
+        </>
       ) : null}
     </div>
   );

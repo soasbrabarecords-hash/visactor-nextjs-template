@@ -5,6 +5,7 @@ import {
   SPOTIFY_CHART_GENRE_ENRICHMENT_MAX_LIMIT,
   enrichLatestSpotifyChartGenres,
 } from "@/lib/charts/spotify-chart-genre-enrichment";
+import { runPlaylistAiMaintenance } from "@/lib/playlists-ai-python-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,9 @@ export async function GET(request: Request) {
   }
 
   const ingestion = genresOnly ? null : await ingestRecentSpotifyCharts();
+  const playlistsAiLearning = genresOnly
+    ? { ok: false as const, reason: "genres_only" as const }
+    : await runPlaylistAiMaintenance();
   const remainingBudgetMs = ROUTE_WORK_BUDGET_MS - (Date.now() - startedAt);
   const genreEnrichment =
     remainingBudgetMs >= MINIMUM_GENRE_BUDGET_MS
@@ -67,6 +71,9 @@ export async function GET(request: Request) {
     `[spotify-charts:ingest] ${JSON.stringify({
       genresOnly,
       ingestionSuccess: ingestion?.success ?? null,
+      playlistsAiLearning: playlistsAiLearning.ok
+        ? { ok: true }
+        : { ok: false, reason: playlistsAiLearning.reason },
       genreEnrichment:
         "processed" in genreEnrichment
           ? {
@@ -90,6 +97,7 @@ export async function GET(request: Request) {
     success: ingestion?.success ?? true,
     genresOnly,
     ingestion,
+    playlistsAiLearning,
     genreEnrichment,
     durationMs: Date.now() - startedAt,
   });

@@ -16,6 +16,20 @@ A modern dashboard template built with [VisActor](https://visactor.io/) and Next
 - 🔄 **State Management** - Efficient state management with Jotai
 - 📦 **Component Library** - Includes Shadcn components styled with Tailwind
 
+## Playlists IA learning agent
+
+The Playlists IA recommendation flow can use the Python service in
+[`services/playlists_ai_agent`](services/playlists_ai_agent/README.md) for
+adaptive ranking, explicit feedback, temporal evaluation, and guarded model
+promotion. Next.js remains the authentication and Spotify-action boundary, and
+the current deterministic score is preserved whenever the Python service is not
+configured or unavailable.
+
+The user-supplied 2021–2026 rap/trap research is stored as time-scoped editorial
+knowledge, not as supervised training labels. See
+[`docs/playlists-ai-learning-agent.md`](docs/playlists-ai-learning-agent.md) for
+the data-quality assessment, safety boundaries, and operational design.
+
 ## Tech Stack
 
 - [Next.js](https://nextjs.org/) - React framework

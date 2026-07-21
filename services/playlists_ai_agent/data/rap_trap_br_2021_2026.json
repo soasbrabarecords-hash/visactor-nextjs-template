@@ -1,0 +1,793 @@
+{
+  "metadata": {
+    "period_start": "2021-01-01",
+    "period_end": "2026-07-31",
+    "known_at": "2026-07-21",
+    "source": "user_supplied_editorial_analysis",
+    "data_classification": "editorial",
+    "supervision": false,
+    "limitations": [
+      "Não existe no material uma pesquisa nacional confiável sobre os artistas mais admirados.",
+      "O ranking é editorial e subjetivo; os cinco critérios não possuem pesos numéricos nem fórmula reproduzível.",
+      "O recorte recente recebe prioridade, mas o valor histórico também é preservado sem uma regra quantitativa explícita.",
+      "O material não contém feedback de usuários, exemplos negativos, contexto de playlists ou rótulos de relevância supervisionados.",
+      "Listas editoriais podem se sobrepor; uma pessoa ou entidade pode aparecer em mais de uma categoria.",
+      "Algumas entradas combinam grupos, integrantes ou colaboradores e não fornecem identificadores canônicos.",
+      "Datas de lançamento, IDs de catálogo e métricas por item não são fornecidos de forma estruturada.",
+      "Contagens públicas citadas no texto original são temporais, podem incluir participações e não representam receita ou audiência exclusiva; por isso não foram convertidas em métricas neste corpus.",
+      "As afirmações e fontes do material não foram verificadas independentemente.",
+      "O fim nominal do período, 2026-07-31, é posterior à data de conhecimento declarada, 2026-07-21."
+    ]
+  },
+  "methodology": {
+    "editorial": true,
+    "criteria": [
+      "alcance e volume de catálogo",
+      "permanência nos charts",
+      "quantidade e longevidade dos hits",
+      "influência artística e empresarial",
+      "reconhecimento crítico, premiações e presença nos maiores festivais"
+    ],
+    "ranking_rule": "Mede principalmente o peso dentro do período recente, preservando o valor histórico.",
+    "monthly_listeners_rule": "Ouvintes mensais não devem ser usados isoladamente para medir grandeza histórica.",
+    "genre_scope": "Rap e trap brasileiro, incluindo artistas híbridos de funk, trap e rap quando influenciaram diretamente o consumo, as colaborações e a linguagem do gênero.",
+    "track_selection_rule": "As faixas formam uma linha narrativa editorial do trap brasileiro e não apenas uma lista de músicas populares."
+  },
+  "top_40": [
+    {
+      "rank": 1,
+      "name": "Matuê",
+      "editorial_reason": "Maior símbolo do trap brasileiro. Criou identidade própria, transformou a 30PRAUM numa potência e estabeleceu recordes nacionais."
+    },
+    {
+      "rank": 2,
+      "name": "Filipe Ret",
+      "editorial_reason": "Catálogo gigantesco, longevidade, público fiel e capacidade de atravessar rap clássico, trap, acústico e mainstream."
+    },
+    {
+      "rank": 3,
+      "name": "Racionais MC’s / Mano Brown",
+      "editorial_reason": "Maior legado do rap brasileiro. Mesmo sem depender de lançamentos constantes, seguem culturalmente acima de praticamente todos."
+    },
+    {
+      "rank": 4,
+      "name": "Veigh",
+      "editorial_reason": "Maior explosão da geração pós-2022. Dos Prédios Deluxe, “Novo Balanço” e o projeto Supernova mudaram a escala do trap paulista."
+    },
+    {
+      "rank": 5,
+      "name": "Orochi",
+      "editorial_reason": "Um dos catálogos mais consumidos, grande quantidade de hits e fundador da Mainstreet, responsável por revelar uma geração inteira."
+    },
+    {
+      "rank": 6,
+      "name": "BK’",
+      "editorial_reason": "Talvez o rapper mais respeitado artisticamente da geração atual. Equilibra conceito, escrita, álbuns fortes e grande alcance popular."
+    },
+    {
+      "rank": 7,
+      "name": "L7NNON",
+      "editorial_reason": "Um dos artistas urbanos mais populares do país, com enorme presença em feats, rap, trap, funk e projetos acústicos."
+    },
+    {
+      "rank": 8,
+      "name": "Djonga",
+      "editorial_reason": "Um dos nomes mais influentes e admirados artisticamente. Recolocou o rap de confronto, identidade negra e discos conceituais no centro."
+    },
+    {
+      "rank": 9,
+      "name": "Teto",
+      "editorial_reason": "Responsável por um dos maiores fenômenos de antecipação e “prévias” da história do trap. “M4”, “Fim de Semana no Rio” e “Vampiro” atravessaram gerações."
+    },
+    {
+      "rank": 10,
+      "name": "MC Cabelinho",
+      "editorial_reason": "Conseguiu unir rap, trap, funk, romance e público de massa. É um dos maiores artistas urbanos completos do período."
+    },
+    {
+      "rank": 11,
+      "name": "KayBlack",
+      "editorial_reason": "Grande voz melódica da geração, com enorme identificação popular e hits como “Melhor Só” e “Licor 43”."
+    },
+    {
+      "rank": 12,
+      "name": "Xamã",
+      "editorial_reason": "Batalhas, rap lírico, trap, pop e atuação. “Malvadão 3” levou sua carreira para fora da bolha do rap."
+    },
+    {
+      "rank": 13,
+      "name": "WIU",
+      "editorial_reason": "Artista e produtor decisivo para a estética da 30PRAUM. “Coração de Gelo” consolidou seu alcance nacional."
+    },
+    {
+      "rank": 14,
+      "name": "Oruam",
+      "editorial_reason": "Um dos maiores fenômenos de audiência de 2024–2026, embora sua posição histórica ainda dependa de longevidade e consistência futura."
+    },
+    {
+      "rank": 15,
+      "name": "Baco Exu do Blues",
+      "editorial_reason": "Influência artística enorme, especialmente na aproximação entre rap, MPB, soul, sexualidade e narrativa negra."
+    },
+    {
+      "rank": 16,
+      "name": "Emicida",
+      "editorial_reason": "Um dos maiores intelectuais, compositores e empresários da história do rap brasileiro. AmarElo ampliou o lugar cultural do gênero."
+    },
+    {
+      "rank": 17,
+      "name": "Hungria Hip Hop",
+      "editorial_reason": "Um dos maiores catálogos populares do rap nacional, especialmente fora do eixo editorial Rio–São Paulo."
+    },
+    {
+      "rank": 18,
+      "name": "Raffa Moreira",
+      "editorial_reason": "Não possui hoje os maiores números, mas é indispensável: foi um dos primeiros a assumir estética, linguagem e produção genuinamente trap no Brasil."
+    },
+    {
+      "rank": 19,
+      "name": "MC Poze do Rodo",
+      "editorial_reason": "Fenômeno popular que atravessa funk, trap e rap de favela. Muito maior em alcance do que em reconhecimento crítico."
+    },
+    {
+      "rank": 20,
+      "name": "BIN",
+      "editorial_reason": "Forte no trap romântico e nos cruzamentos com pop, pagode e funk. Chegou a superar 10 milhões de ouvintes mensais em 2025."
+    },
+    {
+      "rank": 21,
+      "name": "Yunk Vino",
+      "editorial_reason": "Referência estética e sonora para artistas e produtores, principalmente em plug, cloud rap e trap experimental."
+    },
+    {
+      "rank": 22,
+      "name": "Recayd Mob / Derek",
+      "editorial_reason": "A Recayd ajudou a estabelecer o vocabulário do trap nacional. Derek permanece como um de seus arquitetos mais influentes."
+    },
+    {
+      "rank": 23,
+      "name": "TZ da Coronel",
+      "editorial_reason": "Protagonista da nova geração carioca, com forte público, estética reconhecível e catálogo consistente."
+    },
+    {
+      "rank": 24,
+      "name": "MD Chefe",
+      "editorial_reason": "“Rei Lacoste” e a estética do “trap trajadão” marcaram definitivamente a história da cena carioca."
+    },
+    {
+      "rank": 25,
+      "name": "Vulgo FK",
+      "editorial_reason": "Cresceu de participante recorrente para um dos rappers mais consumidos do país. Muito forte em feats e trap-funk."
+    },
+    {
+      "rank": 26,
+      "name": "Chefin",
+      "editorial_reason": "“212”, “Invejoso” e a Mainstreet o transformaram em uma das principais vozes da nova geração carioca."
+    },
+    {
+      "rank": 27,
+      "name": "Major RD",
+      "editorial_reason": "Respeitado pela técnica, presença e identidade do grime/drill/rap de rua."
+    },
+    {
+      "rank": 28,
+      "name": "Borges",
+      "editorial_reason": "Um dos nomes essenciais da expansão do trap carioca, com “AK do Flamengo”, “iPhone Branco” e “Loucura”."
+    },
+    {
+      "rank": 29,
+      "name": "Duquesa",
+      "editorial_reason": "Principal rapper feminina em alcance recente, juntando personalidade, técnica, estética e crescimento comercial."
+    },
+    {
+      "rank": 30,
+      "name": "Tasha & Tracie",
+      "editorial_reason": "Dupla decisiva na conexão entre rap, moda, negritude, periferia e identidade visual."
+    },
+    {
+      "rank": 31,
+      "name": "Ryu, The Runner",
+      "aliases": ["Ryu The Runner"],
+      "editorial_reason": "Um dos artistas mais influentes sobre a sonoridade da nova geração, especialmente entre 2023 e 2026."
+    },
+    {
+      "rank": 32,
+      "name": "Jovem Dex",
+      "editorial_reason": "Figura importante na construção do trap nordestino e da linguagem visual da geração anterior à explosão nacional."
+    },
+    {
+      "rank": 33,
+      "name": "Sidoka",
+      "editorial_reason": "Um dos primeiros nomes a estabelecer um flow de trap brasileiro realmente reconhecível."
+    },
+    {
+      "rank": 34,
+      "name": "Delacruz",
+      "editorial_reason": "Rap, R&B e romantismo com grande catálogo e presença popular."
+    },
+    {
+      "rank": 35,
+      "name": "Froid",
+      "editorial_reason": "Escrita, personalidade, batalhas e influência sobre o rap lírico contemporâneo."
+    },
+    {
+      "rank": 36,
+      "name": "Alee",
+      "editorial_reason": "Um dos principais nomes da geração 2024–2026, com forte evolução artística."
+    },
+    {
+      "rank": 37,
+      "name": "Brandão85",
+      "editorial_reason": "Peça central na nova fase da 30PRAUM e no trap nordestino contemporâneo."
+    },
+    {
+      "rank": 38,
+      "name": "Kyan",
+      "editorial_reason": "Importante na representação periférica paulista e na aproximação entre rap, trap e funk."
+    },
+    {
+      "rank": 39,
+      "name": "Ajuliacosta",
+      "editorial_reason": "Uma das vozes femininas mais respeitadas artística e politicamente."
+    },
+    {
+      "rank": 40,
+      "name": "Ebony",
+      "editorial_reason": "Personalidade, escrita agressiva e papel importante na renovação feminina do rap."
+    }
+  ],
+  "legacy_artists": [
+    "Racionais MC’s",
+    "Mano Brown",
+    "Edi Rock",
+    "Ice Blue",
+    "KL Jay",
+    "Sabotage",
+    "MV Bill",
+    "Marcelo D2",
+    "Planet Hemp",
+    "Black Alien",
+    "Criolo",
+    "Emicida",
+    "Thaíde",
+    "GOG",
+    "Gabriel O Pensador",
+    "Facção Central",
+    "RZO",
+    "Negra Li",
+    "509-E",
+    "Dexter",
+    "Afro-X",
+    "Detentos do Rap",
+    "Realidade Cruel",
+    "SNJ",
+    "Kamau",
+    "Flora Matos",
+    "Karol Conká",
+    "Rael",
+    "Rashid",
+    "Projota",
+    "ConeCrewDiretoria",
+    "Haikaiss",
+    "Costa Gold",
+    "Oriente",
+    "3030",
+    "Cacife Clandestino",
+    "1Kilo",
+    "Pineapple StormTV",
+    "Poesia Acústica",
+    "Rincon Sapiência",
+    "Don L",
+    "Febem",
+    "Síntese",
+    "Sant",
+    "ADL"
+  ],
+  "contemporary_artists": [
+    "Caio Luccas",
+    "Leviano",
+    "Aka Rasta",
+    "Dfideliz",
+    "Jé Santiago",
+    "MC Igu",
+    "The Boy",
+    "Klyn",
+    "Meno Tody",
+    "Kawe",
+    "DomLaike",
+    "Bielzin",
+    "Anezzi",
+    "Dudu",
+    "Leall",
+    "Choice",
+    "MC Maneirinho",
+    "Salvador da Rima",
+    "Chris MC",
+    "Luccas Carlos",
+    "PK",
+    "Kant",
+    "César MC",
+    "Knust",
+    "Baviera",
+    "Pablo Martins",
+    "Sain",
+    "Nochica",
+    "LPT Zlatan",
+    "Tokiodk",
+    "Ghard",
+    "Niink",
+    "Neckklace",
+    "6ee",
+    "Tchelo",
+    "Danzo",
+    "G.A",
+    "Yago Oproprio",
+    "2ZDinizz",
+    "Febre90s",
+    "Nill",
+    "Makalister",
+    "Rodrigo Ogi",
+    "Coruja BC1",
+    "Tássia Reis",
+    "Clara Lima",
+    "Cristal",
+    "Souto MC",
+    "Kaê Guajajara",
+    "N.I.N.A",
+    "Slipmami",
+    "MC Luanna",
+    "Azzy",
+    "Lourena",
+    "Budah",
+    "Drik Barbosa",
+    "Stefanie",
+    "MC Soffia",
+    "Flora Matos",
+    "Negra Li",
+    "Karol Conká",
+    "Cynthia Luz"
+  ],
+  "hybrid_artists": [
+    "MC Hariel",
+    "MC Ryan SP",
+    "MC IG",
+    "MC PH",
+    "MC GP",
+    "MC Tuto",
+    "MC Cebezinho",
+    "MC Marks",
+    "MC Don Juan",
+    "MC Pedrinho",
+    "MC Kevin",
+    "MC Kevin o Chris",
+    "MC Daniel",
+    "MC Maneirinho",
+    "MC Dricka",
+    "Salvador da Rima",
+    "MC Kako"
+  ],
+  "women": [
+    "Negra Li",
+    "Flora Matos",
+    "Karol Conká",
+    "Tássia Reis",
+    "Drik Barbosa",
+    "Cynthia Luz",
+    "Clara Lima",
+    "Lourena",
+    "Azzy",
+    "Budah",
+    "Tasha & Tracie",
+    "Duquesa",
+    "Ebony",
+    "Ajuliacosta",
+    "Slipmami",
+    "MC Luanna",
+    "N.I.N.A",
+    "Stefanie",
+    "Cristal",
+    "Kaê Guajajara",
+    "Souto MC",
+    "MC Soffia"
+  ],
+  "producers": [
+    "Papatinho",
+    "WC no Beat",
+    "Nagalli",
+    "Pedro Lotto",
+    "Celo1st",
+    "Dallass",
+    "Neo Beats",
+    "Ajaxx",
+    "Portugal no Beat",
+    "Ecologyk",
+    "Lucas Spike",
+    "Caio Passos",
+    "Fepache",
+    "Go Dassisti",
+    "Wey",
+    "Nave",
+    "DJ Caique",
+    "DJ KL Jay",
+    "Marquinhos de Oswaldo Cruz",
+    "Lotto",
+    "Wall Hein",
+    "Maffalda",
+    "CESRV"
+  ],
+  "organizations": [
+    "30PRAUM",
+    "Mainstreet",
+    "Supernova",
+    "Recayd Mob",
+    "Pineapple StormTV",
+    "Medellin Records",
+    "Pirâmide Perdida",
+    "Blakkstar"
+  ],
+  "tracks": {
+    "era_1_primeiros_pilares": {
+      "label": "Os primeiros pilares",
+      "items": [
+        {
+          "title": "Bro",
+          "artists": ["Raffa Moreira"]
+        },
+        {
+          "title": "10K",
+          "artists": ["Raffa Moreira"]
+        },
+        {
+          "title": "Anos Luz",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "A Morte do Autotune",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Plaqtudum",
+          "artists": ["Recayd Mob"]
+        },
+        {
+          "title": "Mlks de SP",
+          "artists": ["Recayd Mob"]
+        },
+        {
+          "title": "Mi’adama",
+          "artists": ["Sidoka"]
+        },
+        {
+          "title": "Leans, Pt. 2",
+          "artists": ["Yunk Vino"]
+        },
+        {
+          "title": "NAV",
+          "artists": ["Jovem Dex"]
+        },
+        {
+          "title": "Kenny G",
+          "artists": ["Matuê"]
+        }
+      ]
+    },
+    "era_2_genero_dominante": {
+      "label": "A transformação em gênero dominante",
+      "items": [
+        {
+          "title": "Máquina do Tempo",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Balão",
+          "artists": ["Orochi"]
+        },
+        {
+          "title": "Amor de Fim de Noite",
+          "artists": ["Orochi"]
+        },
+        {
+          "title": "M4",
+          "artists": ["Teto", "Matuê"],
+          "credit": "Teto feat. Matuê"
+        },
+        {
+          "title": "PayPal",
+          "artists": ["Teto"]
+        },
+        {
+          "title": "Quer Voar",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Rei Lacoste",
+          "artists": ["MD Chefe", "DomLaike"],
+          "credit": "MD Chefe feat. DomLaike"
+        },
+        {
+          "title": "Malvadão 3",
+          "artists": ["Xamã"]
+        },
+        {
+          "title": "Jaguar",
+          "artists": ["KayBlack"]
+        },
+        {
+          "title": "212",
+          "artists": ["Chefin"]
+        },
+        {
+          "title": "Minha Cura",
+          "artists": ["MC Cabelinho"]
+        },
+        {
+          "title": "Corte Americano",
+          "artists": ["Filipe Ret"]
+        }
+      ]
+    },
+    "era_3_auge_comercial_2022_2024": {
+      "label": "O auge comercial de 2022–2024",
+      "items": [
+        {
+          "title": "Vampiro",
+          "artists": ["Matuê", "Teto", "WIU"]
+        },
+        {
+          "title": "Fim de Semana no Rio",
+          "artists": ["Teto"]
+        },
+        {
+          "title": "Novo Balanço",
+          "artists": ["Veigh"]
+        },
+        {
+          "title": "Engana Dizendo Que Ama",
+          "artists": ["Veigh"]
+        },
+        {
+          "title": "Vida Chique",
+          "artists": ["Veigh"]
+        },
+        {
+          "title": "Coração de Gelo",
+          "artists": ["WIU"]
+        },
+        {
+          "title": "Melhor Só",
+          "artists": ["KayBlack"]
+        },
+        {
+          "title": "Licor 43",
+          "artists": ["KayBlack"]
+        },
+        {
+          "title": "Sereia",
+          "artists": ["Orochi"]
+        },
+        {
+          "title": "Mitsubishi",
+          "artists": ["Orochi"]
+        },
+        {
+          "title": "Desenrola, Bate, Joga de Ladin",
+          "artists": ["L7NNON"]
+        },
+        {
+          "title": "Good Vibe",
+          "artists": ["Filipe Ret"]
+        },
+        {
+          "title": "War",
+          "artists": ["Filipe Ret"]
+        },
+        {
+          "title": "Deus Perdoa",
+          "artists": ["Filipe Ret"]
+        },
+        {
+          "title": "Conexões de Máfia",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Flow Espacial",
+          "artists": ["Teto"]
+        },
+        {
+          "title": "Carta Aberta",
+          "artists": ["MC Cabelinho"]
+        },
+        {
+          "title": "Loucura",
+          "artists": ["Borges", "Veigh"],
+          "credit": "Borges feat. Veigh"
+        },
+        {
+          "title": "Poesia Acústica 15",
+          "artists": ["Oruam", "MC Ryan SP"],
+          "credit_note": "e colaboradores"
+        }
+      ]
+    },
+    "era_4_albuns_gigantes": {
+      "label": "A era dos álbuns gigantes",
+      "items": [
+        {
+          "title": "Crack com Mussilon",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Imagina Esse Cenário",
+          "artists": ["Matuê", "Teto", "Veigh"]
+        },
+        {
+          "title": "333",
+          "artists": ["Matuê"]
+        },
+        {
+          "title": "Talvez Você Precise de Mim",
+          "artists": ["Veigh"]
+        },
+        {
+          "title": "Artista Genérico",
+          "artists": ["Veigh"]
+        },
+        {
+          "title": "Músicas de Amor Nunca Mais",
+          "artists": ["BK’"]
+        },
+        {
+          "title": "Cacos de Vidro",
+          "artists": ["BK’"]
+        },
+        {
+          "title": "Fuso",
+          "artists": ["Duquesa"]
+        },
+        {
+          "title": "Dharma",
+          "artists": ["Ajuliacosta"]
+        },
+        {
+          "title": "Amina",
+          "artists": ["Tasha & Tracie"]
+        },
+        {
+          "title": "Lido com Crises",
+          "artists": ["Ryu, The Runner", "Vulgo FK"]
+        }
+      ]
+    }
+  },
+  "essential_projects": [
+    {
+      "creator": "Racionais MC’s",
+      "title": "Sobrevivendo no Inferno"
+    },
+    {
+      "creator": "Racionais MC’s",
+      "title": "Nada Como um Dia Após o Outro Dia"
+    },
+    {
+      "creator": "Sabotage",
+      "title": "Rap é Compromisso!"
+    },
+    {
+      "creator": "Black Alien",
+      "title": "Babylon by Gus Vol. 1"
+    },
+    {
+      "creator": "Criolo",
+      "title": "Nó na Orelha"
+    },
+    {
+      "creator": "Emicida",
+      "title": "AmarElo"
+    },
+    {
+      "creator": "Djonga",
+      "title": "Heresia"
+    },
+    {
+      "creator": "Djonga",
+      "title": "O Menino que Queria Ser Deus"
+    },
+    {
+      "creator": "BK’",
+      "title": "Castelos & Ruínas"
+    },
+    {
+      "creator": "BK’",
+      "title": "Icarus"
+    },
+    {
+      "creator": "BK’",
+      "title": "Diamantes, Lágrimas e Rostos para Esquecer"
+    },
+    {
+      "creator": "Baco Exu do Blues",
+      "title": "Bluesman"
+    },
+    {
+      "creator": "Filipe Ret",
+      "title": "Vivaz"
+    },
+    {
+      "creator": "Filipe Ret",
+      "title": "Revel"
+    },
+    {
+      "creator": "Filipe Ret",
+      "title": "Imaterial"
+    },
+    {
+      "creator": "Matuê",
+      "title": "Máquina do Tempo"
+    },
+    {
+      "creator": "Matuê",
+      "title": "333"
+    },
+    {
+      "creator": "Orochi",
+      "title": "Celebridade"
+    },
+    {
+      "creator": "Orochi",
+      "title": "Vida Cara"
+    },
+    {
+      "creator": "Veigh",
+      "title": "Dos Prédios Deluxe"
+    },
+    {
+      "creator": "Veigh",
+      "title": "Eu Venci o Mundo"
+    },
+    {
+      "creator": "Teto",
+      "title": "MAIOR QUE O TEMPO"
+    },
+    {
+      "creator": "Yunk Vino",
+      "title": "237"
+    },
+    {
+      "creator": "Recayd Mob",
+      "title": "Calzone Tapes"
+    },
+    {
+      "creator": "MD Chefe",
+      "title": "ATG Tape"
+    },
+    {
+      "creator": "Tasha & Tracie",
+      "title": "Diretoria"
+    },
+    {
+      "creator": "Duquesa",
+      "title": "Taurus"
+    },
+    {
+      "creator": "Ajuliacosta",
+      "title": "Novo Testamento"
+    },
+    {
+      "creator": "Ryu, The Runner",
+      "title": "Essa é a Vida de um Corredor"
+    },
+    {
+      "creator": "Pineapple StormTV",
+      "title": "série Poesia Acústica"
+    }
+  ],
+  "future_bets": [
+    "Veigh",
+    "KayBlack",
+    "WIU",
+    "Duquesa",
+    "Ryu The Runner",
+    "Alee",
+    "Brandão85"
+  ]
+}

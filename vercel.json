@@ -1,6 +1,42 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["gru1"],
+  "services": {
+    "web": {
+      "root": ".",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "playlists_agent",
+          "format": "url",
+          "env": "PLAYLISTS_AI_PYTHON_URL"
+        }
+      ],
+      "functions": {
+        "src/app/api/**": {
+          "maxDuration": "max",
+          "regions": ["gru1"]
+        }
+      }
+    },
+    "playlists_agent": {
+      "root": "services/playlists_ai_agent",
+      "framework": "fastapi",
+      "entrypoint": "app:app",
+      "functions": {
+        "app.py": {
+          "maxDuration": "max",
+          "regions": ["gru1"]
+        }
+      }
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": { "service": "web" }
+    }
+  ],
   "crons": [
     {
       "path": "/api/jobs/spotify-charts/ingest",
