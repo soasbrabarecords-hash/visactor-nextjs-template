@@ -13,6 +13,8 @@ export type PlaylistsAiIntent =
 export type PlaylistsAiResponseMode =
   "question" | "analysis" | "recommendation";
 
+export type PlaylistsAiFeedbackAction = "save" | "ignore" | "pin" | "add";
+
 export type PlaylistsAiCurationGoal =
   "growth" | "editorial" | "discovery" | "hits" | "retention" | "balanced";
 
@@ -73,6 +75,15 @@ export type PlaylistsAiTrackCard = {
     label: "alto" | "medio" | "baixo" | "indeterminado";
     reason: string;
   } | null;
+  ranking?: {
+    requestId: string;
+    modelVersion: string;
+    rank: number;
+    baseScore: number | null;
+    learnedScore: number | null;
+    reasonCodes: string[];
+    propensity: number | null;
+  } | null;
   historicalMetrics?: {
     windowDays: number;
     chartDays: number;
@@ -114,6 +125,23 @@ export type PlaylistsAiDataSource = {
   status: "used" | "partial" | "unavailable";
 };
 
+export type PlaylistsAiRankingMetadata = {
+  provider: "python" | "baseline";
+  status:
+    | "ranked"
+    | "not_configured"
+    | "missing_context"
+    | "empty_response"
+    | "timeout"
+    | "network_error"
+    | "upstream_error"
+    | "invalid_response";
+  requestId: string | null;
+  modelVersion: string | null;
+  personalized: boolean;
+  coldStart: boolean;
+};
+
 export type PlaylistsAiChatResponse = {
   text: string;
   cards: PlaylistsAiTrackCard[];
@@ -131,6 +159,7 @@ export type PlaylistsAiChatResponse = {
     toolCalls?: string[];
     requestedCount?: number;
     returnedCount?: number;
+    ranking?: PlaylistsAiRankingMetadata;
   };
 };
 

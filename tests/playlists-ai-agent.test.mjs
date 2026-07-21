@@ -167,6 +167,42 @@ test("keeps trap and rap together instead of collapsing the request", () => {
   assert.deepEqual(intent.genres, ["trap", "rap"]);
 });
 
+test("classifies emerging low-saturation tracks as discovery", () => {
+  const intent = classifyPlaylistAiIntent(
+    "Quero descobrir 12 músicas novas e emergentes de trap, pouco saturadas no BR.",
+  );
+
+  assert.equal(intent.name, "chart_opportunities");
+  assert.equal(intent.mode, "discovery");
+  assert.equal(intent.limit, 12);
+  assert.equal(intent.excludeWorkspaceTracks, true);
+  assert.deepEqual(intent.genres, ["trap"]);
+});
+
+test("passes discovery safeguards to the chart tool", async () => {
+  const tools = buildTools();
+  let receivedOptions = null;
+  tools.getChartOpportunities = async (options) => {
+    receivedOptions = options;
+    return {
+      cards: [card(1, "BR")],
+      latestChartDate: "2026-07-20",
+      maxWindow: 365,
+      status: "ready",
+    };
+  };
+
+  const result = await runPlaylistsAiAgent(
+    { message: "Descubra 8 faixas novas de funk pouco saturadas." },
+    { tools, polish: false },
+  );
+
+  assert.equal(receivedOptions.mode, "discovery");
+  assert.equal(receivedOptions.genre, "funk");
+  assert.equal(receivedOptions.excludeTrackIds.has("track-0"), true);
+  assert.match(result.text, /nova no chart/i);
+});
+
 test("does not mistake a historical window for the requested track count", () => {
   const intent = classifyPlaylistAiIntent(
     "Quais faixas de trap mais tocaram nos últimos 30 dias?",
@@ -424,6 +460,66 @@ test("still rejects a concrete music request when the agent skips tools", async 
   assert.equal(result.confidence, 0);
 });
 
+test("keeps the verified explanation when discovery returns no tracks", async () => {
+  const tools = buildTools();
+  tools.getChartOpportunities = async () => ({
+    cards: [],
+    latestChartDate: "2026-07-20",
+    maxWindow: 365,
+    status: "ready",
+  });
+  let calls = 0;
+  const result = await runPlaylistsAiAgent(
+    { message: "Descubra faixas novas de trap pouco saturadas no Brasil." },
+    {
+      tools,
+      agentRequest: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            output: [
+              {
+                type: "function_call",
+                name: "get_chart_opportunities",
+                call_id: "empty-discovery",
+                arguments: JSON.stringify({
+                  purpose: "opportunities",
+                  market: "BR",
+                  genres: ["trap"],
+                  mode: "discovery",
+                  windowDays: null,
+                  limit: 10,
+                  targetSize: 50,
+                  playlistReference: null,
+                  excludeWorkspaceTracks: true,
+                  excludePreviouslyShown: false,
+                }),
+              },
+            ],
+          };
+        }
+        return {
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: "O trap está consolidado; misture gênero desconhecido.",
+                },
+              ],
+            },
+          ],
+        };
+      },
+    },
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.match(result.text, /Não encontrei descobertas de Trap/i);
+  assert.doesNotMatch(result.text, /consolidado|gênero desconhecido/i);
+});
+
 test("treats a natural genre correction as a data request", async () => {
   const tools = buildTools();
   let receivedOptions = null;
@@ -549,6 +645,47 @@ test("returns ten playlist-fit recommendations for FUNK 2026", async () => {
   assert.match(result.text, /FUNK 2026/);
   assert.equal(result.actions[0].type, "add_to_playlist");
   assert.equal(result.actions[0].disabled, true);
+});
+
+test("propagates adaptive ranking metadata without enabling prepared actions", async () => {
+  const tools = buildTools();
+  const baselineRecommend = tools.recommendTracksForPlaylist;
+  tools.recommendTracksForPlaylist = async (...args) => {
+    const baseline = await baselineRecommend(...args);
+    return {
+      ...baseline,
+      cards: baseline.cards.map((item, index) => ({
+        ...item,
+        ranking: {
+          requestId: "request-1",
+          modelVersion: "ltr-1",
+          rank: index + 1,
+          baseScore: item.opportunityScore,
+          learnedScore: item.opportunityScore,
+          reasonCodes: ["chart_strength"],
+          propensity: 0.5,
+        },
+      })),
+      ranking: {
+        provider: "python",
+        status: "ranked",
+        requestId: "request-1",
+        modelVersion: "ltr-1",
+        personalized: true,
+        coldStart: false,
+      },
+    };
+  };
+
+  const result = await runPlaylistsAiAgent(
+    { message: "Me sugere 10 músicas para FUNK 2026." },
+    { tools, polish: false },
+  );
+
+  assert.equal(result.meta.ranking.provider, "python");
+  assert.equal(result.cards[0].ranking.requestId, "request-1");
+  assert.equal(result.actions[0].disabled, true);
+  assert.equal(result.meta.readOnly, true);
 });
 
 test("builds a read-only playlist idea from weekly risers", async () => {

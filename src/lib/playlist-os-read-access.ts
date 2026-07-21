@@ -1,7 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import type { ModuleRole, WorkspaceRole } from "@/lib/workspace-access";
 import { getCurrentWorkspaceSelection } from "@/lib/workspaces";
+
+export type PlaylistOsAccessRole = WorkspaceRole | ModuleRole;
 
 export type PlaylistOsReadAccess =
   | {
@@ -9,6 +12,7 @@ export type PlaylistOsReadAccess =
       status: 200;
       workspaceId: string;
       userId: string;
+      role: PlaylistOsAccessRole;
     }
   | {
       allowed: false;
@@ -90,5 +94,6 @@ export async function getPlaylistOsReadAccess(): Promise<PlaylistOsReadAccess> {
     status: 200,
     workspaceId: selection.workspace.id,
     userId,
+    role: roleResult.data.role as PlaylistOsAccessRole,
   };
 }

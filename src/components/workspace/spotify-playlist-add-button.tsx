@@ -50,6 +50,7 @@ export default function SpotifyPlaylistAddButton({
   ariaLabel,
   compact = false,
   className,
+  onAddSuccess,
 }: {
   spotifyTrackId: string | null;
   suggestedPlaylistName?: string | null;
@@ -59,6 +60,11 @@ export default function SpotifyPlaylistAddButton({
   ariaLabel?: string;
   compact?: boolean;
   className?: string;
+  onAddSuccess?: (result: {
+    playlistId: string;
+    spotifyTrackId: string;
+    alreadyExists: boolean;
+  }) => void;
 }) {
   const cacheKey = useSpotifyAccountPlaylistsCacheKey();
   const activeCacheKeyRef = useRef(cacheKey);
@@ -275,6 +281,11 @@ export default function SpotifyPlaylistAddButton({
           alreadyExists: data.alreadyExists ?? false,
         },
       }));
+      onAddSuccess?.({
+        playlistId,
+        spotifyTrackId,
+        alreadyExists: data.alreadyExists ?? false,
+      });
       invalidateSpotifyAccountPlaylistsClientCache(cacheKey);
       setTimeout(() => setOpen(false), 1200);
     } catch {
